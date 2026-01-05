@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import AntigravityDotsBackground from "@/components/background/AntigravityDotsBackground";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import { useMinDelay } from "@/hooks/useMinDelay";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
@@ -17,21 +18,17 @@ import ThemeToggle from "@/components/theme/ThemeToggle";
 
 function BackgroundBlobs() {
   return (
-    <div className="pointer-events-none absolute inset-0">
-      {/* Light mode blobs */}
+    <div className="pointer-events-none absolute inset-0 z-0">
       <div className="absolute -top-56 -left-56 h-[900px] w-[900px] rounded-full bg-sky-200/60 blur-[140px] float-slow-1 dark:hidden" />
       <div className="absolute top-1/3 left-1/2 h-[900px] w-[900px] -translate-x-1/2 rounded-full bg-violet-200/50 blur-[160px] float-slow-2 dark:hidden" />
       <div className="absolute -bottom-56 -right-56 h-[900px] w-[900px] rounded-full bg-white/70 blur-[160px] float-slow-3 dark:hidden" />
 
-      {/* Dark mode blobs */}
       <div className="hidden dark:block absolute -top-56 -left-56 h-[900px] w-[900px] rounded-full bg-sky-500/10 blur-[160px] float-slow-1" />
       <div className="hidden dark:block absolute top-1/3 left-1/2 h-[900px] w-[900px] -translate-x-1/2 rounded-full bg-violet-500/10 blur-[180px] float-slow-2" />
       <div className="hidden dark:block absolute -bottom-56 -right-56 h-[900px] w-[900px] rounded-full bg-white/5 blur-[180px] float-slow-3" />
 
-      {/* Diagonal shine */}
       <div className="absolute -top-32 left-[-25%] h-[520px] w-[150%] rotate-[-10deg] bg-gradient-to-r from-transparent via-white/40 to-transparent blur-2xl dark:via-white/10" />
 
-      {/* Optional noise */}
       <div
         className="absolute inset-0 opacity-[0.05] dark:opacity-[0.06]"
         style={{
@@ -45,9 +42,7 @@ function BackgroundBlobs() {
 
 export default function LoginPage() {
   const router = useNavRouter();
-
-  // ✅ Hook must be inside component
-  const ready = useMinDelay(3000);
+  const ready = useMinDelay(5000);
 
   const [role, setRole] = React.useState<Role | "">("");
   const [email, setEmail] = React.useState("");
@@ -66,20 +61,31 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      console.log({ role, email, password });
       router.push("/dashboard");
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  // ✅ Always show loader first (minimum delay)
   if (!ready) {
     return (
       <main className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <BackgroundBlobs />
-        <div className="relative z-10 px-4">
-          <PredictiXLoader label="Preparing sign in…" />
+
+        {/* ✅ Sparse antigravity dots (NOT full) */}
+        <AntigravityDotsBackground
+          className="pointer-events-none absolute inset-0 z-[1]"
+          dotSpacing={22}
+          dotRadius={0.9}
+          dotAlpha={0.20}
+          baseVisibility={0.055}
+          intensity={1.2}
+          influenceRadius={300}
+          blueBoost={0.24}
+        />
+
+        <div className="relative z-20 px-4">
+          <PredictiXLoader label="Preparing log in…" />
         </div>
       </main>
     );
@@ -87,18 +93,25 @@ export default function LoginPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
-      {/* Top-right theme toggle */}
-      <div className="absolute right-4 top-4 z-20">
+      <BackgroundBlobs />
+
+      <AntigravityDotsBackground
+        className="pointer-events-none absolute inset-0 z-[1]"
+        dotSpacing={22}
+        dotRadius={0.9}
+        dotAlpha={0.5}
+        baseVisibility={0.055}
+        intensity={1.25}
+        influenceRadius={320}
+        blueBoost={0.35}
+      />
+
+      <div className="absolute right-4 top-4 z-30">
         <ThemeToggle />
       </div>
 
-      {/* Background */}
-      <BackgroundBlobs />
-
-      {/* Content */}
-      <div className="relative mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-4 py-12">
+      <div className="relative z-20 mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-4 py-12">
         <div className="grid w-full grid-cols-1 items-center gap-12 lg:grid-cols-2">
-          {/* Left Brand Panel */}
           <section className="hidden lg:flex flex-col justify-center">
             <PredictiXLogo size={72} />
 
@@ -113,20 +126,17 @@ export default function LoginPage() {
             </p>
           </section>
 
-          {/* Right Login Card */}
           <section className="flex items-center justify-center">
-            <Card className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <Card className="w-full max-w-md rounded-3xl border border-slate-200 bg-white/90 shadow-sm backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/75">
               <CardHeader className="space-y-3">
-                {/* Mobile logo */}
                 <div className="lg:hidden">
                   <PredictiXLogo size={48} />
                 </div>
 
                 <div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+                  <h2 className="text-2xl font-medium tracking-[-0.015em] text-slate-900 dark:text-slate-50">
                     Log in
                   </h2>
-
                   <p className="text-sm text-slate-600 dark:text-slate-300">
                     Select your role and enter your credentials.
                   </p>
@@ -134,12 +144,7 @@ export default function LoginPage() {
               </CardHeader>
 
               <CardContent>
-                <form
-                  onSubmit={onSubmit}
-                  className="space-y-6"
-                  aria-busy={isSubmitting}
-                >
-                  {/* Role */}
+                <form onSubmit={onSubmit} className="space-y-6" aria-busy={isSubmitting}>
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-slate-900 dark:text-slate-100">
                       Role
@@ -147,12 +152,8 @@ export default function LoginPage() {
                     <RoleSelectCards value={role} onChange={setRole} />
                   </div>
 
-                  {/* Email */}
                   <div className="space-y-2">
-                    <Label
-                      htmlFor="email"
-                      className="text-sm font-medium text-slate-900 dark:text-slate-100"
-                    >
+                    <Label htmlFor="email" className="text-sm font-medium text-slate-900 dark:text-slate-100">
                       Email
                     </Label>
                     <Input
@@ -167,12 +168,8 @@ export default function LoginPage() {
                     />
                   </div>
 
-                  {/* Password */}
                   <div className="space-y-2">
-                    <Label
-                      htmlFor="password"
-                      className="text-sm font-medium text-slate-900 dark:text-slate-100"
-                    >
+                    <Label htmlFor="password" className="text-sm font-medium text-slate-900 dark:text-slate-100">
                       Password
                     </Label>
                     <Input
@@ -187,11 +184,7 @@ export default function LoginPage() {
                     />
                   </div>
 
-                  <Button
-                    type="submit"
-                    className="h-11 w-full rounded-xl"
-                    disabled={!canSubmit}
-                  >
+                  <Button type="submit" className="h-11 w-full rounded-xl" disabled={!canSubmit}>
                     {isSubmitting ? "Logging in..." : "Log in"}
                   </Button>
 

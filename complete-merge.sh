@@ -37,14 +37,21 @@ git fetch origin
 # Show what we're about to merge
 echo ""
 echo "Master branch has the following commits that will be merged:"
-git log --oneline copilot/pull-and-merge-changes..origin/master 2>/dev/null || {
-    echo "Note: Comparing with local master if origin/master is not available"
-    git log --oneline copilot/pull-and-merge-changes..master 2>/dev/null || echo "Could not compare branches"
-}
+if git log --oneline copilot/pull-and-merge-changes..origin/master 2>/dev/null; then
+    MERGE_BRANCH="origin/master"
+elif git log --oneline copilot/pull-and-merge-changes..master 2>/dev/null; then
+    MERGE_BRANCH="master"
+    echo "Note: Using local master branch (origin/master not available)"
+else
+    echo "Warning: Could not find master or origin/master branch."
+    echo "Please ensure you have run 'git fetch origin' and that the master branch exists."
+    echo "You can check available branches with: git branch -a"
+    exit 1
+fi
 echo ""
 
 # Confirm merge
-read -p "Do you want to merge master into copilot/pull-and-merge-changes? (y/n) " -n 1 -r
+read -p "Do you want to merge ${MERGE_BRANCH} into copilot/pull-and-merge-changes? (y/n) " -r
 echo ""
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Merge cancelled"
@@ -52,8 +59,8 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # Perform the merge
-echo "Merging origin/master into copilot/pull-and-merge-changes..."
-git merge origin/master -m "Merge master branch into copilot/pull-and-merge-changes" || {
+echo "Merging ${MERGE_BRANCH} into copilot/pull-and-merge-changes..."
+git merge ${MERGE_BRANCH} -m "Merge master branch into copilot/pull-and-merge-changes" || {
     echo ""
     echo "========================================"
     echo "Merge conflict detected!"

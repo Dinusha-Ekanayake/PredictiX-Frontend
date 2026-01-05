@@ -32,7 +32,7 @@ export default function PredictiXLoader({
 
   return (
     <div className={cn("flex flex-col items-center justify-center", className)}>
-      <div className="relative h-[340px] w-[340px]">
+      <div className="relative h-85 w-85">
         {/* ORBIT RING */}
         <div
           className="absolute inset-0"
@@ -73,8 +73,8 @@ export default function PredictiXLoader({
             />
 
             {/* logo plate */}
-            <div className="relative flex h-[128px] w-[128px] items-center justify-center rounded-[28px] border bg-white shadow-md ring-1 ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:ring-slate-800">
-              <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-gradient-to-br from-white/60 via-transparent to-transparent dark:from-white/10" />
+            <div className="relative flex h-32 w-32s-center justify-center rounded-[28px] border bg-white shadow-md ring-1 ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:ring-slate-800">
+              <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-linear-to-br from-white/60 via-transparent to-transparent dark:from-white/10" />
               <Image
                 src="/logo/predictix-icon.svg"
                 alt="PredictiX"
@@ -96,7 +96,7 @@ export default function PredictiXLoader({
           {label}
         </p>
 
-        <div className="pointer-events-none absolute left-1/2 top-full mt-2 h-[2px] w-52 -translate-x-1/2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800/70">
+        <div className="pointer-events-none absolute left-1/2 top-full mt-2 h-0.5 w-52 -translate-x-1/2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800/70">
           <div
             className="h-full w-1/3 rounded-full bg-slate-400/40 dark:bg-slate-500/30"
             style={{ animation: "title-shimmer 1.6s ease-in-out infinite" }}
@@ -166,7 +166,7 @@ function Orbiter({
               "radial-gradient(circle at 30% 25%, var(--bubble-hi), var(--bubble-mid) 45%, var(--bubble-lo))",
           }}
         >
-          <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br from-white/70 via-transparent to-transparent opacity-60 dark:from-white/10" />
+          <div className="pointer-events-none absolute inset-0 rounded-full bg-linear-to-br from-white/70 via-transparent to-transparent opacity-60 dark:from-white/10" />
           <div className="relative">{children}</div>
         </div>
       </div>

@@ -27,19 +27,15 @@ export default function PredictiXLoader({
   className,
 }: Props) {
   const radius = 148;
-  const count = ICONS.length;
-  const step = 360 / count;
+  const step = 360 / ICONS.length;
 
   return (
     <div className={cn("flex flex-col items-center justify-center", className)}>
-      <div className="relative h-85 w-85">
+      <div className="relative h-[340px] w-[340px]">
         {/* ORBIT RING */}
         <div
           className="absolute inset-0"
-          style={{
-            animation: "orbit-ring 12s linear infinite",
-            zIndex: 0,
-          }}
+          style={{ animation: "orbit-ring 12s linear infinite", zIndex: 0 }}
         >
           {ICONS.map(({ Icon, color }, i) => (
             <Orbiter
@@ -55,7 +51,7 @@ export default function PredictiXLoader({
         </div>
 
         {/* CENTER LOGO */}
-        <div className="absolute inset-0 flex items-center justify-center z-10">
+        <div className="absolute inset-0 z-10 flex items-center justify-center">
           <div
             className="relative"
             style={{ animation: "logo-float 2.6s ease-in-out infinite" }}
@@ -66,15 +62,16 @@ export default function PredictiXLoader({
               style={{
                 filter: "blur(18px)",
                 opacity: 0.28,
-                transform: "translateY(30px) scale(0.9)",
+                transform: "translateY(28px) scale(0.92)",
                 background:
                   "radial-gradient(closest-side, rgba(0,0,0,0.45), rgba(0,0,0,0))",
               }}
             />
 
-            {/* logo plate */}
-            <div className="relative flex h-32 w-32s-center justify-center rounded-[28px] border bg-white shadow-md ring-1 ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:ring-slate-800">
-              <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-linear-to-br from-white/60 via-transparent to-transparent dark:from-white/10" />
+            {/* ✅ correct square plate */}
+            <div className="relative flex h-[132px] w-[132px] items-center justify-center rounded-[28px] border bg-white shadow-md ring-1 ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:ring-slate-800">
+              <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-gradient-to-br from-white/60 via-transparent to-transparent dark:from-white/10" />
+
               <Image
                 src="/logo/predictix-icon.svg"
                 alt="PredictiX"
@@ -87,16 +84,16 @@ export default function PredictiXLoader({
         </div>
       </div>
 
-      {/* TITLE (uses label prop) */}
+      {/* TITLE */}
       <div
-        className="relative mt-2 text-center"
+        className="relative mt-3 text-center"
         style={{ animation: "title-rise 650ms ease-out both" }}
       >
         <p className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
           {label}
         </p>
 
-        <div className="pointer-events-none absolute left-1/2 top-full mt-2 h-0.5 w-52 -translate-x-1/2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800/70">
+        <div className="pointer-events-none absolute left-1/2 top-full mt-2 h-[2px] w-52 -translate-x-1/2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800/70">
           <div
             className="h-full w-1/3 rounded-full bg-slate-400/40 dark:bg-slate-500/30"
             style={{ animation: "title-shimmer 1.6s ease-in-out infinite" }}
@@ -151,11 +148,9 @@ function Orbiter({
           className={cn(
             "relative flex h-14 w-14 items-center justify-center rounded-full ring-1 shadow-md",
             "bg-white dark:bg-slate-900",
-            // light-mode bubble gradient variables
             " [--bubble-hi:rgba(255,255,255,0.98)]",
             " [--bubble-mid:rgba(255,255,255,0.72)]",
             " [--bubble-lo:rgba(248,250,252,0.95)]",
-            // dark-mode bubble gradient variables
             " dark:[--bubble-hi:rgba(255,255,255,0.14)]",
             " dark:[--bubble-mid:rgba(255,255,255,0.06)]",
             " dark:[--bubble-lo:rgba(0,0,0,0.35)]",
@@ -166,7 +161,8 @@ function Orbiter({
               "radial-gradient(circle at 30% 25%, var(--bubble-hi), var(--bubble-mid) 45%, var(--bubble-lo))",
           }}
         >
-          <div className="pointer-events-none absolute inset-0 rounded-full bg-linear-to-br from-white/70 via-transparent to-transparent opacity-60 dark:from-white/10" />
+          {/* ✅ correct gradient class */}
+          <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br from-white/70 via-transparent to-transparent opacity-60 dark:from-white/10" />
           <div className="relative">{children}</div>
         </div>
       </div>

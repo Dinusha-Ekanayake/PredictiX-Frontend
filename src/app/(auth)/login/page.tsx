@@ -42,12 +42,13 @@ function BackgroundBlobs() {
 
 export default function LoginPage() {
   const router = useNavRouter();
-  const ready = useMinDelay(5000);
+  const ready = useMinDelay(2000);
 
   const [role, setRole] = React.useState<Role | "">("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [error, setError] = React.useState("");
 
   const canSubmit =
     role !== "" &&
@@ -60,8 +61,29 @@ export default function LoginPage() {
     if (!canSubmit) return;
 
     setIsSubmitting(true);
+    setError("");
+
+    // ✅ TEMP DEFAULT ADMIN LOGIN (DEV ONLY)
+    const ADMIN_EMAIL = "admin@mail.com";
+    const ADMIN_PASSWORD = "admin";
+
     try {
-      router.push("/dashboard");
+      // small delay to feel realistic
+      await new Promise((r) => setTimeout(r, 500));
+
+      // Admin login
+      if (role === "admin") {
+        if (email.trim().toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+          router.push("/admin/dashboard");
+          return;
+        }
+        setError("Invalid admin email or password.");
+        return;
+      }
+
+      // User login (for now: allow any non-empty credentials)
+      // You can tighten this later when backend is ready
+      router.push("/admin/dashboard");
     } finally {
       setIsSubmitting(false);
     }
@@ -72,12 +94,11 @@ export default function LoginPage() {
       <main className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <BackgroundBlobs />
 
-        {/* ✅ Sparse antigravity dots (NOT full) */}
         <AntigravityDotsBackground
           className="pointer-events-none absolute inset-0 z-[1]"
           dotSpacing={22}
           dotRadius={0.9}
-          dotAlpha={0.20}
+          dotAlpha={0.2}
           baseVisibility={0.055}
           intensity={1.2}
           influenceRadius={300}
@@ -116,13 +137,11 @@ export default function LoginPage() {
             <PredictiXLogo size={72} />
 
             <h2 className="mt-10 text-4xl font-semibold leading-tight tracking-tight text-slate-900 dark:text-slate-50">
-              AI-Powered Predictive Maintenance & Smart Ticket Categorization for
-              Asset Management
+              AI-Powered Predictive Maintenance & Smart Ticket Categorization for Asset Management
             </h2>
 
             <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 dark:text-slate-300">
-              Monitor asset health, predict failures, and manage maintenance
-              tickets efficiently — all in one intelligent platform.
+              Monitor asset health, predict failures, and manage maintenance tickets efficiently — all in one intelligent platform.
             </p>
           </section>
 
@@ -159,7 +178,7 @@ export default function LoginPage() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="name@company.com"
+                      placeholder="admin@mail.com"
                       className="h-11"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -175,7 +194,7 @@ export default function LoginPage() {
                     <Input
                       id="password"
                       type="password"
-                      placeholder="Enter your password"
+                      placeholder="admin"
                       className="h-11"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -184,9 +203,19 @@ export default function LoginPage() {
                     />
                   </div>
 
+                  {error && (
+                    <p className="text-sm font-medium text-red-500">{error}</p>
+                  )}
+
                   <Button type="submit" className="h-11 w-full rounded-xl" disabled={!canSubmit}>
                     {isSubmitting ? "Logging in..." : "Log in"}
                   </Button>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                    <div className="font-medium text-slate-800 dark:text-slate-200">Default Admin</div>
+                    <div>Email: admin@mail.com</div>
+                    <div>Password: admin</div>
+                  </div>
 
                   <p className="text-center text-xs text-slate-500 dark:text-slate-400">
                     © {new Date().getFullYear()} PredictiX

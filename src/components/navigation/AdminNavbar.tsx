@@ -981,14 +981,14 @@ export default function AdminNavbar({
           >
             {/* top glow when floating */}
             {scrolled && (
-              <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-b from-white/35 via-transparent to-transparent opacity-70 dark:from-white/10" />
+              <div className="pointer-events-none absolute inset-0 rounded-3xl bg-linear-to-brom-white/35 via-transparent to-transparent opacity-70 dark:from-white/10" />
             )}
 
             {/* soft border glow in dark mode (floating) */}
             {scrolled && (
               <div className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 dark:opacity-100">
-                <div className="absolute inset-[-2px] rounded-[26px] bg-[radial-gradient(60%_60%_at_50%_0%,rgba(99,102,241,0.25),transparent_70%)]" />
-                <div className="absolute inset-[-2px] rounded-[26px] bg-[radial-gradient(50%_50%_at_0%_50%,rgba(56,189,248,0.18),transparent_65%)]" />
+                <div className="absolute -inset-0.5ounded-[26px] bg-[radial-gradient(60%_60%_at_50%_0%,rgba(99,102,241,0.25),transparent_70%)]" />
+                <div className="absolute -inset-0.5 rounded-[26px] bg-[radial-gradient(50%_50%_at_0%_50%,rgba(56,189,248,0.18),transparent_65%)]" />
               </div>
             )}
 
@@ -1061,8 +1061,8 @@ export default function AdminNavbar({
                     >
                       <Icon
                         className={cn(
-                          "transition-transform duration-200 group-hover:-translate-y-[1px]",
-                          scrolled ? "h-[18px] w-[18px]" : "h-4 w-4"
+                          "transition-transform duration-200 group-hover:-translate-y-px",
+                          scrolled ? "h-4.5 w-4.5" : "h-4 w-4"
                         )}
                       />
                       {item.label}
@@ -1090,7 +1090,7 @@ export default function AdminNavbar({
                   <div
                     className={cn(
                       "grid place-items-center rounded-full font-semibold text-white",
-                      "bg-gradient-to-br from-violet-600 to-indigo-600",
+                      "bg-linear-to-br from-violet-600 to-indigo-600",
                       "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
                       "ring-1 ring-white/40 dark:ring-white/10",
                       "h-10 w-10 text-sm transition-transform duration-200 hover:scale-105"
@@ -1105,7 +1105,7 @@ export default function AdminNavbar({
                 <div
                   className={cn(
                     "sm:hidden grid place-items-center rounded-full font-semibold text-white",
-                    "bg-gradient-to-br from-violet-600 to-indigo-600",
+                    "bg-linear-to-brrom-violet-600 to-indigo-600",
                     "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
                     "ring-1 ring-white/40 dark:ring-white/10",
                     "h-10 w-10 text-sm"
@@ -1124,7 +1124,7 @@ export default function AdminNavbar({
                       </Button>
                     </SheetTrigger>
 
-                    <SheetContent side="right" className="w-[320px] sm:w-[360px]">
+                    <SheetContent side="right" className="w-[320px] sm:w-90">
                       <SheetHeader>
                         <SheetTitle className="flex items-center gap-3">
                           <PredictiXLogo size={32} showText={false} />
@@ -1142,7 +1142,7 @@ export default function AdminNavbar({
                           <div
                             className={cn(
                               "grid place-items-center rounded-full font-semibold text-white",
-                              "bg-gradient-to-br from-violet-600 to-indigo-600",
+                              "bg-linear-to-br from-violet-600 to-indigo-600",
                               "ring-1 ring-white/40 dark:ring-white/10",
                               "h-10 w-10 text-sm"
                             )}

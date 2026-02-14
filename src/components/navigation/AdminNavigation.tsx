@@ -5,11 +5,10 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutGrid,
+  Ticket,
   Box,
-  FileText,
-  BrainCircuit,
+  Warehouse,
   Users,
-  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,12 +25,11 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Overview", href: "/admin/dashboard", icon: LayoutGrid },
-  { label: "All Assets", href: "/admin/assets", icon: Box },
-  { label: "All Tickets", href: "/admin/tickets", icon: FileText },
-  { label: "Predictive Insights", href: "/admin/predictive-insights", icon: BrainCircuit },
+  { label: "Dashboard", href: "/admin/dashboard", icon: LayoutGrid },
+  { label: "Tickets", href: "/admin/tickets", icon: Ticket },
+  { label: "Assets Insights", href: "/admin/assets-insights", icon: Box },
+  { label: "Warehouse Insights", href: "/admin/warehouse-insights", icon: Warehouse },
   { label: "Users", href: "/admin/users", icon: Users },
-  { label: "Insights", href: "/admin/insights", icon: BarChart3 },
 ];
 
 export default function AdminNavigation() {

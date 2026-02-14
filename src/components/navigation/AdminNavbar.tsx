@@ -373,20 +373,29 @@ export default function AdminNavbar() {
             <Link href="/admin/dashboard" className="relative flex items-center gap-3">
               <PredictiXLogo
                 size={scrolled ? 30 : 40}
-                showText={!scrolled}
-                className={cn("transition-all", scrolled && "gap-2")}
+                showText={false}   // 🔥 Disable internal text
               />
-              {scrolled && (
-                <span className={cn(
+
+              <div className="leading-tight">
+                <div
+                  className={cn(
+                    "transition-all duration-300",
                     scrolled
-                    ? "text-[20px] font-medium tracking-wide"
-                    : "text-[25px] font-semibold tracking-[0.05em]"
-                )}
+                      ? "text-[16px] font-medium tracking-wide"
+                      : "text-[20px] font-semibold tracking-tight"  // 👈 CONTROL TOP SIZE HERE
+                  )}
                 >
                   PredictiX
-                </span>
-              )}
+                </div>
+
+                {!scrolled && (
+                  <div className="text-sm font-medium text-muted-foreground">
+                    AI-Powered Asset Management
+                  </div>
+                )}
+              </div>
             </Link>
+
 
             {/* Center nav */}
             <nav

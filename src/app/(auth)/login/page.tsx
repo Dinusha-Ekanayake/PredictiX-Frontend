@@ -19,7 +19,7 @@ import ThemeToggle from "@/components/theme/ThemeToggle";
 function BackgroundBlobs() {
   return (
     <div className="pointer-events-none absolute inset-0 z-0">
-      <div className="absolute -top-56 -left-56 h-225 w-[900px] rounded-full bg-sky-200/60 blur-[140px] float-slow-1 dark:hidden" />
+      <div className="absolute -top-56 -left-56 h-225 w-225 rounded-full bg-sky-200/60 blur-[140px] float-slow-1 dark:hidden" />
       <div className="absolute top-1/3 left-1/2 h-225 w-[900px] -translate-x-1/2 rounded-full bg-violet-200/50 blur-[160px] float-slow-2 dark:hidden" />
       <div className="absolute -bottom-56 -right-56 h-[900px] w-225 rounded-full bg-white/70 blur-[160px] float-slow-3 dark:hidden" />
 
@@ -27,7 +27,7 @@ function BackgroundBlobs() {
       <div className="hidden dark:block absolute top-1/3 left-1/2 h-[900px] w-[900px] -translate-x-1/2 rounded-full bg-violet-500/10 blur-[180px] float-slow-2" />
       <div className="hidden dark:block absolute -bottom-56 -right-56 h-[900px] w-[900px] rounded-full bg-white/5 blur-[180px] float-slow-3" />
 
-      <div className="absolute -top-32 left-[-25%] h-[520px] w-[150%] rotate-[-10deg] bg-gradient-to-r from-transparent via-white/40 to-transparent blur-2xl dark:via-white/10" />
+      <div className="absolute -top-32 left-[-25%] h-[520px] w-[150%] rotate-[-10deg] bg-linear-to-r from-transparent via-white/40 to-transparent blur-2xl dark:via-white/10" />
 
       <div
         className="absolute inset-0 opacity-[0.05] dark:opacity-[0.06]"

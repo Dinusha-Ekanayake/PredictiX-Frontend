@@ -19,11 +19,11 @@ import ThemeToggle from "@/components/theme/ThemeToggle";
 function BackgroundBlobs() {
   return (
     <div className="pointer-events-none absolute inset-0 z-0">
-      <div className="absolute -top-56 -left-56 h-[900px] w-[900px] rounded-full bg-sky-200/60 blur-[140px] float-slow-1 dark:hidden" />
-      <div className="absolute top-1/3 left-1/2 h-[900px] w-[900px] -translate-x-1/2 rounded-full bg-violet-200/50 blur-[160px] float-slow-2 dark:hidden" />
-      <div className="absolute -bottom-56 -right-56 h-[900px] w-[900px] rounded-full bg-white/70 blur-[160px] float-slow-3 dark:hidden" />
+      <div className="absolute -top-56 -left-56 h-225 w-[900px] rounded-full bg-sky-200/60 blur-[140px] float-slow-1 dark:hidden" />
+      <div className="absolute top-1/3 left-1/2 h-225 w-[900px] -translate-x-1/2 rounded-full bg-violet-200/50 blur-[160px] float-slow-2 dark:hidden" />
+      <div className="absolute -bottom-56 -right-56 h-[900px] w-225 rounded-full bg-white/70 blur-[160px] float-slow-3 dark:hidden" />
 
-      <div className="hidden dark:block absolute -top-56 -left-56 h-[900px] w-[900px] rounded-full bg-sky-500/10 blur-[160px] float-slow-1" />
+      <div className="hidden dark:block absolute -top-56 -left-56 h-225 w-225 rounded-full bg-sky-500/10 blur-[160px] float-slow-1" />
       <div className="hidden dark:block absolute top-1/3 left-1/2 h-[900px] w-[900px] -translate-x-1/2 rounded-full bg-violet-500/10 blur-[180px] float-slow-2" />
       <div className="hidden dark:block absolute -bottom-56 -right-56 h-[900px] w-[900px] rounded-full bg-white/5 blur-[180px] float-slow-3" />
 
@@ -72,7 +72,7 @@ export default function LoginPage() {
       await new Promise((r) => setTimeout(r, 500));
 
       // Admin login
-      if (role === "admin") {
+      if (role === "ADMIN") {
         if (email.trim().toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
           router.push("/admin/dashboard");
           return;

@@ -4,6 +4,11 @@
 /* Tailwind v4 dark variant */
 @custom-variant dark (&:is(.dark *));
 
+html {
+  scroll-behavior: smooth;
+}
+
+
 /* shadcn theme mapping */
 @theme inline {
   --color-background: var(--background);

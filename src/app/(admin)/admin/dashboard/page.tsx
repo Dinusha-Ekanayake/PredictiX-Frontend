@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 
 import {
   Table,
@@ -108,11 +108,7 @@ const healthDistribution = [
   { name: "Critical", value: 12 },
 ];
 
-const PIE_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--muted-foreground))",
-  "hsl(var(--destructive))",
-];
+const PIE_COLORS = ["#6366f1", "#8b8fa3", "#ef4444"];
 
 const recentAlerts: AlertItem[] = [
   {
@@ -190,10 +186,13 @@ export default function AdminDashboardPage() {
     setIsRefreshing(true);
     await new Promise((r) => setTimeout(r, 700));
     setIsRefreshing(false);
+    toast.success("Dashboard refreshed", {
+      description: "All data is up to date.",
+    });
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] w-full">
+    <div className="w-full space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Admin Dashboard</h1>
@@ -220,14 +219,12 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      <Separator className="my-6" />
-
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((k) => (
           <Card key={k.label} className="rounded-2xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{k.label}</CardTitle>
-              <k.icon className="h-5 w-5 text-muted-foreground" />
+              <k.icon className="h-6 w-6 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-semibold">{k.value}</div>
@@ -237,7 +234,7 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card className="rounded-2xl lg:col-span-2">
           <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -262,7 +259,7 @@ export default function AdminDashboardPage() {
                       <Line
                         type="monotone"
                         dataKey="minutes"
-                        stroke="hsl(var(--primary))"
+                        stroke="#6366f1"
                         strokeWidth={2}
                         dot={false}
                       />
@@ -327,7 +324,7 @@ export default function AdminDashboardPage() {
         </Card>
       </div>
 
-      <Card className="mt-6 rounded-2xl">
+      <Card className="rounded-2xl">
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Latest Tickets</CardTitle>

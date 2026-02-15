@@ -1710,7 +1710,7 @@ export default function AdminNavbar({
               {/* RIGHT */}
               <div className="flex items-center gap-3 justify-self-end">
                 {/* Theme icon: keep perfectly centered with name/avatar */}
-                <ThemeToggle className="-translate-y-px" size={18} />
+                <ThemeToggle className="-translate-y-px" size={20} />
 
                 {/* User (sm+) */}
                 <div className="hidden sm:flex items-center gap-3">

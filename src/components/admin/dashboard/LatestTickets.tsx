@@ -4,87 +4,83 @@ import * as React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { ExternalLink } from "lucide-react";
 
-type TicketItem = {
+type AlertItem = {
   id: string;
+  severity: "Critical" | "Warning" | "Info";
   title: string;
-  category: string;
-  priority: "High" | "Medium" | "Low";
-  status: "Open" | "In Progress" | "Resolved";
-  createdAt: string;
+  description: string;
+  timeAgo: string;
 };
 
-const latestTickets: TicketItem[] = [
-  { id: "TCK-2301", title: "Abnormal vibration on Compressor A-14", category: "Mechanical", priority: "High", status: "Open", createdAt: "2026-01-05" },
-  { id: "TCK-2297", title: "Oil leak suspected near Pump P-09", category: "Maintenance", priority: "Medium", status: "In Progress", createdAt: "2026-01-04" },
-  { id: "TCK-2293", title: "Sensor drift on Motor M-02", category: "Sensors", priority: "Low", status: "Resolved", createdAt: "2026-01-03" },
+const alerts: AlertItem[] = [
+  {
+    id: "A-1001",
+    severity: "Critical",
+    title: "Compressor A-14",
+    description: "Vibration exceeded threshold (RMS 12.3 mm/s).",
+    timeAgo: "10 mins ago",
+  },
+  {
+    id: "A-1002",
+    severity: "Warning",
+    title: "Pump P-09",
+    description: "Temperature rising trend detected (last 3 hours).",
+    timeAgo: "34 mins ago",
+  },
+  {
+    id: "A-1003",
+    severity: "Info",
+    title: "Motor M-02",
+    description: "Maintenance window scheduled for tomorrow.",
+    timeAgo: "2 hrs ago",
+  },
 ];
 
-function PriorityBadge({ priority }: { priority: TicketItem["priority"] }) {
-  if (priority === "High") return <Badge variant="destructive">High</Badge>;
-  if (priority === "Medium") return <Badge variant="secondary">Medium</Badge>;
-  return <Badge variant="outline">Low</Badge>;
-}
-
-function StatusBadge({ status }: { status: TicketItem["status"] }) {
-  if (status === "Open") return <Badge variant="destructive">Open</Badge>;
-  if (status === "In Progress") return <Badge variant="secondary">In Progress</Badge>;
-  return <Badge variant="outline">Resolved</Badge>;
+function SeverityBadge({ severity }: { severity: AlertItem["severity"] }) {
+  if (severity === "Critical") return <Badge variant="destructive">Critical</Badge>;
+  if (severity === "Warning") return <Badge variant="secondary">Warning</Badge>;
+  return <Badge variant="outline">Info</Badge>;
 }
 
 export default function LatestTickets() {
   return (
     <Card className="rounded-2xl">
-      <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <CardHeader className="flex items-start justify-between gap-4">
         <div>
-          <CardTitle>Latest Tickets</CardTitle>
-          <p className="text-sm text-muted-foreground">Monitor current issues and progress.</p>
+          <CardTitle>Recent Alerts</CardTitle>
+          <p className="text-sm text-muted-foreground">Latest detected events from asset monitoring.</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">Manage Tickets</Button>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Ticket
+
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
+            View all
+            <ExternalLink className="ml-2 h-4 w-4" />
           </Button>
         </div>
       </CardHeader>
 
       <CardContent>
-        <div className="overflow-x-auto rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px]">Ticket ID</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead className="w-[140px]">Category</TableHead>
-                <TableHead className="w-[120px]">Priority</TableHead>
-                <TableHead className="w-35">Status</TableHead>
-                <TableHead className="w-[130px]">Created</TableHead>
-              </TableRow>
-            </TableHeader>
+        <div className="flex flex-col gap-3">
+          {alerts.map((a) => (
+            <div key={a.id} className="flex items-start gap-4 rounded-lg border p-4 bg-card">
+              <div className="shrink-0">
+                <SeverityBadge severity={a.severity} />
+              </div>
 
-            <TableBody>
-              {latestTickets.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-medium">{t.id}</TableCell>
-                  <TableCell className="min-w-[320px]">{t.title}</TableCell>
-                  <TableCell>{t.category}</TableCell>
-                  <TableCell><PriorityBadge priority={t.priority} /></TableCell>
-                  <TableCell><StatusBadge status={t.status} /></TableCell>
-                  <TableCell className="text-muted-foreground">{t.createdAt}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              <div className="flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold">{a.title}</p>
+                    <p className="text-sm text-muted-foreground">{a.description}</p>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground whitespace-nowrap">{a.timeAgo}</div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>

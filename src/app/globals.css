@@ -111,6 +111,13 @@ html {
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.551 0.027 264.364);
+  /* dynamic accent RGB channels (updated by JS on scroll when in dark mode) */
+  --dynamic-accent-r: 64;
+  --dynamic-accent-g: 0;
+  --dynamic-accent-b: 96;
+  --dynamic-accent: rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b));
+  /* When JS sets --accent, many components that use --accent will pick it up; fallback to dynamic-accent */
+  --accent: var(--dynamic-accent);
 }
 
 /* Base */
@@ -150,6 +157,34 @@ html {
 .float-slow-1 { animation: float-slow-1 16s ease-in-out infinite; }
 .float-slow-2 { animation: float-slow-2 18s ease-in-out infinite; }
 .float-slow-3 { animation: float-slow-3 20s ease-in-out infinite; }
+
+/* Utility to apply the dynamic accent color as background / ring */
+.dynamic-accent-bg {
+  background-color: rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.08);
+}
+
+.dynamic-accent-ring {
+  box-shadow: 0 6px 18px -6px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.28), 0 0 0 4px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.06);
+}
+
+/* Card / ticket hover styles that use the dynamic accent in dark mode */
+.dark .card-dynamic {
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+.dark .card-dynamic:hover {
+  background-color: rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.12);
+  box-shadow: 0 10px 30px -8px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.32);
+  transform: translateY(-2px) scale(1.02);
+}
+
+.dark .ticket-dynamic {
+  transition: background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+.dark .ticket-dynamic:hover {
+  background-color: rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.06);
+  box-shadow: 0 8px 22px -6px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.26);
+  transform: translateY(-2px) scale(1.06);
+}
 
 /* ===== PredictiX loader animations ===== */
 

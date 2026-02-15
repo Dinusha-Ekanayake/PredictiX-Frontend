@@ -142,8 +142,7 @@ export default function NewTicketDialog({ open, onOpenChange }: Props) {
                 <SelectContent>
                   <SelectItem value="Mechanical">Mechanical</SelectItem>
                   <SelectItem value="Electrical">Electrical</SelectItem>
-                  <SelectItem value="Sensors">Sensors</SelectItem>
-                  <SelectItem value="Maintenance">Maintenance</SelectItem>
+                  <SelectItem value="Software">Software</SelectItem>
                 </SelectContent>
               </Select>
             </div>

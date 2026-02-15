@@ -6,8 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import NewTicketDialog from "@/components/admin/NewTicketDialog";
-import TicketDetailsDialog from "@/components/admin/TicketDetailsDialog";
+import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
+import TicketDetailsDialog from "@/components/admin/dialogs/TicketDetailsDialog";
 import {
   Select,
   SelectTrigger,
@@ -35,20 +35,20 @@ export default function AdminTicketsPage() {
 
   const MOCK_TICKETS: Ticket[] = [
     { id: "T-1001", asset: "Compressor A-14", title: "Vibration spike detected", description: "RMS exceeded threshold during last cycle.", priority: "High", status: "open", category: "Mechanical", assignedTo: "Tech-01", createdAt: "2026-02-14" },
-    { id: "T-1002", asset: "Pump P-09", title: "Temperature rising trend", description: "Gradual temp increase over 3 hours.", priority: "Medium", status: "open", category: "Maintenance", assignedTo: "Tech-02", createdAt: "2026-02-13" },
-    { id: "T-1003", asset: "Motor M-02", title: "Minor sensor drift", description: "Sensor offset observed intermittently.", priority: "Low", status: "open", category: "Sensors", assignedTo: "Tech-03", createdAt: "2026-02-12" },
+    { id: "T-1002", asset: "Pump P-09", title: "Temperature rising trend", description: "Gradual temp increase over 3 hours.", priority: "Medium", status: "open", category: "Electrical", assignedTo: "Tech-02", createdAt: "2026-02-13" },
+    { id: "T-1003", asset: "Motor M-02", title: "Minor sensor drift", description: "Sensor offset observed intermittently.", priority: "Low", status: "open", category: "Software", assignedTo: "Tech-03", createdAt: "2026-02-12" },
 
     { id: "T-2001", asset: "Conveyor B-12", title: "Strange noise during run", description: "Grinding noise coming from bearing area.", priority: "High", status: "in-progress", category: "Mechanical", assignedTo: "Tech-01", createdAt: "2026-02-11" },
     { id: "T-2002", asset: "Heater H-07", title: "Intermittent trip", description: "Circuit trips under load occasionally.", priority: "Medium", status: "in-progress", category: "Electrical", assignedTo: "Tech-02", createdAt: "2026-02-10" },
-    { id: "T-2003", asset: "Sensor S-21", title: "Calibration needed", description: "Periodic re-calibration recommended.", priority: "Low", status: "in-progress", category: "Sensors", assignedTo: "Tech-03", createdAt: "2026-02-09" },
+    { id: "T-2003", asset: "Sensor S-21", title: "Calibration needed", description: "Periodic re-calibration recommended.", priority: "Low", status: "in-progress", category: "Software", assignedTo: "Tech-03", createdAt: "2026-02-09" },
 
     { id: "T-3001", asset: "Crane LD-03", title: "Load imbalance resolved", description: "Root cause fixed and verified.", priority: "High", status: "resolved", category: "Mechanical", assignedTo: "Tech-04", createdAt: "2026-02-08" },
-    { id: "T-3002", asset: "Pump P-11", title: "Seal replaced", description: "Leak fixed, monitoring for recurrence.", priority: "Medium", status: "resolved", category: "Maintenance", assignedTo: "Tech-05", createdAt: "2026-02-07" },
+    { id: "T-3002", asset: "Pump P-11", title: "Seal replaced", description: "Leak fixed, monitoring for recurrence.", priority: "Medium", status: "resolved", category: "Mechanical", assignedTo: "Tech-05", createdAt: "2026-02-07" },
     { id: "T-3003", asset: "Fan F-02", title: "Imbalance corrected", description: "Fan balanced and vibration reduced.", priority: "Low", status: "resolved", category: "Mechanical", assignedTo: "Tech-06", createdAt: "2026-02-06" },
 
     { id: "T-4001", asset: "Generator G-01", title: "Closed - awaiting parts", description: "Ticket closed but unresolved (awaiting long-lead parts).", priority: "High", status: "closed", category: "Electrical", assignedTo: "Tech-07", createdAt: "2026-02-05" },
-    { id: "T-4002", asset: "Valve V-08", title: "Closed - monitoring", description: "Issue closed, continue to monitor.", priority: "Medium", status: "closed", category: "Maintenance", assignedTo: "Tech-08", createdAt: "2026-02-04" },
-    { id: "T-4003", asset: "Gauge G-12", title: "Closed - informational", description: "Routine notice, no action required.", priority: "Low", status: "closed", category: "Sensors", assignedTo: "Tech-09", createdAt: "2026-02-03" },
+    { id: "T-4002", asset: "Valve V-08", title: "Closed - monitoring", description: "Issue closed, continue to monitor.", priority: "Medium", status: "closed", category: "Mechanical", assignedTo: "Tech-08", createdAt: "2026-02-04" },
+    { id: "T-4003", asset: "Gauge G-12", title: "Closed - informational", description: "Routine notice, no action required.", priority: "Low", status: "closed", category: "Software", assignedTo: "Tech-09", createdAt: "2026-02-03" },
   ];
   // default order: inverse of initial array (newest first by createdAt)
   const [tickets, setTickets] = React.useState<Ticket[]>(() => {
@@ -70,12 +70,10 @@ export default function AdminTicketsPage() {
     switch ((cat || "").toLowerCase()) {
       case "mechanical":
         return "bg-emerald-100 text-emerald-800";
-      case "maintenance":
-        return "bg-amber-100 text-amber-800";
-      case "sensors":
-        return "bg-sky-100 text-sky-800";
       case "electrical":
         return "bg-pink-100 text-pink-800";
+      case "software":
+        return "bg-sky-100 text-sky-800";
       default:
         return "bg-emerald-100 text-emerald-800";
     }
@@ -213,48 +211,6 @@ export default function AdminTicketsPage() {
 
   return (
     <div className="w-full space-y-6">
-      {/* Mini dashboard */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card className="cursor-default hover:bg-red-50 transition-colors">
-          <CardContent className="flex items-center gap-3">
-            <AlertCircle className="h-6 w-6 text-red-500" />
-            <div>
-              <div className="text-sm text-muted-foreground">Open</div>
-              <div className="text-xl font-semibold">{stats.open}</div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-default hover:bg-amber-50 transition-colors">
-          <CardContent className="flex items-center gap-3">
-            <RefreshCw className="h-6 w-6 text-amber-500" />
-            <div>
-              <div className="text-sm text-muted-foreground">In Progress</div>
-              <div className="text-xl font-semibold">{stats["in-progress"]}</div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-default hover:bg-emerald-50 transition-colors">
-          <CardContent className="flex items-center gap-3">
-            <CheckCircle className="h-6 w-6 text-emerald-500" />
-            <div>
-              <div className="text-sm text-muted-foreground">Resolved</div>
-              <div className="text-xl font-semibold">{stats.resolved}</div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-default hover:bg-slate-50 transition-colors">
-          <CardContent className="flex items-center gap-3">
-            <XCircle className="h-6 w-6 text-slate-500" />
-            <div>
-              <div className="text-sm text-muted-foreground">Closed</div>
-              <div className="text-xl font-semibold">{stats.closed}</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
       <div>
         <h1 className="text-2xl font-semibold">Tickets</h1>
         <p className="text-sm text-muted-foreground">Manage support tickets and alerts.</p>
@@ -341,6 +297,48 @@ export default function AdminTicketsPage() {
         </div>
       </div>
 
+      {/* Mini dashboard */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card className="card-dynamic cursor-default hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <AlertCircle className="h-6 w-6 text-red-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">Open</div>
+              <div className="text-xl font-semibold">{stats.open}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-dynamic cursor-default hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <RefreshCw className="h-6 w-6 text-amber-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">In Progress</div>
+              <div className="text-xl font-semibold">{stats["in-progress"]}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-dynamic cursor-default hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <CheckCircle className="h-6 w-6 text-emerald-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">Resolved</div>
+              <div className="text-xl font-semibold">{stats.resolved}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-dynamic cursor-default hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <XCircle className="h-6 w-6 text-slate-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">Closed</div>
+              <div className="text-xl font-semibold">{stats.closed}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
       {/* Tickets list */}
       <div className="flex flex-col gap-4">
         {tickets.map((t, idx) => (
@@ -353,7 +351,7 @@ export default function AdminTicketsPage() {
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onDragEnd={handleDragEnd}
-            className="rounded-xl border p-4 cursor-move hover:shadow-md"
+            className="ticket-dynamic rounded-xl border p-4 cursor-move transform-gpu will-change-transform hover:scale-[1.01] hover:bg-muted/10 dark:hover:bg-muted/20 hover:shadow-lg transition-transform duration-150 ease-out hover:z-10"
             onClick={() => {
               setSelectedTicket(t);
               setDetailOpen(true);

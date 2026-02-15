@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
 import TicketDetailsDialog from "@/components/admin/dialogs/TicketDetailsDialog";
 import {
@@ -29,9 +30,15 @@ type Ticket = {
 };
 
 export default function AdminTicketsPage() {
+  const [isLoading, setIsLoading] = React.useState(true);
   const [open, setOpen] = React.useState(false);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [selectedTicket, setSelectedTicket] = React.useState<Ticket | null>(null);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const MOCK_TICKETS: Ticket[] = [
     { id: "T-1001", asset: "Compressor A-14", title: "Vibration spike detected", description: "RMS exceeded threshold during last cycle.", priority: "High", status: "open", category: "Mechanical", assignedTo: "Tech-01", createdAt: "2026-02-14" },
@@ -207,6 +214,14 @@ export default function AdminTicketsPage() {
     setTickets((prev) => prev.filter((t) => t.id !== id));
     setSelectedTicket(null);
     setDetailOpen(false);
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <PredictiXLoader label="Loading tickets…" />
+      </div>
+    );
   }
 
   return (

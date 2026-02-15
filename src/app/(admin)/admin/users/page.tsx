@@ -22,12 +22,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import AddUserDialog from "@/components/admin/AddUserDialog";
-import type { NewUser } from "@/components/admin/AddUserDialog";
-import ViewUserDetailsDialog from "@/components/admin/ViewUserDetailsDialog";
+import AddUserDialog from "@/components/admin/users/AddUserDialog";
+import type { NewUser } from "@/components/admin/users/AddUserDialog";
+import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
 import ViewAssignedAssetsDialog, {
   getMockAssetsForUser,
-} from "@/components/admin/ViewAssignedAssetsDialog";
+} from "@/components/admin/users/ViewAssignedAssetsDialog";
 
 import {
   Users,

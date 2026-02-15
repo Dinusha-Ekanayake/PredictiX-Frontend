@@ -1547,6 +1547,9 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import AdminProfileDialog, {
+  type AdminProfile,
+} from "@/components/navigation/AdminProfileDialog";
 
 const NAV = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -1566,6 +1569,9 @@ type Props = {
   name?: string;
   role?: UserRole;
   initials?: string;
+  email?: string;
+  assignedWarehouse?: string;
+  department?: string;
 };
 
 function getInitials(name: string) {
@@ -1579,13 +1585,29 @@ export default function AdminNavbar({
   name = "Dinusha Ekanayake",
   role = "ADMIN",
   initials,
+  email = "admin@mail.com",
+  assignedWarehouse = "Main Warehouse",
+  department = "Operations",
 }: Props) {
   const pathname = usePathname() ?? "";
   const [scrolled, setScrolled] = React.useState(false);
   const [open, setOpen] = React.useState(false);
+  const [profileOpen, setProfileOpen] = React.useState(false);
 
   const badgeText = role === "ADMIN" ? "Admin" : "User";
   const avatarText = initials ?? getInitials(name);
+
+  const adminProfile: AdminProfile = {
+    name,
+    email,
+    role,
+    department,
+    assignedWarehouse,
+  };
+
+  function handleProfileClick() {
+    setProfileOpen(true);
+  }
 
   React.useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 80);
@@ -1712,8 +1734,12 @@ export default function AdminNavbar({
                 {/* Theme icon: keep perfectly centered with name/avatar */}
                 <ThemeToggle className="-translate-y-px" size={20} />
 
-                {/* User (sm+) */}
-                <div className="hidden sm:flex items-center gap-3">
+                {/* User (sm+) - clickable profile */}
+                <button
+                  type="button"
+                  onClick={handleProfileClick}
+                  className="hidden sm:flex items-center gap-3 rounded-xl px-1 py-1 -mr-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                >
                   <div className="text-right leading-[1.05]">
                     <div className="text-sm font-semibold tracking-tight">
                       {name}
@@ -1727,26 +1753,28 @@ export default function AdminNavbar({
                       "bg-gradient-to-br from-violet-600 to-indigo-600",
                       "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
                       "ring-1 ring-white/40 dark:ring-white/10",
-                      "h-10 w-10 text-sm"
+                      "h-10 w-10 text-sm transition-transform hover:scale-105"
                     )}
                   >
                     {avatarText}
                   </div>
-                </div>
+                </button>
 
-                {/* Compact avatar (xs) */}
-                <div
+                {/* Compact avatar (xs) - clickable profile */}
+                <button
+                  type="button"
+                  onClick={handleProfileClick}
                   className={cn(
                     "sm:hidden grid place-items-center rounded-full font-semibold text-white",
                     "bg-gradient-to-br from-violet-600 to-indigo-600",
                     "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
                     "ring-1 ring-white/40 dark:ring-white/10",
-                    "h-10 w-10 text-sm"
+                    "h-10 w-10 text-sm transition-transform hover:scale-105 cursor-pointer"
                   )}
-                  title={`${name} • ${badgeText}`}
+                  title={`${name} • ${badgeText} (click for details)`}
                 >
                   {avatarText}
-                </div>
+                </button>
 
                 {/* Mobile menu */}
                 <div className="md:hidden">
@@ -1767,7 +1795,14 @@ export default function AdminNavbar({
                         </SheetTitle>
                       </SheetHeader>
 
-                      <div className="mt-5 rounded-2xl border border-slate-200 p-3 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpen(false);
+                          setProfileOpen(true);
+                        }}
+                        className="mt-5 w-full rounded-2xl border border-slate-200 p-3 dark:border-slate-800 text-left hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                      >
                         <div className="flex items-center justify-between gap-3">
                           <div className="leading-tight">
                             <div className="text-sm font-semibold">{name}</div>
@@ -1785,7 +1820,7 @@ export default function AdminNavbar({
                             {avatarText}
                           </div>
                         </div>
-                      </div>
+                      </button>
 
                       <nav className="mt-6 flex flex-col gap-2">
                         {NAV.map((item) => {
@@ -1818,6 +1853,13 @@ export default function AdminNavbar({
           </div>
         </div>
       </header>
+
+      {/* Admin profile details pop-up */}
+      <AdminProfileDialog
+        admin={adminProfile}
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+      />
 
       {/* Spacer for floating bar */}
       <div className={cn(!scrolled ? "h-0" : "h-24")} />

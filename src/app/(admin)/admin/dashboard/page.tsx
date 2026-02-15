@@ -686,7 +686,23 @@
 "use client";
 
 import * as React from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Table,
@@ -769,10 +785,17 @@ function SeverityBadge({ severity }: { severity: AlertItem["severity"] }) {
   return <Badge variant="outline">Info</Badge>;
 }
 
-import KpiCards from "@/components/admin/dashboard/KpiCards";
-import OperationalCharts from "@/components/admin/dashboard/OperationalCharts";
-import RecentAlerts from "@/components/admin/dashboard/RecentAlerts";
-import LatestTickets from "@/components/admin/dashboard/LatestTickets";
+function PriorityBadge({ priority }: { priority: TicketItem["priority"] }) {
+  if (priority === "High") return <Badge variant="destructive">High</Badge>;
+  if (priority === "Medium") return <Badge variant="secondary">Medium</Badge>;
+  return <Badge variant="outline">Low</Badge>;
+}
+
+function StatusBadge({ status }: { status: TicketItem["status"] }) {
+  if (status === "Open") return <Badge variant="destructive">Open</Badge>;
+  if (status === "In Progress") return <Badge variant="secondary">In Progress</Badge>;
+  return <Badge variant="outline">Resolved</Badge>;
+}
 
 export default function AdminDashboardPage() {
   const [refreshing, setRefreshing] = React.useState(false);

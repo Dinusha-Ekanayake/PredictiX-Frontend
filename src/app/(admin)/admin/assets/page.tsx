@@ -1,79 +1,108 @@
 "use client";
 
-import SectionCard from "@/components/admin/common/SectionCard";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import * as React from "react";
+import AssetsSummary from "@/components/admin/assets/AssetsSummary";
+import AssetsToolbar, { type AssetFilters } from "@/components/admin/assets/AssetsToolbar";
+import AssetsTable from "@/components/admin/assets/AssetsTable";
+import AssetDetailsPanel from "@/components/admin/assets/AssetDetailsPanel";
 
-const assets = [
-  { id: "A-001", name: "Forklift FL-22", warehouse: "Warehouse A", status: "Active", health: 72, risk: 0.91 },
-  { id: "A-002", name: "Conveyor C-09", warehouse: "Warehouse B", status: "Maintenance", health: 65, risk: 0.86 },
-  { id: "A-003", name: "Generator G-11", warehouse: "Warehouse C", status: "Active", health: 81, risk: 0.81 },
-];
+import { ASSETS } from "@/components/admin/assets/mock";
+import type { Asset } from "@/components/admin/assets/types";
 
-export default function AssetsPage() {
+function applyFilters(assets: Asset[], f: AssetFilters) {
+  const q = f.q.trim().toLowerCase();
+
+  return assets.filter((a) => {
+    const matchesQ =
+      !q ||
+      a.id.toLowerCase().includes(q) ||
+      a.name.toLowerCase().includes(q) ||
+      a.warehouse.name.toLowerCase().includes(q) ||
+      a.location.toLowerCase().includes(q) ||
+      (a.assignedPerson?.name.toLowerCase().includes(q) ?? false);
+
+    const matchesStatus = f.status === "ALL" ? true : a.status === f.status;
+
+    const matchesAssigned =
+      f.assigned === "ALL"
+        ? true
+        : f.assigned === "ASSIGNED"
+        ? a.assignedPerson !== null
+        : a.assignedPerson === null;
+
+    const matchesWarehouse =
+      f.warehouse === "ALL" ? true : a.warehouse.id === f.warehouse;
+
+    return matchesQ && matchesStatus && matchesAssigned && matchesWarehouse;
+  });
+}
+
+export default function AdminAssetsPage() {
+  const [filters, setFilters] = React.useState<AssetFilters>({
+    q: "",
+    status: "ALL",
+    assigned: "ALL",
+    warehouse: "ALL",
+  });
+
+  const filtered = React.useMemo(() => applyFilters(ASSETS, filters), [filters]);
+
+  const [selectedId, setSelectedId] = React.useState<string | null>(
+    filtered[0]?.id ?? null
+  );
+
+  React.useEffect(() => {
+    if (selectedId && filtered.some((a) => a.id === selectedId)) return;
+    setSelectedId(filtered[0]?.id ?? null);
+  }, [filtered, selectedId]);
+
+  const selected = React.useMemo(
+    () => filtered.find((a) => a.id === selectedId) ?? null,
+    [filtered, selectedId]
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-lg font-semibold">Assets</h1>
-          <p className="text-sm text-muted-foreground">Manage assets and view predicted risk.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="rounded-xl">Export</Button>
-          <Button className="rounded-xl">Add Asset</Button>
+          <h1 className="text-2xl font-semibold tracking-tight">Assets</h1>
+          <p className="text-sm text-muted-foreground">
+            Manage asset lifecycle, maintenance schedules, predictive insights, and history.
+          </p>
         </div>
       </div>
 
-      <SectionCard
-        title="Asset List"
-        right={<div className="w-[240px]"><Input className="h-9 rounded-xl" placeholder="Search assets..." /></div>}
-      >
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Asset</TableHead>
-              <TableHead>Warehouse</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Health</TableHead>
-              <TableHead className="text-right">Risk</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {assets.map((a) => (
-              <TableRow key={a.id}>
-                <TableCell className="text-muted-foreground">{a.id}</TableCell>
-                <TableCell className="font-medium">{a.name}</TableCell>
-                <TableCell className="text-muted-foreground">{a.warehouse}</TableCell>
-                <TableCell>
-                  <Badge variant={a.status === "Maintenance" ? "secondary" : "default"}>
-                    {a.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">{a.health}%</TableCell>
-                <TableCell className="text-right">
-                  <Badge>{a.risk}</Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="outline" className="h-8 rounded-xl px-3 text-xs">
-                    View
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </SectionCard>
+      {/* KPI row */}
+      <AssetsSummary assets={ASSETS} />
+
+      {/* Filters */}
+      <AssetsToolbar
+        filters={filters}
+        setFilters={setFilters}
+        resultsCount={filtered.length}
+      />
+
+      {/* Main split */}
+      <div className="grid grid-cols-12 gap-6">
+        <div className="col-span-12 xl:col-span-5">
+          <AssetsTable
+            assets={filtered}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
+        </div>
+
+        <div className="col-span-12 xl:col-span-7">
+          {selected ? (
+            <AssetDetailsPanel asset={selected} />
+          ) : (
+            <div className="rounded-2xl border bg-background p-6 text-sm text-muted-foreground">
+              No asset selected.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

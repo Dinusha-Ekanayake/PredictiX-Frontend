@@ -50,13 +50,36 @@ export default function AdminTicketsPage() {
     { id: "T-4002", asset: "Valve V-08", title: "Closed - monitoring", description: "Issue closed, continue to monitor.", priority: "Medium", status: "closed", category: "Maintenance", assignedTo: "Tech-08", createdAt: "2026-02-04" },
     { id: "T-4003", asset: "Gauge G-12", title: "Closed - informational", description: "Routine notice, no action required.", priority: "Low", status: "closed", category: "Sensors", assignedTo: "Tech-09", createdAt: "2026-02-03" },
   ];
-  const [tickets, setTickets] = React.useState<Ticket[]>(MOCK_TICKETS);
+  // default order: inverse of initial array (newest first by createdAt)
+  const [tickets, setTickets] = React.useState<Ticket[]>(() => {
+    return MOCK_TICKETS.slice().sort((a, b) => {
+      // ISO date strings compare correctly
+      if (a.createdAt < b.createdAt) return 1;
+      if (a.createdAt > b.createdAt) return -1;
+      return 0;
+    });
+  });
   const dragItemId = React.useRef<string | null>(null);
   const dragGhostRef = React.useRef<HTMLElement | null>(null);
   const draggedElRef = React.useRef<HTMLElement | null>(null);
   const [query, setQuery] = React.useState("");
   const [selectedStatus, setSelectedStatus] = React.useState<string>("all");
   const [selectedPriority, setSelectedPriority] = React.useState<string>("all");
+
+  const categoryClass = React.useCallback((cat?: string) => {
+    switch ((cat || "").toLowerCase()) {
+      case "mechanical":
+        return "bg-emerald-100 text-emerald-800";
+      case "maintenance":
+        return "bg-amber-100 text-amber-800";
+      case "sensors":
+        return "bg-sky-100 text-sky-800";
+      case "electrical":
+        return "bg-pink-100 text-pink-800";
+      default:
+        return "bg-emerald-100 text-emerald-800";
+    }
+  }, []);
 
   function handleDragStart(e: React.DragEvent, id: string) {
     dragItemId.current = id;
@@ -174,6 +197,14 @@ export default function AdminTicketsPage() {
     });
   }, [tickets, query, selectedStatus, selectedPriority]);
 
+  const stats = React.useMemo(() => {
+    const s = { open: 0, "in-progress": 0, resolved: 0, closed: 0 } as Record<string, number>;
+    tickets.forEach((t) => {
+      s[t.status] = (s[t.status] || 0) + 1;
+    });
+    return s;
+  }, [tickets]);
+
   function handleDeleteTicket(id: string) {
     setTickets((prev) => prev.filter((t) => t.id !== id));
     setSelectedTicket(null);
@@ -182,6 +213,48 @@ export default function AdminTicketsPage() {
 
   return (
     <div className="w-full space-y-6">
+      {/* Mini dashboard */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card className="cursor-default hover:bg-red-50 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <AlertCircle className="h-6 w-6 text-red-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">Open</div>
+              <div className="text-xl font-semibold">{stats.open}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-default hover:bg-amber-50 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <RefreshCw className="h-6 w-6 text-amber-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">In Progress</div>
+              <div className="text-xl font-semibold">{stats["in-progress"]}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-default hover:bg-emerald-50 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <CheckCircle className="h-6 w-6 text-emerald-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">Resolved</div>
+              <div className="text-xl font-semibold">{stats.resolved}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-default hover:bg-slate-50 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <XCircle className="h-6 w-6 text-slate-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">Closed</div>
+              <div className="text-xl font-semibold">{stats.closed}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
       <div>
         <h1 className="text-2xl font-semibold">Tickets</h1>
         <p className="text-sm text-muted-foreground">Manage support tickets and alerts.</p>
@@ -263,7 +336,7 @@ export default function AdminTicketsPage() {
                 <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
                   <Filter className="h-4 w-4" />
                 </Button>
-                <Button onClick={() => setOpen(true)} className="bg-cyan-500 hover:bg-cyan-400 text-white">+ New Ticket</Button>
+                <Button onClick={() => setOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white">+ New Ticket</Button>
               </div>
         </div>
       </div>
@@ -325,12 +398,12 @@ export default function AdminTicketsPage() {
                 <p className="text-sm mt-2 text-muted-foreground">{t.description}</p>
 
                 <div className="mt-3 flex items-center gap-3">
-                  <Badge variant="default">{t.category}</Badge>
+                  <Badge className="bg-emerald-100 text-emerald-800">{t.category}</Badge>
                   <span className="text-sm text-muted-foreground">Created: {t.createdAt}</span>
                 </div>
               </div>
 
-              <div className="ml-4 text-sm text-muted-foreground whitespace-nowrap">Assigned to: {t.assignedTo}</div>
+              <div className="ml-4 text-sm text-muted-foreground whitespace-nowrap flex items-center gap-2">Assigned to: {t.assignedTo ? <span><Badge className="bg-purple-100 text-purple-800">{t.assignedTo}</Badge></span> : <span className="text-sm">Unassigned</span>}</div>
             </div>
           </div>
         ))}

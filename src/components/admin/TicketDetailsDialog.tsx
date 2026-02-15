@@ -69,12 +69,12 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
               </div>
             </div>
 
-              <div className="flex items-center gap-2">
-                <Button className="bg-amber-400 text-white">Start Review</Button>
-                <Button variant="ghost" onClick={() => setConfirmOpen((s) => !s)} className="text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+            <div className="flex items-center gap-2">
+              <Button className="bg-purple-600 hover:bg-purple-500 text-white">Start Review</Button>
+              <Button variant="ghost" onClick={() => setConfirmOpen((s) => !s)} className="text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           <DialogDescription className="mt-3 text-sm text-muted-foreground">{ticket?.asset}</DialogDescription>
@@ -89,7 +89,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-md border p-3 bg-muted/30">
               <h4 className="text-sm font-medium text-muted-foreground">Category</h4>
-              <div className="mt-2"><Badge>{ticket?.category}</Badge></div>
+              <div className="mt-2"><Badge className={ticket?.category ? (ticket.category.toLowerCase() === 'mechanical' ? 'bg-emerald-100 text-emerald-800' : ticket.category.toLowerCase() === 'maintenance' ? 'bg-amber-100 text-amber-800' : ticket.category.toLowerCase() === 'sensors' ? 'bg-sky-100 text-sky-800' : ticket.category.toLowerCase() === 'electrical' ? 'bg-pink-100 text-pink-800' : 'bg-emerald-100 text-emerald-800') : 'bg-emerald-100 text-emerald-800'}>{ticket?.category}</Badge></div>
             </div>
 
             <div className="rounded-md border p-3 bg-muted/30">

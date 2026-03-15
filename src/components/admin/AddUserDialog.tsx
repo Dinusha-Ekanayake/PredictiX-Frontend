@@ -56,7 +56,6 @@ export type NewUser = {
 type FormErrors = {
   firstName?: string;
   lastName?: string;
-  name?: string;
   password?: string;
   address?: string;
   contactNumber?: string;
@@ -140,7 +139,6 @@ export default function AddUserDialog({
 }: Props) {
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
-  const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [address, setAddress] = React.useState("");
@@ -160,7 +158,6 @@ export default function AddUserDialog({
       const timer = setTimeout(() => {
         setFirstName("");
         setLastName("");
-        setName("");
         setEmail("");
         setPassword("");
         setAddress("");
@@ -181,8 +178,6 @@ export default function AddUserDialog({
     const errs: FormErrors = {};
     if (!firstName.trim()) errs.firstName = "First name is required.";
     if (!lastName.trim()) errs.lastName = "Last name is required.";
-    if (!name.trim()) errs.name = "Full name is required.";
-    else if (name.trim().length < 2) errs.name = "Name must be at least 2 characters.";
     if (!email.trim()) errs.email = "Email is required.";
     else if (!validateEmail(email.trim())) errs.email = "Please enter a valid email address.";
     if (!password.trim()) errs.password = "Password is required.";
@@ -221,7 +216,7 @@ export default function AddUserDialog({
       id: generateUserId(role as UserRole, department),
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      name: name.trim(),
+      name: `${firstName.trim()} ${lastName.trim()}`,
       password: password.trim(),
       address: address.trim(),
       contactNumber: contactNumber.trim(),
@@ -281,21 +276,6 @@ export default function AddUserDialog({
                 if (errors.lastName) setErrors((p) => ({ ...p, lastName: undefined }));
               }}
               aria-invalid={!!errors.lastName}
-              className="bg-background"
-            />
-          </FieldCard>
-
-          {/* Full Name (auto or manual) */}
-          <FieldCard icon={User} label="Full Name" error={errors.name}>
-            <Input
-              id="add-user-name"
-              placeholder="e.g. Jane Cooper"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (errors.name) setErrors((p) => ({ ...p, name: undefined }));
-              }}
-              aria-invalid={!!errors.name}
               className="bg-background"
             />
           </FieldCard>

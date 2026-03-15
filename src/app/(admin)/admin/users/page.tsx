@@ -228,13 +228,6 @@ export default function AdminUsersPage() {
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
 
-<<<<<<< Updated upstream
-=======
-  React.useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
   function generateUserId(role: UserRole, department: string): string {
     const roleLetter = role === "admin" ? "A" : "U";
     const deptLetter = department.charAt(0).toUpperCase() || "X";
@@ -255,8 +248,6 @@ export default function AdminUsersPage() {
     const next = String(maxNumber + 1).padStart(4, "0");
     return `${roleLetter}${next}${deptLetter}`;
   }
-
->>>>>>> Stashed changes
   const filteredUsers = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 

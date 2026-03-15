@@ -221,7 +221,7 @@ export default function AddUserDialog({
       id: generateUserId(role as UserRole, department),
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      name: name.trim() || `${firstName.trim()} ${lastName.trim()}`.trim(),
+      name: name.trim(),
       password: password.trim(),
       address: address.trim(),
       contactNumber: contactNumber.trim(),

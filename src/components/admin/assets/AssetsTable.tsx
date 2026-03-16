@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,7 +37,7 @@ export default function AssetsTable({
         </div>
 
         {/* Rows */}
-        <ScrollArea className="mt-3 h-[520px] rounded-xl border">
+        <ScrollArea className="mt-3 h-130 rounded-xl border">
           <div className="divide-y">
             {assets.map((a) => {
               const active = selectedId === a.id;

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import SectionCard from "@/components/admin/common/SectionCard";
@@ -119,12 +120,12 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
           <TabsContent value="insights" className="mt-4 space-y-4">
             <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12 lg:col-span-6">
-                <div className="h-[220px] rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Health Score Trend & Forecast (placeholder)
                 </div>
               </div>
               <div className="col-span-12 lg:col-span-6">
-                <div className="h-[220px] rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Failure Probability Forecast (8 weeks) (placeholder)
                 </div>
               </div>

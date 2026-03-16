@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // // // "use client";
 
 // // // import * as React from "react";
@@ -1456,17 +1457,17 @@ export default function AdminDashboardPage() {
               </TabsList>
 
               <TabsContent value="health" className="mt-4">
-                <div className="h-[260px] rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <div className="h-65 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Chart placeholder (Health trend)
                 </div>
               </TabsContent>
               <TabsContent value="risk" className="mt-4">
-                <div className="h-[260px] rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <div className="h-65 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Chart placeholder (Risk trend)
                 </div>
               </TabsContent>
               <TabsContent value="due" className="mt-4">
-                <div className="h-[260px] rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <div className="h-65 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Chart placeholder (Maintenance timeline)
                 </div>
               </TabsContent>
@@ -1533,12 +1534,12 @@ export default function AdminDashboardPage() {
           >
             <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12 md:col-span-5">
-                <div className="h-[220px] rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Donut placeholder (Status)
                 </div>
               </div>
               <div className="col-span-12 md:col-span-7">
-                <div className="h-[220px] rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Bar placeholder (Category)
                 </div>
               </div>

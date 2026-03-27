@@ -144,9 +144,7 @@ export default function AddUserDialog({
   const [address, setAddress] = React.useState("");
   const [contactNumber, setContactNumber] = React.useState("");
   const [warehouse, setWarehouse] = React.useState("");
-  const [profileImageUrl, setProfileImageUrl] = React.useState<string | undefined>(
-    undefined,
-  );
+  const [, setProfileImageUrl] = React.useState<string | undefined>(undefined);
   const [role, setRole] = React.useState<UserRole | "">("");
   const [department, setDepartment] = React.useState("");
   const [status, setStatus] = React.useState<UserStatus | "">("");

@@ -1,11 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-
 import {
   Select,
   SelectContent,
@@ -13,109 +11,135 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { AssetFilters } from "./types";
 
-import type { AssetStatus } from "./types";
-
-export type AssetFilters = {
-  q: string;
-  status: AssetStatus | "ALL";
-  assigned: "ALL" | "ASSIGNED" | "UNASSIGNED";
-  warehouse: "ALL" | "WH-A" | "WH-B" | "WH-C";
+type Props = {
+  filters: AssetFilters;
+  setFilters: (next: AssetFilters) => void;
+  resultsCount: number;
+  warehouseOptions: Array<{ value: string; label: string }>;
 };
 
 export default function AssetsToolbar({
   filters,
   setFilters,
   resultsCount,
-}: {
-  filters: AssetFilters;
-  setFilters: (next: AssetFilters) => void;
-  resultsCount: number;
-}) {
+  warehouseOptions,
+}: Props) {
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-2xl border-border/60 bg-card/90 backdrop-blur-sm">
       <CardContent className="p-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          {/* Left cluster */}
-          <div className="grid flex-1 grid-cols-12 gap-3">
-            <div className="col-span-12 lg:col-span-5">
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-12 xl:col-span-5">
               <Input
                 className="h-10 rounded-xl"
-                placeholder="Search by ID, name, warehouse, location, assigned person..."
-                value={filters.q}
-                onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+                placeholder="Search by asset name, asset code, VIN, make, model..."
+                value={filters.query}
+                onChange={(e) =>
+                  setFilters({ ...filters, query: e.target.value })
+                }
               />
             </div>
 
-            <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+            <div className="col-span-12 sm:col-span-4 xl:col-span-2">
               <Select
                 value={filters.status}
-                onValueChange={(v) => setFilters({ ...filters, status: v as any })}
+                onValueChange={(value) =>
+                  setFilters({
+                    ...filters,
+                    status: value as AssetFilters["status"],
+                  })
+                }
               >
                 <SelectTrigger className="h-10 rounded-xl">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All Status</SelectItem>
-                  <SelectItem value="OPERATIONAL">Operational</SelectItem>
-                  <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                  <SelectItem value="CRITICAL">Critical</SelectItem>
-                  <SelectItem value="OFFLINE">Offline</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="under_maintenance">
+                    Under Maintenance
+                  </SelectItem>
+                  <SelectItem value="critical">Critical</SelectItem>
+                  <SelectItem value="decommissioned">Decommissioned</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+            <div className="col-span-12 sm:col-span-4 xl:col-span-2">
               <Select
-                value={filters.assigned}
-                onValueChange={(v) => setFilters({ ...filters, assigned: v as any })}
+                value={filters.healthBand}
+                onValueChange={(value) =>
+                  setFilters({
+                    ...filters,
+                    healthBand: value as AssetFilters["healthBand"],
+                  })
+                }
               >
                 <SelectTrigger className="h-10 rounded-xl">
-                  <SelectValue placeholder="Assignment" />
+                  <SelectValue placeholder="Health Band" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All</SelectItem>
-                  <SelectItem value="ASSIGNED">Assigned</SelectItem>
-                  <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
+                  <SelectItem value="all">All Health Bands</SelectItem>
+                  <SelectItem value="excellent">Excellent</SelectItem>
+                  <SelectItem value="good">Good</SelectItem>
+                  <SelectItem value="moderate">Moderate</SelectItem>
+                  <SelectItem value="poor">Poor</SelectItem>
+                  <SelectItem value="critical">Critical</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="col-span-12 lg:col-span-3">
+            <div className="col-span-12 sm:col-span-4 xl:col-span-3">
               <Select
                 value={filters.warehouse}
-                onValueChange={(v) => setFilters({ ...filters, warehouse: v as any })}
+                onValueChange={(value) =>
+                  setFilters({
+                    ...filters,
+                    warehouse: value,
+                  })
+                }
               >
                 <SelectTrigger className="h-10 rounded-xl">
                   <SelectValue placeholder="Warehouse" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All Warehouses</SelectItem>
-                  <SelectItem value="WH-A">Warehouse A</SelectItem>
-                  <SelectItem value="WH-B">Warehouse B</SelectItem>
-                  <SelectItem value="WH-C">Warehouse C</SelectItem>
+                  <SelectItem value="all">All Warehouses</SelectItem>
+                  {warehouseOptions.map((warehouse) => (
+                    <SelectItem key={warehouse.value} value={warehouse.value}>
+                      {warehouse.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Right cluster */}
-          <div className="flex items-center justify-between gap-2 xl:justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <Badge variant="secondary" className="rounded-xl px-3 py-1">
-              {resultsCount} results
+              {resultsCount} assets found
             </Badge>
 
-            <Button
-              variant="outline"
-              className="h-10 rounded-xl"
-              onClick={() =>
-                setFilters({ q: "", status: "ALL", assigned: "ALL", warehouse: "ALL" })
-              }
-            >
-              Reset
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="h-10 rounded-xl"
+                onClick={() =>
+                  setFilters({
+                    query: "",
+                    status: "all",
+                    healthBand: "all",
+                    warehouse: "all",
+                  })
+                }
+              >
+                Reset
+              </Button>
 
-            <Button className="h-10 rounded-xl px-4">Add Asset</Button>
+              <Button className="h-10 rounded-xl px-4">Add Asset</Button>
+            </div>
           </div>
         </div>
       </CardContent>

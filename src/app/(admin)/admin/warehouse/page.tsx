@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Plus, FileText } from "lucide-react";
+import { RefreshCw, FileText } from "lucide-react";
 
 import WarehouseOverviewCards from "@/components/admin/warehouse/WarehouseOverviewCards";
 import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsightsSection";
+import WarehouseInsightSummary from "@/components/admin/warehouse/WarehouseInsightSummary";
 
 export default function WarehousePage() {
   const [refreshing, setRefreshing] = React.useState(false);
@@ -28,15 +29,8 @@ export default function WarehousePage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={onRefresh} disabled={refreshing}>
-            <RefreshCw
-              className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
-          </Button>
-
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
           </Button>
 
           <Button variant="secondary">
@@ -47,6 +41,9 @@ export default function WarehousePage() {
       </div>
 
       <WarehouseOverviewCards />
+
+      <WarehouseInsightSummary />
+
       <WarehouseInsightsSection />
 
       <div className="h-20" />

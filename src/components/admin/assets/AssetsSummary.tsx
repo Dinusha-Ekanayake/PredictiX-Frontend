@@ -1,28 +1,78 @@
 "use client";
 
 import StatCard from "@/components/admin/common/StatCard";
-import { AlertTriangle, CheckCircle2, Wrench, Boxes } from "lucide-react";
-import type { Asset } from "./types";
+import type { AssetRecord } from "./types";
+import {
+  Activity,
+  AlertTriangle,
+  ShieldCheck,
+  Wrench,
+} from "lucide-react";
 
-export default function AssetsSummary({ assets }: { assets: Asset[] }) {
-  const total = assets.length;
-  const operational = assets.filter((a) => a.status === "OPERATIONAL").length;
-  const maintenance = assets.filter((a) => a.status === "MAINTENANCE").length;
-  const critical = assets.filter((a) => a.status === "CRITICAL").length;
+function avg(values: number[]) {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+export default function AssetsSummary({ assets }: { assets: AssetRecord[] }) {
+  const totalAssets = assets.length;
+
+  const maintenanceCount = assets.filter(
+    (asset) => asset.status === "under_maintenance"
+  ).length;
+
+  const atRiskCount = assets.filter(
+    (asset) =>
+      asset.status === "critical" ||
+      asset.healthBand === "critical" ||
+      asset.healthBand === "poor" ||
+      (asset.prediction?.failureProbability ?? 0) >= 0.5
+  ).length;
+
+  const overallHealth = Math.round(
+    avg(
+      assets
+        .map((asset) => asset.prediction?.healthScore)
+        .filter((score): score is number => typeof score === "number")
+    )
+  );
 
   return (
-    <div className="grid grid-cols-12 gap-6">
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
-        <StatCard label="Total Assets" value={String(total)} hint="All warehouses" icon={<Boxes className="h-4 w-4" />} />
+    <div className="grid grid-cols-12 gap-4 lg:gap-6">
+      <div className="col-span-12 sm:col-span-6 xl:col-span-3">
+        <StatCard
+          label="Total Assets"
+          value={String(totalAssets)}
+          hint="Across visible warehouse scope"
+          icon={<Activity className="h-4 w-4" />}
+        />
       </div>
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
-        <StatCard label="Operational" value={String(operational)} hint="Active / running" icon={<CheckCircle2 className="h-4 w-4" />} />
+
+      <div className="col-span-12 sm:col-span-6 xl:col-span-3">
+        <StatCard
+          label="Overall Asset Health"
+          value={`${overallHealth}%`}
+          hint="Average predicted health score"
+          icon={<ShieldCheck className="h-4 w-4" />}
+        />
       </div>
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
-        <StatCard label="Under Maintenance" value={String(maintenance)} hint="Currently in progress" icon={<Wrench className="h-4 w-4" />} />
+
+      <div className="col-span-12 sm:col-span-6 xl:col-span-3">
+        <StatCard
+          label="In Maintenance"
+          value={String(maintenanceCount)}
+          hint="Assets currently under maintenance"
+          icon={<Wrench className="h-4 w-4" />}
+        />
       </div>
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
-        <StatCard label="Critical Risk" value={String(critical)} hint="Needs attention now" icon={<AlertTriangle className="h-4 w-4" />} />
+
+      <div className="col-span-12 sm:col-span-6 xl:col-span-3">
+        <StatCard
+          label="Needs Attention"
+          value={String(atRiskCount)}
+          hint="Critical, poor, or high-risk assets"
+          icon={<AlertTriangle className="h-4 w-4" />}
+        />
       </div>
     </div>
   );

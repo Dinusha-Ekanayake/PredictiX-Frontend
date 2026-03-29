@@ -3,6 +3,7 @@
 import * as React from "react";
 import { CircleHelp, Mail, MessageSquareText, PlusCircle, Search } from "lucide-react";
 
+import AdminNavbar from "@/components/navigation/AdminNavbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -135,8 +136,10 @@ export default function HelpDeskPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8 md:px-8">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <AdminNavbar />
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <Card className="border-border/70">
           <CardHeader className="pb-4">
             <div className="flex items-start justify-between gap-4">
@@ -280,7 +283,8 @@ export default function HelpDeskPage() {
             </CardContent>
           </Card>
         ) : null}
-      </div>
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }

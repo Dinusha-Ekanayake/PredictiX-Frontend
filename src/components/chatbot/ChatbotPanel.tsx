@@ -8,16 +8,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "./types";
 
-const CHATBOT_API_URL =
-  process.env.NEXT_PUBLIC_CHATBOT_API_URL ?? "/api/chatbot";
+const CHATBOT_API_URL = process.env.NEXT_PUBLIC_CHATBOT_API_URL;
 
-const WELCOME_MESSAGE: ChatMessage = {
-  id: "welcome",
-  role: "assistant",
-  content:
-    "Hi! I'm the PredictiX AI assistant. Ask me anything about your assets, tickets, or maintenance schedules.",
-  timestamp: new Date(),
-};
+function makeWelcomeMessage(): ChatMessage {
+  return {
+    id: "welcome",
+    role: "assistant",
+    content:
+      "Hi! I'm the PredictiX AI assistant. Ask me anything about your assets, tickets, or maintenance schedules.",
+    timestamp: new Date(),
+  };
+}
 
 function formatTime(date: Date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -28,13 +29,14 @@ type Props = {
 };
 
 export default function ChatbotPanel({ onClose }: Props) {
-  const [messages, setMessages] = React.useState<ChatMessage[]>([
-    WELCOME_MESSAGE,
+  const [messages, setMessages] = React.useState<ChatMessage[]>(() => [
+    makeWelcomeMessage(),
   ]);
   const [input, setInput] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -45,13 +47,28 @@ export default function ChatbotPanel({ onClose }: Props) {
   }, []);
 
   function clearChat() {
-    setMessages([{ ...WELCOME_MESSAGE, timestamp: new Date() }]);
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setIsLoading(false);
+    setMessages([makeWelcomeMessage()]);
   }
 
   async function sendMessage(e?: React.FormEvent) {
     e?.preventDefault();
     const text = input.trim();
     if (!text || isLoading) return;
+
+    if (!CHATBOT_API_URL) {
+      const cfgErrorMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content:
+          "The chatbot service is not configured. Please set NEXT_PUBLIC_CHATBOT_API_URL in your environment.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, cfgErrorMsg]);
+      return;
+    }
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -64,10 +81,14 @@ export default function ChatbotPanel({ onClose }: Props) {
     setInput("");
     setIsLoading(true);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const response = await fetch(CHATBOT_API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           message: text,
           history: messages
@@ -90,7 +111,9 @@ export default function ChatbotPanel({ onClose }: Props) {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
-    } catch {
+    } catch (err) {
+      // Ignore AbortError — the request was intentionally cancelled by clearChat
+      if (err instanceof Error && err.name === "AbortError") return;
       const errorMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
@@ -101,6 +124,7 @@ export default function ChatbotPanel({ onClose }: Props) {
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   }
 
@@ -134,8 +158,10 @@ export default function ChatbotPanel({ onClose }: Props) {
           <button
             type="button"
             onClick={clearChat}
+            disabled={isLoading}
             title="Clear chat"
-            className="grid place-items-center h-7 w-7 rounded-xl text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            aria-label="Clear chat"
+            className="grid place-items-center h-7 w-7 rounded-xl text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -143,6 +169,7 @@ export default function ChatbotPanel({ onClose }: Props) {
             type="button"
             onClick={onClose}
             title="Close chat"
+            aria-label="Close chat"
             className="grid place-items-center h-7 w-7 rounded-xl text-muted-foreground hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="h-3.5 w-3.5" />

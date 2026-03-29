@@ -10,17 +10,12 @@ export default function ChatbotButton() {
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
-      {/* Chat panel — animated in/out */}
-      <div
-        className={cn(
-          "origin-bottom-right transition-all duration-300",
-          open
-            ? "opacity-100 scale-100 pointer-events-auto"
-            : "opacity-0 scale-90 pointer-events-none"
-        )}
-      >
-        <ChatbotPanel onClose={() => setOpen(false)} />
-      </div>
+      {/* Chat panel — rendered only when open to avoid focus stealing */}
+      {open && (
+        <div className="animate-in fade-in zoom-in-90 origin-bottom-right duration-200">
+          <ChatbotPanel onClose={() => setOpen(false)} />
+        </div>
+      )}
 
       {/* FAB */}
       <button

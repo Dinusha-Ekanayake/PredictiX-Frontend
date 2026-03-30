@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import {
   Select,
   SelectContent,
@@ -189,12 +190,18 @@ function UserAvatar({ name }: { name: string }) {
 // ---------------------------------------------------------------------------
 
 export default function AdminUsersPage() {
+  const [isLoading, setIsLoading] = React.useState(true);
   const [users, setUsers] = React.useState<UserItem[]>(INITIAL_USERS);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const filteredUsers = React.useMemo(() => {
     return users.filter((user) => {
@@ -221,6 +228,14 @@ export default function AdminUsersPage() {
 
   function handleViewAssets(user: UserItem) {
     setAssetsUser(user);
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <PredictiXLoader label="Loading users…" />
+      </div>
+    );
   }
 
   return (

@@ -28,6 +28,18 @@ function PriorityIcon({ priority }: { priority: string }) {
 
 export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDelete }: Props) {
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const categoryBadgeClass = (cat?: string) => {
+    switch ((cat || "").toLowerCase()) {
+      case "mechanical":
+        return "bg-emerald-100 text-emerald-800";
+      case "electrical":
+        return "bg-pink-100 text-pink-800";
+      case "software":
+        return "bg-sky-100 text-sky-800";
+      default:
+        return "bg-emerald-100 text-emerald-800";
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,7 +101,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-md border p-3 bg-muted/30">
               <h4 className="text-sm font-medium text-muted-foreground">Category</h4>
-              <div className="mt-2"><Badge className={ticket?.category ? (ticket.category.toLowerCase() === 'mechanical' ? 'bg-emerald-100 text-emerald-800' : ticket.category.toLowerCase() === 'maintenance' ? 'bg-amber-100 text-amber-800' : ticket.category.toLowerCase() === 'sensors' ? 'bg-sky-100 text-sky-800' : ticket.category.toLowerCase() === 'electrical' ? 'bg-pink-100 text-pink-800' : 'bg-emerald-100 text-emerald-800') : 'bg-emerald-100 text-emerald-800'}>{ticket?.category}</Badge></div>
+              <div className="mt-2"><Badge className={categoryBadgeClass(ticket?.category)}>{ticket?.category}</Badge></div>
             </div>
 
             <div className="rounded-md border p-3 bg-muted/30">

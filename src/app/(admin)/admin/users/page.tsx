@@ -272,7 +272,7 @@ export default function AdminUsersPage() {
 
           <div className="flex items-center gap-3">
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-35">
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
               <SelectContent>
@@ -297,12 +297,12 @@ export default function AdminUsersPage() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="min-w-[240px] pl-6">User</TableHead>
-                  <TableHead className="w-[100px]">Role</TableHead>
-                  <TableHead className="w-[160px]">Department</TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[140px]">Assigned Assets</TableHead>
-                  <TableHead className="w-[180px]">Actions</TableHead>
+                  <TableHead className="min-w-60 pl-6">User</TableHead>
+                  <TableHead className="w-25">Role</TableHead>
+                  <TableHead className="w-40">Department</TableHead>
+                  <TableHead className="w-25">Status</TableHead>
+                  <TableHead className="w-35">Assigned Assets</TableHead>
+                  <TableHead className="w-45">Actions</TableHead>
                 </TableRow>
               </TableHeader>
 

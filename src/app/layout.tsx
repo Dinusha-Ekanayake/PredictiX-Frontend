@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
 import FloatingChatbot from "@/components/chat/FloatingChatbot";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
+import HelpDeskButton from "@/components/HelpDeskButton";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
@@ -35,6 +36,7 @@ export default function RootLayout({
       >
         <ThemeProvider>
           {children}
+          <HelpDeskButton />
           <FloatingChatbot />
           <Toaster closeButton position="top-right" />
         </ThemeProvider>

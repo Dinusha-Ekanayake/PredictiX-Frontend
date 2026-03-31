@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import AdminNavbar from "@/components/navigation/AdminNavbar";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
-import ChatbotButton from "@/components/chatbot/ChatbotButton";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,7 +15,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {children}
         </Suspense>
       </main>
-      <ChatbotButton />
     </div>
   );
 }

@@ -3,7 +3,9 @@ import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
 import FloatingChatbot from "@/components/chat/FloatingChatbot";
+
 import BottomHelpDeskLink from "@/components/navigation/BottomHelpDeskLink";
+
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -36,7 +38,9 @@ export default function RootLayout({
       >
         <ThemeProvider>
           {children}
+
           <BottomHelpDeskLink />
+
           <FloatingChatbot />
           <Toaster closeButton position="top-right" />
         </ThemeProvider>

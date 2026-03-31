@@ -4,6 +4,7 @@ import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
 import type { AssetHealthBand, AssetRecord, AssetStatus } from "./types";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,7 @@ function healthBandClasses(healthBand?: AssetHealthBand | null) {
 }
 
 function formatPercent(value?: number | null) {
+
   if (typeof value !== "number") return "—";
   return `${Math.round(value * 100)}%`;
 }
@@ -55,6 +57,7 @@ export default function AssetsTable({
   onSelect: (id: string) => void;
 }) {
   return (
+
     <Card className="rounded-2xl border-border/60 bg-card/90 backdrop-blur-sm">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold">Asset Inventory</CardTitle>
@@ -74,11 +77,13 @@ export default function AssetsTable({
             {assets.map((asset) => {
               const active = selectedId === asset.id;
 
+
               return (
                 <button
                   key={asset.id}
                   onClick={() => onSelect(asset.id)}
                   className={cn(
+
                     "w-full px-3 py-3 text-left transition-colors",
                     "hover:bg-accent/40",
                     active && "bg-accent/50"
@@ -100,8 +105,9 @@ export default function AssetsTable({
                       </div>
                       <div className="truncate text-xs text-muted-foreground">
                         {asset.warehouse.name}
+
                       </div>
-                    </div>
+
 
                     <div className="col-span-2">
                       <Badge
@@ -135,6 +141,7 @@ export default function AssetsTable({
                       </div>
                       <div className="text-xs text-muted-foreground">
                         confidence {formatPercent(asset.prediction?.confidence)}
+
                       </div>
                     </div>
                   </div>

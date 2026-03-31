@@ -52,7 +52,7 @@ export default function AssetsToolbar({
                   })
                 }
               >
-                <SelectTrigger className="h-10 rounded-xl">
+                <SelectTrigger className="h-9 w-[140px] rounded-xl border-border/40 bg-background/50 text-[13px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -66,7 +66,6 @@ export default function AssetsToolbar({
                   <SelectItem value="decommissioned">Decommissioned</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
 
             <div className="col-span-12 sm:col-span-4 xl:col-span-2">
               <Select
@@ -90,7 +89,6 @@ export default function AssetsToolbar({
                   <SelectItem value="critical">Critical</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
 
             <div className="col-span-12 sm:col-span-4 xl:col-span-3">
               <Select
@@ -102,7 +100,7 @@ export default function AssetsToolbar({
                   })
                 }
               >
-                <SelectTrigger className="h-10 rounded-xl">
+                <SelectTrigger className="h-9 w-[160px] rounded-xl border-border/40 bg-background/50 text-[13px]">
                   <SelectValue placeholder="Warehouse" />
                 </SelectTrigger>
                 <SelectContent>

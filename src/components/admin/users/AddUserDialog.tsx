@@ -57,7 +57,6 @@ export type NewUser = {
 type FormErrors = {
   firstName?: string;
   lastName?: string;
-  password?: string;
   address?: string;
   contactNumber?: string;
   warehouse?: string;
@@ -89,11 +88,6 @@ const DEPARTMENTS = [
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function generateId(): string {
-  const num = Math.floor(Math.random() * 900) + 100;
-  return `USR-${num}`;
-}
 
 function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -145,11 +139,9 @@ export default function AddUserDialog({
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
   const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
   const [address, setAddress] = React.useState("");
   const [contactNumber, setContactNumber] = React.useState("");
   const [warehouse, setWarehouse] = React.useState("");
-  const profileImageUrlRef = React.useRef<string | undefined>(undefined);
   const [role, setRole] = React.useState<UserRole | "">("");
   const [department, setDepartment] = React.useState("");
   const [status, setStatus] = React.useState<UserStatus | "">("");
@@ -162,14 +154,9 @@ export default function AddUserDialog({
         setFirstName("");
         setLastName("");
         setEmail("");
-        setPassword("");
         setAddress("");
         setContactNumber("");
         setWarehouse("");
-        if (profileImageUrlRef.current) {
-          URL.revokeObjectURL(profileImageUrlRef.current);
-          profileImageUrlRef.current = undefined;
-        }
         setRole("");
         setDepartment("");
         setStatus("");
@@ -186,9 +173,6 @@ export default function AddUserDialog({
     if (!lastName.trim()) errs.lastName = "Last name is required.";
     if (!email.trim()) errs.email = "Email is required.";
     else if (!validateEmail(email.trim())) errs.email = "Please enter a valid email address.";
-    if (!password.trim()) errs.password = "Password is required.";
-    else if (password.trim().length < 6)
-      errs.password = "Password must be at least 6 characters.";
     if (!address.trim()) errs.address = "Residence address is required.";
     if (!contactNumber.trim()) errs.contactNumber = "Contact number is required.";
     if (!warehouse) errs.warehouse = "Please select a warehouse.";
@@ -234,7 +218,6 @@ export default function AddUserDialog({
     };
 
     onUserAdded(newUser);
-    setPassword("");
     onOpenChange(false);
 
     toast.success("User added successfully!", {
@@ -298,22 +281,6 @@ export default function AddUserDialog({
                 if (errors.email) setErrors((p) => ({ ...p, email: undefined }));
               }}
               aria-invalid={!!errors.email}
-              className="bg-background"
-            />
-          </FieldCard>
-
-          {/* Password */}
-          <FieldCard icon={Shield} label="Password" htmlFor="add-user-password" error={errors.password}>
-            <Input
-              id="add-user-password"
-              type="password"
-              placeholder="Enter a secure password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (errors.password) setErrors((p) => ({ ...p, password: undefined }));
-              }}
-              aria-invalid={!!errors.password}
               className="bg-background"
             />
           </FieldCard>
@@ -426,27 +393,6 @@ export default function AddUserDialog({
                 <SelectItem value="Galle">Galle</SelectItem>
               </SelectContent>
             </Select>
-          </FieldCard>
-
-          {/* Profile Picture */}
-          <FieldCard icon={UserPlus} label="Profile Picture" htmlFor="add-user-profile-picture" error={undefined}>
-            <Input
-              id="add-user-profile-picture"
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (profileImageUrlRef.current) {
-                  URL.revokeObjectURL(profileImageUrlRef.current);
-                }
-                if (file) {
-                  profileImageUrlRef.current = URL.createObjectURL(file);
-                } else {
-                  profileImageUrlRef.current = undefined;
-                }
-              }}
-              className="bg-background"
-            />
           </FieldCard>
 
           {/* Action buttons */}

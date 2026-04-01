@@ -230,6 +230,27 @@ export default function AdminUsersPage() {
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
 
+  function generateUserId(role: UserRole, department: string): string {
+    const roleLetter = role === "admin" ? "A" : "U";
+    const deptLetter = department.charAt(0).toUpperCase() || "X";
+
+    const relevantUsers = users.filter((u) => u.id.startsWith(roleLetter));
+    let maxNumber = 0;
+
+    for (const u of relevantUsers) {
+      const match = u.id.match(/^[AU](\d{4})[A-Z]?$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!Number.isNaN(num) && num > maxNumber) {
+          maxNumber = num;
+        }
+      }
+    }
+
+    const next = String(maxNumber + 1).padStart(4, "0");
+    return `${roleLetter}${next}${deptLetter}`;
+  }
+
   React.useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 1000);
     return () => clearTimeout(timer);
@@ -304,7 +325,7 @@ export default function AdminUsersPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search users by name or ID"
+              placeholder="Search users by name, email or ID"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"

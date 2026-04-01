@@ -129,7 +129,7 @@ export default function AdminNavbar({
           >
             {/* Top glow when floating */}
             {scrolled && (
-              <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-b from-white/35 via-transparent to-transparent opacity-70 dark:from-white/10" />
+              <div className="pointer-events-none absolute inset-0 rounded-3xl bg-linear-to-b from-white/35 via-transparent to-transparent opacity-70 dark:from-white/10" />
             )}
 
             {/* Soft border glow in dark mode (floating) */}
@@ -226,7 +226,7 @@ export default function AdminNavbar({
                   <div
                     className={cn(
                       "grid place-items-center rounded-full font-semibold text-white",
-                      "bg-gradient-to-br from-violet-600 to-indigo-600",
+                      "bg-linear-to-br from-violet-600 to-indigo-600",
                       "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
                       "ring-1 ring-white/40 dark:ring-white/10",
                       "h-10 w-10 text-sm transition-transform hover:scale-105"
@@ -242,7 +242,7 @@ export default function AdminNavbar({
                   onClick={handleProfileClick}
                   className={cn(
                     "sm:hidden grid place-items-center rounded-full font-semibold text-white",
-                    "bg-gradient-to-br from-violet-600 to-indigo-600",
+                    "bg-linear-to-br from-violet-600 to-indigo-600",
                     "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
                     "ring-1 ring-white/40 dark:ring-white/10",
                     "h-10 w-10 text-sm transition-transform hover:scale-105 cursor-pointer"
@@ -261,7 +261,7 @@ export default function AdminNavbar({
                       </Button>
                     </SheetTrigger>
 
-                    <SheetContent side="right" className="w-[320px] sm:w-[360px]">
+                    <SheetContent side="right" className="w-[320px] sm:w-90">
                       <SheetHeader>
                         <SheetTitle className="flex items-center gap-3">
                           <PredictiXLogo size={32} showText={false} />
@@ -288,7 +288,7 @@ export default function AdminNavbar({
                           <div
                             className={cn(
                               "grid place-items-center rounded-full font-semibold text-white",
-                              "bg-gradient-to-br from-violet-600 to-indigo-600",
+                              "bg-linear-to-br from-violet-600 to-indigo-600",
                               "ring-1 ring-white/40 dark:ring-white/10",
                               "h-10 w-10 text-sm"
                             )}

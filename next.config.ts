@@ -1,14 +1,18 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
 
-  // IMPORTANT: no http:// and no :3000
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",
     "192.168.56.1",
   ],
+
+  turbopack: {
+    root: path.join(__dirname),
+  },
 };
 
 export default nextConfig;

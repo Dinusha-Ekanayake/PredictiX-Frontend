@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import {
   Select,
   SelectContent,
@@ -22,12 +23,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import AddUserDialog from "@/components/admin/AddUserDialog";
-import type { NewUser } from "@/components/admin/AddUserDialog";
-import ViewUserDetailsDialog from "@/components/admin/ViewUserDetailsDialog";
+import AddUserDialog from "@/components/admin/users/AddUserDialog";
+import type { NewUser } from "@/components/admin/users/AddUserDialog";
+import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
 import ViewAssignedAssetsDialog, {
   getMockAssetsForUser,
-} from "@/components/admin/ViewAssignedAssetsDialog";
+} from "@/components/admin/users/ViewAssignedAssetsDialog";
 
 import {
   Users,
@@ -219,6 +220,7 @@ function UserAvatar({ name }: { name: string }) {
 // ---------------------------------------------------------------------------
 
 export default function AdminUsersPage() {
+  const [isLoading, setIsLoading] = React.useState(true);
   const [users, setUsers] = React.useState<UserItem[]>(INITIAL_USERS);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
@@ -228,26 +230,11 @@ export default function AdminUsersPage() {
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
 
-  function generateUserId(role: UserRole, department: string): string {
-    const roleLetter = role === "admin" ? "A" : "U";
-    const deptLetter = department.charAt(0).toUpperCase() || "X";
+  React.useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
-    const relevantUsers = users.filter((u) => u.id.startsWith(roleLetter));
-    let maxNumber = 0;
-
-    for (const u of relevantUsers) {
-      const match = u.id.match(/^[AU](\d{4})[A-Z]?$/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (!Number.isNaN(num) && num > maxNumber) {
-          maxNumber = num;
-        }
-      }
-    }
-
-    const next = String(maxNumber + 1).padStart(4, "0");
-    return `${roleLetter}${next}${deptLetter}`;
-  }
   const filteredUsers = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
@@ -284,6 +271,14 @@ export default function AdminUsersPage() {
     setAssetsUser(user);
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <PredictiXLoader label="Loading users…" />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full space-y-6">
       {/* KPI cards */}
@@ -318,7 +313,7 @@ export default function AdminUsersPage() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-35">
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
               <SelectContent>
@@ -371,12 +366,12 @@ export default function AdminUsersPage() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="min-w-[240px] pl-6">User</TableHead>
-                  <TableHead className="w-[100px]">Role</TableHead>
-                  <TableHead className="w-[160px]">Department</TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[140px]">Assigned Assets</TableHead>
-                  <TableHead className="w-[180px]">Actions</TableHead>
+                  <TableHead className="min-w-60 pl-6">User</TableHead>
+                  <TableHead className="w-25">Role</TableHead>
+                  <TableHead className="w-40">Department</TableHead>
+                  <TableHead className="w-25">Status</TableHead>
+                  <TableHead className="w-35">Assigned Assets</TableHead>
+                  <TableHead className="w-45">Actions</TableHead>
                 </TableRow>
               </TableHeader>
 

@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-import { Mail, Building2, ShieldCheck } from "lucide-react";
+import { Mail, Building2, ShieldCheck, Phone, MapPin } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,8 +23,13 @@ type UserStatus = "active" | "inactive";
 
 export type ViewUser = {
   id: string;
+  firstName: string;
+  lastName: string;
   name: string;
   email: string;
+  address: string;
+  contactNumber: string;
+  warehouse: string;
   role: UserRole;
   department: string;
   status: UserStatus;
@@ -153,6 +158,9 @@ export default function ViewUserDetailsDialog({
           <InfoCard icon={Mail} label="Email" value={user.email} />
           <InfoCard icon={Building2} label="Department" value={user.department} />
           <InfoCard icon={ShieldCheck} label="Status" value={user.status} />
+          <InfoCard icon={Phone} label="Contact Number" value={user.contactNumber} />
+          <InfoCard icon={MapPin} label="Residence Address" value={user.address} />
+          <InfoCard icon={Building2} label="Warehouse" value={user.warehouse} />
         </div>
 
         {/* Assigned assets highlight card */}

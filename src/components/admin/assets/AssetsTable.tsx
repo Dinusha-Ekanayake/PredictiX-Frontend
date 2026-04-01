@@ -4,22 +4,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Asset } from "./types";
+import type { ComponentProps } from "react";
+
+type BadgeVariant = ComponentProps<typeof Badge>["variant"];
 
 function StatusBadge({ s }: { s: Asset["status"] }) {
-  const variant =
-    s === "CRITICAL" ? "destructive" : s === "MAINTENANCE" ? "secondary" : "default";
-  return <Badge variant={variant as any}>{s}</Badge>;
+  const variant: BadgeVariant =
+    s === "CRITICAL"
+      ? "destructive"
+      : s === "MAINTENANCE"
+        ? "secondary"
+        : "default";
+
+  return <Badge variant={variant}>{s}</Badge>;
 }
+
+type AssetsTableProps = {
+  assets: Asset[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+};
 
 export default function AssetsTable({
   assets,
   selectedId,
   onSelect,
-}: {
-  assets: Asset[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
+}: AssetsTableProps) {
   return (
     <Card className="rounded-2xl">
       <CardHeader className="pb-3">
@@ -27,7 +37,6 @@ export default function AssetsTable({
       </CardHeader>
 
       <CardContent className="pt-0">
-        {/* Header row */}
         <div className="grid grid-cols-12 rounded-xl border bg-muted/20 px-3 py-2 text-xs font-medium text-muted-foreground">
           <div className="col-span-5">Asset</div>
           <div className="col-span-3">Warehouse</div>
@@ -35,30 +44,32 @@ export default function AssetsTable({
           <div className="col-span-2 text-right">Health</div>
         </div>
 
-        {/* Rows */}
-        <ScrollArea className="mt-3 h-[520px] rounded-xl border">
+        <ScrollArea className="mt-3 h-130 rounded-xl border">
           <div className="divide-y">
             {assets.map((a) => {
               const active = selectedId === a.id;
+
               return (
                 <button
                   key={a.id}
                   onClick={() => onSelect(a.id)}
                   className={[
-                    "w-full text-left px-3 py-3 transition",
+                    "w-full px-3 py-3 text-left transition",
                     "hover:bg-accent/40",
                     active ? "bg-accent/50" : "",
                   ].join(" ")}
                 >
                   <div className="grid grid-cols-12 items-center gap-2">
                     <div className="col-span-5">
-                      <div className="text-sm font-semibold leading-tight">{a.name}</div>
+                      <div className="text-sm font-semibold leading-tight">
+                        {a.name}
+                      </div>
                       <div className="text-xs text-muted-foreground">{a.id}</div>
                     </div>
 
                     <div className="col-span-3">
                       <div className="text-sm font-medium">{a.warehouse.name}</div>
-                      <div className="text-xs text-muted-foreground line-clamp-1">
+                      <div className="line-clamp-1 text-xs text-muted-foreground">
                         {a.location}
                       </div>
                     </div>

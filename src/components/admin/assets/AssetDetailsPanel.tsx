@@ -1,5 +1,6 @@
 "use client";
 
+import type { ComponentProps } from "react";
 import SectionCard from "@/components/admin/common/SectionCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,10 +9,17 @@ import { Separator } from "@/components/ui/separator";
 
 import type { Asset } from "./types";
 
+type BadgeVariant = ComponentProps<typeof Badge>["variant"];
+
 function StatusBadge({ s }: { s: Asset["status"] }) {
-  const variant =
-    s === "CRITICAL" ? "destructive" : s === "MAINTENANCE" ? "secondary" : "default";
-  return <Badge variant={variant as any}>{s}</Badge>;
+  const variant: BadgeVariant =
+    s === "CRITICAL"
+      ? "destructive"
+      : s === "MAINTENANCE"
+        ? "secondary"
+        : "default";
+
+  return <Badge variant={variant}>{s}</Badge>;
 }
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -23,7 +31,13 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
+type AssetDetailsPanelProps = {
+  asset: Asset;
+};
+
+export default function AssetDetailsPanel({
+  asset,
+}: AssetDetailsPanelProps) {
   return (
     <div className="space-y-6">
       <SectionCard
@@ -46,13 +60,14 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
               <StatusBadge s={asset.status} />
               <Badge variant="secondary">ID: {asset.id}</Badge>
             </div>
-            <div className="mt-1 text-sm text-muted-foreground">{asset.description}</div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              {asset.description}
+            </div>
           </div>
         </div>
 
         <Separator className="my-4" />
 
-        {/* Key fields grid */}
         <div className="grid grid-cols-12 gap-3">
           <div className="col-span-12 md:col-span-4">
             <Field label="Warehouse" value={asset.warehouse.name} />
@@ -61,7 +76,10 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
             <Field label="Location" value={asset.location} />
           </div>
           <div className="col-span-12 md:col-span-4">
-            <Field label="Assigned Person" value={asset.assignedPerson?.name ?? "Unassigned"} />
+            <Field
+              label="Assigned Person"
+              value={asset.assignedPerson?.name ?? "Unassigned"}
+            />
           </div>
 
           <div className="col-span-12 md:col-span-4">
@@ -81,33 +99,49 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
           </div>
 
           <div className="col-span-12 md:col-span-6">
-            <Field label="Last Maintenance" value={asset.lastMaintenanceDate ?? "—"} />
+            <Field
+              label="Last Maintenance"
+              value={asset.lastMaintenanceDate ?? "—"}
+            />
           </div>
           <div className="col-span-12 md:col-span-6">
-            <Field label="Next Maintenance" value={asset.nextMaintenanceDate ?? "—"} />
+            <Field
+              label="Next Maintenance"
+              value={asset.nextMaintenanceDate ?? "—"}
+            />
           </div>
 
           <div className="col-span-12 md:col-span-6">
-            <Field label="Scheduled Maintenance" value={asset.scheduledMaintenanceDate ?? "—"} />
+            <Field
+              label="Scheduled Maintenance"
+              value={asset.scheduledMaintenanceDate ?? "—"}
+            />
           </div>
           <div className="col-span-12 md:col-span-6">
-            <Field label="Predicted Maintenance" value={asset.predictedMaintenanceDate ?? "—"} />
+            <Field
+              label="Predicted Maintenance"
+              value={asset.predictedMaintenanceDate ?? "—"}
+            />
           </div>
 
           <div className="col-span-12 md:col-span-6">
-            <Field label="Estimated Cost" value={`$${asset.estimatedCost.toLocaleString()}`} />
+            <Field
+              label="Estimated Cost"
+              value={`$${asset.estimatedCost.toLocaleString()}`}
+            />
           </div>
           <div className="col-span-12 md:col-span-6">
             <Field
               label="Cost Variance (30d)"
-              value={`${asset.costVariance30d >= 0 ? "+" : ""}${(asset.costVariance30d * 100).toFixed(0)}%`}
+              value={`${asset.costVariance30d >= 0 ? "+" : ""}${(
+                asset.costVariance30d * 100
+              ).toFixed(0)}%`}
             />
           </div>
         </div>
 
         <Separator className="my-4" />
 
-        {/* Tabs */}
         <Tabs defaultValue="insights">
           <TabsList className="rounded-xl">
             <TabsTrigger value="insights">Predictive Insights</TabsTrigger>
@@ -119,12 +153,12 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
           <TabsContent value="insights" className="mt-4 space-y-4">
             <div className="grid grid-cols-12 gap-4">
               <div className="col-span-12 lg:col-span-6">
-                <div className="h-[220px] rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Health Score Trend & Forecast (placeholder)
                 </div>
               </div>
               <div className="col-span-12 lg:col-span-6">
-                <div className="h-[220px] rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Failure Probability Forecast (8 weeks) (placeholder)
                 </div>
               </div>
@@ -132,9 +166,15 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
                 <div className="rounded-2xl border p-4">
                   <div className="text-sm font-medium">Insight Summary</div>
                   <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                    <li>Predicted maintenance earlier than scheduled (based on risk trend).</li>
+                    <li>
+                      Predicted maintenance earlier than scheduled (based on risk
+                      trend).
+                    </li>
                     <li>Confidence reflects available sensor/log coverage.</li>
-                    <li>Estimated cost variance indicates recent maintenance cost deviation.</li>
+                    <li>
+                      Estimated cost variance indicates recent maintenance cost
+                      deviation.
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -156,7 +196,9 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
                     </div>
                     <Badge variant="secondary">${l.cost.toLocaleString()}</Badge>
                   </div>
-                  <div className="mt-2 text-sm text-muted-foreground">{l.notes}</div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    {l.notes}
+                  </div>
                   <div className="mt-2 text-xs text-muted-foreground">
                     Performed by: {l.performedBy?.name ?? "—"}
                   </div>

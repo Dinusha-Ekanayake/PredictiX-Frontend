@@ -6,24 +6,26 @@ import AssetsToolbar from "@/components/admin/assets/AssetsToolbar";
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel from "@/components/admin/assets/AssetDetailsPanel";
 import { ASSETS } from "@/components/admin/assets/mock";
-import type { AssetFilters, AssetRecord } from "@/components/admin/assets/types";
+import type { AssetRecord, AssetFilters } from "@/components/admin/assets/types";
+import { Box } from "lucide-react";
+
+function getHealthBand(score: number) {
+  if (score >= 80) return "excellent";
+  if (score >= 60) return "good";
+  if (score >= 40) return "moderate";
+  if (score >= 20) return "poor";
+  return "critical";
+}
 
 function matchesQuery(asset: AssetRecord, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
 
   const searchableValues = [
-    asset.assetCode,
+    asset.id,
     asset.assetName,
-    asset.assetType,
-    asset.category,
-    asset.vehicleType,
-    asset.make,
-    asset.model,
-    asset.makeModel,
-    asset.registrationNumber,
-    asset.vin,
-    asset.warehouse.code,
+    asset.assetCode,
+    asset.description,
     asset.warehouse.name,
     asset.assignedTo?.name,
   ]
@@ -42,11 +44,11 @@ function applyFilters(assets: AssetRecord[], filters: AssetFilters) {
     const healthBandMatch =
       filters.healthBand === "all"
         ? true
-        : asset.healthBand === filters.healthBand;
+        : getHealthBand(asset.prediction?.healthScore ?? 0) === filters.healthBand;
     const warehouseMatch =
       filters.warehouse === "all"
         ? true
-        : asset.warehouse.code === filters.warehouse;
+        : asset.warehouse.id === filters.warehouse;
 
     return queryMatch && statusMatch && healthBandMatch && warehouseMatch;
   });
@@ -63,7 +65,7 @@ export default function AdminAssetsPage() {
   const warehouseOptions = React.useMemo(() => {
     const seen = new Map<string, string>();
     ASSETS.forEach((asset) => {
-      seen.set(asset.warehouse.code, asset.warehouse.name);
+      seen.set(asset.warehouse.id, asset.warehouse.name);
     });
 
     return Array.from(seen.entries()).map(([value, label]) => ({
@@ -100,18 +102,22 @@ export default function AdminAssetsPage() {
   );
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+    <div className="space-y-6">
+      {/* Page header */}
+      <div className="flex flex-col gap-1.5 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Assets</h1>
-          <p className="text-sm text-muted-foreground">
-            Monitor vehicle health, warehouse coverage, maintenance state, and predictive insights.
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            Monitor fleet health, maintenance state, and predictive insights
+            across all warehouses.
           </p>
         </div>
       </div>
 
+      {/* Summary cards */}
       <AssetsSummary assets={filteredAssets} />
 
+      {/* Toolbar */}
       <AssetsToolbar
         filters={filters}
         setFilters={setFilters}
@@ -119,7 +125,8 @@ export default function AdminAssetsPage() {
         warehouseOptions={warehouseOptions}
       />
 
-      <div className="grid grid-cols-12 gap-6">
+      {/* Main content: List + Detail panel */}
+      <div className="grid grid-cols-12 gap-5">
         <div className="col-span-12 xl:col-span-5">
           <AssetsTable
             assets={filteredAssets}
@@ -132,8 +139,14 @@ export default function AdminAssetsPage() {
           {selectedAsset ? (
             <AssetDetailsPanel asset={selectedAsset} />
           ) : (
-            <div className="rounded-2xl border border-border/60 bg-card/90 p-6 text-sm text-muted-foreground backdrop-blur-sm">
-              No asset selected.
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-border/40 bg-card/80 px-6 py-20 text-center backdrop-blur-xl">
+              <Box className="mb-4 h-12 w-12 text-muted-foreground/20" />
+              <p className="text-sm font-medium text-muted-foreground">
+                No asset selected
+              </p>
+              <p className="mt-1 text-[12px] text-muted-foreground/60">
+                Select an asset from the list to view its details
+              </p>
             </div>
           )}
         </div>

@@ -52,7 +52,7 @@ export default function AssetsToolbar({
                   })
                 }
               >
-                <SelectTrigger className="h-10 rounded-xl">
+                <SelectTrigger className="h-9 w-[140px] rounded-xl border-border/40 bg-background/50 text-[13px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -102,7 +102,7 @@ export default function AssetsToolbar({
                   })
                 }
               >
-                <SelectTrigger className="h-10 rounded-xl">
+                <SelectTrigger className="h-9 w-[160px] rounded-xl border-border/40 bg-background/50 text-[13px]">
                   <SelectValue placeholder="Warehouse" />
                 </SelectTrigger>
                 <SelectContent>

@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import AssetsSummary from "@/components/admin/assets/AssetsSummary";
-import AssetsToolbar, { AssetFilters } from "@/components/admin/assets/AssetsToolbar";
+import AssetsToolbar from "@/components/admin/assets/AssetsToolbar";
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel from "@/components/admin/assets/AssetDetailsPanel";
 import { ASSETS } from "@/components/admin/assets/mock";
-import type { Asset } from "@/components/admin/assets/types";
+import type { AssetRecord, AssetFilters } from "@/components/admin/assets/types";
 import { Box } from "lucide-react";
 
 function getHealthBand(score: number) {
@@ -17,17 +17,17 @@ function getHealthBand(score: number) {
   return "critical";
 }
 
-function matchesQuery(asset: Asset, query: string) {
+function matchesQuery(asset: AssetRecord, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
 
   const searchableValues = [
     asset.id,
-    asset.name,
+    asset.assetName,
+    asset.assetCode,
     asset.description,
     asset.warehouse.name,
-    asset.location,
-    asset.assignedPerson?.name,
+    asset.assignedTo?.name,
   ]
     .filter(Boolean)
     .join(" ")
@@ -36,7 +36,7 @@ function matchesQuery(asset: Asset, query: string) {
   return searchableValues.includes(q);
 }
 
-function applyFilters(assets: Asset[], filters: AssetFilters) {
+function applyFilters(assets: AssetRecord[], filters: AssetFilters) {
   return assets.filter((asset) => {
     const queryMatch = matchesQuery(asset, filters.query);
     const statusMatch =
@@ -44,7 +44,7 @@ function applyFilters(assets: Asset[], filters: AssetFilters) {
     const healthBandMatch =
       filters.healthBand === "all"
         ? true
-        : getHealthBand(asset.healthScore ?? 0) === filters.healthBand;
+        : getHealthBand(asset.prediction?.healthScore ?? 0) === filters.healthBand;
     const warehouseMatch =
       filters.warehouse === "all"
         ? true

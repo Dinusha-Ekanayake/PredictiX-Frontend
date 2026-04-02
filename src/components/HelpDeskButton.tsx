@@ -7,13 +7,15 @@ import { CircleHelp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseBrowserClient";
 
+const AUTH_PATHS = ["/login"];
+
 export default function HelpDeskButton() {
   const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
 
   // Don't show on auth pages
-  const isAuthPage = pathname?.includes("/login") || pathname?.includes("/(auth)");
+  const isAuthPage = pathname != null && AUTH_PATHS.includes(pathname);
 
   React.useEffect(() => {
     // Check Supabase session

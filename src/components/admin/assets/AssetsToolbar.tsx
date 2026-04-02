@@ -12,13 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, RotateCcw, Search } from "lucide-react";
-
-export type AssetFilters = {
-  query: string;
-  status: string;
-  healthBand: string;
-  warehouse: string;
-};
+import type { AssetFilters } from "./types";
 
 type Props = {
   filters: AssetFilters;

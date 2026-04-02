@@ -16,6 +16,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { useTheme } from "next-themes";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, PieChart as PieIcon, BarChart3 } from "lucide-react";
@@ -58,12 +59,24 @@ const assetsByType = [
   { type: "Climate Control", count: 1 },
 ];
 
-function gridStroke() {
-  // subtle grid in dark mode too
-  return "hsl(var(--border))";
+// Reusable hook-based styles
+function useChartStyles() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  return {
+    axisColor: isDark ? "#cbd5e1" : "#475569",
+    gridColor: isDark ? "rgba(148, 163, 184, 0.18)" : "rgba(148, 163, 184, 0.3)",
+    tooltipStyle: {
+      backgroundColor: isDark ? "#0f172a" : "#ffffff",
+      border: isDark ? "1px solid #334155" : "1px solid #e2e8f0",
+      color: isDark ? "#f8fafc" : "#0f172a",
+    },
+  };
 }
 
 export function HealthMaintenanceTrendsCard() {
+  const { axisColor, gridColor, tooltipStyle } = useChartStyles();
+
   return (
     <Card className="rounded-2xl">
       <CardHeader>
@@ -80,12 +93,12 @@ export function HealthMaintenanceTrendsCard() {
         <div className="h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={healthMaintenanceTrends} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke()} />
-              <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-              <YAxis yAxisId="left" tick={{ fill: "hsl(var(--muted-foreground))" }} domain={[0, 100]} />
-              <YAxis yAxisId="right" orientation="right" hide />
-              <Tooltip />
-              <Legend />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="month" tick={{ fill: axisColor }} />
+              <YAxis yAxisId="left" tick={{ fill: axisColor }} domain={[0, 100]} />
+              <YAxis yAxisId="right" orientation="right" hide tick={{ fill: axisColor }} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ color: axisColor }} />
               <Area
                 yAxisId="left"
                 type="monotone"
@@ -113,6 +126,8 @@ export function HealthMaintenanceTrendsCard() {
 }
 
 export function AssetStatusDistributionCard() {
+  const { axisColor, tooltipStyle } = useChartStyles();
+
   return (
     <Card className="rounded-2xl">
       <CardHeader>
@@ -147,8 +162,8 @@ export function AssetStatusDistributionCard() {
                   />
                 ))}
               </Pie>
-              <Tooltip />
-              <Legend />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ color: axisColor }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -158,6 +173,8 @@ export function AssetStatusDistributionCard() {
 }
 
 export function HealthScoreDistributionCard() {
+  const { axisColor, gridColor, tooltipStyle } = useChartStyles();
+
   return (
     <Card className="rounded-2xl">
       <CardHeader>
@@ -174,11 +191,11 @@ export function HealthScoreDistributionCard() {
         <div className="h-[260px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={healthScoreDist} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke()} />
-              <XAxis dataKey="bucket" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
-              <Tooltip />
-              <Legend />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="bucket" tick={{ fill: axisColor }} />
+              <YAxis tick={{ fill: axisColor }} allowDecimals={false} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ color: axisColor }} />
               <Bar dataKey="count" name="Number of Assets" fill="#22d3ee" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -189,6 +206,8 @@ export function HealthScoreDistributionCard() {
 }
 
 export function AssetsByTypeCard() {
+  const { axisColor, gridColor, tooltipStyle } = useChartStyles();
+
   return (
     <Card className="rounded-2xl">
       <CardHeader>
@@ -209,16 +228,16 @@ export function AssetsByTypeCard() {
               layout="vertical"
               margin={{ top: 10, right: 10, left: 20, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke()} />
-              <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis type="number" tick={{ fill: axisColor }} allowDecimals={false} />
               <YAxis
                 type="category"
                 dataKey="type"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fill: axisColor }}
                 width={120}
               />
-              <Tooltip />
-              <Legend />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ color: axisColor }} />
               <Bar dataKey="count" name="Number of Assets" fill="#14b8a6" radius={[8, 8, 8, 8]} />
             </BarChart>
           </ResponsiveContainer>

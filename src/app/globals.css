@@ -110,6 +110,18 @@ html {
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.551 0.027 264.364);
+  /* dynamic accent RGB channels (updated by JS on scroll when in dark mode) */
+  --dynamic-accent-r: 64;
+  --dynamic-accent-g: 0;
+  --dynamic-accent-b: 96;
+  --dynamic-accent: rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b));
+  /* When JS sets --accent, many components that use --accent will pick it up; fallback to dynamic-accent */
+  --accent: var(--dynamic-accent);
+  
+  /* Gradient color cores: dark purple, green, blue */
+  --gradient-purple: #4a1d6f;
+  --gradient-green: #1d5e3f;
+  --gradient-blue: #1d3a5f;
 }
 
 /* Base */
@@ -120,6 +132,21 @@ html {
 
   body {
     @apply bg-background text-foreground antialiased;
+  }
+  
+  /* Dark mode gradient background with purple, green, blue color cores */
+  .dark {
+    background: linear-gradient(
+      135deg,
+      var(--gradient-purple) 0%,
+      #2a1045 15%,
+      var(--gradient-blue) 35%,
+      #0f2535 50%,
+      var(--gradient-green) 70%,
+      #1a3f2f 85%,
+      var(--gradient-purple) 100%
+    );
+    background-attachment: fixed;
   }
 }
 
@@ -140,6 +167,85 @@ html {
 .float-slow-1 { animation: float-slow-1 16s ease-in-out infinite; }
 .float-slow-2 { animation: float-slow-2 18s ease-in-out infinite; }
 .float-slow-3 { animation: float-slow-3 20s ease-in-out infinite; }
+
+/* Theme bubble toggle animation */
+@keyframes theme-bubble {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    width: 200vw;
+    height: 200vw;
+    opacity: 0;
+  }
+}
+
+.animate-theme-bubble {
+  animation: theme-bubble 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Utility to apply the dynamic accent color as background / ring */
+.dynamic-accent-bg {
+  background-color: rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.08);
+}
+
+.dynamic-accent-ring {
+  box-shadow: 0 6px 18px -6px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.28), 0 0 0 4px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.06);
+}
+
+/* Card / ticket hover styles that use the dynamic accent in dark mode */
+.dark .card-dynamic {
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, border-color 160ms ease;
+  background: linear-gradient(
+    135deg,
+    rgba(74, 29, 111, 0.15) 0%,
+    rgba(29, 94, 63, 0.08) 50%,
+    rgba(29, 58, 95, 0.12) 100%
+  );
+  border: 1px solid rgba(29, 58, 95, 0.3);
+}
+.dark .card-dynamic:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(74, 29, 111, 0.25) 0%,
+    rgba(29, 94, 63, 0.15) 50%,
+    rgba(29, 58, 95, 0.22) 100%
+  );
+  box-shadow: 0 10px 30px -8px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.32), 
+              0 0 20px -8px rgba(29, 94, 63, 0.2),
+              0 0 15px -8px rgba(29, 58, 95, 0.15);
+  transform: translateY(-2px) scale(1.02);
+  border-color: rgba(29, 94, 63, 0.5);
+}
+
+.dark .ticket-dynamic {
+  transition: background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease, border-color 140ms ease;
+  background: linear-gradient(
+    135deg,
+    rgba(74, 29, 111, 0.08) 0%,
+    rgba(29, 94, 63, 0.06) 50%,
+    rgba(29, 58, 95, 0.08) 100%
+  );
+  border: 1px solid rgba(74, 29, 111, 0.2);
+}
+.dark .ticket-dynamic:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(74, 29, 111, 0.15) 0%,
+    rgba(29, 94, 63, 0.12) 50%,
+    rgba(29, 58, 95, 0.15) 100%
+  );
+  box-shadow: 0 8px 22px -6px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.26),
+              0 0 15px -6px rgba(29, 94, 63, 0.15),
+              0 0 12px -6px rgba(29, 58, 95, 0.12);
+  transform: translateY(-2px) scale(1.06);
+  border-color: rgba(29, 94, 63, 0.4);
+}
 
 /* ===== PredictiX loader animations ===== */
 

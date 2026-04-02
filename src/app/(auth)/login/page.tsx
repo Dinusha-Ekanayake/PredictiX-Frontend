@@ -74,6 +74,8 @@ export default function LoginPage() {
       // Admin login
       if (role === "ADMIN") {
         if (email.trim().toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+          window.localStorage.setItem("predictix.user.role", "ADMIN");
+          window.localStorage.setItem("predictix.user.email", email.trim().toLowerCase());
           router.push("/admin/dashboard");
           return;
         }
@@ -83,6 +85,8 @@ export default function LoginPage() {
 
       // User login (for now: allow any non-empty credentials)
       // You can tighten this later when backend is ready
+      window.localStorage.setItem("predictix.user.role", "USER");
+      window.localStorage.setItem("predictix.user.email", email.trim().toLowerCase());
       router.push("/admin/dashboard");
     } finally {
       setIsSubmitting(false);

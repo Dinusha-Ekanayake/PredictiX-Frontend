@@ -30,7 +30,12 @@ import {
 import type {
   Asset,
   AssetStatus,
+  AssetHealthBand,
+  AssetRecord,
+  MaintenanceEventType,
   MaintenanceLog,
+  AssignmentEvent,
+  AssetAuditEvent,
 } from "./types";
 
 /* ═══════════════════════════════════════════════
@@ -460,7 +465,7 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
                   {/* Timeline line */}
                   <div className="absolute left-[17px] top-2 bottom-2 w-px bg-border/40" />
 
-                  {asset.maintenanceLogs.map((event) => {
+                  {asset.maintenanceLogs.map((event: MaintenanceLog) => {
                     const config = maintenanceEventConfig(event.type);
                     return (
                       <div key={event.id} className="relative flex gap-4 pb-5 last:pb-0">
@@ -537,7 +542,7 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
                 <div className="relative space-y-0">
                   <div className="absolute left-[17px] top-2 bottom-2 w-px bg-border/40" />
 
-                  {asset.assignmentHistory.map((assignment: any) => (
+                  {asset.assignmentHistory.map((assignment: AssignmentEvent) => (
                     <div
                       key={assignment.id}
                       className="relative flex gap-4 pb-5 last:pb-0"
@@ -603,7 +608,7 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
                 <div className="relative space-y-0">
                   <div className="absolute left-[17px] top-2 bottom-2 w-px bg-border/40" />
 
-                  {asset.auditTrail.map((event: any) => (
+                  {asset.auditTrail.map((event: AssetAuditEvent) => (
                     <div
                       key={event.id}
                       className="relative flex gap-4 pb-5 last:pb-0"

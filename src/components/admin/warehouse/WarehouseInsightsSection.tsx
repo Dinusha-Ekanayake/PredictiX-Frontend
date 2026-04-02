@@ -2,6 +2,9 @@
 
 import * as React from "react";
 
+import WarehouseKPIGrid from "@/components/admin/warehouse/WarehouseKPIGrid";
+import CriticalAssetsTable from "@/components/admin/warehouse/CriticalAssetsTable";
+
 import {
   HealthMaintenanceTrendsCard,
   AssetStatusDistributionCard,
@@ -19,26 +22,32 @@ import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/Warehouse
 
 export default function WarehouseInsightsSection() {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {/* Row 1 */}
-      <HealthMaintenanceTrendsCard />
-      <AssetStatusDistributionCard />
+    <div className="space-y-6">
+      {/* New KPI cards */}
+      <WarehouseKPIGrid />
 
-      {/* Row 2 */}
-      <HealthScoreDistributionCard />
-      <TicketPriorityBreakdownCard />
+      {/* Previous charts */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <HealthMaintenanceTrendsCard />
+        <AssetStatusDistributionCard />
 
-      {/* Row 3 */}
-      <TicketsByCategoryCard />
-      <AssetsByTypeCard />
+        <HealthScoreDistributionCard />
+        <TicketPriorityBreakdownCard />
 
-      {/* Full width */}
-      <div className="lg:col-span-2">
-        <WarehouseMaintenanceSchedule />
+        <TicketsByCategoryCard />
+        <AssetsByTypeCard />
+
+        <div className="lg:col-span-2">
+          <WarehouseMaintenanceSchedule />
+        </div>
+
+        <div className="lg:col-span-2">
+          <MonthlyTicketVolumeCard />
+        </div>
       </div>
 
-      {/* Full width */}
-      <MonthlyTicketVolumeCard />
+      {/* New table */}
+      <CriticalAssetsTable />
     </div>
   );
 }

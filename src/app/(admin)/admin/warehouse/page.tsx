@@ -34,10 +34,7 @@ export default function WarehousePage() {
             Refresh
           </Button>
 
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
-          </Button>
+          
 
           <Button variant="secondary">
             <FileText className="mr-2 h-4 w-4" />

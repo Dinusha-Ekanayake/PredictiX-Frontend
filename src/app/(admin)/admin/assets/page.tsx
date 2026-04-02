@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import AssetsSummary from "@/components/admin/assets/AssetsSummary";
-import AssetsToolbar from "@/components/admin/assets/AssetsToolbar";
+import AssetsToolbar, {
+  AssetFilters,
+} from "@/components/admin/assets/AssetsToolbar";
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel from "@/components/admin/assets/AssetDetailsPanel";
 import { ASSETS } from "@/components/admin/assets/mock";
@@ -64,6 +66,7 @@ export default function AdminAssetsPage() {
 
   const warehouseOptions = React.useMemo(() => {
     const seen = new Map<string, string>();
+
     ASSETS.forEach((asset) => {
       seen.set(asset.warehouse.id, asset.warehouse.name);
     });
@@ -103,7 +106,6 @@ export default function AdminAssetsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
       <div className="flex flex-col gap-1.5 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Assets</h1>
@@ -114,10 +116,8 @@ export default function AdminAssetsPage() {
         </div>
       </div>
 
-      {/* Summary cards */}
       <AssetsSummary assets={filteredAssets} />
 
-      {/* Toolbar */}
       <AssetsToolbar
         filters={filters}
         setFilters={setFilters}
@@ -125,7 +125,6 @@ export default function AdminAssetsPage() {
         warehouseOptions={warehouseOptions}
       />
 
-      {/* Main content: List + Detail panel */}
       <div className="grid grid-cols-12 gap-5">
         <div className="col-span-12 xl:col-span-5">
           <AssetsTable

@@ -8,7 +8,7 @@ import {
   Users,
 } from "lucide-react";
 
-import WarehouseInsightsSection from "@/components/Dashboard/WarehouseInsightsSection";
+import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsightsSection";
 
 // IMPORTANT: change this import path to match your repo
 // Use Ctrl+Shift+F and search:  export function ThemeToggle

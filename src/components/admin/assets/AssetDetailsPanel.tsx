@@ -1,110 +1,43 @@
 "use client";
 
-import * as React from "react";
+import type { ComponentProps } from "react";
 import SectionCard from "@/components/admin/common/SectionCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
-import type {
-  AssetHealthBand,
-  AssetRecord,
-  AssetStatus,
-  MaintenanceEventType,
-} from "./types";
 
-function statusClasses(status: AssetStatus) {
-  switch (status) {
-    case "critical":
-      return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20";
-    case "under_maintenance":
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20";
-    case "inactive":
-      return "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/20";
-    case "decommissioned":
-      return "bg-zinc-500/10 text-zinc-700 dark:text-zinc-400 border-zinc-500/20";
-    case "active":
-    default:
-      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20";
-  }
+import type { Asset } from "./types";
+
+type BadgeVariant = ComponentProps<typeof Badge>["variant"];
+
+function StatusBadge({ s }: { s: Asset["status"] }) {
+  const variant: BadgeVariant =
+    s === "CRITICAL"
+      ? "destructive"
+      : s === "MAINTENANCE"
+        ? "secondary"
+        : "default";
+
+  return <Badge variant={variant}>{s}</Badge>;
 }
 
-function healthBandClasses(healthBand?: AssetHealthBand | null) {
-  switch (healthBand) {
-    case "critical":
-      return "bg-red-500/10 text-red-600 dark:text-red-400";
-    case "poor":
-      return "bg-orange-500/10 text-orange-700 dark:text-orange-400";
-    case "moderate":
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
-    case "good":
-      return "bg-sky-500/10 text-sky-700 dark:text-sky-400";
-    case "excellent":
-      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
-    default:
-      return "bg-muted text-muted-foreground";
-  }
-}
-
-function maintenanceEventClasses(type: MaintenanceEventType) {
-  switch (type) {
-    case "breakdown":
-      return "bg-red-500/10 text-red-600 dark:text-red-400";
-    case "repair":
-    case "corrective":
-      return "bg-orange-500/10 text-orange-700 dark:text-orange-400";
-    case "inspection":
-    case "scheduled_service":
-    case "preventive":
-      return "bg-sky-500/10 text-sky-700 dark:text-sky-400";
-    case "replacement":
-      return "bg-violet-500/10 text-violet-700 dark:text-violet-400";
-    default:
-      return "bg-muted text-muted-foreground";
-  }
-}
-
-function formatDate(date?: string | null) {
-  if (!date) return "—";
-  return new Date(date).toLocaleDateString();
-}
-
-function formatDateTime(date?: string | null) {
-  if (!date) return "—";
-  return new Date(date).toLocaleString();
-}
-
-function formatCurrency(value?: number | null, currency = "LKR") {
-  if (typeof value !== "number") return "—";
-  return new Intl.NumberFormat("en-LK", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatPercent(value?: number | null) {
-  if (typeof value !== "number") return "—";
-  return `${Math.round(value * 100)}%`;
-}
-
-function InfoField({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-background/60 p-3">
+    <div className="rounded-2xl border p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-1 text-sm font-medium">{value}</div>
     </div>
   );
 }
 
-export default function AssetDetailsPanel({ asset }: { asset: AssetRecord }) {
+type AssetDetailsPanelProps = {
+  asset: Asset;
+};
+
+export default function AssetDetailsPanel({
+  asset,
+}: AssetDetailsPanelProps) {
   return (
     <div className="space-y-6">
       <SectionCard
@@ -114,367 +47,212 @@ export default function AssetDetailsPanel({ asset }: { asset: AssetRecord }) {
             <Button variant="outline" className="h-8 rounded-xl px-3 text-xs">
               Edit
             </Button>
-            <Button className="h-8 rounded-xl px-3 text-xs">Create Ticket</Button>
+            <Button variant="destructive" className="h-8 rounded-xl px-3 text-xs">
+              Delete
+            </Button>
           </div>
         }
       >
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="text-lg font-semibold">{asset.assetName}</div>
-
-                <Badge
-                  variant="outline"
-                  className={cn("capitalize", statusClasses(asset.status))}
-                >
-                  {asset.status.replaceAll("_", " ")}
-                </Badge>
-
-                <Badge
-                  variant="secondary"
-                  className={cn("capitalize", healthBandClasses(asset.healthBand))}
-                >
-                  {asset.healthBand ?? "unknown"}
-                </Badge>
-
-                <Badge variant="outline">{asset.assetCode}</Badge>
-              </div>
-
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                {asset.description ?? "No description available."}
-              </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-base font-semibold">{asset.name}</div>
+              <StatusBadge s={asset.status} />
+              <Badge variant="secondary">ID: {asset.id}</Badge>
             </div>
-
-            <div className="grid min-w-[220px] grid-cols-2 gap-3">
-              <InfoField
-                label="Health Score"
-                value={
-                  typeof asset.prediction?.healthScore === "number"
-                    ? `${asset.prediction.healthScore}%`
-                    : "—"
-                }
-              />
-              <InfoField
-                label="Failure Risk"
-                value={formatPercent(asset.prediction?.failureProbability)}
-              />
+            <div className="mt-1 text-sm text-muted-foreground">
+              {asset.description}
             </div>
           </div>
-
-          <Separator />
-
-          <div className="grid grid-cols-12 gap-3">
-            <div className="col-span-12 md:col-span-4">
-              <InfoField label="Warehouse" value={asset.warehouse.name} />
-            </div>
-            <div className="col-span-12 md:col-span-4">
-              <InfoField
-                label="Assigned User"
-                value={asset.assignedTo?.name ?? "Unassigned"}
-              />
-            </div>
-            <div className="col-span-12 md:col-span-4">
-              <InfoField
-                label="Maintenance Priority"
-                value={asset.maintenancePriority ?? "—"}
-              />
-            </div>
-
-            <div className="col-span-12 md:col-span-4">
-              <InfoField label="Type" value={asset.vehicleType ?? asset.assetType} />
-            </div>
-            <div className="col-span-12 md:col-span-4">
-              <InfoField
-                label="Make / Model"
-                value={(asset.makeModel ?? [asset.make, asset.model].filter(Boolean).join(" / ")) || "—"}
-              />
-            </div>
-            <div className="col-span-12 md:col-span-4">
-              <InfoField
-                label="Registration No."
-                value={asset.registrationNumber ?? "—"}
-              />
-            </div>
-
-            <div className="col-span-12 md:col-span-4">
-              <InfoField
-                label="Current Mileage"
-                value={
-                  typeof asset.currentMileage === "number"
-                    ? `${asset.currentMileage.toLocaleString()} km`
-                    : "—"
-                }
-              />
-            </div>
-            <div className="col-span-12 md:col-span-4">
-              <InfoField
-                label="Last Service Date"
-                value={formatDate(asset.lastServiceDate)}
-              />
-            </div>
-            <div className="col-span-12 md:col-span-4">
-              <InfoField
-                label="Next Service Date"
-                value={formatDate(asset.nextServiceDate)}
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          <Tabs defaultValue="predictions">
-            <TabsList className="rounded-xl">
-              <TabsTrigger value="predictions">Predictions</TabsTrigger>
-              <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
-              <TabsTrigger value="properties">Properties</TabsTrigger>
-              <TabsTrigger value="audit">Audit Trail</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="predictions" className="mt-4 space-y-4">
-              <div className="grid grid-cols-12 gap-3">
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Confidence"
-                    value={formatPercent(asset.prediction?.confidence)}
-                  />
-                </div>
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Predicted Maintenance Date"
-                    value={formatDate(asset.prediction?.predictedMaintenanceDate)}
-                  />
-                </div>
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Days Until Maintenance"
-                    value={asset.prediction?.daysUntilMaintenance ?? "—"}
-                  />
-                </div>
-
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Estimated Cost"
-                    value={formatCurrency(
-                      asset.prediction?.estimatedCost,
-                      asset.prediction?.currency
-                    )}
-                  />
-                </div>
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Estimated Cost Range"
-                    value={`${formatCurrency(
-                      asset.prediction?.minCost,
-                      asset.prediction?.currency
-                    )} — ${formatCurrency(
-                      asset.prediction?.maxCost,
-                      asset.prediction?.currency
-                    )}`}
-                  />
-                </div>
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Criticality Score"
-                    value={asset.criticalityScore ?? "—"}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border/60 p-4">
-                <div className="text-sm font-semibold">Top Explanations</div>
-                {asset.prediction?.topExplanations?.length ? (
-                  <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                    {asset.prediction.topExplanations.map((item, index) => (
-                      <li
-                        key={`${item}-${index}`}
-                        className="rounded-xl bg-muted/30 px-3 py-2"
-                      >
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    No explanation data available.
-                  </p>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="maintenance" className="mt-4 space-y-3">
-              {asset.maintenanceEvents.length === 0 ? (
-                <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
-                  No maintenance events available.
-                </div>
-              ) : (
-                asset.maintenanceEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="rounded-2xl border border-border/60 p-4"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="text-sm font-semibold">{event.title}</div>
-                          <Badge
-                            variant="secondary"
-                            className={cn(
-                              "capitalize",
-                              maintenanceEventClasses(event.eventType)
-                            )}
-                          >
-                            {event.eventType.replaceAll("_", " ")}
-                          </Badge>
-                        </div>
-
-                        {event.description ? (
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {event.description}
-                          </p>
-                        ) : null}
-                      </div>
-
-                      <div className="text-sm font-medium">
-                        {formatCurrency(event.costAmount, event.currency)}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-12 gap-3 text-sm">
-                      <div className="col-span-12 md:col-span-4">
-                        <InfoField
-                          label="Scheduled"
-                          value={formatDateTime(event.scheduledDate)}
-                        />
-                      </div>
-                      <div className="col-span-12 md:col-span-4">
-                        <InfoField
-                          label="Performed"
-                          value={formatDateTime(event.performedAt)}
-                        />
-                      </div>
-                      <div className="col-span-12 md:col-span-4">
-                        <InfoField
-                          label="Performed By"
-                          value={event.performedBy?.name ?? "—"}
-                        />
-                      </div>
-                    </div>
-
-                    {event.notes ? (
-                      <div className="mt-3 rounded-xl bg-muted/25 p-3 text-sm text-muted-foreground">
-                        {event.notes}
-                      </div>
-                    ) : null}
-                  </div>
-                ))
-              )}
-            </TabsContent>
-
-            <TabsContent value="properties" className="mt-4">
-              <div className="grid grid-cols-12 gap-3">
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField label="Asset UUID" value={asset.id} />
-                </div>
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField label="VIN" value={asset.vin ?? "—"} />
-                </div>
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Payload Capacity"
-                    value={
-                      typeof asset.payloadCapacityKg === "number"
-                        ? `${asset.payloadCapacityKg.toLocaleString()} kg`
-                        : "—"
-                    }
-                  />
-                </div>
-
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField label="Fuel Type" value={asset.fuelType ?? "—"} />
-                </div>
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Transmission"
-                    value={asset.transmission ?? "—"}
-                  />
-                </div>
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Service Provider"
-                    value={asset.serviceProviderType ?? "—"}
-                  />
-                </div>
-
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Vehicle Age"
-                    value={
-                      typeof asset.vehicleAgeYears === "number"
-                        ? `${asset.vehicleAgeYears} years`
-                        : "—"
-                    }
-                  />
-                </div>
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Lifetime Services"
-                    value={asset.lifetimeServiceCount ?? "—"}
-                  />
-                </div>
-                <div className="col-span-12 md:col-span-4">
-                  <InfoField
-                    label="Lifetime Breakdowns"
-                    value={asset.lifetimeBreakdownCount ?? "—"}
-                  />
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="audit" className="mt-4 space-y-3">
-              {asset.auditTrail.length === 0 ? (
-                <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
-                  No audit trail available.
-                </div>
-              ) : (
-                asset.auditTrail.map((event) => (
-                  <div
-                    key={event.id}
-                    className="rounded-2xl border border-border/60 p-4"
-                  >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="text-sm font-semibold">{event.field}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDateTime(event.createdAt)}
-                        </div>
-                      </div>
-                      <Badge variant="secondary">
-                        {event.changedBy?.name ?? "System"}
-                      </Badge>
-                    </div>
-
-                    <div className="mt-3 text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">
-                        {event.oldValue ?? "—"}
-                      </span>{" "}
-                      →{" "}
-                      <span className="font-medium text-foreground">
-                        {event.newValue ?? "—"}
-                      </span>
-                    </div>
-
-                    {event.reason ? (
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        Reason: {event.reason}
-                      </div>
-                    ) : null}
-                  </div>
-                ))
-              )}
-            </TabsContent>
-          </Tabs>
         </div>
+
+        <Separator className="my-4" />
+
+        <div className="grid grid-cols-12 gap-3">
+          <div className="col-span-12 md:col-span-4">
+            <Field label="Warehouse" value={asset.warehouse.name} />
+          </div>
+          <div className="col-span-12 md:col-span-4">
+            <Field label="Location" value={asset.location} />
+          </div>
+          <div className="col-span-12 md:col-span-4">
+            <Field
+              label="Assigned Person"
+              value={asset.assignedPerson?.name ?? "Unassigned"}
+            />
+          </div>
+
+          <div className="col-span-12 md:col-span-4">
+            <Field label="Health Score" value={`${asset.healthScore}%`} />
+          </div>
+          <div className="col-span-12 md:col-span-4">
+            <Field
+              label="Failure Probability (8w)"
+              value={`${(asset.failureProbability8w * 100).toFixed(0)}%`}
+            />
+          </div>
+          <div className="col-span-12 md:col-span-4">
+            <Field
+              label="Prediction Confidence"
+              value={`${(asset.predictionConfidence * 100).toFixed(0)}%`}
+            />
+          </div>
+
+          <div className="col-span-12 md:col-span-6">
+            <Field
+              label="Last Maintenance"
+              value={asset.lastMaintenanceDate ?? "—"}
+            />
+          </div>
+          <div className="col-span-12 md:col-span-6">
+            <Field
+              label="Next Maintenance"
+              value={asset.nextMaintenanceDate ?? "—"}
+            />
+          </div>
+
+          <div className="col-span-12 md:col-span-6">
+            <Field
+              label="Scheduled Maintenance"
+              value={asset.scheduledMaintenanceDate ?? "—"}
+            />
+          </div>
+          <div className="col-span-12 md:col-span-6">
+            <Field
+              label="Predicted Maintenance"
+              value={asset.predictedMaintenanceDate ?? "—"}
+            />
+          </div>
+
+          <div className="col-span-12 md:col-span-6">
+            <Field
+              label="Estimated Cost"
+              value={`$${asset.estimatedCost.toLocaleString()}`}
+            />
+          </div>
+          <div className="col-span-12 md:col-span-6">
+            <Field
+              label="Cost Variance (30d)"
+              value={`${asset.costVariance30d >= 0 ? "+" : ""}${(
+                asset.costVariance30d * 100
+              ).toFixed(0)}%`}
+            />
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+
+        <Tabs defaultValue="insights">
+          <TabsList className="rounded-xl">
+            <TabsTrigger value="insights">Predictive Insights</TabsTrigger>
+            <TabsTrigger value="history">Maintenance Logs</TabsTrigger>
+            <TabsTrigger value="assignments">Assignments</TabsTrigger>
+            <TabsTrigger value="audit">Audit Trail</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="insights" className="mt-4 space-y-4">
+            <div className="grid grid-cols-12 gap-4">
+              <div className="col-span-12 lg:col-span-6">
+                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                  Health Score Trend & Forecast (placeholder)
+                </div>
+              </div>
+              <div className="col-span-12 lg:col-span-6">
+                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                  Failure Probability Forecast (8 weeks) (placeholder)
+                </div>
+              </div>
+              <div className="col-span-12">
+                <div className="rounded-2xl border p-4">
+                  <div className="text-sm font-medium">Insight Summary</div>
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted-foreground">
+                    <li>
+                      Predicted maintenance earlier than scheduled (based on risk
+                      trend).
+                    </li>
+                    <li>Confidence reflects available sensor/log coverage.</li>
+                    <li>
+                      Estimated cost variance indicates recent maintenance cost
+                      deviation.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-4 space-y-3">
+            {asset.maintenanceLogs.length === 0 ? (
+              <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
+                No maintenance logs available.
+              </div>
+            ) : (
+              asset.maintenanceLogs.map((l) => (
+                <div key={l.id} className="rounded-2xl border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">{l.type}</div>
+                      <div className="text-xs text-muted-foreground">{l.date}</div>
+                    </div>
+                    <Badge variant="secondary">${l.cost.toLocaleString()}</Badge>
+                  </div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    {l.notes}
+                  </div>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Performed by: {l.performedBy?.name ?? "—"}
+                  </div>
+                </div>
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="assignments" className="mt-4 space-y-3">
+            {asset.assignmentHistory.length === 0 ? (
+              <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
+                No assignment history available.
+              </div>
+            ) : (
+              asset.assignmentHistory.map((e) => (
+                <div key={e.id} className="rounded-2xl border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">{e.action}</div>
+                      <div className="text-xs text-muted-foreground">{e.date}</div>
+                    </div>
+                    <Badge variant="secondary">{e.user?.name ?? "—"}</Badge>
+                  </div>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Changed by: {e.byAdmin?.name ?? "—"}
+                  </div>
+                </div>
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="audit" className="mt-4 space-y-3">
+            {asset.auditTrail.length === 0 ? (
+              <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
+                No audit events available.
+              </div>
+            ) : (
+              asset.auditTrail.map((a) => (
+                <div key={a.id} className="rounded-2xl border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">{a.field}</div>
+                      <div className="text-xs text-muted-foreground">{a.date}</div>
+                    </div>
+                    <Badge variant="secondary">{a.by?.name ?? "—"}</Badge>
+                  </div>
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    {a.oldValue} → <span className="font-medium">{a.newValue}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
       </SectionCard>
     </div>
   );

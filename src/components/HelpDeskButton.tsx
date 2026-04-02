@@ -21,7 +21,10 @@ export default function HelpDeskButton() {
     // Check Supabase session
     const checkAuth = async () => {
       try {
-        const { data } = await supabase?.auth.getSession() || { data: { session: null } };
+        const { data, error } = (await supabase?.auth.getSession()) || { data: { session: null }, error: null };
+        if (error) {
+          console.error("Supabase getSession error:", error);
+        }
         const isAuthenticated = !!data?.session;
         
         // Also check localStorage as fallback (for local auth)

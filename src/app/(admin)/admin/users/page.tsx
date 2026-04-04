@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import {
   Select,
   SelectContent,
@@ -189,12 +190,18 @@ function UserAvatar({ name }: { name: string }) {
 // ---------------------------------------------------------------------------
 
 export default function AdminUsersPage() {
+  const [isLoading, setIsLoading] = React.useState(true);
   const [users, setUsers] = React.useState<UserItem[]>(INITIAL_USERS);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const filteredUsers = React.useMemo(() => {
     return users.filter((user) => {
@@ -221,6 +228,14 @@ export default function AdminUsersPage() {
 
   function handleViewAssets(user: UserItem) {
     setAssetsUser(user);
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <PredictiXLoader label="Loading users…" />
+      </div>
+    );
   }
 
   return (
@@ -257,7 +272,7 @@ export default function AdminUsersPage() {
 
           <div className="flex items-center gap-3">
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-35">
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
               <SelectContent>
@@ -282,12 +297,12 @@ export default function AdminUsersPage() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="min-w-[240px] pl-6">User</TableHead>
-                  <TableHead className="w-[100px]">Role</TableHead>
-                  <TableHead className="w-[160px]">Department</TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[140px]">Assigned Assets</TableHead>
-                  <TableHead className="w-[180px]">Actions</TableHead>
+                  <TableHead className="min-w-60 pl-6">User</TableHead>
+                  <TableHead className="w-25">Role</TableHead>
+                  <TableHead className="w-40">Department</TableHead>
+                  <TableHead className="w-25">Status</TableHead>
+                  <TableHead className="w-35">Assigned Assets</TableHead>
+                  <TableHead className="w-45">Actions</TableHead>
                 </TableRow>
               </TableHeader>
 

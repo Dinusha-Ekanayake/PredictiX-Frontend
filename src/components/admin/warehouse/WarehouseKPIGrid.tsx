@@ -25,10 +25,11 @@ const kpiData = [
   },
 ];
 
-export default function WarehouseKPIGrid() {
+export default function WarehouseKPIGrid({ data: externalData }: { data?: any[] }) {
+  const data = externalData && externalData.length > 0 ? externalData : kpiData;
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {kpiData.map((item) => (
+      {data.map((item) => (
         <div
           key={item.title}
           className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"

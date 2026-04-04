@@ -19,7 +19,8 @@ function getStatusColor(status: string) {
   return "bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-300";
 }
 
-export default function CriticalAssetsTable() {
+export default function CriticalAssetsTable({ data: externalData }: { data?: any[] }) {
+  const data = externalData || criticalAssets;
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-4">
@@ -58,7 +59,7 @@ export default function CriticalAssetsTable() {
           </thead>
 
           <tbody>
-            {criticalAssets.map((asset) => (
+            {data.map((asset) => (
               <tr
                 key={asset.id}
                 className="border-b border-gray-100 last:border-0 dark:border-slate-800"

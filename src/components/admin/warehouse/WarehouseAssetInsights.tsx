@@ -38,10 +38,9 @@ const assetStatus = [
 ];
 
 const STATUS_COLORS = {
-  Operational: "#10b981",
-  Maintenance: "#f59e0b",
+  Active: "#10b981",
   Critical: "#ef4444",
-  Offline: "hsl(var(--muted-foreground))",
+  Under_Maintenance: "#f59e0b",
 } as const;
 
 const healthScoreDist = [
@@ -74,7 +73,8 @@ function useChartStyles() {
   };
 }
 
-export function HealthMaintenanceTrendsCard() {
+export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: any[] }) {
+  const data = externalData || healthMaintenanceTrends;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 
   return (
@@ -92,7 +92,7 @@ export function HealthMaintenanceTrendsCard() {
       <CardContent>
         <div className="h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={healthMaintenanceTrends} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+            <AreaChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis dataKey="month" tick={{ fill: axisColor }} />
               <YAxis yAxisId="left" tick={{ fill: axisColor }} domain={[0, 100]} />
@@ -125,7 +125,8 @@ export function HealthMaintenanceTrendsCard() {
   );
 }
 
-export function AssetStatusDistributionCard() {
+export function AssetStatusDistributionCard({ data: externalData }: { data?: any[] }) {
+  const data = externalData || assetStatus;
   const { axisColor, tooltipStyle } = useChartStyles();
 
   return (
@@ -145,14 +146,14 @@ export function AssetStatusDistributionCard() {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={assetStatus}
+                data={data}
                 dataKey="value"
                 nameKey="name"
                 innerRadius={60}
                 outerRadius={95}
                 paddingAngle={4}
               >
-                {assetStatus.map((d) => (
+                {data.map((d) => (
                   <Cell
                     key={d.name}
                     fill={
@@ -172,7 +173,8 @@ export function AssetStatusDistributionCard() {
   );
 }
 
-export function HealthScoreDistributionCard() {
+export function HealthScoreDistributionCard({ data: externalData }: { data?: any[] }) {
+  const data = externalData || healthScoreDist;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 
   return (
@@ -190,7 +192,7 @@ export function HealthScoreDistributionCard() {
       <CardContent>
         <div className="h-[260px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={healthScoreDist} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+            <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis dataKey="bucket" tick={{ fill: axisColor }} />
               <YAxis tick={{ fill: axisColor }} allowDecimals={false} />
@@ -205,7 +207,8 @@ export function HealthScoreDistributionCard() {
   );
 }
 
-export function AssetsByTypeCard() {
+export function AssetsByTypeCard({ data: externalData }: { data?: any[] }) {
+  const data = externalData || assetsByType;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 
   return (
@@ -224,7 +227,7 @@ export function AssetsByTypeCard() {
         <div className="h-[260px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={assetsByType}
+              data={data}
               layout="vertical"
               margin={{ top: 10, right: 10, left: 20, bottom: 0 }}
             >

@@ -11,14 +11,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+<<<<<<< HEAD
+
+import type { AssetStatus } from "./types";
+
+export type AssetFilters = {
+  query: string;
+  status: AssetStatus | "all";
+  healthBand: "all" | "excellent" | "good" | "moderate" | "poor" | "critical";
+  warehouse: string;
+};
+=======
 import { Plus, RotateCcw, Search } from "lucide-react";
 import type { AssetFilters } from "./types";
+>>>>>>> feature/warehouse-section-ui
 
-type Props = {
+type WarehouseOption = {
+  value: string;
+  label: string;
+};
+
+type AssetsToolbarProps = {
   filters: AssetFilters;
-  setFilters: (next: AssetFilters) => void;
+  setFilters: React.Dispatch<React.SetStateAction<AssetFilters>>;
   resultsCount: number;
-  warehouseOptions: Array<{ value: string; label: string }>;
+  warehouseOptions: WarehouseOption[];
 };
 
 export default function AssetsToolbar({
@@ -26,65 +43,57 @@ export default function AssetsToolbar({
   setFilters,
   resultsCount,
   warehouseOptions,
-}: Props) {
-  const hasActiveFilters =
-    filters.query !== "" ||
-    filters.status !== "all" ||
-    filters.healthBand !== "all" ||
-    filters.warehouse !== "all";
-
+}: AssetsToolbarProps) {
   return (
-    <Card className="rounded-2xl border-border/40 bg-card/80 backdrop-blur-xl">
+    <Card className="rounded-2xl">
       <CardContent className="p-4">
-        <div className="flex flex-col gap-3">
-          {/* Top row: Search + Filters */}
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="grid flex-1 grid-cols-12 gap-3">
+            <div className="col-span-12 lg:col-span-4">
               <Input
-                className="h-10 rounded-xl border-border/40 bg-background/50 pl-10 transition-colors focus:bg-background"
-                placeholder="Search assets..."
+                className="h-10 rounded-xl"
+                placeholder="Search by ID, name, warehouse, location, assigned person..."
                 value={filters.query}
                 onChange={(e) =>
-                  setFilters({ ...filters, query: e.target.value })
+                  setFilters((prev) => ({ ...prev, query: e.target.value }))
                 }
               />
             </div>
 
-            {/* Filter dropdowns */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="col-span-12 sm:col-span-4 lg:col-span-2">
               <Select
                 value={filters.status}
                 onValueChange={(value) =>
-                  setFilters({
-                    ...filters,
-                    status: value,
-                  })
+                  setFilters((prev) => ({
+                    ...prev,
+                    status: value as AssetFilters["status"],
+                  }))
                 }
               >
-                <SelectTrigger className="h-9 w-[140px] rounded-xl border-border/40 bg-background/50 text-[13px]">
+                <SelectTrigger className="h-10 rounded-xl">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="OPERATIONAL">Operational</SelectItem>
                   <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
                   <SelectItem value="CRITICAL">Critical</SelectItem>
                   <SelectItem value="OFFLINE">Offline</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
 
+            <div className="col-span-12 sm:col-span-4 lg:col-span-3">
               <Select
                 value={filters.healthBand}
                 onValueChange={(value) =>
-                  setFilters({
-                    ...filters,
-                    healthBand: value,
-                  })
+                  setFilters((prev) => ({
+                    ...prev,
+                    healthBand: value as AssetFilters["healthBand"],
+                  }))
                 }
               >
-                <SelectTrigger className="h-9 w-[140px] rounded-xl border-border/40 bg-background/50 text-[13px]">
+                <SelectTrigger className="h-10 rounded-xl">
                   <SelectValue placeholder="Health" />
                 </SelectTrigger>
                 <SelectContent>
@@ -96,24 +105,23 @@ export default function AssetsToolbar({
                   <SelectItem value="critical">Critical</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
 
+            <div className="col-span-12 sm:col-span-4 lg:col-span-3">
               <Select
                 value={filters.warehouse}
                 onValueChange={(value) =>
-                  setFilters({
-                    ...filters,
-                    warehouse: value,
-                  })
+                  setFilters((prev) => ({ ...prev, warehouse: value }))
                 }
               >
-                <SelectTrigger className="h-9 w-[160px] rounded-xl border-border/40 bg-background/50 text-[13px]">
+                <SelectTrigger className="h-10 rounded-xl">
                   <SelectValue placeholder="Warehouse" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Warehouses</SelectItem>
-                  {warehouseOptions.map((warehouse) => (
-                    <SelectItem key={warehouse.value} value={warehouse.value}>
-                      {warehouse.label}
+                  {warehouseOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -121,47 +129,27 @@ export default function AssetsToolbar({
             </div>
           </div>
 
-          {/* Bottom row: count + actions */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Badge
-                variant="secondary"
-                className="rounded-lg bg-muted/60 px-2.5 py-1 text-[12px] font-medium"
-              >
-                {resultsCount} {resultsCount === 1 ? "asset" : "assets"}
-              </Badge>
-              {hasActiveFilters && (
-                <span className="text-[12px] text-muted-foreground/60">
-                  filtered
-                </span>
-              )}
-            </div>
+          <div className="flex items-center justify-between gap-2 xl:justify-end">
+            <Badge variant="secondary" className="rounded-xl px-3 py-1">
+              {resultsCount} results
+            </Badge>
 
-            <div className="flex items-center gap-2">
-              {hasActiveFilters && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 rounded-xl px-3 text-[13px] text-muted-foreground"
-                  onClick={() =>
-                    setFilters({
-                      query: "",
-                      status: "all",
-                      healthBand: "all",
-                      warehouse: "all",
-                    })
-                  }
-                >
-                  <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                  Reset
-                </Button>
-              )}
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl"
+              onClick={() =>
+                setFilters({
+                  query: "",
+                  status: "all",
+                  healthBand: "all",
+                  warehouse: "all",
+                })
+              }
+            >
+              Reset
+            </Button>
 
-              <Button className="h-9 rounded-xl px-4 text-[13px]">
-                <Plus className="mr-1.5 h-4 w-4" />
-                Add Asset
-              </Button>
-            </div>
+            <Button className="h-10 rounded-xl px-4">Add Asset</Button>
           </div>
         </div>
       </CardContent>

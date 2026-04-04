@@ -1,7 +1,5 @@
 export type AssetStatus = "OPERATIONAL" | "MAINTENANCE" | "CRITICAL" | "OFFLINE";
 
-export type AssetHealthBand = "excellent" | "good" | "moderate" | "poor" | "critical";
-
 export type MaintenanceLog = {
   id: string;
   date: string; // ISO
@@ -10,8 +8,6 @@ export type MaintenanceLog = {
   performedBy: { id: string; name: string } | null;
   cost: number;
 };
-
-export type MaintenanceEventType = "PREVENTIVE" | "CORRECTIVE" | "INSPECTION";
 
 export type AssignmentEvent = {
   id: string;
@@ -29,15 +25,6 @@ export type AssetAuditEvent = {
   newValue: string;
   by: { id: string; name: string } | null;
 };
-
-export type AssetFilters = {
-  query: string;
-  status: string;
-  healthBand: string;
-  warehouse: string;
-};
-
-export type AssetRecord = Asset;
 
 export type Asset = {
   id: string; // asset id

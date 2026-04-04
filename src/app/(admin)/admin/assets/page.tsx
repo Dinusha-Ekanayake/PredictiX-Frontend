@@ -2,17 +2,13 @@
 
 import * as React from "react";
 import AssetsSummary from "@/components/admin/assets/AssetsSummary";
-<<<<<<< HEAD
 import AssetsToolbar, {
   AssetFilters,
 } from "@/components/admin/assets/AssetsToolbar";
-=======
-import AssetsToolbar from "@/components/admin/assets/AssetsToolbar";
->>>>>>> feature/warehouse-section-ui
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel from "@/components/admin/assets/AssetDetailsPanel";
 import { ASSETS } from "@/components/admin/assets/mock";
-import type { Asset, AssetFilters } from "@/components/admin/assets/types";
+import type { Asset } from "@/components/admin/assets/types";
 import { Box } from "lucide-react";
 
 function getHealthBand(score: number) {

@@ -16,16 +16,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarClock, Lightbulb } from "lucide-react";
 import { useTheme } from "next-themes";
 
-const schedule = [
-  { asset: "HVAC System H-A1", predicted: 1.2, scheduled: 2.0 },
-  { asset: "Pallet Jack PJ-05", predicted: 0.7, scheduled: 1.5 },
-  { asset: "Loading Dock LD-03", predicted: 1.0, scheduled: 2.2 },
-  { asset: "Conveyor Belt CB-12", predicted: 1.6, scheduled: 2.0 },
-];
-
-export default function WarehouseMaintenanceSchedule() {
+export default function WarehouseMaintenanceSchedule({ data }: { data?: any[] } = {}) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+  
+  // Only use real data from PostgreSQL - no mock defaults
+  const displayData = data || [];
 
   const axisColor = isDark ? "#cbd5e1" : "#475569";
   const gridColor = isDark
@@ -37,6 +33,23 @@ export default function WarehouseMaintenanceSchedule() {
     color: isDark ? "#f8fafc" : "#0f172a",
   };
 
+  // Only show chart if real data exists
+  if (!displayData || displayData.length === 0) {
+    return (
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarClock className="h-4 w-4 text-muted-foreground" />
+            Predictive Maintenance Schedule
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">No maintenance schedule data available.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="rounded-2xl">
       <CardHeader>
@@ -45,7 +58,7 @@ export default function WarehouseMaintenanceSchedule() {
           Predictive Maintenance Schedule
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Predicted need vs scheduled window (days) — sample.
+          Predicted need vs scheduled window (days) from database
         </p>
       </CardHeader>
 
@@ -53,7 +66,7 @@ export default function WarehouseMaintenanceSchedule() {
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={schedule}
+              data={displayData}
               layout="vertical"
               margin={{ top: 10, right: 10, left: 40, bottom: 0 }}
               barCategoryGap={10}

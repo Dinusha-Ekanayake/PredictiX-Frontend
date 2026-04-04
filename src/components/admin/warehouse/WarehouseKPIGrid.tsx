@@ -2,31 +2,9 @@
 
 import * as React from "react";
 
-const kpiData = [
-  {
-    title: "Total Vehicles",
-    value: "128",
-    subtitle: "Across all warehouse operations",
-  },
-  {
-    title: "Critical Assets",
-    value: "12",
-    subtitle: "Require immediate attention",
-  },
-  {
-    title: "Avg Component Health",
-    value: "84%",
-    subtitle: "Overall fleet component health",
-  },
-  {
-    title: "Monthly Maintenance Cost",
-    value: "$24,500",
-    subtitle: "Estimated current month cost",
-  },
-];
-
 export default function WarehouseKPIGrid({ data: externalData }: { data?: any[] }) {
-  const data = externalData && externalData.length > 0 ? externalData : kpiData;
+  // Use only external data from PostgreSQL - no fallback defaults
+  const data = externalData && externalData.length > 0 ? externalData : [];
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
       {data.map((item) => (

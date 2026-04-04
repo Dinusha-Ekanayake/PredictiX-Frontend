@@ -14,7 +14,6 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarClock, Lightbulb } from "lucide-react";
-import { useTheme } from "next-themes";
 
 const schedule = [
   { asset: "HVAC System H-A1", predicted: 1.2, scheduled: 2.0 },
@@ -23,20 +22,11 @@ const schedule = [
   { asset: "Conveyor Belt CB-12", predicted: 1.6, scheduled: 2.0 },
 ];
 
+function gridStroke() {
+  return "hsl(var(--border))";
+}
+
 export default function WarehouseMaintenanceSchedule() {
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
-
-  const axisColor = isDark ? "#cbd5e1" : "#475569";
-  const gridColor = isDark
-    ? "rgba(148, 163, 184, 0.18)"
-    : "rgba(148, 163, 184, 0.3)";
-  const tooltipStyle = {
-    backgroundColor: isDark ? "#0f172a" : "#ffffff",
-    border: isDark ? "1px solid #334155" : "1px solid #e2e8f0",
-    color: isDark ? "#f8fafc" : "#0f172a",
-  };
-
   return (
     <Card className="rounded-2xl">
       <CardHeader>
@@ -58,16 +48,16 @@ export default function WarehouseMaintenanceSchedule() {
               margin={{ top: 10, right: 10, left: 40, bottom: 0 }}
               barCategoryGap={10}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis type="number" tick={{ fill: axisColor }} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke()} />
+              <XAxis type="number" tick={{ fill: "hsl(var(--muted-foreground))" }} />
               <YAxis
                 type="category"
                 dataKey="asset"
-                tick={{ fill: axisColor }}
+                tick={{ fill: "hsl(var(--muted-foreground))" }}
                 width={170}
               />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Legend wrapperStyle={{ color: axisColor }} />
+              <Tooltip />
+              <Legend />
               <Bar
                 dataKey="predicted"
                 name="Predicted Need (days)"

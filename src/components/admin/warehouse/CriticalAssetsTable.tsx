@@ -2,13 +2,6 @@
 
 import * as React from "react";
 
-const criticalAssets = [
-  { id: "VH-1021", vehicle: "Truck A12", component: "Brake System", health: "42%", priority: "High", status: "Critical" },
-  { id: "VH-1044", vehicle: "Forklift F07", component: "Hydraulic Pump", health: "51%", priority: "High", status: "Warning" },
-  { id: "VH-1098", vehicle: "Trailer T09", component: "Suspension", health: "39%", priority: "High", status: "Critical" },
-  { id: "VH-1102", vehicle: "Van V03", component: "Engine Cooling", health: "47%", priority: "Medium", status: "Warning" },
-];
-
 function getStatusColor(status: string) {
   if (status === "Critical") {
     return "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300";
@@ -20,7 +13,8 @@ function getStatusColor(status: string) {
 }
 
 export default function CriticalAssetsTable({ data: externalData }: { data?: any[] }) {
-  const data = externalData || criticalAssets;
+  // Use only real data from PostgreSQL - no fallback defaults
+  const data = externalData || [];
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-4">

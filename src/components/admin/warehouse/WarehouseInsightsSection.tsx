@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import WarehouseKPIGrid from "@/components/admin/warehouse/WarehouseKPIGrid";
 import CriticalAssetsTable from "@/components/admin/warehouse/CriticalAssetsTable";
@@ -19,8 +21,59 @@ import {
 } from "@/components/admin/warehouse/WarehouseTicketInsights";
 
 import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
+import { getWarehouseSummary, WarehouseSummaryData } from "@/lib/warehouseService";
 
-export default function WarehouseInsightsSection({ data }: { data?: any }) {
+export default function WarehouseInsightsSection({ data: initialData }: { data?: any }) {
+  const [data, setData] = useState<WarehouseSummaryData | null>(initialData || null);
+  const [loading, setLoading] = useState(!initialData);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const summaryData = await getWarehouseSummary();
+        setData(summaryData);
+        setError(null);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load warehouse data';
+        setError(errorMessage);
+        console.error('Warehouse data fetch error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Only fetch if no initial data was provided
+    if (!initialData) {
+      fetchData();
+    }
+  }, [initialData]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+        <span className="ml-2 text-slate-600">Loading warehouse data...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
+        <h3 className="font-semibold text-red-900 dark:text-red-200">Error Loading Data</h3>
+        <p className="mt-1 text-sm text-red-800 dark:text-red-300">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-3 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* New KPI cards (Row 2) */}

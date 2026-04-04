@@ -20,34 +20,34 @@ import {
 
 import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
 
-export default function WarehouseInsightsSection() {
+export default function WarehouseInsightsSection({ data }: { data?: any }) {
   return (
     <div className="space-y-6">
-      {/* New KPI cards */}
-      <WarehouseKPIGrid />
+      {/* New KPI cards (Row 2) */}
+      <WarehouseKPIGrid data={data?.kpiGrid} />
 
       {/* Previous charts */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <HealthMaintenanceTrendsCard />
-        <AssetStatusDistributionCard />
+        <HealthMaintenanceTrendsCard data={data?.healthMaintenanceTrends} />
+        <AssetStatusDistributionCard data={data?.assetStatus} />
 
-        <HealthScoreDistributionCard />
-        <TicketPriorityBreakdownCard />
+        <HealthScoreDistributionCard data={data?.healthScoreDist} />
+        <TicketPriorityBreakdownCard data={data?.ticketPriority} />
 
-        <TicketsByCategoryCard />
-        <AssetsByTypeCard />
+        <TicketsByCategoryCard data={data?.ticketsByCategory} />
+        <AssetsByTypeCard data={data?.assetsByType} />
 
         <div className="lg:col-span-2">
           <WarehouseMaintenanceSchedule />
         </div>
 
         <div className="lg:col-span-2">
-          <MonthlyTicketVolumeCard />
+          <MonthlyTicketVolumeCard data={data?.monthlyTicketVolume} />
         </div>
       </div>
 
       {/* New table */}
-      <CriticalAssetsTable />
+      <CriticalAssetsTable data={data?.criticalAssets} />
     </div>
   );
 }

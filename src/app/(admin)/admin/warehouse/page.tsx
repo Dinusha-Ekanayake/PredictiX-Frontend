@@ -8,13 +8,25 @@ import WarehouseOverviewCards from "@/components/admin/warehouse/WarehouseOvervi
 import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsightsSection";
 
 export default function WarehousePage() {
-  const [refreshing, setRefreshing] = React.useState(false);
+  const [data, setData] = React.useState<any>(null);
+  const [refreshing, setRefreshing] = React.useState(true);
 
-  async function onRefresh() {
+  async function fetchData() {
     setRefreshing(true);
-    await new Promise((r) => setTimeout(r, 700));
-    setRefreshing(false);
+    try {
+      const response = await fetch("http://127.0.0.1:8000/warehouse-dashboard/summary");
+      const result = await response.json();
+      setData(result);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRefreshing(false);
+    }
   }
+
+  React.useEffect(() => {
+    fetchData();
+  }, []);
 
   return (
     <div className="w-full space-y-6">
@@ -27,7 +39,7 @@ export default function WarehousePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={onRefresh} disabled={refreshing}>
+          <Button variant="outline" onClick={fetchData} disabled={refreshing}>
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
@@ -39,9 +51,9 @@ export default function WarehousePage() {
         </div>
       </div>
 
-      <WarehouseOverviewCards />
+      <WarehouseOverviewCards data={data?.kpis} isLoading={refreshing && !data} />
 
-      <WarehouseInsightsSection />
+      {data && <WarehouseInsightsSection data={data} />}
 
       <div className="h-20" />
     </div>

@@ -56,8 +56,13 @@ type UserStatus = "active" | "inactive";
 
 type UserItem = {
   id: string;
+  firstName: string;
+  lastName: string;
   name: string;
   email: string;
+  address: string;
+  contactNumber: string;
+  warehouse: string;
   role: UserRole;
   department: string;
   status: UserStatus;
@@ -70,45 +75,70 @@ type UserItem = {
 
 const INITIAL_USERS: UserItem[] = [
   {
-    id: "USR-001",
+    id: "U0001O",
+    firstName: "John",
+    lastName: "Smith",
     name: "John Smith",
     email: "john.smith@warehouse.com",
+    address: "No. 12, First Lane, Colombo",
+    contactNumber: "0711234567",
+    warehouse: "Main Branch - Colombo",
     role: "user",
-    department: "Operations",
+    department: "Administrative",
     status: "active",
     assignedAssets: 3,
   },
   {
-    id: "USR-002",
+    id: "A0001M",
+    firstName: "Sarah",
+    lastName: "Johnson",
     name: "Sarah Johnson",
     email: "sarah.johnson@warehouse.com",
+    address: "No. 22, Lake Road, Kandy",
+    contactNumber: "0772345678",
+    warehouse: "Main Branch - Colombo",
     role: "admin",
-    department: "Management",
+    department: "Mechanical",
     status: "active",
     assignedAssets: 0,
   },
   {
-    id: "USR-003",
+    id: "U0002M",
+    firstName: "Mike",
+    lastName: "Davis",
     name: "Mike Davis",
     email: "mike.davis@warehouse.com",
+    address: "No. 5, Palm Gardens, Galle",
+    contactNumber: "0753456789",
+    warehouse: "Galle",
     role: "user",
-    department: "Operations",
+    department: "Mechanical",
     status: "active",
     assignedAssets: 2,
   },
   {
-    id: "USR-004",
+    id: "U0003E",
+    firstName: "Emily",
+    lastName: "Chen",
     name: "Emily Chen",
     email: "emily.chen@warehouse.com",
+    address: "No. 8, Rose Avenue, Colombo",
+    contactNumber: "0724567890",
+    warehouse: "Main Branch - Colombo",
     role: "user",
-    department: "Engineering",
+    department: "Electrical",
     status: "active",
     assignedAssets: 5,
   },
   {
-    id: "USR-005",
+    id: "U0004M",
+    firstName: "David",
+    lastName: "Wilson",
     name: "David Wilson",
     email: "david.wilson@warehouse.com",
+    address: "No. 16, Temple Road, Galle",
+    contactNumber: "0765678901",
+    warehouse: "Galle",
     role: "user",
     department: "Maintenance",
     status: "inactive",
@@ -194,9 +224,32 @@ export default function AdminUsersPage() {
   const [users, setUsers] = React.useState<UserItem[]>(INITIAL_USERS);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
+  const [departmentFilter, setDepartmentFilter] = React.useState<string>("all");
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
+
+  function generateUserId(role: UserRole, department: string): string {
+    const roleLetter = role === "admin" ? "A" : "U";
+    const deptLetter = department.charAt(0).toUpperCase() || "X";
+
+    const relevantUsers = users.filter((u) => u.id.startsWith(roleLetter));
+    let maxNumber = 0;
+
+    for (const u of relevantUsers) {
+      const match = u.id.match(/^[AU](\d{4})[A-Z]?$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!Number.isNaN(num) && num > maxNumber) {
+          maxNumber = num;
+        }
+      }
+    }
+
+    const next = String(maxNumber + 1).padStart(4, "0");
+    return `${roleLetter}${next}${deptLetter}`;
+  }
 
   React.useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 1000);
@@ -204,17 +257,26 @@ export default function AdminUsersPage() {
   }, []);
 
   const filteredUsers = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
     return users.filter((user) => {
       const matchesSearch =
-        searchQuery === "" ||
-        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase());
+        query === "" ||
+        user.name.toLowerCase().includes(query) ||
+        user.email.toLowerCase().includes(query) ||
+        user.id.toLowerCase().includes(query);
 
       const matchesRole = roleFilter === "all" || user.role === roleFilter;
+      const matchesDepartment =
+        departmentFilter === "all" || user.department === departmentFilter;
+      const matchesStatus =
+        statusFilter === "all" || user.status === statusFilter;
 
-      return matchesSearch && matchesRole;
+      return (
+        matchesSearch && matchesRole && matchesDepartment && matchesStatus
+      );
     });
-  }, [users, searchQuery, roleFilter]);
+  }, [users, searchQuery, roleFilter, departmentFilter, statusFilter]);
 
   const kpis = computeKpis(users);
 
@@ -263,14 +325,14 @@ export default function AdminUsersPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search users..."
+              placeholder="Search users by name, email or ID"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
             />
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-35">
                 <SelectValue placeholder="All Roles" />
@@ -282,7 +344,35 @@ export default function AdminUsersPage() {
               </SelectContent>
             </Select>
 
-            <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Select
+              value={departmentFilter}
+              onValueChange={setDepartmentFilter}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Departments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                <SelectItem value="Administrative">Administrative</SelectItem>
+                <SelectItem value="Mechanical">Mechanical</SelectItem>
+                <SelectItem value="Electrical">Electrical</SelectItem>
+                <SelectItem value="IT">IT</SelectItem>
+                <SelectItem value="Maintenance">Maintenance</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button onClick={() => setIsAddDialogOpen(true)} className="ml-auto">
               <UserPlus className="mr-2 h-4 w-4" />
               Add User
             </Button>
@@ -352,18 +442,18 @@ export default function AdminUsersPage() {
                         {user.assignedAssets}
                       </TableCell>
 
-                      <TableCell>
-                        <div className="flex items-center gap-4">
+                      <TableCell className="pr-6">
+                        <div className="flex items-center gap-3">
                           <button
                             onClick={() => handleViewDetails(user)}
-                            className="text-sm font-medium text-teal-400 hover:text-teal-300"
+                            className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
                           >
                             View Details
                           </button>
                           {user.assignedAssets > 0 && (
                             <button
                               onClick={() => handleViewAssets(user)}
-                              className="text-sm font-medium text-teal-400 hover:text-teal-300"
+                              className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
                             >
                               View Assets
                             </button>
@@ -384,6 +474,7 @@ export default function AdminUsersPage() {
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
         onUserAdded={handleUserAdded}
+        generateUserId={generateUserId}
       />
 
       {/* View User Details Dialog */}

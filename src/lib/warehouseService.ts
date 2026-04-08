@@ -23,61 +23,68 @@ export interface WarehouseSummaryData {
  */
 export async function getMaintenanceSchedule() {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/warehouse-dashboard/maintenance-schedule`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
-      }
-    );
+    const url = `${API_BASE_URL}/warehouse-dashboard/maintenance-schedule`;
+    console.log('[DEBUG] Fetching maintenance schedule from:', url);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    });
 
     if (!response.ok) {
-      console.warn(`Maintenance schedule API error: ${response.status}`);
+      console.warn(`[DEBUG] Maintenance schedule API error: ${response.status} ${response.statusText}`);
       return [];
     }
 
-    return await response.json();
+    const data = await response.json();
+    console.log('[DEBUG] Maintenance schedule data received:', data);
+    return data;
   } catch (error) {
-    console.error('Error fetching maintenance schedule:', error);
+    console.error('[ERROR] Failed to fetch maintenance schedule:', error);
     return [];
   }
 }
 
 /**
- * Fetch warehouse dashboard summary from backend
+ * Fetch warehouse dashboard summary from PostgreSQL backend
  */
 export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/warehouse-dashboard/summary`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store', // Disable caching for fresh data
-      }
-    );
+    const url = `${API_BASE_URL}/warehouse-dashboard/summary`;
+    console.log('[DEBUG] Fetching warehouse summary from:', url);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store', // Disable caching for fresh data
+    });
 
     if (!response.ok) {
-      console.error(`Warehouse API error: ${response.status}`);
+      console.error(`[ERROR] Warehouse API error: ${response.status}`);
       throw new Error(`Failed to fetch warehouse summary: ${response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('[DEBUG] Warehouse summary data received:', data);
     
     // Fetch maintenance schedule separately and include it
     const maintenanceSchedule = await getMaintenanceSchedule();
+    console.log('[DEBUG] Merging maintenance schedule with summary data');
     
-    return {
+    const result = {
       ...data,
       maintenanceSchedule,
     };
+    
+    console.log('[DEBUG] Final warehouse summary with maintenance schedule:', result);
+    return result;
   } catch (error) {
-    console.error('Error fetching warehouse summary:', error);
+    console.error('[ERROR] Failed to fetch warehouse summary:', error);
     throw error;
   }
 }

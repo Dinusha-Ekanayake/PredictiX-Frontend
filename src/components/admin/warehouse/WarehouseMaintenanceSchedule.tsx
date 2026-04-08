@@ -20,8 +20,16 @@ export default function WarehouseMaintenanceSchedule({ data }: { data?: any[] } 
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   
-  // Only use real data from PostgreSQL - no mock defaults
-  const displayData = data || [];
+  // Sample/fallback data for development (from PostgreSQL in production)
+  const sampleData = [
+    { asset: "HVAC System H-A1", predicted: 0.4, scheduled: 1.4 },
+    { asset: "Pallet Jack P-05", predicted: 0.5, scheduled: 1.1 },
+    { asset: "Loading Dock LD-03", predicted: 0.6, scheduled: 1.8 },
+    { asset: "Conveyor Belt CB-12", predicted: 0.75, scheduled: 1.5 },
+  ];
+  
+  // Use PostgreSQL data if available, otherwise use sample data
+  const displayData = data && data.length > 0 ? data : sampleData;
 
   const axisColor = isDark ? "#cbd5e1" : "#475569";
   const gridColor = isDark
@@ -33,23 +41,6 @@ export default function WarehouseMaintenanceSchedule({ data }: { data?: any[] } 
     color: isDark ? "#f8fafc" : "#0f172a",
   };
 
-  // Only show chart if real data exists
-  if (!displayData || displayData.length === 0) {
-    return (
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarClock className="h-4 w-4 text-muted-foreground" />
-            Predictive Maintenance Schedule
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">No maintenance schedule data available.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card className="rounded-2xl">
       <CardHeader>
@@ -58,7 +49,7 @@ export default function WarehouseMaintenanceSchedule({ data }: { data?: any[] } 
           Predictive Maintenance Schedule
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Predicted need vs scheduled window (days) from database
+          Predicted need vs scheduled window (days) — {data && data.length > 0 ? "from PostgreSQL database" : "sample data"}
         </p>
       </CardHeader>
 

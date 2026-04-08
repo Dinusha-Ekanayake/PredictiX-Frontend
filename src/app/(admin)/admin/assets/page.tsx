@@ -27,7 +27,7 @@ function getHealthBand(score: number) {
   return "critical";
 }
 
-function matchesQuery(asset: AssetRecord, query: string) {
+function matchesQuery(asset: any, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
 
@@ -46,7 +46,7 @@ function matchesQuery(asset: AssetRecord, query: string) {
   return searchableValues.includes(q);
 }
 
-function applyFilters(assets: AssetRecord[], filters: AssetFilters) {
+function applyFilters(assets: any[], filters: AssetFilters) {
   return assets.filter((asset) => {
     const queryMatch = matchesQuery(asset, filters.query);
     const statusMatch =

@@ -9,8 +9,10 @@ import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsi
 
 // ── Warehouse Report (my section — warehouse components only) ──
 import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
+import { getWarehouseSummary } from "@/lib/warehouseService";
 
-const REPORT_API = "http://127.0.0.1:8000/warehouse-dashboard/generate-report";
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+const REPORT_API = `${API_BASE_URL}/warehouse-dashboard/generate-report`;
 
 export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
@@ -20,8 +22,7 @@ export default function WarehousePage() {
   async function fetchData() {
     setRefreshing(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/warehouse-dashboard/summary");
-      const result = await response.json();
+      const result = await getWarehouseSummary();
       setData(result);
     } catch (e) {
       console.error(e);
@@ -100,7 +101,7 @@ export default function WarehousePage() {
       </div>
 
       {/* ── Existing dashboard (completely untouched) ── */}
-      <WarehouseOverviewCards data={data?.kpis} isLoading={refreshing && !data} />
+      <WarehouseOverviewCards data={data?.kpiGrid} isLoading={refreshing && !data} />
       {data && <WarehouseInsightsSection data={data} />}
 
       <div className="h-20" />

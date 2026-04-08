@@ -458,10 +458,10 @@ function ReportStep({
             {assetTypeData.length > 0 && (
               <div>
                 <CLabel text="Assets by Type" />
-                <ResponsiveContainer width="100%" height={155}>
-                  <BarChart data={assetTypeData} layout="vertical" margin={{ left: 4 }}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={assetTypeData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                     <XAxis type="number" tick={{ fontSize: 10 }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={80} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
                     <Tooltip content={<CTip />} />
                     <Bar dataKey="value" fill={P.violet} radius={[0, 4, 4, 0]} />
                   </BarChart>
@@ -535,10 +535,10 @@ function ReportStep({
             {shapData.length > 0 && (
               <div>
                 <CLabel text="Top SHAP Failure Drivers" />
-                <ResponsiveContainer width="100%" height={155}>
-                  <BarChart data={shapData} layout="vertical" margin={{ left: 4 }}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={shapData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                     <XAxis type="number" tick={{ fontSize: 10 }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={105} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
                     <Tooltip content={<CTip />} />
                     <Bar dataKey="value" fill={P.rose} radius={[0, 4, 4, 0]} />
                   </BarChart>
@@ -679,10 +679,10 @@ function ReportStep({
             <>
               <Divider label="Ticket Categories" />
               <div className="grid gap-4 sm:grid-cols-2">
-                <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={ticketCatData} layout="vertical" margin={{ left: 4 }}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={ticketCatData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                     <XAxis type="number" tick={{ fontSize: 10 }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={90} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
                     <Tooltip content={<CTip />} />
                     <Bar dataKey="value" fill={P.sky} radius={[0, 4, 4, 0]} />
                   </BarChart>

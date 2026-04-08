@@ -77,7 +77,7 @@ export default function WarehouseOverviewCards({ data, isLoading }: { data?: any
     { label: "Monthly Maintenance Cost", value: "$24,500", sub: "Estimated current month cost", icon: DollarSign },
   ];
 
-  // Always show 8 cards - use defaults
+  // Always display all 8 cards
   const displayKpis = defaultKpis;
 
   return (

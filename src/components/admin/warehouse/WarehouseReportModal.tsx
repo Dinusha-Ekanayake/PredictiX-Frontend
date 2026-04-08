@@ -14,6 +14,7 @@ import {
   ResponsiveContainer,
   LineChart, Line, Legend,
 } from "recharts";
+import { downloadReportPDF } from "@/lib/pdfExport";
 
 // ── Palette ──────────────────────────────────────────────
 const P = {
@@ -337,6 +338,7 @@ function ReportStep({
   onClose: () => void;
 }) {
   const [sourcesOpen, setSourcesOpen] = React.useState(false);
+  const reportContentRef = React.useRef<HTMLDivElement>(null);
   const ctx = data.context;
   const ai  = data.ai_sections;
   const cur = ctx.currency ?? "LKR";
@@ -353,6 +355,15 @@ function ReportStep({
   const shapData        = (ctx.top_shap_features ?? []).slice(0, 6).map(([f, c]) => ({
     name: f.replace(/_/g, " ").slice(0, 22), value: c,
   }));
+
+  const handlePDFExport = () => {
+    if (reportContentRef.current) {
+      const warehouseName = ctx.warehouse_name || "warehouse";
+      const date = new Date().toISOString().split("T")[0];
+      const filename = `${warehouseName}-report-${date}.pdf`;
+      downloadReportPDF(reportContentRef.current, filename);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -376,7 +387,7 @@ function ReportStep({
           <button onClick={() => setSourcesOpen((p) => !p)} className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
             <BookOpen className="h-3.5 w-3.5" /> Sources
           </button>
-          <button onClick={() => window.print()} className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+          <button onClick={handlePDFExport} className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
             <Download className="h-3.5 w-3.5" /> PDF
           </button>
           <button onClick={onRegenerate} className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors">
@@ -389,7 +400,7 @@ function ReportStep({
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+      <div ref={reportContentRef} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
 
         {/* RAG sources */}
         {sourcesOpen && (
@@ -754,7 +765,159 @@ function ReportStep({
         <div className="h-4" />
       </div>
 
-      <style>{`@media print { button, nav, header { display: none !important; } }`}</style>
+      <style>{`
+        @media print {
+          /* Page setup - A4 dimensions */
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+
+          html, body {
+            width: 210mm;
+            height: 297mm;
+            margin: 0;
+            padding: 0;
+          }
+
+          /* Hide interactive elements */
+          button, nav, header, .flex.items-center.justify-between {
+            display: none !important;
+          }
+
+          /* Main container */
+          .flex.flex-col.h-full {
+            page-break-after: always;
+            page-break-inside: avoid;
+          }
+
+          /* Page setup - margins and size */
+          body {
+            margin: 0;
+            padding: 15mm;
+            background: white;
+          }
+
+          /* Section styling for page breaks */
+          .rounded-2xl.border {
+            page-break-inside: avoid;
+            page-break-after: auto;
+            margin-bottom: 12pt;
+            page-break-before: auto;
+          }
+
+          /* Divider styling */
+          .flex.items-center.gap-3.my-4 {
+            page-break-inside: avoid;
+            page-break-after: avoid;
+          }
+
+          /* KPI strip - no break inside */
+          .flex.flex-wrap.gap-2 {
+            page-break-inside: avoid;
+            page-break-after: avoid;
+            margin-bottom: 14pt;
+          }
+
+          /* Force page break after main sections */
+          .rounded-2xl.border:nth-of-type(2),
+          .rounded-2xl.border:nth-of-type(3),
+          .rounded-2xl.border:nth-of-type(4) {
+            page-break-after: always;
+            margin-bottom: 20pt;
+          }
+
+          /* Chart containers - prevent breaking */
+          .recharts-wrapper {
+            page-break-inside: avoid;
+            height: 180px !important;
+            min-height: 180px !important;
+          }
+
+          /* Table styling for print */
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            page-break-inside: avoid;
+            font-size: 9pt;
+            margin-bottom: 12pt;
+          }
+
+          thead {
+            display: table-header-group;
+            page-break-after: avoid;
+          }
+
+          tbody tr {
+            page-break-inside: avoid;
+          }
+
+          /* Text sizing for print */
+          h1, h2, h3 { font-size: 14pt; margin-bottom: 10pt; }
+          h4, h5, h6 { font-size: 11pt; margin-bottom: 8pt; }
+          p, span, div { font-size: 10pt; line-height: 1.4; }
+          .text-xs { font-size: 8pt; }
+          .text-sm { font-size: 9pt; }
+          .text-lg { font-size: 12pt; }
+
+          /* Grid layout adjustment */
+          .grid {
+            page-break-inside: avoid;
+            margin-bottom: 12pt;
+          }
+
+          /* Ensure content fits on page */
+          .overflow-y-auto {
+            overflow: visible !important;
+            height: auto !important;
+          }
+
+          /* Print-friendly spacing */
+          .px-6 { padding-left: 0; padding-right: 0; }
+          .py-5 { padding-top: 0; padding-bottom: 8pt; }
+          .space-y-4 > * + * { margin-top: 12pt; }
+
+          /* Border styling for print */
+          border {
+            border-color: #000 !important;
+          }
+
+          /* Prevent color wash - use grays */
+          .bg-slate-50,
+          .dark\\:bg-slate-800\\/ 40 {
+            background: #f5f5f5 !important;
+          }
+
+          /* Chart text - ensure visibility */
+          .recharts-text,
+          .recharts-legend-item-text,
+          .recharts-cartesian-axis-tick {
+            font-size: 8pt !important;
+            fill: #000 !important;
+          }
+
+          /* Force single column on print for better fit */
+          .sm\\:grid-cols-2 { grid-template-columns: 1fr !important; }
+          .lg\\:grid-cols-3 { grid-template-columns: 1fr !important; }
+
+          /* Last section - no break after */
+          .rounded-2xl.border:last-of-type {
+            page-break-after: avoid;
+            margin-bottom: 0;
+          }
+
+          /* Remove bottom padding from last item */
+          .flex-1.overflow-y-auto > div:last-child {
+            margin-bottom: 0;
+          }
+        }
+
+        /* Screen-only styles */
+        @media screen {
+          /* Ensure normal display on screen */
+        }
+      `}</style>
     </div>
   );
 }

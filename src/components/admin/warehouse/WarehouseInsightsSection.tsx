@@ -4,8 +4,7 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
-import WarehouseKPIGrid from "@/components/admin/warehouse/WarehouseKPIGrid";
-import CriticalAssetsTable from "@/components/admin/warehouse/CriticalAssetsTable";
+
 
 import {
   HealthMaintenanceTrendsCard,
@@ -76,10 +75,7 @@ export default function WarehouseInsightsSection({ data: initialData }: { data?:
 
   return (
     <div className="space-y-6">
-      {/* New KPI cards (Row 2) */}
-      <WarehouseKPIGrid data={data?.kpiGrid} />
-
-      {/* Previous charts */}
+      {/* Charts and insights */}
       <div className="grid gap-4 lg:grid-cols-2">
         <HealthMaintenanceTrendsCard data={data?.healthMaintenanceTrends} />
         <AssetStatusDistributionCard data={data?.assetStatus} />
@@ -98,9 +94,6 @@ export default function WarehouseInsightsSection({ data: initialData }: { data?:
           <MonthlyTicketVolumeCard data={data?.monthlyTicketVolume} />
         </div>
       </div>
-
-      {/* New table */}
-      <CriticalAssetsTable data={data?.criticalAssets} />
     </div>
   );
 }

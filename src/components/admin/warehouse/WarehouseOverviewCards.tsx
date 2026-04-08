@@ -49,10 +49,10 @@ export default function WarehouseOverviewCards({ data, isLoading }: { data?: any
     { label: "Active Tickets", value: "...", sub: "...", icon: Ticket },
   ];
 
-  const displayKpis = data && data.length > 0 
-    ? data.map((d, i) => ({
+  const displayKpis = data && data.length > 0
+    ? data.slice(0, defaultKpis.length).map((d, i) => ({
         ...d,
-        icon: defaultKpis[i].icon // Map String icon names to React lucide components
+        icon: defaultKpis[i]?.icon ?? Activity, // Map String icon names to React lucide components
       }))
     : defaultKpis;
 

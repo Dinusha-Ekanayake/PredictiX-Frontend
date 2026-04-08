@@ -394,10 +394,10 @@ export default function WarehouseAIReportPanel({
                   {assetTypeData.length > 0 && (
                     <div>
                       <h4 className="chart-label">Assets by Type</h4>
-                      <ResponsiveContainer width="100%" height={160}>
-                        <BarChart data={assetTypeData} layout="vertical" margin={{ left: 4 }}>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={assetTypeData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                           <XAxis type="number" tick={{ fontSize: 10 }} />
-                          <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={80} />
+                          <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
                           <Tooltip content={<CustomTooltip />} />
                           <Bar dataKey="value" fill={P.violet} radius={[0, 4, 4, 0]} />
                         </BarChart>

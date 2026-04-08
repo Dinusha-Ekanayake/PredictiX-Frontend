@@ -20,11 +20,22 @@ export default function WarehousePage() {
   async function fetchData() {
     setRefreshing(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/warehouse-dashboard/summary");
+      const response = await fetch("http://127.0.0.1:8000/warehouse-dashboard/summary", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const result = await response.json();
       setData(result);
     } catch (e) {
-      console.error(e);
+      console.error("Failed to fetch warehouse data:", e);
+      setData(null);
     } finally {
       setRefreshing(false);
     }
@@ -45,15 +56,24 @@ export default function WarehousePage() {
     setReportError(null);
     setReportData(null);
     try {
-      const res = await fetch(REPORT_API);
+      const res = await fetch(REPORT_API, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
+        const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
         throw new Error(err.detail || `HTTP ${res.status}`);
       }
+      
       const result = await res.json();
       setReportData(result);
     } catch (e: unknown) {
-      setReportError((e as Error).message);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      console.error("Report generation error:", errorMsg);
+      setReportError(errorMsg);
     } finally {
       setGenerating(false);
     }
@@ -105,7 +125,7 @@ export default function WarehousePage() {
       </div>
 
       {/* ── Existing dashboard (completely untouched) ── */}
-      <WarehouseOverviewCards data={data?.kpis} isLoading={refreshing && !data} />
+      <WarehouseOverviewCards data={data} isLoading={refreshing && !data} />
       {data && <WarehouseInsightsSection data={data} />}
 
       <div className="h-20" />

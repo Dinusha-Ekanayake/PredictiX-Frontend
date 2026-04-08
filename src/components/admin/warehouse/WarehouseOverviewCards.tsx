@@ -77,12 +77,8 @@ export default function WarehouseOverviewCards({ data, isLoading }: { data?: any
     { label: "Monthly Maintenance Cost", value: "$24,500", sub: "Estimated current month cost", icon: DollarSign },
   ];
 
-  const displayKpis = data && data.length > 0 
-    ? data.map((d, i) => ({
-        ...d,
-        icon: defaultKpis[i].icon // Map String icon names to React lucide components
-      }))
-    : defaultKpis;
+  // Always show 8 cards - use defaults
+  const displayKpis = defaultKpis;
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

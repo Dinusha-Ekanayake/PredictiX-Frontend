@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, ShieldCheck, AlertTriangle, Ticket } from "lucide-react";
+import { Activity, ShieldCheck, AlertTriangle, Ticket, Truck, AlertCircle, Zap, DollarSign } from "lucide-react";
 
 const kpis = [
   {
@@ -29,13 +29,37 @@ const kpis = [
     sub: "Of 4 total",
     icon: Ticket,
   },
+  {
+    label: "Total Vehicles",
+    value: "128",
+    sub: "Across all warehouse operations",
+    icon: Truck,
+  },
+  {
+    label: "Critical Assets",
+    value: "12",
+    sub: "Require immediate attention",
+    icon: AlertCircle,
+  },
+  {
+    label: "Avg Component Health",
+    value: "84%",
+    sub: "Overall fleet component health",
+    icon: Zap,
+  },
+  {
+    label: "Monthly Maintenance Cost",
+    value: "$24,500",
+    sub: "Estimated current month cost",
+    icon: DollarSign,
+  },
 ] as const;
 
 export default function WarehouseOverviewCards({ data, isLoading }: { data?: any[], isLoading?: boolean }) {
   if (isLoading) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
           <Card key={i} className="rounded-2xl h-[120px] animate-pulse bg-muted" />
         ))}
       </div>
@@ -43,10 +67,14 @@ export default function WarehouseOverviewCards({ data, isLoading }: { data?: any
   }
 
   const defaultKpis = [
-    { label: "Average Health", value: "...", sub: "Across all assets", icon: Activity },
-    { label: "Healthy Assets", value: "...", sub: "...", icon: ShieldCheck },
-    { label: "At Risk", value: "...", sub: "Require attention", icon: AlertTriangle },
-    { label: "Active Tickets", value: "...", sub: "...", icon: Ticket },
+    { label: "Average Health", value: "77%", sub: "Across all assets", icon: Activity },
+    { label: "Healthy Assets", value: "3", sub: "50% of total", icon: ShieldCheck },
+    { label: "At Risk", value: "1", sub: "Require attention", icon: AlertTriangle },
+    { label: "Active Tickets", value: "3", sub: "Of 4 total", icon: Ticket },
+    { label: "Total Vehicles", value: "128", sub: "Across all warehouse operations", icon: Truck },
+    { label: "Critical Assets", value: "12", sub: "Require immediate attention", icon: AlertCircle },
+    { label: "Avg Component Health", value: "84%", sub: "Overall fleet component health", icon: Zap },
+    { label: "Monthly Maintenance Cost", value: "$24,500", sub: "Estimated current month cost", icon: DollarSign },
   ];
 
   const displayKpis = data && data.length > 0 

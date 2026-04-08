@@ -336,7 +336,7 @@
 // // //           </div>
 // // //           <div className="flex gap-2">
 // // //             <Button variant="outline">Manage Tickets</Button>
-// // //             
+// // //             <Button>
 // // //               <Plus className="mr-2 h-4 w-4" />
 // // //               New Ticket
 // // //             </Button>
@@ -1345,7 +1345,274 @@
 // }
 
 
-// VERSION T2
+// // VERSION T2
+
+// "use client";
+
+// import StatCard from "@/components/admin/common/StatCard";
+// import SectionCard from "@/components/admin/common/SectionCard";
+
+// import { Badge } from "@/components/ui/badge";
+// import { Button } from "@/components/ui/button";
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// import {
+//   Table,
+//   TableBody,
+//   TableCell,
+//   TableHead,
+//   TableHeader,
+//   TableRow,
+// } from "@/components/ui/table";
+
+// import {
+//   AlertTriangle,
+//   Boxes,
+//   Ticket,
+//   TrendingUp,
+//   Warehouse,
+// } from "lucide-react";
+
+// const kpis = [
+//   { label: "Total Assets", value: "1,284", hint: "Across all warehouses", icon: <Boxes className="h-4 w-4" /> },
+//   { label: "High-Risk Assets", value: "37", hint: "Risk > 0.75", icon: <AlertTriangle className="h-4 w-4" /> },
+//   { label: "Predicted Failures (30d)", value: "12", hint: "Model forecast", icon: <TrendingUp className="h-4 w-4" /> },
+//   { label: "Active Tickets", value: "94", hint: "Open + In progress", icon: <Ticket className="h-4 w-4" /> },
+//   { label: "Critical Tickets", value: "9", hint: "Priority: Critical", icon: <AlertTriangle className="h-4 w-4" /> },
+//   { label: "Avg Health Score", value: "82%", hint: "Weighted average", icon: <Warehouse className="h-4 w-4" /> },
+// ];
+
+// const alerts = [
+//   { title: "Forklift FL-22 risk increased", level: "High", meta: "Vibration spike • WH-A" },
+//   { title: "Overdue maintenance: Conveyor C-09", level: "Medium", meta: "5 days overdue • WH-B" },
+//   { title: "Critical ticket pending approval", level: "Critical", meta: "Hydraulic leak • WH-A" },
+//   { title: "Sensor missing readings detected", level: "Low", meta: "Temp sensor • WH-C" },
+// ];
+
+// const highRiskAssets = [
+//   { name: "Forklift FL-22", wh: "Warehouse A", risk: "0.91", due: "2026-02-20" },
+//   { name: "Conveyor C-09", wh: "Warehouse B", risk: "0.86", due: "2026-02-16" },
+//   { name: "Palletizer P-03", wh: "Warehouse A", risk: "0.84", due: "2026-02-28" },
+//   { name: "Generator G-11", wh: "Warehouse C", risk: "0.81", due: "2026-03-03" },
+//   { name: "Cooling Unit CU-06", wh: "Warehouse B", risk: "0.78", due: "2026-02-25" },
+// ];
+
+// const warehouseCompare = [
+//   { wh: "Warehouse A", avgHealth: "79%", riskAssets: 18, tickets: 41, estCost: "$6,250" },
+//   { wh: "Warehouse B", avgHealth: "83%", riskAssets: 12, tickets: 33, estCost: "$4,120" },
+//   { wh: "Warehouse C", avgHealth: "87%", riskAssets: 7, tickets: 20, estCost: "$2,980" },
+// ];
+
+// function SeverityBadge({ level }: { level: string }) {
+//   const variant =
+//     level === "Critical" ? "destructive" : level === "High" ? "default" : "secondary";
+//   return <Badge variant={variant as any}>{level}</Badge>;
+// }
+
+// export default function AdminDashboardPage() {
+//   return (
+//     <div className="space-y-6">
+//       {/* Title row (optional, only if your topbar doesn't already show it) */}
+//       <div className="flex items-end justify-between gap-3">
+//         <div>
+//           <h1 className="text-lg font-semibold">Dashboard</h1>
+//           <p className="text-sm text-muted-foreground">
+//             System overview of assets, risks, tickets, and AI insights.
+//           </p>
+//         </div>
+//         <div className="flex gap-2">
+//           <Button variant="outline" className="rounded-xl">
+//             Export
+//           </Button>
+//           <Button className="rounded-xl">Generate Report</Button>
+//         </div>
+//       </div>
+
+//       {/* KPI cards */}
+//       <div className="grid grid-cols-12 gap-6">
+//         {kpis.map((k) => (
+//           <div key={k.label} className="col-span-12 sm:col-span-6 lg:col-span-2">
+//             <StatCard label={k.label} value={k.value} hint={k.hint} icon={k.icon} />
+//           </div>
+//         ))}
+//       </div>
+
+//       {/* Trend + Alerts */}
+//       <div className="grid grid-cols-12 gap-6">
+//         <div className="col-span-12 lg:col-span-8">
+//           <SectionCard
+//             title="Asset Health Trend"
+//             right={
+//               <div className="flex items-center gap-2">
+//                 <Button variant="outline" className="h-8 rounded-xl px-3 text-xs">7d</Button>
+//                 <Button variant="outline" className="h-8 rounded-xl px-3 text-xs">30d</Button>
+//                 <Button variant="outline" className="h-8 rounded-xl px-3 text-xs">90d</Button>
+//               </div>
+//             }
+//           >
+//             <Tabs defaultValue="health">
+//               <TabsList className="rounded-xl">
+//                 <TabsTrigger value="health">Health Score</TabsTrigger>
+//                 <TabsTrigger value="risk">Failure Probability</TabsTrigger>
+//                 <TabsTrigger value="due">Maintenance Due</TabsTrigger>
+//               </TabsList>
+
+//               <TabsContent value="health" className="mt-4">
+//                 <div className="h-65 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+//                   Chart placeholder (Health trend)
+//                 </div>
+//               </TabsContent>
+//               <TabsContent value="risk" className="mt-4">
+//                 <div className="h-65 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+//                   Chart placeholder (Risk trend)
+//                 </div>
+//               </TabsContent>
+//               <TabsContent value="due" className="mt-4">
+//                 <div className="h-65 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+//                   Chart placeholder (Maintenance timeline)
+//                 </div>
+//               </TabsContent>
+//             </Tabs>
+//           </SectionCard>
+//         </div>
+
+//         <div className="col-span-12 lg:col-span-4">
+//           <SectionCard
+//             title="Alerts & Attention"
+//             right={<Button variant="outline" className="h-8 rounded-xl px-3 text-xs">View all</Button>}
+//           >
+//             <div className="space-y-3">
+//               {alerts.map((a) => (
+//                 <div key={a.title} className="rounded-2xl border p-3">
+//                   <div className="flex items-start justify-between gap-3">
+//                     <div className="text-sm font-medium">{a.title}</div>
+//                     <SeverityBadge level={a.level} />
+//                   </div>
+//                   <div className="mt-1 text-xs text-muted-foreground">{a.meta}</div>
+//                 </div>
+//               ))}
+//             </div>
+//           </SectionCard>
+//         </div>
+//       </div>
+
+//       {/* Risk assets + Ticket overview */}
+//       <div className="grid grid-cols-12 gap-6">
+//         <div className="col-span-12 lg:col-span-6">
+//           <SectionCard
+//             title="Top High-Risk Assets"
+//             right={<Button variant="outline" className="h-8 rounded-xl px-3 text-xs">Open Assets</Button>}
+//           >
+//             <Table>
+//               <TableHeader>
+//                 <TableRow>
+//                   <TableHead>Asset</TableHead>
+//                   <TableHead>Warehouse</TableHead>
+//                   <TableHead className="text-right">Risk</TableHead>
+//                   <TableHead className="text-right">Next Maint.</TableHead>
+//                 </TableRow>
+//               </TableHeader>
+//               <TableBody>
+//                 {highRiskAssets.map((r) => (
+//                   <TableRow key={r.name}>
+//                     <TableCell className="font-medium">{r.name}</TableCell>
+//                     <TableCell className="text-muted-foreground">{r.wh}</TableCell>
+//                     <TableCell className="text-right">
+//                       <Badge>{r.risk}</Badge>
+//                     </TableCell>
+//                     <TableCell className="text-right text-muted-foreground">{r.due}</TableCell>
+//                   </TableRow>
+//                 ))}
+//               </TableBody>
+//             </Table>
+//           </SectionCard>
+//         </div>
+
+//         <div className="col-span-12 lg:col-span-6">
+//           <SectionCard
+//             title="Ticket Overview"
+//             right={<Button variant="outline" className="h-8 rounded-xl px-3 text-xs">Open Tickets</Button>}
+//           >
+//             <div className="grid grid-cols-12 gap-4">
+//               <div className="col-span-12 md:col-span-5">
+//                 <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+//                   Donut placeholder (Status)
+//                 </div>
+//               </div>
+//               <div className="col-span-12 md:col-span-7">
+//                 <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+//                   Bar placeholder (Category)
+//                 </div>
+//               </div>
+//             </div>
+//           </SectionCard>
+//         </div>
+//       </div>
+
+//       {/* Warehouse compare + AI */}
+//       <div className="grid grid-cols-12 gap-6">
+//         <div className="col-span-12 lg:col-span-8">
+//           <SectionCard
+//             title="Warehouse Comparison"
+//             right={<Button variant="outline" className="h-8 rounded-xl px-3 text-xs">Export</Button>}
+//           >
+//             <Table>
+//               <TableHeader>
+//                 <TableRow>
+//                   <TableHead>Warehouse</TableHead>
+//                   <TableHead className="text-right">Avg Health</TableHead>
+//                   <TableHead className="text-right">Risk Assets</TableHead>
+//                   <TableHead className="text-right">Tickets</TableHead>
+//                   <TableHead className="text-right">Est. Cost</TableHead>
+//                 </TableRow>
+//               </TableHeader>
+//               <TableBody>
+//                 {warehouseCompare.map((w) => (
+//                   <TableRow key={w.wh}>
+//                     <TableCell className="font-medium">{w.wh}</TableCell>
+//                     <TableCell className="text-right">{w.avgHealth}</TableCell>
+//                     <TableCell className="text-right">{w.riskAssets}</TableCell>
+//                     <TableCell className="text-right">{w.tickets}</TableCell>
+//                     <TableCell className="text-right">{w.estCost}</TableCell>
+//                   </TableRow>
+//                 ))}
+//               </TableBody>
+//             </Table>
+//           </SectionCard>
+//         </div>
+
+//         <div className="col-span-12 lg:col-span-4">
+//           <SectionCard title="AI Insights">
+//             <div className="space-y-3">
+//               <div className="rounded-2xl border p-3">
+//                 <div className="text-sm font-medium">Quick Reports</div>
+//                 <div className="mt-3 flex flex-col gap-2">
+//                   <Button className="rounded-xl">Generate Warehouse Report</Button>
+//                   <Button variant="outline" className="rounded-xl">
+//                     Generate Asset Report
+//                   </Button>
+//                 </div>
+//               </div>
+
+//               <div className="rounded-2xl border p-3">
+//                 <div className="flex items-center justify-between">
+//                   <div className="text-sm font-medium">Latest Summary</div>
+//                   <Badge variant="secondary">Grounded: High</Badge>
+//                 </div>
+//                 <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted-foreground">
+//                   <li>Warehouse A risk rising due to forklift vibration anomalies.</li>
+//                   <li>Overdue maintenance increasing ticket backlog in Warehouse B.</li>
+//                   <li>7 assets missing sensor readings; predictions rely on logs only.</li>
+//                 </ul>
+//               </div>
+//             </div>
+//           </SectionCard>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
+// VERSION 03
 
 "use client";
 
@@ -1373,45 +1640,138 @@ import {
 } from "lucide-react";
 
 const kpis = [
-  { label: "Total Assets", value: "1,284", hint: "Across all warehouses", icon: <Boxes className="h-4 w-4" /> },
-  { label: "High-Risk Assets", value: "37", hint: "Risk > 0.75", icon: <AlertTriangle className="h-4 w-4" /> },
-  { label: "Predicted Failures (30d)", value: "12", hint: "Model forecast", icon: <TrendingUp className="h-4 w-4" /> },
-  { label: "Active Tickets", value: "94", hint: "Open + In progress", icon: <Ticket className="h-4 w-4" /> },
-  { label: "Critical Tickets", value: "9", hint: "Priority: Critical", icon: <AlertTriangle className="h-4 w-4" /> },
-  { label: "Avg Health Score", value: "82%", hint: "Weighted average", icon: <Warehouse className="h-4 w-4" /> },
+  {
+    label: "Total Assets",
+    value: "1,284",
+    hint: "Across all warehouses",
+    icon: <Boxes className="h-4 w-4" />,
+  },
+  {
+    label: "High-Risk Assets",
+    value: "37",
+    hint: "Risk > 0.75",
+    icon: <AlertTriangle className="h-4 w-4" />,
+  },
+  {
+    label: "Predicted Failures (30d)",
+    value: "12",
+    hint: "Model forecast",
+    icon: <TrendingUp className="h-4 w-4" />,
+  },
+  {
+    label: "Active Tickets",
+    value: "94",
+    hint: "Open + In progress",
+    icon: <Ticket className="h-4 w-4" />,
+  },
+  {
+    label: "Critical Tickets",
+    value: "9",
+    hint: "Priority: Critical",
+    icon: <AlertTriangle className="h-4 w-4" />,
+  },
+  {
+    label: "Avg Health Score",
+    value: "82%",
+    hint: "Weighted average",
+    icon: <Warehouse className="h-4 w-4" />,
+  },
 ];
 
 const alerts = [
-  { title: "Forklift FL-22 risk increased", level: "High", meta: "Vibration spike • WH-A" },
-  { title: "Overdue maintenance: Conveyor C-09", level: "Medium", meta: "5 days overdue • WH-B" },
-  { title: "Critical ticket pending approval", level: "Critical", meta: "Hydraulic leak • WH-A" },
-  { title: "Sensor missing readings detected", level: "Low", meta: "Temp sensor • WH-C" },
+  {
+    title: "Forklift FL-22 risk increased",
+    level: "High",
+    meta: "Vibration spike • WH-A",
+  },
+  {
+    title: "Overdue maintenance: Conveyor C-09",
+    level: "Medium",
+    meta: "5 days overdue • WH-B",
+  },
+  {
+    title: "Critical ticket pending approval",
+    level: "Critical",
+    meta: "Hydraulic leak • WH-A",
+  },
+  {
+    title: "Sensor missing readings detected",
+    level: "Low",
+    meta: "Temp sensor • WH-C",
+  },
 ];
 
 const highRiskAssets = [
-  { name: "Forklift FL-22", wh: "Warehouse A", risk: "0.91", due: "2026-02-20" },
-  { name: "Conveyor C-09", wh: "Warehouse B", risk: "0.86", due: "2026-02-16" },
-  { name: "Palletizer P-03", wh: "Warehouse A", risk: "0.84", due: "2026-02-28" },
-  { name: "Generator G-11", wh: "Warehouse C", risk: "0.81", due: "2026-03-03" },
-  { name: "Cooling Unit CU-06", wh: "Warehouse B", risk: "0.78", due: "2026-02-25" },
+  {
+    name: "Forklift FL-22",
+    wh: "Warehouse A",
+    risk: "0.91",
+    due: "2026-02-20",
+  },
+  {
+    name: "Conveyor C-09",
+    wh: "Warehouse B",
+    risk: "0.86",
+    due: "2026-02-16",
+  },
+  {
+    name: "Palletizer P-03",
+    wh: "Warehouse A",
+    risk: "0.84",
+    due: "2026-02-28",
+  },
+  {
+    name: "Generator G-11",
+    wh: "Warehouse C",
+    risk: "0.81",
+    due: "2026-03-03",
+  },
+  {
+    name: "Cooling Unit CU-06",
+    wh: "Warehouse B",
+    risk: "0.78",
+    due: "2026-02-25",
+  },
 ];
 
 const warehouseCompare = [
-  { wh: "Warehouse A", avgHealth: "79%", riskAssets: 18, tickets: 41, estCost: "$6,250" },
-  { wh: "Warehouse B", avgHealth: "83%", riskAssets: 12, tickets: 33, estCost: "$4,120" },
-  { wh: "Warehouse C", avgHealth: "87%", riskAssets: 7, tickets: 20, estCost: "$2,980" },
+  {
+    wh: "Warehouse A",
+    avgHealth: "79%",
+    riskAssets: 18,
+    tickets: 41,
+    estCost: "$6,250",
+  },
+  {
+    wh: "Warehouse B",
+    avgHealth: "83%",
+    riskAssets: 12,
+    tickets: 33,
+    estCost: "$4,120",
+  },
+  {
+    wh: "Warehouse C",
+    avgHealth: "87%",
+    riskAssets: 7,
+    tickets: 20,
+    estCost: "$2,980",
+  },
 ];
 
 function SeverityBadge({ level }: { level: string }) {
   const variant =
-    level === "Critical" ? "destructive" : level === "High" ? "default" : "secondary";
+    level === "Critical"
+      ? "destructive"
+      : level === "High"
+      ? "default"
+      : "secondary";
+
   return <Badge variant={variant as any}>{level}</Badge>;
 }
 
 export default function AdminDashboardPage() {
   return (
     <div className="space-y-6">
-      {/* Title row (optional, only if your topbar doesn't already show it) */}
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">Dashboard</h1>
@@ -1419,6 +1779,7 @@ export default function AdminDashboardPage() {
             System overview of assets, risks, tickets, and AI insights.
           </p>
         </div>
+
         <div className="flex gap-2">
           <Button variant="outline" className="rounded-xl">
             Export
@@ -1427,29 +1788,50 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* KPI cards */}
       <div className="grid grid-cols-12 gap-6">
         {kpis.map((k) => (
-          <div key={k.label} className="col-span-12 sm:col-span-6 lg:col-span-2">
-            <StatCard label={k.label} value={k.value} hint={k.hint} icon={k.icon} />
+          <div
+            key={k.label}
+            className="col-span-12 min-w-0 sm:col-span-6 lg:col-span-2"
+          >
+            <StatCard
+              label={k.label}
+              value={k.value}
+              hint={k.hint}
+              icon={k.icon}
+            />
           </div>
         ))}
       </div>
 
-      {/* Trend + Alerts */}
       <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 lg:col-span-8">
+        <div className="col-span-12 min-w-0 lg:col-span-8">
           <SectionCard
             title="Asset Health Trend"
             right={
               <div className="flex items-center gap-2">
-                <Button variant="outline" className="h-8 rounded-xl px-3 text-xs">7d</Button>
-                <Button variant="outline" className="h-8 rounded-xl px-3 text-xs">30d</Button>
-                <Button variant="outline" className="h-8 rounded-xl px-3 text-xs">90d</Button>
+                <Button
+                  variant="outline"
+                  className="h-8 rounded-xl px-3 text-xs"
+                >
+                  7d
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-8 rounded-xl px-3 text-xs"
+                >
+                  30d
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-8 rounded-xl px-3 text-xs"
+                >
+                  90d
+                </Button>
               </div>
             }
           >
-            <Tabs defaultValue="health">
+            <Tabs defaultValue="health" className="w-full min-w-0">
               <TabsList className="rounded-xl">
                 <TabsTrigger value="health">Health Score</TabsTrigger>
                 <TabsTrigger value="risk">Failure Probability</TabsTrigger>
@@ -1457,28 +1839,43 @@ export default function AdminDashboardPage() {
               </TabsList>
 
               <TabsContent value="health" className="mt-4">
-                <div className="h-65 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
-                  Chart placeholder (Health trend)
+                <div className="min-w-0">
+                  <div className="flex h-80 w-full min-w-0 items-center justify-center rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                    Chart placeholder (Health trend)
+                  </div>
                 </div>
               </TabsContent>
+
               <TabsContent value="risk" className="mt-4">
-                <div className="h-65 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
-                  Chart placeholder (Risk trend)
+                <div className="min-w-0">
+                  <div className="flex h-80ll min-w-0 items-center justify-center rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                    Chart placeholder (Risk trend)
+                  </div>
                 </div>
               </TabsContent>
+
               <TabsContent value="due" className="mt-4">
-                <div className="h-65 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
-                  Chart placeholder (Maintenance timeline)
+                <div className="min-w-0">
+                  <div className="flex h-80ll min-w-0 items-center justify-center rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                    Chart placeholder (Maintenance timeline)
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
           </SectionCard>
         </div>
 
-        <div className="col-span-12 lg:col-span-4">
+        <div className="col-span-12 min-w-0 lg:col-span-4">
           <SectionCard
             title="Alerts & Attention"
-            right={<Button variant="outline" className="h-8 rounded-xl px-3 text-xs">View all</Button>}
+            right={
+              <Button
+                variant="outline"
+                className="h-8 rounded-xl px-3 text-xs"
+              >
+                View all
+              </Button>
+            }
           >
             <div className="space-y-3">
               {alerts.map((a) => (
@@ -1487,7 +1884,9 @@ export default function AdminDashboardPage() {
                     <div className="text-sm font-medium">{a.title}</div>
                     <SeverityBadge level={a.level} />
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{a.meta}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {a.meta}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1495,51 +1894,71 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Risk assets + Ticket overview */}
       <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 lg:col-span-6">
+        <div className="col-span-12 min-w-0 lg:col-span-6">
           <SectionCard
             title="Top High-Risk Assets"
-            right={<Button variant="outline" className="h-8 rounded-xl px-3 text-xs">Open Assets</Button>}
+            right={
+              <Button
+                variant="outline"
+                className="h-8 rounded-xl px-3 text-xs"
+              >
+                Open Assets
+              </Button>
+            }
           >
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Asset</TableHead>
-                  <TableHead>Warehouse</TableHead>
-                  <TableHead className="text-right">Risk</TableHead>
-                  <TableHead className="text-right">Next Maint.</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {highRiskAssets.map((r) => (
-                  <TableRow key={r.name}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.wh}</TableCell>
-                    <TableCell className="text-right">
-                      <Badge>{r.risk}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">{r.due}</TableCell>
+            <div className="min-w-0 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Asset</TableHead>
+                    <TableHead>Warehouse</TableHead>
+                    <TableHead className="text-right">Risk</TableHead>
+                    <TableHead className="text-right">Next Maint.</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {highRiskAssets.map((r) => (
+                    <TableRow key={r.name}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {r.wh}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge>{r.risk}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {r.due}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </SectionCard>
         </div>
 
-        <div className="col-span-12 lg:col-span-6">
+        <div className="col-span-12 min-w-0 lg:col-span-6">
           <SectionCard
             title="Ticket Overview"
-            right={<Button variant="outline" className="h-8 rounded-xl px-3 text-xs">Open Tickets</Button>}
+            right={
+              <Button
+                variant="outline"
+                className="h-8 rounded-xl px-3 text-xs"
+              >
+                Open Tickets
+              </Button>
+            }
           >
             <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-5">
-                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+              <div className="col-span-12 min-w-0 md:col-span-5">
+                <div className="flex h-65 w-full min-w-0 items-center justify-center rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Donut placeholder (Status)
                 </div>
               </div>
-              <div className="col-span-12 md:col-span-7">
-                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+
+              <div className="col-span-12 min-w-0 md:col-span-7">
+                <div className="flex h-65 w-full min-w-0 items-center justify-center rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Bar placeholder (Category)
                 </div>
               </div>
@@ -1548,45 +1967,61 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Warehouse compare + AI */}
       <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 lg:col-span-8">
+        <div className="col-span-12 min-w-0 lg:col-span-8">
           <SectionCard
             title="Warehouse Comparison"
-            right={<Button variant="outline" className="h-8 rounded-xl px-3 text-xs">Export</Button>}
+            right={
+              <Button
+                variant="outline"
+                className="h-8 rounded-xl px-3 text-xs"
+              >
+                Export
+              </Button>
+            }
           >
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Warehouse</TableHead>
-                  <TableHead className="text-right">Avg Health</TableHead>
-                  <TableHead className="text-right">Risk Assets</TableHead>
-                  <TableHead className="text-right">Tickets</TableHead>
-                  <TableHead className="text-right">Est. Cost</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {warehouseCompare.map((w) => (
-                  <TableRow key={w.wh}>
-                    <TableCell className="font-medium">{w.wh}</TableCell>
-                    <TableCell className="text-right">{w.avgHealth}</TableCell>
-                    <TableCell className="text-right">{w.riskAssets}</TableCell>
-                    <TableCell className="text-right">{w.tickets}</TableCell>
-                    <TableCell className="text-right">{w.estCost}</TableCell>
+            <div className="min-w-0 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Warehouse</TableHead>
+                    <TableHead className="text-right">Avg Health</TableHead>
+                    <TableHead className="text-right">Risk Assets</TableHead>
+                    <TableHead className="text-right">Tickets</TableHead>
+                    <TableHead className="text-right">Est. Cost</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {warehouseCompare.map((w) => (
+                    <TableRow key={w.wh}>
+                      <TableCell className="font-medium">{w.wh}</TableCell>
+                      <TableCell className="text-right">
+                        {w.avgHealth}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {w.riskAssets}
+                      </TableCell>
+                      <TableCell className="text-right">{w.tickets}</TableCell>
+                      <TableCell className="text-right">{w.estCost}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </SectionCard>
         </div>
 
-        <div className="col-span-12 lg:col-span-4">
+        <div className="col-span-12 min-w-0 lg:col-span-4">
           <SectionCard title="AI Insights">
             <div className="space-y-3">
               <div className="rounded-2xl border p-3">
                 <div className="text-sm font-medium">Quick Reports</div>
+
                 <div className="mt-3 flex flex-col gap-2">
-                  <Button className="rounded-xl">Generate Warehouse Report</Button>
+                  <Button className="rounded-xl">
+                    Generate Warehouse Report
+                  </Button>
+
                   <Button variant="outline" className="rounded-xl">
                     Generate Asset Report
                   </Button>
@@ -1598,10 +2033,18 @@ export default function AdminDashboardPage() {
                   <div className="text-sm font-medium">Latest Summary</div>
                   <Badge variant="secondary">Grounded: High</Badge>
                 </div>
+
                 <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                  <li>Warehouse A risk rising due to forklift vibration anomalies.</li>
-                  <li>Overdue maintenance increasing ticket backlog in Warehouse B.</li>
-                  <li>7 assets missing sensor readings; predictions rely on logs only.</li>
+                  <li>
+                    Warehouse A risk rising due to forklift vibration anomalies.
+                  </li>
+                  <li>
+                    Overdue maintenance increasing ticket backlog in Warehouse B.
+                  </li>
+                  <li>
+                    7 assets missing sensor readings; predictions rely on logs
+                    only.
+                  </li>
                 </ul>
               </div>
             </div>

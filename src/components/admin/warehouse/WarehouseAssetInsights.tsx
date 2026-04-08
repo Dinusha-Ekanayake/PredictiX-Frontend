@@ -224,24 +224,32 @@ export function AssetsByTypeCard({ data: externalData }: { data?: any[] }) {
       </CardHeader>
 
       <CardContent>
-        <div className="h-[260px] w-full">
+        <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
               layout="vertical"
-              margin={{ top: 10, right: 10, left: 20, bottom: 0 }}
+              margin={{ top: 10, right: 30, left: 140, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis type="number" tick={{ fill: axisColor }} allowDecimals={false} />
+              <XAxis type="number" tick={{ fill: axisColor, fontSize: 12 }} allowDecimals={false} />
               <YAxis
                 type="category"
                 dataKey="type"
-                tick={{ fill: axisColor }}
-                width={120}
+                tick={{ fill: axisColor, fontSize: 12 }}
+                width={130}
               />
-              <Tooltip contentStyle={tooltipStyle} />
+              <Tooltip 
+                contentStyle={tooltipStyle}
+                formatter={(value) => [value, "Number of Assets"]}
+              />
               <Legend wrapperStyle={{ color: axisColor }} />
-              <Bar dataKey="count" name="Number of Assets" fill="#14b8a6" radius={[8, 8, 8, 8]} />
+              <Bar 
+                dataKey="count" 
+                name="Number of Assets" 
+                fill="#14b8a6" 
+                radius={[8, 8, 8, 8]}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>

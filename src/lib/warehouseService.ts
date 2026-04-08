@@ -1,15 +1,9 @@
 /**
  * Warehouse Service
- * Handles all API calls to backend warehouse endpoints connected to PostgreSQL
+ * Handles all API calls to backend warehouse endpoints
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-
-export interface MaintenanceScheduleItem {
-  asset: string;
-  predicted: number;
-  scheduled: number;
-}
 
 export interface WarehouseSummaryData {
   kpiGrid?: any[];
@@ -21,13 +15,13 @@ export interface WarehouseSummaryData {
   assetsByType?: any[];
   monthlyTicketVolume?: any[];
   criticalAssets?: any[];
-  maintenanceSchedule?: MaintenanceScheduleItem[];
+  maintenanceSchedule?: any[];
 }
 
 /**
- * Fetch predictive maintenance schedule from PostgreSQL
+ * Fetch predictive maintenance schedule from PostgreSQL backend
  */
-export async function getMaintenanceSchedule(): Promise<MaintenanceScheduleItem[]> {
+export async function getMaintenanceSchedule() {
   try {
     const response = await fetch(
       `${API_BASE_URL}/warehouse-dashboard/maintenance-schedule`,
@@ -45,8 +39,7 @@ export async function getMaintenanceSchedule(): Promise<MaintenanceScheduleItem[
       return [];
     }
 
-    const data = await response.json();
-    return data;
+    return await response.json();
   } catch (error) {
     console.error('Error fetching maintenance schedule:', error);
     return [];
@@ -54,7 +47,7 @@ export async function getMaintenanceSchedule(): Promise<MaintenanceScheduleItem[
 }
 
 /**
- * Fetch warehouse dashboard summary from PostgreSQL backend
+ * Fetch warehouse dashboard summary from backend
  */
 export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
   try {
@@ -76,7 +69,7 @@ export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
 
     const data = await response.json();
     
-    // Fetch maintenance schedule separately
+    // Fetch maintenance schedule separately and include it
     const maintenanceSchedule = await getMaintenanceSchedule();
     
     return {

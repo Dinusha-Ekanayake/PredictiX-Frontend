@@ -59,8 +59,13 @@ export default function WarehousePage() {
     }
   }
 
-  function openModal() {
+  function openModalAndGenerate() {
     setModalOpen(true);
+    setGenerating(true);
+    setReportError(null);
+    setReportData(null);
+    // Start generation immediately
+    handleGenerate();
   }
 
   function closeModal() {
@@ -87,11 +92,11 @@ export default function WarehousePage() {
             Refresh
           </Button>
 
-          {/* Generate Report → opens full-screen report modal */}
+          {/* Generate Report → Skip confirmation, go directly to generating */}
           <Button
             variant="secondary"
             id="btn-generate-warehouse-report"
-            onClick={openModal}
+            onClick={openModalAndGenerate}
           >
             <FileText className="mr-2 h-4 w-4" />
             Generate Report

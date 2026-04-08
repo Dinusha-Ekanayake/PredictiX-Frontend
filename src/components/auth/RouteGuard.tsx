@@ -13,7 +13,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAuthenticated, isAdmin, isUserRole } from "@/lib/authService";
-import { PredictiXLoader } from "@/components/loading/PredictiXLoader";
+import PredictiXLoader from "@/components/loading/PredictiXLoader";
 
 interface RouteGuardProps {
   children: React.ReactNode;

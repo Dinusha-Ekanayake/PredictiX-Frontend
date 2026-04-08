@@ -85,16 +85,16 @@ export default function WarehouseOverviewCards({ data, isLoading }: { data?: any
       {displayKpis.map((k) => {
         const IconComponent = k.icon;
         return (
-          <Card key={k.label || k.title} className="rounded-2xl">
+          <Card key={k.label} className="rounded-2xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                {k.label || k.title}
+                {k.label}
               </CardTitle>
               {IconComponent && <IconComponent className="h-5 w-5 text-muted-foreground" />}
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-semibold">{k.value}</div>
-              <p className="mt-1 text-xs text-muted-foreground">{k.sub || k.subtitle}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{k.sub}</p>
             </CardContent>
           </Card>
         );

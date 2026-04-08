@@ -4,57 +4,6 @@ import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, ShieldCheck, AlertTriangle, Ticket, Truck, AlertCircle, Zap, DollarSign } from "lucide-react";
 
-const kpis = [
-  {
-    label: "Average Health",
-    value: "77%",
-    sub: "Across all assets",
-    icon: Activity,
-  },
-  {
-    label: "Healthy Assets",
-    value: "3",
-    sub: "50% of total",
-    icon: ShieldCheck,
-  },
-  {
-    label: "At Risk",
-    value: "1",
-    sub: "Require attention",
-    icon: AlertTriangle,
-  },
-  {
-    label: "Active Tickets",
-    value: "3",
-    sub: "Of 4 total",
-    icon: Ticket,
-  },
-  {
-    label: "Total Vehicles",
-    value: "128",
-    sub: "Across all warehouse operations",
-    icon: Truck,
-  },
-  {
-    label: "Critical Assets",
-    value: "12",
-    sub: "Require immediate attention",
-    icon: AlertCircle,
-  },
-  {
-    label: "Avg Component Health",
-    value: "84%",
-    sub: "Overall fleet component health",
-    icon: Zap,
-  },
-  {
-    label: "Monthly Maintenance Cost",
-    value: "$24,500",
-    sub: "Estimated current month cost",
-    icon: DollarSign,
-  },
-] as const;
-
 export default function WarehouseOverviewCards({ data, isLoading }: { data?: any[], isLoading?: boolean }) {
   if (isLoading) {
     return (
@@ -66,19 +15,34 @@ export default function WarehouseOverviewCards({ data, isLoading }: { data?: any
     );
   }
 
-  const defaultKpis = [
-    { label: "Average Health", value: "77%", sub: "Across all assets", icon: Activity },
-    { label: "Healthy Assets", value: "3", sub: "50% of total", icon: ShieldCheck },
-    { label: "At Risk", value: "1", sub: "Require attention", icon: AlertTriangle },
-    { label: "Active Tickets", value: "3", sub: "Of 4 total", icon: Ticket },
-    { label: "Total Vehicles", value: "128", sub: "Across all warehouse operations", icon: Truck },
-    { label: "Critical Assets", value: "12", sub: "Require immediate attention", icon: AlertCircle },
-    { label: "Avg Component Health", value: "84%", sub: "Overall fleet component health", icon: Zap },
-    { label: "Monthly Maintenance Cost", value: "$24,500", sub: "Estimated current month cost", icon: DollarSign },
-  ];
-
-  // Always display all 8 cards
-  const displayKpis = defaultKpis;
+  // Build KPIs from real API data
+  const displayKpis = data && data.kpis && data.kpiGrid 
+    ? [
+        // First 4 cards from kpis array (from database queries)
+        ...data.kpis.map((kpi: any) => ({
+          label: kpi.label,
+          value: kpi.value,
+          sub: kpi.sub,
+          icon: kpi.label === "Average Health" ? Activity 
+               : kpi.label === "Healthy Assets" ? ShieldCheck 
+               : kpi.label === "At Risk" ? AlertTriangle 
+               : Ticket,
+        })),
+        // Next 4 cards from kpiGrid array (from database queries)
+        ...data.kpiGrid.map((kpi: any) => ({
+          label: kpi.title,
+          value: kpi.value,
+          sub: kpi.subtitle,
+          icon: kpi.title === "Total Vehicles" ? Truck 
+               : kpi.title === "Critical Assets" ? AlertCircle 
+               : kpi.title === "Avg Component Health" ? Zap 
+               : DollarSign,
+        })),
+      ]
+    : [
+        // Fallback to show loading message if data is missing
+        { label: "No Data", value: "N/A", sub: "Unable to fetch from database", icon: Activity },
+      ];
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

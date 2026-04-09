@@ -2,21 +2,10 @@
 
 import * as React from "react";
 import AssetsSummary from "@/components/admin/assets/AssetsSummary";
-import AssetsToolbar, {
-  // Remove the duplicate import
-} from "@/components/admin/assets/AssetsToolbar";
+import AssetsToolbar, { AssetFilters } from "@/components/admin/assets/AssetsToolbar";
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel from "@/components/admin/assets/AssetDetailsPanel";
 import { ASSETS } from "@/components/admin/assets/mock";
-// Ensure that AssetFilters is defined and exported
-export type AssetFilters = {
-  query: string;
-  status: string;
-  healthBand: string;
-  warehouse: string;
-};
-
-// Other type definitions...
 import { Box } from "lucide-react";
 
 function getHealthBand(score: number) {

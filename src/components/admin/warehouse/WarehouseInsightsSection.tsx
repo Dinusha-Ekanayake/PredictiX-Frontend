@@ -87,7 +87,7 @@ export default function WarehouseInsightsSection({ data: initialData }: { data?:
         <AssetsByTypeCard data={data?.assetsByType} />
 
         <div className="lg:col-span-2">
-          <WarehouseMaintenanceSchedule data={data?.maintenanceSchedule} />
+          <WarehouseMaintenanceSchedule />
         </div>
 
         <div className="lg:col-span-2">

@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
   LineChart, Line, Legend,
 } from "recharts";
-import { downloadReportPDF } from "@/lib/pdfExport";
+import { downloadProfessionalPDF } from "@/lib/professionalPdfExport";
 
 // ── Palette ──────────────────────────────────────────────
 const P = {
@@ -48,6 +48,9 @@ interface Ctx {
   avg_failure_prob_pct?: number;
   risk_breakdown?: Record<string, number>;
   health_score_distribution?: Record<string, number>;
+  urgent_count?: number;
+  open_ticket_count?: number;
+  monthly_maintenance_cost?: number;
   top_shap_features?: [string, number][];
   urgent_maintenance_count?: number; soon_maintenance_count?: number;
   avg_days_to_maintenance?: number | null;
@@ -184,7 +187,7 @@ function ConfirmStep({ onGenerate, onClose }: { onGenerate: () => void; onClose:
           </div>
           <div>
             <h2 className="text-lg font-bold text-white">Generate Warehouse Report</h2>
-            <p className="text-sm text-violet-200">Full AI analysis · Llama 3 (Meta AI) · Live PostgreSQL data</p>
+            <p className="text-sm text-violet-200">Complete analysis · Live data</p>
           </div>
         </div>
         <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
@@ -194,7 +197,7 @@ function ConfirmStep({ onGenerate, onClose }: { onGenerate: () => void; onClose:
 
       <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Report Includes 5 AI-Generated Sections</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Report Includes 5 Sections</p>
           <div className="space-y-2">
             {SECTIONS.map((s, i) => (
               <div key={i} className="flex items-start gap-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5">
@@ -208,7 +211,7 @@ function ConfirmStep({ onGenerate, onClose }: { onGenerate: () => void; onClose:
         <div className="rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3">
           <div className="flex items-center gap-2 mb-2">
             <Database className="h-3.5 w-3.5 text-violet-500" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">PostgreSQL Data Sources (RAG)</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Data Sources</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {SOURCES.map((s) => (
@@ -220,7 +223,7 @@ function ConfirmStep({ onGenerate, onClose }: { onGenerate: () => void; onClose:
         <div className="flex items-center gap-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 px-4 py-3">
           <Cpu className="h-4 w-4 shrink-0 text-indigo-500" />
           <p className="text-xs text-indigo-700 dark:text-indigo-300">
-            All live PostgreSQL data is injected into <strong>Llama 3 (Meta AI)</strong> via LangChain.
+            All live data is processed and analyzed via PredictiX.
             Report generation takes approximately <strong>10–25 seconds</strong>.
           </p>
         </div>
@@ -247,11 +250,11 @@ function ConfirmStep({ onGenerate, onClose }: { onGenerate: () => void; onClose:
 function LoadingStep() {
   const [step, setStep] = React.useState(0);
   const steps = [
-    "Connecting to PostgreSQL database…",
+    "Connecting to database…",
     "Aggregating asset health & failure data…",
     "Processing ticket & maintenance records…",
-    "Injecting context into Llama 3 (Meta AI)…",
-    "Generating AI-powered report sections…",
+    "Analyzing data patterns…",
+    "Generating report sections…",
   ];
   React.useEffect(() => {
     const t = setInterval(() => setStep((p) => (p < steps.length - 1 ? p + 1 : p)), 3500);
@@ -267,8 +270,8 @@ function LoadingStep() {
         <div className="absolute -inset-1 rounded-full border-2 border-violet-200 dark:border-violet-800 animate-ping opacity-40" />
       </div>
       <div className="text-center max-w-sm">
-        <h3 className="text-lg font-bold mb-1">Generating AI Report</h3>
-        <p className="text-sm text-muted-foreground mb-6">Powered by Llama 3 · Live PostgreSQL data</p>
+        <h3 className="text-lg font-bold mb-1">Generating Report</h3>
+        <p className="text-sm text-muted-foreground mb-6">Powered by PredictiX</p>
         <div className="space-y-2">
           {steps.map((s, i) => (
             <div key={i} className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-xs transition-all duration-500 ${
@@ -357,12 +360,97 @@ function ReportStep({
   }));
 
   const handlePDFExport = () => {
-    if (reportContentRef.current) {
-      const warehouseName = ctx.warehouse_name || "warehouse";
-      const date = new Date().toISOString().split("T")[0];
-      const filename = `${warehouseName}-report-${date}.pdf`;
-      downloadReportPDF(reportContentRef.current, filename);
-    }
+    const warehouseName = ctx.warehouse_name || "Warehouse";
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const filename = `${warehouseName}-AI-Report-${new Date().toISOString().split('T')[0]}.pdf`;
+    
+    // Prepare structured report data with ALL warehouse context data
+    const pdfData = {
+      title: "Warehouse AI Report",
+      warehouseName: warehouseName,
+      warehouseCity: ctx.warehouse_city,
+      generatedDate: date,
+      summary: {
+        totalAssets: ctx.total_assets || 0,
+        fleetHealth: Math.round(ctx.avg_health_pct || 0),
+        failureProb: Math.round(ctx.avg_failure_prob_pct || 0),
+        critical: ctx.critical_count || 0,
+        urgent: ctx.urgent_count || 0,
+        activeTickets: ctx.open_ticket_count || 0,
+        activeUsers: ctx.active_users || 0,
+        maintenanceCost: `LKR ${(ctx.monthly_maintenance_cost || 0).toLocaleString()}`,
+      },
+      // AI Content Sections - from data parameter
+      aiContent: {
+        insight_summary: ai.insight_summary || "",
+        risk_analysis: ai.risk_analysis || "",
+        maintenance_intelligence: ai.maintenance_intelligence || "",
+        pattern_and_trend: ai.pattern_and_trend || "",
+        conclusion: ai.conclusion || "",
+      },
+      // Asset Details
+      assetDetail: {
+        activeAssets: ctx.active_assets || 0,
+        inactiveAssets: ctx.inactive_assets || 0,
+        underMaintenanceAssets: ctx.under_maintenance_assets || 0,
+        retiredAssets: ctx.retired_assets || 0,
+        avgVehicleAge: ctx.avg_vehicle_age_years || 0,
+      },
+      // Maintenance Details
+      maintenanceDetail: {
+        estimatedCost: `LKR ${(ctx.total_estimated_cost || 0).toLocaleString()}`,
+        avgCostPerAsset: `LKR ${(ctx.avg_cost_per_asset || 0).toLocaleString()}`,
+        actualCost3m: `LKR ${(ctx.actual_cost_3m || 0).toLocaleString()}`,
+        maintenanceEvents3m: ctx.total_maintenance_events_3m || 0,
+        avgDowntimeHours: ctx.avg_downtime_hours || 0,
+      },
+      // Ticket Details
+      ticketDetail: {
+        totalTickets: ctx.total_tickets || 0,
+        openTickets: ctx.open_tickets || 0,
+        inProgressTickets: ctx.in_progress_tickets || 0,
+        resolvedTickets: ctx.resolved_tickets || 0,
+        closedTickets: ctx.closed_tickets || 0,
+        highPriorityTickets: ctx.high_priority_active_tickets || 0,
+      },
+      // User Details
+      userDetail: {
+        totalUsers: ctx.total_users || 0,
+        adminUsers: ctx.admin_users || 0,
+        standardUsers: ctx.standard_users || 0,
+        inactiveUsers: ctx.inactive_users || 0,
+      },
+      // Chart Sections
+      sections: {
+        assetStatus: Object.entries(ctx.asset_status_breakdown || {}).map(([name, value]) => ({ name, value })),
+        ticketPriority: toChart(ctx.ticket_priority_breakdown || {}),
+        ticketsByCategory: toChart(ctx.ticket_category_breakdown || {}),
+        assetsByType: toChart(ctx.asset_type_breakdown || {}),
+        healthScoreDistribution: Object.entries(ctx.health_score_distribution || {}).map(([bucket, count]) => ({ bucket, count })),
+        maintenanceTypes: Object.entries(ctx.maintenance_type_breakdown || {}).map(([name, value]) => ({ name, value })),
+        riskBreakdown: Object.entries(ctx.risk_breakdown || {}).map(([name, value]) => ({ name, value })),
+        criticaAssets: (ctx.critical_assets || []).map(asset => ({
+          id: asset.code || "N/A",
+          vehicle: asset.name || "Unknown",
+          component: asset.type || "General",
+          health: asset.health || "N/A",
+          priority: Math.round(parseFloat(asset.failure_prob || "0")) > 50 ? "High" : "Medium",
+          status: asset.status || "Unknown",
+        })),
+      },
+      // Trends Data
+      trends: {
+        ticketTrend: ctx.ticket_trend_last_3m || [],
+        maintenanceTrend: ctx.monthly_maintenance_trend || [],
+      },
+      // SHAP Features (Top Failure Drivers)
+      shapFeatures: (ctx.top_shap_features || []).slice(0, 8).map(([feature, importance]) => ({
+        feature: feature.replace(/_/g, " "),
+        importance: importance,
+      })),
+    };
+    
+    downloadProfessionalPDF(pdfData as any, filename);
   };
 
   return (
@@ -374,9 +462,8 @@ function ReportStep({
             <Brain className="h-4 w-4" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold">AI Warehouse Full Report</h2>
-              <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[9px] font-bold text-white uppercase tracking-wide">Llama 3 · RAG</span>
+            <div>
+              <h2 className="text-sm font-bold">Warehouse Full Report</h2>
             </div>
             <p className="text-xs text-muted-foreground">
               {ctx.warehouse_name} · {ctx.warehouse_city} · {ctx.report_date}
@@ -384,9 +471,6 @@ function ReportStep({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setSourcesOpen((p) => !p)} className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-            <BookOpen className="h-3.5 w-3.5" /> Sources
-          </button>
           <button onClick={handlePDFExport} className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
             <Download className="h-3.5 w-3.5" /> PDF
           </button>
@@ -400,7 +484,7 @@ function ReportStep({
       </div>
 
       {/* Scrollable body */}
-      <div ref={reportContentRef} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+      <div ref={reportContentRef} className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
 
         {/* RAG sources */}
         {sourcesOpen && (

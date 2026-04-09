@@ -292,3 +292,27 @@ html {
   60% { opacity: .18; }
   100% { transform: translateX(120%); opacity: 0; }
 }
+
+/* ===== Custom Scrollbar Styling ===== */
+.scrollbar-styled::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-styled::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-styled::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.scrollbar-styled::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+.scrollbar-styled {
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  scrollbar-width: thin;
+}

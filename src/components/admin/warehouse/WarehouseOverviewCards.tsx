@@ -7,8 +7,8 @@ import { Activity, ShieldCheck, AlertTriangle, Ticket, Truck, AlertCircle, Zap, 
 export default function WarehouseOverviewCards({ data, isLoading }: { data?: any; isLoading?: boolean }) {
   if (isLoading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
           <Card key={i} className="rounded-2xl h-[120px] animate-pulse bg-muted" />
         ))}
       </div>
@@ -38,14 +38,14 @@ export default function WarehouseOverviewCards({ data, isLoading }: { data?: any
                : kpi.title === "Avg Component Health" ? Zap 
                : DollarSign,
         })),
-      ]
+      ].filter((kpi) => kpi.label !== "At Risk" && kpi.label !== "Avg Component Health")
     : [
         // Fallback to show loading message if data is missing
         { label: "No Data", value: "N/A", sub: "Unable to fetch from database", icon: Activity },
       ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {displayKpis.map((k) => {
         const IconComponent = k.icon;
         return (

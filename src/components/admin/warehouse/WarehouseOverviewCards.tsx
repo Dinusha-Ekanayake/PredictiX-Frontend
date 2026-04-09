@@ -4,7 +4,7 @@ import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, ShieldCheck, AlertTriangle, Ticket, Truck, AlertCircle, Zap, DollarSign } from "lucide-react";
 
-export default function WarehouseOverviewCards({ data, isLoading }: { data?: any[], isLoading?: boolean }) {
+export default function WarehouseOverviewCards({ data, isLoading }: { data?: any; isLoading?: boolean }) {
   if (isLoading) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

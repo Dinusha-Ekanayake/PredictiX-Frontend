@@ -447,7 +447,7 @@ export default function UserProfilePage() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overflow-y-auto scrollbar-styled max-h-96">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -541,7 +541,7 @@ export default function UserProfilePage() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overflow-y-auto scrollbar-styled max-h-96">
                 <Table>
                   <TableHeader>
                     <TableRow>

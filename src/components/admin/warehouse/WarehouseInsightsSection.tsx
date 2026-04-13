@@ -19,7 +19,6 @@ import {
   MonthlyTicketVolumeCard,
 } from "@/components/admin/warehouse/WarehouseTicketInsights";
 
-import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
 import { getWarehouseSummary, WarehouseSummaryData } from "@/lib/warehouseService";
 
 export default function WarehouseInsightsSection({ data: initialData }: { data?: any }) {
@@ -85,10 +84,6 @@ export default function WarehouseInsightsSection({ data: initialData }: { data?:
 
         <TicketsByCategoryCard data={data?.ticketsByCategory} />
         <AssetsByTypeCard data={data?.assetsByType} />
-
-        <div className="lg:col-span-2">
-          <WarehouseMaintenanceSchedule />
-        </div>
 
         <div className="lg:col-span-2">
           <MonthlyTicketVolumeCard data={data?.monthlyTicketVolume} />

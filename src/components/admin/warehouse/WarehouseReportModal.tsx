@@ -363,11 +363,11 @@ function ReportStep({
   const handlePDFExport = () => {
     const warehouseName = ctx.warehouse_name || "Warehouse";
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const filename = `${warehouseName}-AI-Report-${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `${warehouseName}-Report-${new Date().toISOString().split('T')[0]}.pdf`;
     
     // Prepare structured report data with ALL warehouse context data
     const pdfData = {
-      title: "Warehouse AI Report",
+      title: "Warehouse Report",
       warehouseName: warehouseName,
       warehouseCity: ctx.warehouse_city,
       generatedDate: date,

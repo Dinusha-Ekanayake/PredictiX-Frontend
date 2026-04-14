@@ -75,7 +75,7 @@ interface Ctx {
 interface Props {
   open: boolean;
   generating: boolean;
-  reportData: { ai_sections: AISections; context: Ctx } | null;
+  reportData: { ai_sections: AISections; context: Ctx; kb_annotations?: any } | null;
   reportError: string | null;
   onGenerate: () => void;
   onClose: () => void;
@@ -336,7 +336,7 @@ function ErrorStep({ error, onRetry, onClose }: { error: string; onRetry: () => 
 function ReportStep({
   data, onRegenerate, onClose,
 }: {
-  data: { ai_sections: AISections; context: Ctx };
+  data: { ai_sections: AISections; context: Ctx; kb_annotations?: any };
   onRegenerate: () => void;
   onClose: () => void;
 }) {
@@ -344,6 +344,7 @@ function ReportStep({
   const reportContentRef = React.useRef<HTMLDivElement>(null);
   const ctx = data.context;
   const ai  = data.ai_sections;
+  const kb  = data.kb_annotations || {};
   const cur = ctx.currency ?? "LKR";
 
   const riskData        = toChart(ctx.risk_breakdown);
@@ -376,10 +377,11 @@ function ReportStep({
         failureProb: Math.round(ctx.avg_failure_prob_pct || 0),
         critical: ctx.critical_count || 0,
         urgent: ctx.urgent_count || 0,
-        activeTickets: ctx.open_ticket_count || 0,
+        activeTickets: ctx.active_tickets || 0,
         activeUsers: ctx.active_users || 0,
         maintenanceCost: `LKR ${(ctx.monthly_maintenance_cost || 0).toLocaleString()}`,
       },
+      kbAnnotations: kb,
       // AI Content Sections - from data parameter
       aiContent: {
         insight_summary: ai.insight_summary || "",
@@ -412,6 +414,8 @@ function ReportStep({
         resolvedTickets: ctx.resolved_tickets || 0,
         closedTickets: ctx.closed_tickets || 0,
         highPriorityTickets: ctx.high_priority_active_tickets || 0,
+        mediumPriorityTickets: ctx.ticket_priority_breakdown?.['Medium'] || ctx.ticket_final_priority_breakdown?.['Medium'] || 0,
+        lowPriorityTickets: ctx.ticket_priority_breakdown?.['Low'] || ctx.ticket_final_priority_breakdown?.['Low'] || 0,
       },
       // User Details
       userDetail: {
@@ -451,6 +455,18 @@ function ReportStep({
     };
     
     downloadProfessionalPDF(pdfData as any, filename);
+    
+    // Trigger Server Notification
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (token) {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/warehouse-dashboard/notify-print`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }).catch(e => console.error("Failed to notify report print:", e));
+    }
   };
 
   return (
@@ -521,66 +537,136 @@ function ReportStep({
         </div>
 
         {/* ── S1: Executive Summary ── */}
-        <Section icon={Brain} accent={P.violet} title="1. Executive Insight Summary" subtitle="Fleet health · Assets · Tickets · Users · Cost overview">
+        <Section icon={Brain} accent={P.violet} title="1. Executive Insight Summary" subtitle="Top-level AI intelligence & benchmark context">
           <AIBlock text={ai.insight_summary} />
-          <Divider label="Asset & User Overview" />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {kb.benchmark_alerts?.map((a: any, i: number) => (
+            <div key={i} className="my-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
+              <span className="font-bold flex items-center gap-1.5"><AlertTriangle className="h-4 w-4" /> Benchmark Alert</span>
+              <p className="mt-1">{a.message}</p>
+            </div>
+          ))}
+        </Section>
+
+        {/* ── S2: Fleet Asset Overview ── */}
+        <Section icon={ClipboardList} accent={P.sky} title="2. Fleet Asset Overview" subtitle="Status distribution · Fleet compilation">
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Asset Status + Table */}
             {assetStatusData.length > 0 && (
-              <div>
-                <CLabel text="Asset Status" />
-                <ResponsiveContainer width="100%" height={155}>
-                  <PieChart>
-                    <Pie data={assetStatusData} cx="50%" cy="50%" innerRadius={32} outerRadius={58} paddingAngle={3} dataKey="value">
-                      {assetStatusData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip content={<CTip />} />
-                    <Legend iconType="circle" iconSize={7} />
-                  </PieChart>
-                </ResponsiveContainer>
+              <div className="min-w-0 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 bg-slate-50/30 dark:bg-slate-900/10">
+                <CLabel text="Asset Status Distribution" />
+                <div className="flex flex-col xl:flex-row items-center gap-4 mt-2">
+                  <div className="w-full xl:w-1/2">
+                    <ResponsiveContainer width="100%" height={160}>
+                      <PieChart>
+                        <Pie data={assetStatusData} cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={3} dataKey="value">
+                          {assetStatusData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip content={<CTip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="w-full xl:w-1/2 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-700">
+                          <th className="pb-2 text-left font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Status</th>
+                          <th className="pb-2 text-right font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Count</th>
+                          <th className="pb-2 text-right font-bold text-muted-foreground uppercase tracking-wider text-[10px]">% Fleet</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assetStatusData.map((d, i) => (
+                          <tr key={i} className="border-b border-slate-100 dark:border-slate-800/80">
+                            <td className="py-2.5 flex items-center gap-2 font-medium capitalize">
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}></span>
+                              {d.name.replace(/_/g, " ")}
+                            </td>
+                            <td className="py-2.5 text-right font-semibold">{d.value}</td>
+                            <td className="py-2.5 text-right text-muted-foreground">{Math.round((d.value / Math.max(ctx.total_assets, 1)) * 100)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
+
+            {/* Assets By Type + Table */}
             {assetTypeData.length > 0 && (
-              <div>
-                <CLabel text="Assets by Type" />
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={assetTypeData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
-                    <XAxis type="number" tick={{ fontSize: 10 }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
-                    <Tooltip content={<CTip />} />
-                    <Bar dataKey="value" fill={P.violet} radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="min-w-0 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 bg-slate-50/30 dark:bg-slate-900/10">
+                <CLabel text="Fleet Composition by Type" />
+                <div className="flex flex-col xl:flex-row items-center gap-4 mt-2">
+                  <div className="w-full xl:w-1/2">
+                    <ResponsiveContainer width="100%" height={160}>
+                      <BarChart data={assetTypeData} layout="vertical" margin={{ left: 70, right: 20, top: 10, bottom: 0 }}>
+                        <XAxis type="number" tick={{ fontSize: 10 }} hide />
+                        <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={65} axisLine={false} tickLine={false} />
+                        <Tooltip content={<CTip />} />
+                        <Bar dataKey="value" fill={P.sky} radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="w-full xl:w-1/2 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-700">
+                          <th className="pb-2 text-left font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Asset Type</th>
+                          <th className="pb-2 text-right font-bold text-muted-foreground uppercase tracking-wider text-[10px]">Units</th>
+                          <th className="pb-2 text-right font-bold text-muted-foreground uppercase tracking-wider text-[10px]">% Fleet</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assetTypeData.slice(0, 4).map((d, i) => (
+                          <tr key={i} className="border-b border-slate-100 dark:border-slate-800/80">
+                            <td className="py-2.5 font-medium capitalize text-slate-700 dark:text-slate-300">
+                               <div className="flex flex-col">
+                                 <span>{d.name.replace(/_/g, " ")}</span>
+                               </div>
+                            </td>
+                            <td className="py-2.5 text-right font-semibold text-slate-800 dark:text-slate-200">{d.value}</td>
+                            <td className="py-2.5 text-right text-muted-foreground">{Math.round((d.value / Math.max(ctx.total_assets, 1)) * 100)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
-            <div>
-              <CLabel text="Workforce" />
-              <div className="space-y-1.5 mt-1">
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 mt-4">
+            <div className="min-w-0 rounded-2xl border border-slate-100 dark:border-slate-800 p-4">
+              <CLabel text="Workforce Structure" />
+              <div className="space-y-2 mt-3">
                 {[
                   { l: "Total Users",    v: ctx.total_users,    c: P.slate },
                   { l: "Active",         v: ctx.active_users,   c: P.emerald },
                   { l: "Inactive",       v: ctx.inactive_users, c: P.slate },
-                  { l: "Admin",          v: ctx.admin_users,    c: P.violet },
-                  { l: "Standard",       v: ctx.standard_users, c: P.sky },
+                  { l: "Admin & Standards", v: `${ctx.admin_users} / ${ctx.standard_users}`, c: P.violet },
                 ].map(({ l, v, c }) => <KpiRow key={l} label={l} val={v} color={c} />)}
               </div>
-              <div className="mt-3">
-                <CLabel text="Tickets" />
-                <div className="space-y-1.5">
-                  {[
-                    { l: "Open",              v: ctx.open_tickets,              c: P.amber },
-                    { l: "In Progress",       v: ctx.in_progress_tickets,       c: P.sky },
-                    { l: "Resolved",          v: ctx.resolved_tickets,          c: P.emerald },
-                    { l: "Closed",            v: ctx.closed_tickets,            c: P.slate },
-                    { l: "High Priority Active", v: ctx.high_priority_active_tickets, c: P.rose },
-                  ].map(({ l, v, c }) => <KpiRow key={l} label={l} val={v} color={c} />)}
-                </div>
-              </div>
             </div>
+
+            {kb.service_interval_text && (
+              <div className="min-w-0 rounded-2xl border border-sky-200 bg-sky-50 dark:border-sky-900/50 dark:bg-sky-950/20 p-5 flex flex-col justify-center">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="p-1.5 rounded-lg bg-sky-100 dark:bg-sky-900 text-sky-600 dark:text-sky-400">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-sky-800 dark:text-sky-300">Service Interval Standard</span>
+                </div>
+                <p className="text-xs text-sky-700 dark:text-sky-400 italic leading-relaxed">
+                  "{kb.service_interval_text}"
+                </p>
+              </div>
+            )}
           </div>
         </Section>
 
-        {/* ── S2: Risk Analysis ── */}
-        <Section icon={AlertTriangle} accent={P.rose} title="2. Risk & Failure Analysis" subtitle="AI-identified risks · SHAP drivers · Critical asset table">
+        {/* ── S3: Health & Risk Analysis ── */}
+        <Section icon={AlertTriangle} accent={P.rose} title="3. Health & Risk Analysis" subtitle="AI-identified risks · SHAP drivers · Critical asset table">
           <AIBlock text={ai.risk_analysis} />
           <Divider label="Risk Distribution" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -616,7 +702,25 @@ function ReportStep({
                 </ResponsiveContainer>
               </div>
             )}
-            {shapData.length > 0 && (
+            {kb.shap_enriched && kb.shap_enriched.length > 0 ? (
+              <div className="lg:col-span-2">
+                <CLabel text="Enriched SHAP Failure Drivers" />
+                <div className="mt-2 space-y-2">
+                  {kb.shap_enriched.slice(0, 4).map((f: any, i: number) => (
+                    <div key={i} className="flex flex-col gap-1 rounded-lg border border-slate-100 bg-slate-50/50 p-2 dark:border-slate-800 dark:bg-slate-800/20 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-700 dark:text-slate-200">{f.feature}</span>
+                        <span className="font-bold text-rose-600">{f.impact_pct}%</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+                        <span><span className="font-semibold text-amber-600">Threshold:</span> {f.kb_threshold}</span>
+                        <span><span className="font-semibold text-emerald-600">Action:</span> {f.action}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : shapData.length > 0 ? (
               <div>
                 <CLabel text="Top SHAP Failure Drivers" />
                 <ResponsiveContainer width="100%" height={200}>
@@ -628,7 +732,7 @@ function ReportStep({
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            )}
+            ) : null}
           </div>
 
           <Divider label="Critical Assets (Lowest Health)" />
@@ -677,8 +781,8 @@ function ReportStep({
           ) : <p className="text-sm text-muted-foreground italic text-center py-3">No critical assets found.</p>}
         </Section>
 
-        {/* ── S3: Maintenance ── */}
-        <Section icon={Wrench} accent={P.amber} title="3. Maintenance Intelligence & Cost Forecast" subtitle="Service urgency · Cost predictions · Downtime analysis">
+        {/* ── S4: Maintenance ── */}
+        <Section icon={Wrench} accent={P.amber} title="4. Maintenance Intelligence" subtitle="Service urgency · Cost predictions · Downtime analysis">
           <AIBlock text={ai.maintenance_intelligence} />
           <Divider label="Service Urgency & Costs" />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -725,9 +829,39 @@ function ReportStep({
           )}
         </Section>
 
-        {/* ── S4: Trend Analysis ── */}
-        <Section icon={TrendingUp} accent={P.sky} title="4. Pattern & Trend Analysis" subtitle="3-month ticket & maintenance trends · Priority & category breakdown">
+        {/* ── S5: Ticket Management ── */}
+        <Section icon={Database} accent={P.sky} title="5. Ticket Management Status" subtitle="3-month ticket trends · Priority & category breakdown">
           <AIBlock text={ai.pattern_and_trend} />
+          
+          <div className="grid gap-4 sm:grid-cols-2 mt-4">
+            <div>
+              <CLabel text="Tickets Standing" />
+              <div className="space-y-1.5 mt-1 border border-slate-100 dark:border-slate-800 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/50">
+                {[
+                  { l: "Open",              v: ctx.open_tickets,              c: P.amber },
+                  { l: "In Progress",       v: ctx.in_progress_tickets,       c: P.sky },
+                  { l: "Resolved",          v: ctx.resolved_tickets,          c: P.emerald },
+                  { l: "Closed",            v: ctx.closed_tickets,            c: P.slate },
+                  { l: "High Priority Active", v: ctx.high_priority_active_tickets, c: P.rose },
+                ].map(({ l, v, c }) => <KpiRow key={l} label={l} val={v} color={c} />)}
+              </div>
+            </div>
+            {ticketPriData.length > 0 && (
+              <div>
+                <CLabel text="Ticket Priority" />
+                <ResponsiveContainer width="100%" height={150}>
+                  <PieChart>
+                    <Pie data={ticketPriData} cx="50%" cy="50%" innerRadius={28} outerRadius={55} paddingAngle={3} dataKey="value">
+                      {ticketPriData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip content={<CTip />} />
+                    <Legend iconType="circle" iconSize={7} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+          
           <Divider label="Ticket Trends" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {ticketTrend.length > 0 && (
@@ -741,20 +875,6 @@ function ReportStep({
                     <Tooltip content={<CTip />} />
                     <Line type="monotone" dataKey="tickets" name="Tickets" stroke={P.sky} strokeWidth={2.5} dot={{ r: 4, fill: P.sky }} />
                   </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-            {ticketPriData.length > 0 && (
-              <div>
-                <CLabel text="Ticket Priority" />
-                <ResponsiveContainer width="100%" height={150}>
-                  <PieChart>
-                    <Pie data={ticketPriData} cx="50%" cy="50%" innerRadius={28} outerRadius={55} paddingAngle={3} dataKey="value">
-                      {ticketPriData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip content={<CTip />} />
-                    <Legend iconType="circle" iconSize={7} />
-                  </PieChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -775,7 +895,7 @@ function ReportStep({
                   {ticketCatData.map((d, i) => (
                     <div key={d.name} className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                         <span className="text-muted-foreground truncate max-w-[130px]">{d.name}</span>
                       </div>
                       <span className="font-semibold">{d.value}</span>
@@ -787,8 +907,42 @@ function ReportStep({
           )}
         </Section>
 
-        {/* ── S5: Conclusion ── */}
-        <Section icon={FileText} accent={P.indigo} title="5. Overall Warehouse Conclusion (Last 3 Months)" subtitle="Full RAG-powered executive summary with top recommendations">
+        {/* ── S6: Recommendations ── */}
+        <Section icon={ShieldAlert} accent={P.emerald} title="6. Recommendations" subtitle="Data-driven prescriptive actions">
+          {kb.recommendations ? (
+            <div className="grid gap-4">
+              {kb.recommendations.critical?.length > 0 && (
+                <div className="rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/20 overflow-hidden text-xs">
+                  <div className="bg-rose-600 px-3 py-1.5 font-bold text-white tracking-widest uppercase text-[10px]">Critical (0-7 Days)</div>
+                  <ul className="px-5 py-3 list-disc space-y-1.5 text-rose-900 dark:text-rose-200">
+                    {kb.recommendations.critical.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                  </ul>
+                </div>
+              )}
+              {kb.recommendations.high?.length > 0 && (
+                <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 overflow-hidden text-xs">
+                  <div className="bg-amber-500 px-3 py-1.5 font-bold text-white tracking-widest uppercase text-[10px]">High (7-30 Days)</div>
+                  <ul className="px-5 py-3 list-disc space-y-1.5 text-amber-900 dark:text-amber-200">
+                    {kb.recommendations.high.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                  </ul>
+                </div>
+              )}
+              {kb.recommendations.medium?.length > 0 && (
+                <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20 overflow-hidden text-xs">
+                  <div className="bg-emerald-600 px-3 py-1.5 font-bold text-white tracking-widest uppercase text-[10px]">Medium (30-90 Days)</div>
+                  <ul className="px-5 py-3 list-disc space-y-1.5 text-emerald-900 dark:text-emerald-200">
+                    {kb.recommendations.medium.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm italic text-muted-foreground">No recommendations generated.</p>
+          )}
+        </Section>
+
+        {/* ── S7: Conclusion ── */}
+        <Section icon={FileText} accent={P.indigo} title="7. Conclusion" subtitle="Overall summary and metric snapshots">
           <AIBlock text={ai.conclusion} />
           <Divider label="3-Month Dashboard Summary" />
           <div className="grid gap-3 sm:grid-cols-3">
@@ -836,11 +990,11 @@ function ReportStep({
             ))}
           </div>
 
-          <div className="flex items-center gap-3 rounded-2xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/20 px-4 py-3">
+          <div className="flex items-center gap-3 rounded-2xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/20 px-4 py-3 mt-4">
             <Clock className="h-5 w-5 text-rose-600 shrink-0" />
             <p className="text-xs text-rose-600 dark:text-rose-300">
-              <strong>{ctx.urgent_maintenance_count}</strong> assets need service within 7 days ·{" "}
-              <strong>{ctx.soon_maintenance_count}</strong> within 30 days ·{" "}
+              <strong>{ctx.urgent_maintenance_count}</strong> assets need service within 7 days · 
+              <strong>{ctx.soon_maintenance_count}</strong> within 30 days · 
               Avg: <strong>{ctx.avg_days_to_maintenance ?? "N/A"} days</strong> to next service
             </p>
           </div>

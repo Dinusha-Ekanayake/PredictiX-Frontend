@@ -1,7 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 function getAuthHeaders() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("predictix.access_token") : null;
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   return {
     "Content-Type": "application/json",
     Authorization: token ? `Bearer ${token}` : "",
@@ -284,7 +284,7 @@ export async function updateUser(userId: string, data: any): Promise<UserItemOut
 }
 
 export async function getTeamMembers(): Promise<TeamMemberData[]> {
-  const res = await fetch(`${API_URL}/user-profile/me/team-members`, {
+  const res = await fetch(`${API_URL}/user-profile/me/colleagues`, {
     method: "GET",
     headers: getAuthHeaders(),
   });

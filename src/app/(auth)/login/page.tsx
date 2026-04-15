@@ -130,8 +130,10 @@ export default function LoginPage() {
         return;
       }
 
-      // Mock token
-      const mockToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIke3VzZXIuaWR9IiwiZW1haWwiOiIke2VtYWlsTG93ZXJ9Iiwicm9sZSI6IiR7dXNlci5yb2xlfSJ9.mock`;
+      // Mock token — build a proper base64-encoded payload so the backend
+      // can decode sub/email/role correctly from its development fallback path.
+      const mockPayload = btoa(JSON.stringify({ sub: user.id, email: emailLower, role: user.role }));
+      const mockToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${mockPayload}.mock`;
 
       window.localStorage.setItem("token", mockToken);
       window.localStorage.setItem("predictix.user.role", user.role.toUpperCase());

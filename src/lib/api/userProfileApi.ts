@@ -1,10 +1,14 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 function getAuthHeaders() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("token") ||
+        localStorage.getItem("predictix.access_token")
+      : null;
   return {
     "Content-Type": "application/json",
-    Authorization: token ? `Bearer ${token}` : "",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
@@ -58,41 +62,16 @@ export type TeamMemberData = {
 };
 
 export async function fetchMyProfile(): Promise<UserProfileData> {
-  try {
-    const res = await fetch(`${API_URL}/user-profile/me`, {
-      headers: getAuthHeaders(),
-    });
-    
-    if (res.ok) {
-      return res.json();
-    }
-    
+  const res = await fetch(`${API_URL}/user-profile/me`, {
+    headers: getAuthHeaders(),
+  });
+  
+  if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.detail || `HTTP ${res.status}`);
-  } catch (error: any) {
-    // Return mock data if API truly fails
-    console.warn("Profile API failed, using mock data:", error.message);
-    const email = typeof window !== "undefined" ? localStorage.getItem("predictix.user.email") || "nuwan.gunasekara.tra1@lankalogix.lk" : "";
-    const name = typeof window !== "undefined" ? localStorage.getItem("predictix.user.name") || "Nuwan Gunasekara" : "";
-    
-    return {
-      id: typeof window !== "undefined" ? localStorage.getItem("predictix.user.id") || "aaaaaaaa-aaaa-5000-a000-000000000000" : "",
-      employee_id: "EMP-TEST001",
-      firstName: name.split(" ")[0],
-      lastName: name.split(" ").slice(1).join(" "),
-      name: name,
-      email: email,
-      contactNumber: null,
-      address: null,
-      department: "Testing",
-      department_id: null,
-      warehouse: null,
-      warehouse_id: null,
-      role: "user",
-      status: "active",
-      assignedAssetsCount: 0
-    };
   }
+  
+  return res.json();
 }
 
 export async function updateMyProfile(data: {
@@ -101,91 +80,44 @@ export async function updateMyProfile(data: {
   contactNumber?: string;
   address?: string;
 }): Promise<UserProfileData> {
-  try {
-    const res = await fetch(`${API_URL}/user-profile/me`, {
-      method: "PUT",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
-    
-    if (res.ok) {
-      return res.json();
-    }
-  } catch (error) {
-    // Silently continue to mock data
+  const res = await fetch(`${API_URL}/user-profile/me`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `HTTP ${res.status}`);
   }
   
-  // If API fails, return updated mock profile
-  const currentProfile = await fetchMyProfile();
-  return {
-    ...currentProfile,
-    firstName: data.firstName || currentProfile.firstName,
-    lastName: data.lastName || currentProfile.lastName,
-    contactNumber: data.contactNumber || currentProfile.contactNumber,
-    address: data.address || currentProfile.address
-  };
+  return res.json();
 }
 
 export async function fetchMyAssets(): Promise<UserAssetData[]> {
-  try {
-    const res = await fetch(`${API_URL}/user-profile/me/assets`, {
-      headers: getAuthHeaders(),
-    });
-    
-    if (res.ok) {
-      return res.json();
-    }
-  } catch (error) {
-    // Silently continue to mock data
+  const res = await fetch(`${API_URL}/user-profile/me/assets`, {
+    headers: getAuthHeaders(),
+  });
+  
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `HTTP ${res.status}`);
   }
   
-  // Return mock data if API fails or is unavailable
-  return [
-    {
-      assignment_id: "1",
-      asset_id: "asset-001",
-      asset_code: "VS-001",
-      name: "Vehicle - Truck A",
-      asset_type: "Vehicle",
-      category: "Heavy Duty",
-      location: "Colombo Warehouse",
-      status: "active",
-      healthPercent: 85,
-      nextServiceDate: "2026-05-15"
-    },
-    {
-      assignment_id: "2",
-      asset_id: "asset-002",
-      asset_code: "VS-002",
-      name: "Vehicle - Van B",
-      asset_type: "Vehicle",
-      category: "Light Duty",
-      location: "Colombo Warehouse",
-      status: "active",
-      healthPercent: 92,
-      nextServiceDate: "2026-06-20"
-    }
-  ];
+  return res.json();
 }
 
 export async function fetchMyStats(): Promise<UserStatsData> {
-  try {
-    const res = await fetch(`${API_URL}/user-profile/me/stats`, {
-      headers: getAuthHeaders(),
-    });
-    
-    if (res.ok) {
-      return res.json();
-    }
-  } catch (error) {
-    // Silently continue to mock data
+  const res = await fetch(`${API_URL}/user-profile/me/stats`, {
+    headers: getAuthHeaders(),
+  });
+  
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `HTTP ${res.status}`);
   }
   
-  // Return mock data if API fails or is unavailable
-  return {
-    assignedAssets: 2,
-    activeAssets: 2
-  };
+  return res.json();
 }
 
 export type UserItemOut = {

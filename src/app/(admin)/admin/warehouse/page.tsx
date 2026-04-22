@@ -6,6 +6,7 @@ import { RefreshCw, FileText } from "lucide-react";
 
 import WarehouseOverviewCards from "@/components/admin/warehouse/WarehouseOverviewCards";
 import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsightsSection";
+import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
 
 // ── Warehouse Report (my section — warehouse components only) ──
 import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
@@ -127,6 +128,9 @@ export default function WarehousePage() {
       {/* ── Existing dashboard (completely untouched) ── */}
       <WarehouseOverviewCards data={data} isLoading={refreshing && !data} />
       {data && <WarehouseInsightsSection data={data} />}
+
+      {/* ── Predictive Maintenance Schedule Chart ── */}
+      <WarehouseMaintenanceSchedule />
 
       <div className="h-20" />
 

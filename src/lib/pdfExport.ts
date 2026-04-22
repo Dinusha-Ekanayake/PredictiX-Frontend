@@ -316,7 +316,7 @@ export function downloadReportPDF(
   try {
     exportElementToPDF(element, {
       filename,
-      title: "Warehouse AI Report",
+      title: "Warehouse Report",
       subtitle: `Generated: ${new Date().toLocaleDateString()}`,
     });
   } finally {

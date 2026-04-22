@@ -63,31 +63,91 @@ export default function LoginPage() {
     setIsSubmitting(true);
     setError("");
 
-    // ✅ TEMP DEFAULT ADMIN LOGIN (DEV ONLY)
-    const ADMIN_EMAIL = "admin@mail.com";
-    const ADMIN_PASSWORD = "admin";
-
     try {
-      // small delay to feel realistic
-      await new Promise((r) => setTimeout(r, 500));
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const emailLower = email.trim().toLowerCase();
+      const passwordTrimmed = password.trim();
+      const roleLower = role.toLowerCase();
 
-      // Admin login
-      if (role === "ADMIN") {
-        if (email.trim().toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-          window.localStorage.setItem("predictix.user.role", "ADMIN");
-          window.localStorage.setItem("predictix.user.email", email.trim().toLowerCase());
-          router.push("/admin/dashboard");
+      try {
+        // Try to call backend login endpoint
+        const response = await fetch(`${API_URL}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: emailLower,
+            password: passwordTrimmed,
+            role: roleLower.toUpperCase(),
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Save to localStorage
+          window.localStorage.setItem("token", data.access_token);
+          window.localStorage.setItem("predictix.user.role", data.role.toUpperCase());
+          window.localStorage.setItem("predictix.user.email", data.email);
+          window.localStorage.setItem("predictix.user.id", data.user_id);
+          window.localStorage.setItem("predictix.user.name", data.full_name);
+
+          // Redirect
+          if (data.role.toLowerCase() === "admin") {
+            router.push("/admin/dashboard");
+          } else {
+            router.push("/user/users");
+          }
           return;
         }
-        setError("Invalid admin email or password.");
+      } catch (apiError) {
+        console.log("Backend login failed, falling back to mock");
+      }
+
+      // Fallback: Mock login
+      const mockUsers: Record<string, { password: string; role: string; id: string; name: string }> = {
+        "nuwan.gunasekara.tra1@lankalogix.lk": {
+          password: "nuwan",
+          role: "user",
+          id: "aaaaaaaa-aaaa-5000-a000-000000000000",
+          name: "Nuwan Gunasekara"
+        },
+        "anjali.warnakulasuriya.adm1@lankalogix.lk": {
+          password: "admin",
+          role: "admin",
+          id: "bbbbbbbb-bbbb-5000-a000-000000000000",
+          name: "Anjali Warnakulasuriya"
+        }
+      };
+
+      if (!(emailLower in mockUsers)) {
+        setError("Invalid email or password");
         return;
       }
 
-      // User login (for now: allow any non-empty credentials)
-      // You can tighten this later when backend is ready
-      window.localStorage.setItem("predictix.user.role", "USER");
-      window.localStorage.setItem("predictix.user.email", email.trim().toLowerCase());
-      router.push("/admin/dashboard");
+      const user = mockUsers[emailLower];
+      if (user.password !== passwordTrimmed || user.role !== roleLower) {
+        setError("Invalid email or password");
+        return;
+      }
+
+      // Mock token — build a proper base64-encoded payload so the backend
+      // can decode sub/email/role correctly from its development fallback path.
+      const mockPayload = btoa(JSON.stringify({ sub: user.id, email: emailLower, role: user.role }));
+      const mockToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${mockPayload}.mock`;
+
+      window.localStorage.setItem("token", mockToken);
+      window.localStorage.setItem("predictix.user.role", user.role.toUpperCase());
+      window.localStorage.setItem("predictix.user.email", emailLower);
+      window.localStorage.setItem("predictix.user.id", user.id);
+      window.localStorage.setItem("predictix.user.name", user.name);
+
+      if (user.role === "admin") {
+        router.push("/admin/dashboard");
+      } else {
+        router.push("/user/users");
+      }
+    } catch (err: any) {
+      setError(err.message || "Login failed");
     } finally {
       setIsSubmitting(false);
     }

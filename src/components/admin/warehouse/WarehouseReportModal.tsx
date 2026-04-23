@@ -382,7 +382,6 @@ function ReportStep({
         maintenanceCost: `LKR ${(ctx.monthly_maintenance_cost || 0).toLocaleString()}`,
       },
       kbAnnotations: kb,
-      // AI Content Sections - from data parameter
       aiContent: {
         insight_summary: ai.insight_summary || "",
         risk_analysis: ai.risk_analysis || "",
@@ -390,7 +389,6 @@ function ReportStep({
         pattern_and_trend: ai.pattern_and_trend || "",
         conclusion: ai.conclusion || "",
       },
-      // Asset Details
       assetDetail: {
         activeAssets: ctx.active_assets || 0,
         inactiveAssets: ctx.inactive_assets || 0,
@@ -398,7 +396,6 @@ function ReportStep({
         retiredAssets: ctx.retired_assets || 0,
         avgVehicleAge: ctx.avg_vehicle_age_years || 0,
       },
-      // Maintenance Details
       maintenanceDetail: {
         estimatedCost: `LKR ${(ctx.total_estimated_cost || 0).toLocaleString()}`,
         avgCostPerAsset: `LKR ${(ctx.avg_cost_per_asset || 0).toLocaleString()}`,
@@ -406,7 +403,6 @@ function ReportStep({
         maintenanceEvents3m: ctx.total_maintenance_events_3m || 0,
         avgDowntimeHours: ctx.avg_downtime_hours || 0,
       },
-      // Ticket Details
       ticketDetail: {
         totalTickets: ctx.total_tickets || 0,
         openTickets: ctx.open_tickets || 0,
@@ -414,17 +410,15 @@ function ReportStep({
         resolvedTickets: ctx.resolved_tickets || 0,
         closedTickets: ctx.closed_tickets || 0,
         highPriorityTickets: ctx.high_priority_active_tickets || 0,
-        mediumPriorityTickets: ctx.ticket_priority_breakdown?.['Medium'] || ctx.ticket_final_priority_breakdown?.['Medium'] || 0,
-        lowPriorityTickets: ctx.ticket_priority_breakdown?.['Low'] || ctx.ticket_final_priority_breakdown?.['Low'] || 0,
+        mediumPriorityTickets: ctx.ticket_priority_breakdown?.["Medium"] || 0,
+        lowPriorityTickets: ctx.ticket_priority_breakdown?.["Low"] || 0,
       },
-      // User Details
       userDetail: {
         totalUsers: ctx.total_users || 0,
         adminUsers: ctx.admin_users || 0,
         standardUsers: ctx.standard_users || 0,
         inactiveUsers: ctx.inactive_users || 0,
       },
-      // Chart Sections
       sections: {
         assetStatus: Object.entries(ctx.asset_status_breakdown || {}).map(([name, value]) => ({ name, value })),
         ticketPriority: toChart(ctx.ticket_priority_breakdown || {}),
@@ -442,17 +436,102 @@ function ReportStep({
           status: asset.status || "Unknown",
         })),
       },
-      // Trends Data
       trends: {
         ticketTrend: ctx.ticket_trend_last_3m || [],
         maintenanceTrend: ctx.monthly_maintenance_trend || [],
       },
-      // SHAP Features (Top Failure Drivers)
       shapFeatures: (ctx.top_shap_features || []).slice(0, 8).map(([feature, importance]) => ({
         feature: feature.replace(/_/g, " "),
         importance: importance,
       })),
     };
+    // const pdfData = {
+    //   title: "Warehouse Report",
+    //   warehouseName: warehouseName,
+    //   warehouseCity: ctx.warehouse_city,
+    //   generatedDate: date,
+    //   summary: {
+    //     totalAssets: ctx.total_assets || 0,
+    //     fleetHealth: Math.round(ctx.avg_health_pct || 0),
+    //     failureProb: Math.round(ctx.avg_failure_prob_pct || 0),
+    //     critical: ctx.critical_count || 0,
+    //     urgent: ctx.urgent_count || 0,
+    //     activeTickets: ctx.active_tickets || 0,
+    //     activeUsers: ctx.active_users || 0,
+    //     maintenanceCost: `LKR ${(ctx.monthly_maintenance_cost || 0).toLocaleString()}`,
+    //   },
+    //   kbAnnotations: kb,
+    //   // AI Content Sections - from data parameter
+    //   aiContent: {
+    //     insight_summary: ai.insight_summary || "",
+    //     risk_analysis: ai.risk_analysis || "",
+    //     maintenance_intelligence: ai.maintenance_intelligence || "",
+    //     pattern_and_trend: ai.pattern_and_trend || "",
+    //     conclusion: ai.conclusion || "",
+    //   },
+    //   // Asset Details
+    //   assetDetail: {
+    //     activeAssets: ctx.active_assets || 0,
+    //     inactiveAssets: ctx.inactive_assets || 0,
+    //     underMaintenanceAssets: ctx.under_maintenance_assets || 0,
+    //     retiredAssets: ctx.retired_assets || 0,
+    //     avgVehicleAge: ctx.avg_vehicle_age_years || 0,
+    //   },
+    //   // Maintenance Details
+    //   maintenanceDetail: {
+    //     estimatedCost: `LKR ${(ctx.total_estimated_cost || 0).toLocaleString()}`,
+    //     avgCostPerAsset: `LKR ${(ctx.avg_cost_per_asset || 0).toLocaleString()}`,
+    //     actualCost3m: `LKR ${(ctx.actual_cost_3m || 0).toLocaleString()}`,
+    //     maintenanceEvents3m: ctx.total_maintenance_events_3m || 0,
+    //     avgDowntimeHours: ctx.avg_downtime_hours || 0,
+    //   },
+    //   // Ticket Details
+    //   ticketDetail: {
+    //     totalTickets: ctx.total_tickets || 0,
+    //     openTickets: ctx.open_tickets || 0,
+    //     inProgressTickets: ctx.in_progress_tickets || 0,
+    //     resolvedTickets: ctx.resolved_tickets || 0,
+    //     closedTickets: ctx.closed_tickets || 0,
+    //     highPriorityTickets: ctx.high_priority_active_tickets || 0,
+    //     mediumPriorityTickets: ctx.ticket_priority_breakdown?.['Medium'] || ctx.ticket_final_priority_breakdown?.['Medium'] || 0,
+    //     lowPriorityTickets: ctx.ticket_priority_breakdown?.['Low'] || ctx.ticket_final_priority_breakdown?.['Low'] || 0,
+    //   },
+    //   // User Details
+    //   userDetail: {
+    //     totalUsers: ctx.total_users || 0,
+    //     adminUsers: ctx.admin_users || 0,
+    //     standardUsers: ctx.standard_users || 0,
+    //     inactiveUsers: ctx.inactive_users || 0,
+    //   },
+    //   // Chart Sections
+    //   sections: {
+    //     assetStatus: Object.entries(ctx.asset_status_breakdown || {}).map(([name, value]) => ({ name, value })),
+    //     ticketPriority: toChart(ctx.ticket_priority_breakdown || {}),
+    //     ticketsByCategory: toChart(ctx.ticket_category_breakdown || {}),
+    //     assetsByType: toChart(ctx.asset_type_breakdown || {}),
+    //     healthScoreDistribution: Object.entries(ctx.health_score_distribution || {}).map(([bucket, count]) => ({ bucket, count })),
+    //     maintenanceTypes: Object.entries(ctx.maintenance_type_breakdown || {}).map(([name, value]) => ({ name, value })),
+    //     riskBreakdown: Object.entries(ctx.risk_breakdown || {}).map(([name, value]) => ({ name, value })),
+    //     criticaAssets: (ctx.critical_assets || []).map(asset => ({
+    //       id: asset.code || "N/A",
+    //       vehicle: asset.name || "Unknown",
+    //       component: asset.type || "General",
+    //       health: asset.health || "N/A",
+    //       priority: Math.round(parseFloat(asset.failure_prob || "0")) > 50 ? "High" : "Medium",
+    //       status: asset.status || "Unknown",
+    //     })),
+    //   },
+    //   // Trends Data
+    //   trends: {
+    //     ticketTrend: ctx.ticket_trend_last_3m || [],
+    //     maintenanceTrend: ctx.monthly_maintenance_trend || [],
+    //   },
+    //   // SHAP Features (Top Failure Drivers)
+    //   shapFeatures: (ctx.top_shap_features || []).slice(0, 8).map(([feature, importance]) => ({
+    //     feature: feature.replace(/_/g, " "),
+    //     importance: importance,
+    //   })),
+    // };
     
     downloadProfessionalPDF(pdfData as any, filename);
     

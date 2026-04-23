@@ -248,18 +248,23 @@ function ConfirmStep({ onGenerate, onClose }: { onGenerate: () => void; onClose:
 // ─────────────────────────────────────────────────────────
 
 function LoadingStep() {
-  const [step, setStep] = React.useState(0);
-  const steps = [
+  const steps = React.useMemo(() => [
     "Connecting to database…",
     "Aggregating asset health & failure data…",
     "Processing ticket & maintenance records…",
     "Analyzing data patterns…",
     "Generating report sections…",
-  ];
+  ], []);
+  
   React.useEffect(() => {
-    const t = setInterval(() => setStep((p) => (p < steps.length - 1 ? p + 1 : p)), 3500);
+    if (!steps || steps.length === 0) return;
+
+    const t = setInterval(() => {
+      setStep((p) => (p < steps.length - 1 ? p + 1 : p));
+    }, 3500);
+
     return () => clearInterval(t);
-  }, []);
+  }, [steps]);
 
   return (
     <div className="flex flex-col h-full items-center justify-center gap-6 px-8 py-12">
@@ -661,7 +666,7 @@ function ReportStep({
                               {d.name.replace(/_/g, " ")}
                             </td>
                             <td className="py-2.5 text-right font-semibold">{d.value}</td>
-                            <td className="py-2.5 text-right text-muted-foreground">{Math.round((d.value / Math.max(ctx.total_assets, 1)) * 100)}%</td>
+                            <td className="py-2.5 text-right text-muted-foreground">{Math.round(((d.value ?? 0) / Math.max(ctx.total_assets ?? 0, 1)) * 100)}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -704,7 +709,7 @@ function ReportStep({
                                </div>
                             </td>
                             <td className="py-2.5 text-right font-semibold text-slate-800 dark:text-slate-200">{d.value}</td>
-                            <td className="py-2.5 text-right text-muted-foreground">{Math.round((d.value / Math.max(ctx.total_assets, 1)) * 100)}%</td>
+                            <td className="py-2.5 text-right text-muted-foreground">{Math.round(((d.value ?? 0) / Math.max(ctx.total_assets ?? 0, 1)) * 100)}%</td>
                           </tr>
                         ))}
                       </tbody>

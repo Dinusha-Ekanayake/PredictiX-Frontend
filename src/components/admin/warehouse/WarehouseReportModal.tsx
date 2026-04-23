@@ -433,7 +433,7 @@ function ReportStep({
         healthScoreDistribution: Object.entries(ctx.health_score_distribution || {}).map(([bucket, count]) => ({ bucket, count })),
         maintenanceTypes: Object.entries(ctx.maintenance_type_breakdown || {}).map(([name, value]) => ({ name, value })),
         riskBreakdown: Object.entries(ctx.risk_breakdown || {}).map(([name, value]) => ({ name, value })),
-        criticaAssets: (ctx.critical_assets || []).map(asset => ({
+        criticalAssets: (ctx.critical_assets || []).map(asset => ({
           id: asset.code || "N/A",
           vehicle: asset.name || "Unknown",
           component: asset.type || "General",

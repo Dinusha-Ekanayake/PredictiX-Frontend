@@ -148,3 +148,53 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
 
   return response.json();
 }
+
+export type ChatbotSource = {
+  title: string;
+  category: string;
+};
+
+export type ChatbotAskResponse = {
+  answer: string;
+  sources: ChatbotSource[];
+};
+
+export async function askChatbot(question: string): Promise<ChatbotAskResponse> {
+  const url = "http://localhost:8002/chatbot/ask";
+  
+  console.log("[API] Chatbot Request:", {
+    url,
+    method: "POST",
+    body: { question },
+  });
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+
+    console.log("[API] Chatbot Response Status:", response.status, response.statusText);
+    console.log("[API] Chatbot Response Headers:", {
+      contentType: response.headers.get("content-type"),
+      corsOrigin: response.headers.get("access-control-allow-origin"),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[API] Chatbot Error Response:", errorText);
+      throw new Error(`Chatbot request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("[API] Chatbot Response Data:", data);
+    return data;
+  } catch (error) {
+    console.error("[API] Chatbot Fetch Error:", error);
+    if (error instanceof TypeError) {
+      console.error("[API] Network error - Backend might not be reachable");
+    }
+    throw error;
+  }
+}

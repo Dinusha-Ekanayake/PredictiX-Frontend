@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import RoleSelectCards, { type Role } from "@/components/auth/RoleSelectCards";
 import PredictiXLogo from "@/components/brand/PredictiXLogo";
 import ThemeToggle from "@/components/theme/ThemeToggle";
+import { login, storeAuthSession } from "@/lib/authService";
 
 function BackgroundBlobs() {
   return (
@@ -63,31 +64,17 @@ export default function LoginPage() {
     setIsSubmitting(true);
     setError("");
 
-    // ✅ TEMP DEFAULT ADMIN LOGIN (DEV ONLY)
-    const ADMIN_EMAIL = "admin@mail.com";
-    const ADMIN_PASSWORD = "admin";
-
     try {
-      // small delay to feel realistic
-      await new Promise((r) => setTimeout(r, 500));
+      const data = await login({ email: email.trim().toLowerCase(), password });
+      storeAuthSession(data);
 
-      // Admin login
-      if (role === "ADMIN") {
-        if (email.trim().toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-          window.localStorage.setItem("predictix.user.role", "ADMIN");
-          window.localStorage.setItem("predictix.user.email", email.trim().toLowerCase());
-          router.push("/admin/dashboard");
-          return;
-        }
-        setError("Invalid admin email or password.");
-        return;
+      if (data.user.role.toUpperCase() === "ADMIN") {
+        router.push("/admin/dashboard");
+      } else {
+        router.push("/user/users");
       }
-
-      // User login (for now: allow any non-empty credentials)
-      // You can tighten this later when backend is ready
-      window.localStorage.setItem("predictix.user.role", "USER");
-      window.localStorage.setItem("predictix.user.email", email.trim().toLowerCase());
-      router.push("/admin/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.");
     } finally {
       setIsSubmitting(false);
     }
@@ -182,7 +169,7 @@ export default function LoginPage() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="admin@mail.com"
+                      placeholder="you@example.com"
                       className="h-11"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -198,7 +185,7 @@ export default function LoginPage() {
                     <Input
                       id="password"
                       type="password"
-                      placeholder="admin"
+                      placeholder="••••••••"
                       className="h-11"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -214,12 +201,6 @@ export default function LoginPage() {
                   <Button type="submit" className="h-11 w-full rounded-xl" disabled={!canSubmit}>
                     {isSubmitting ? "Logging in..." : "Log in"}
                   </Button>
-
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-                    <div className="font-medium text-slate-800 dark:text-slate-200">Default Admin</div>
-                    <div>Email: admin@mail.com</div>
-                    <div>Password: admin</div>
-                  </div>
 
                   <p className="text-center text-xs text-slate-500 dark:text-slate-400">
                     © {new Date().getFullYear()} PredictiX

@@ -226,13 +226,8 @@ export default function FloatingChatbot() {
     setErrorMessage(null);
     setIsLoading(true);
 
-    console.log("[Chatbot] Sending message:", text);
-
     try {
-      console.log("[Chatbot] Calling askChatbot()...");
       const response = await askChatbot(text);
-
-      console.log("[Chatbot] Received response:", response);
 
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -243,12 +238,7 @@ export default function FloatingChatbot() {
       };
 
       setMessages((current) => [...current, assistantMessage]);
-      console.log("[Chatbot] Message added to chat history");
-    } catch (error) {
-      console.error("[Chatbot] Error:", error);
-      if (error instanceof Error) {
-        console.error("[Chatbot] Error message:", error.message);
-      }
+    } catch {
       setErrorMessage("Unable to reach the chatbot service. Please try again.");
     } finally {
       setIsLoading(false);

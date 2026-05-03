@@ -16,6 +16,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
+import { useTheme } from "next-themes";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart as PieIcon, BarChart3, LineChart as LineIcon } from "lucide-react";
@@ -49,11 +50,25 @@ const monthlyTicketVolume = [
   { month: "Dec", total: 4 },
 ];
 
-function gridStroke() {
-  return "hsl(var(--border))";
+// Reusable hook-based styles
+function useChartStyles() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  return {
+    axisColor: isDark ? "#cbd5e1" : "#475569",
+    gridColor: isDark ? "rgba(148, 163, 184, 0.18)" : "rgba(148, 163, 184, 0.3)",
+    tooltipStyle: {
+      backgroundColor: isDark ? "#0f172a" : "#ffffff",
+      border: isDark ? "1px solid #334155" : "1px solid #e2e8f0",
+      color: isDark ? "#f8fafc" : "#0f172a",
+    },
+  };
 }
 
-export function TicketPriorityBreakdownCard() {
+export function TicketPriorityBreakdownCard({ data: externalData }: { data?: any[] }) {
+  const data = externalData || ticketPriority;
+  const { axisColor, tooltipStyle } = useChartStyles();
+
   return (
     <Card className="rounded-2xl">
       <CardHeader>
@@ -71,14 +86,14 @@ export function TicketPriorityBreakdownCard() {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={ticketPriority}
+                data={data}
                 dataKey="value"
                 nameKey="name"
                 innerRadius={60}
                 outerRadius={95}
                 paddingAngle={4}
               >
-                {ticketPriority.map((d) => (
+                {data.map((d) => (
                   <Cell
                     key={d.name}
                     fill={
@@ -88,8 +103,8 @@ export function TicketPriorityBreakdownCard() {
                   />
                 ))}
               </Pie>
-              <Tooltip />
-              <Legend />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ color: axisColor }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -98,7 +113,10 @@ export function TicketPriorityBreakdownCard() {
   );
 }
 
-export function TicketsByCategoryCard() {
+export function TicketsByCategoryCard({ data: externalData }: { data?: any[] }) {
+  const data = externalData || ticketsByCategory;
+  const { axisColor, gridColor, tooltipStyle } = useChartStyles();
+
   return (
     <Card className="rounded-2xl">
       <CardHeader>
@@ -114,12 +132,12 @@ export function TicketsByCategoryCard() {
       <CardContent>
         <div className="h-[260px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={ticketsByCategory} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke()} />
-              <XAxis dataKey="category" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
-              <Tooltip />
-              <Legend />
+            <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="category" tick={{ fill: axisColor }} />
+              <YAxis tick={{ fill: axisColor }} allowDecimals={false} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ color: axisColor }} />
               <Bar dataKey="count" name="Number of Tickets" fill="#a855f7" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -129,7 +147,10 @@ export function TicketsByCategoryCard() {
   );
 }
 
-export function MonthlyTicketVolumeCard() {
+export function MonthlyTicketVolumeCard({ data: externalData }: { data?: any[] }) {
+  const data = externalData || monthlyTicketVolume;
+  const { axisColor, gridColor, tooltipStyle } = useChartStyles();
+
   return (
     <Card className="rounded-2xl lg:col-span-2">
       <CardHeader>
@@ -145,12 +166,12 @@ export function MonthlyTicketVolumeCard() {
       <CardContent>
         <div className="h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={monthlyTicketVolume} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke()} />
-              <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-              <YAxis tick={{ fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
-              <Tooltip />
-              <Legend />
+            <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="month" tick={{ fill: axisColor }} />
+              <YAxis tick={{ fill: axisColor }} allowDecimals={false} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ color: axisColor }} />
               <Line
                 type="monotone"
                 dataKey="total"

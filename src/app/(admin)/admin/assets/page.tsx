@@ -6,9 +6,6 @@ import AssetsToolbar, { AssetFilters } from "@/components/admin/assets/AssetsToo
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel from "@/components/admin/assets/AssetDetailsPanel";
 import { ASSETS } from "@/components/admin/assets/mock";
-import type { Asset } from "@/components/admin/assets/types";
-
-// Other type definitions...
 import { Box } from "lucide-react";
 
 function getHealthBand(score: number) {
@@ -19,7 +16,7 @@ function getHealthBand(score: number) {
   return "critical";
 }
 
-function matchesQuery(asset: Asset, query: string) {
+function matchesQuery(asset: any, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
 
@@ -36,7 +33,7 @@ function matchesQuery(asset: Asset, query: string) {
   return searchableValues.includes(q);
 }
 
-function applyFilters(assets: Asset[], filters: AssetFilters) {
+function applyFilters(assets: any[], filters: AssetFilters) {
   return assets.filter((asset) => {
     const queryMatch = matchesQuery(asset, filters.query);
     const statusMatch =

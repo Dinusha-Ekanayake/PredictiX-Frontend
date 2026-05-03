@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { FileText, Plus } from "lucide-react";
 import type { AssetStatus } from "./types";
 
 export type AssetFilters = {
@@ -144,7 +145,15 @@ export default function AssetsToolbar({
               Reset
             </Button>
 
-            <Button className="h-10 rounded-xl px-4">Add Asset</Button>
+            <Button variant="secondary" className="h-10 rounded-xl px-4">
+              <FileText className="mr-2 h-4 w-4" />
+              Generate Report
+            </Button>
+
+            <Button className="h-10 rounded-xl px-4">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Asset
+            </Button>
           </div>
         </div>
       </CardContent>

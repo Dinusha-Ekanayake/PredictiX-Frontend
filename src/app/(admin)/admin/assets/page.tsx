@@ -2,19 +2,11 @@
 
 import * as React from "react";
 import AssetsSummary from "@/components/admin/assets/AssetsSummary";
-import AssetsToolbar, {
-  // Remove the duplicate import
-} from "@/components/admin/assets/AssetsToolbar";
+import AssetsToolbar, { AssetFilters } from "@/components/admin/assets/AssetsToolbar";
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel from "@/components/admin/assets/AssetDetailsPanel";
 import { ASSETS } from "@/components/admin/assets/mock";
-// Ensure that AssetFilters is defined and exported
-export type AssetFilters = {
-  query: string;
-  status: string;
-  healthBand: string;
-  warehouse: string;
-};
+import type { Asset } from "@/components/admin/assets/types";
 
 // Other type definitions...
 import { Box } from "lucide-react";
@@ -27,17 +19,15 @@ function getHealthBand(score: number) {
   return "critical";
 }
 
-function matchesQuery(asset: AssetRecord, query: string) {
+function matchesQuery(asset: Asset, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
 
   const searchableValues = [
     asset.id,
-    asset.assetName,
-    asset.assetCode,
-    asset.description,
+    asset.name,
     asset.warehouse.name,
-    asset.assignedTo?.name,
+    asset.assignedPerson?.name,
   ]
     .filter(Boolean)
     .join(" ")
@@ -46,7 +36,7 @@ function matchesQuery(asset: AssetRecord, query: string) {
   return searchableValues.includes(q);
 }
 
-function applyFilters(assets: AssetRecord[], filters: AssetFilters) {
+function applyFilters(assets: Asset[], filters: AssetFilters) {
   return assets.filter((asset) => {
     const queryMatch = matchesQuery(asset, filters.query);
     const statusMatch =
@@ -54,7 +44,7 @@ function applyFilters(assets: AssetRecord[], filters: AssetFilters) {
     const healthBandMatch =
       filters.healthBand === "all"
         ? true
-        : getHealthBand(asset.prediction?.healthScore ?? 0) === filters.healthBand;
+        : getHealthBand(asset.healthScore ?? 0) === filters.healthBand;
     const warehouseMatch =
       filters.warehouse === "all"
         ? true
@@ -72,10 +62,12 @@ export default function AdminAssetsPage() {
     warehouse: "all",
   });
 
+  const [assets, setAssets] = React.useState<Asset[]>(ASSETS);
+
   const warehouseOptions = React.useMemo(() => {
     const seen = new Map<string, string>();
 
-    ASSETS.forEach((asset) => {
+    assets.forEach((asset) => {
       seen.set(asset.warehouse.id, asset.warehouse.name);
     });
 
@@ -83,12 +75,16 @@ export default function AdminAssetsPage() {
       value,
       label,
     }));
-  }, []);
+  }, [assets]);
 
   const filteredAssets = React.useMemo(
-    () => applyFilters(ASSETS, filters),
-    [filters]
+    () => applyFilters(assets, filters),
+    [assets, filters]
   );
+
+  const handleAssetAdded = (newAsset: Asset) => {
+    setAssets((prev) => [newAsset, ...prev]);
+  };
 
   const [selectedId, setSelectedId] = React.useState<string | null>(
     ASSETS[0]?.id ?? null
@@ -131,6 +127,7 @@ export default function AdminAssetsPage() {
         setFilters={setFilters}
         resultsCount={filteredAssets.length}
         warehouseOptions={warehouseOptions}
+        onAssetAdded={handleAssetAdded}
       />
 
       <div className="grid grid-cols-12 gap-5">

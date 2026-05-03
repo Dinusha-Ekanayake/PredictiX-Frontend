@@ -53,4 +53,18 @@ export type Asset = {
   maintenanceLogs: MaintenanceLog[];
   assignmentHistory: AssignmentEvent[];
   auditTrail: AssetAuditEvent[];
+
+  // Added fields from AddAsset form
+  type?: string;
+  technicalDetails?: {
+    manufacturer: string;
+    modelNumber: string;
+    serialNumber: string;
+    powerType: string;
+  };
+  usageDetails?: {
+    machineAge: number;
+    usageHours: number;
+    maintenanceCount: number;
+  };
 };

@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,8 @@ import {
 } from "@/components/ui/select";
 
 import { FileText, Plus } from "lucide-react";
-import type { AssetStatus } from "./types";
+import type { Asset, AssetStatus } from "./types";
+import AddAssetDialog from "./AddAssetDialog";
 
 export type AssetFilters = {
   query: string;
@@ -32,6 +34,7 @@ type AssetsToolbarProps = {
   setFilters: React.Dispatch<React.SetStateAction<AssetFilters>>;
   resultsCount: number;
   warehouseOptions: WarehouseOption[];
+  onAssetAdded: (asset: Asset) => void;
 };
 
 export default function AssetsToolbar({
@@ -39,124 +42,138 @@ export default function AssetsToolbar({
   setFilters,
   resultsCount,
   warehouseOptions,
+  onAssetAdded,
 }: AssetsToolbarProps) {
+  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
+
   return (
-    <Card className="rounded-2xl">
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="grid flex-1 grid-cols-12 gap-3">
-            <div className="col-span-12 lg:col-span-4">
-              <Input
+    <>
+      <Card className="rounded-2xl">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="grid flex-1 grid-cols-12 gap-3">
+              <div className="col-span-12 lg:col-span-4">
+                <Input
+                  className="h-10 rounded-xl"
+                  placeholder="Search by ID, name, warehouse, location, assigned person..."
+                  value={filters.query}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, query: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="col-span-12 sm:col-span-4 lg:col-span-2">
+                <Select
+                  value={filters.status}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      status: value as AssetFilters["status"],
+                    }))
+                  }
+                >
+                  <SelectTrigger className="h-10 rounded-xl">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="OPERATIONAL">Operational</SelectItem>
+                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                    <SelectItem value="CRITICAL">Critical</SelectItem>
+                    <SelectItem value="OFFLINE">Offline</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="col-span-12 sm:col-span-4 lg:col-span-3">
+                <Select
+                  value={filters.healthBand}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      healthBand: value as AssetFilters["healthBand"],
+                    }))
+                  }
+                >
+                  <SelectTrigger className="h-10 rounded-xl">
+                    <SelectValue placeholder="Health" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Health</SelectItem>
+                    <SelectItem value="excellent">Excellent</SelectItem>
+                    <SelectItem value="good">Good</SelectItem>
+                    <SelectItem value="moderate">Moderate</SelectItem>
+                    <SelectItem value="poor">Poor</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="col-span-12 sm:col-span-4 lg:col-span-3">
+                <Select
+                  value={filters.warehouse}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({ ...prev, warehouse: value }))
+                  }
+                >
+                  <SelectTrigger className="h-10 rounded-xl">
+                    <SelectValue placeholder="Warehouse" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Warehouses</SelectItem>
+                    {warehouseOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 xl:justify-end">
+              <Badge variant="secondary" className="rounded-xl px-3 py-1">
+                {resultsCount} results
+              </Badge>
+
+              <Button
+                variant="outline"
                 className="h-10 rounded-xl"
-                placeholder="Search by ID, name, warehouse, location, assigned person..."
-                value={filters.query}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, query: e.target.value }))
-                }
-              />
-            </div>
-
-            <div className="col-span-12 sm:col-span-4 lg:col-span-2">
-              <Select
-                value={filters.status}
-                onValueChange={(value) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    status: value as AssetFilters["status"],
-                  }))
+                onClick={() =>
+                  setFilters({
+                    query: "",
+                    status: "all",
+                    healthBand: "all",
+                    warehouse: "all",
+                  })
                 }
               >
-                <SelectTrigger className="h-10 rounded-xl">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="OPERATIONAL">Operational</SelectItem>
-                  <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                  <SelectItem value="CRITICAL">Critical</SelectItem>
-                  <SelectItem value="OFFLINE">Offline</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                Reset
+              </Button>
 
-            <div className="col-span-12 sm:col-span-4 lg:col-span-3">
-              <Select
-                value={filters.healthBand}
-                onValueChange={(value) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    healthBand: value as AssetFilters["healthBand"],
-                  }))
-                }
-              >
-                <SelectTrigger className="h-10 rounded-xl">
-                  <SelectValue placeholder="Health" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Health</SelectItem>
-                  <SelectItem value="excellent">Excellent</SelectItem>
-                  <SelectItem value="good">Good</SelectItem>
-                  <SelectItem value="moderate">Moderate</SelectItem>
-                  <SelectItem value="poor">Poor</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <Button variant="secondary" className="h-10 rounded-xl px-4">
+                <FileText className="mr-2 h-4 w-4" />
+                Generate Report
+              </Button>
 
-            <div className="col-span-12 sm:col-span-4 lg:col-span-3">
-              <Select
-                value={filters.warehouse}
-                onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, warehouse: value }))
-                }
+              <Button
+                onClick={() => setIsAddDialogOpen(true)}
+                className="h-10 rounded-xl px-4"
               >
-                <SelectTrigger className="h-10 rounded-xl">
-                  <SelectValue placeholder="Warehouse" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Warehouses</SelectItem>
-                  {warehouseOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Asset
+              </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="flex items-center justify-between gap-2 xl:justify-end">
-            <Badge variant="secondary" className="rounded-xl px-3 py-1">
-              {resultsCount} results
-            </Badge>
-
-            <Button
-              variant="outline"
-              className="h-10 rounded-xl"
-              onClick={() =>
-                setFilters({
-                  query: "",
-                  status: "all",
-                  healthBand: "all",
-                  warehouse: "all",
-                })
-              }
-            >
-              Reset
-            </Button>
-
-            <Button variant="secondary" className="h-10 rounded-xl px-4">
-              <FileText className="mr-2 h-4 w-4" />
-              Generate Report
-            </Button>
-
-            <Button className="h-10 rounded-xl px-4">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Asset
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      <AddAssetDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onAssetAdded={onAssetAdded}
+      />
+    </>
   );
 }

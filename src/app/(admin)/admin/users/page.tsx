@@ -31,13 +31,15 @@ import ViewAssignedAssetsDialog, {
 } from "@/components/admin/users/ViewAssignedAssetsDialog";
 
 import {
-  Users,
-  UserCheck,
-  Shield,
-  UserRound,
-  UserPlus,
   Search,
   Building2,
+  LayoutGrid,
+  List,
+  Users,
+  Shield,
+  UserCheck,
+  UserPlus,
+  UserRound,
 } from "lucide-react";
 
 /**
@@ -209,9 +211,81 @@ function UserAvatar({ name }: { name: string }) {
     .slice(0, 2);
 
   return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-base font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
       {initials}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-component: User Card (for Grid View)
+// ---------------------------------------------------------------------------
+
+function UserCard({
+  user,
+  onViewDetails,
+  onViewAssets,
+}: {
+  user: UserItem;
+  onViewDetails: (u: UserItem) => void;
+  onViewAssets: (u: UserItem) => void;
+}) {
+  return (
+    <Card className="group overflow-hidden rounded-2xl transition-all hover:shadow-lg dark:hover:shadow-emerald-900/20">
+      <CardContent className="p-6">
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 transform transition-transform group-hover:scale-110">
+            <UserAvatar name={user.name} />
+          </div>
+          <h3 className="line-clamp-1 text-lg font-bold">{user.name}</h3>
+          <p className="mb-4 line-clamp-1 text-sm text-muted-foreground">
+            {user.email}
+          </p>
+
+          <div className="mb-6 flex flex-wrap justify-center gap-2">
+            <RoleBadge role={user.role} />
+            <StatusBadge status={user.status} />
+          </div>
+
+          <div className="mb-6 w-full space-y-3 text-sm">
+            <div className="flex items-center justify-between border-b border-dashed pb-2">
+              <span className="text-muted-foreground">ID</span>
+              <span className="font-mono font-medium">{user.id}</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-dashed pb-2">
+              <span className="text-muted-foreground">Department</span>
+              <div className="flex items-center gap-1.5 font-medium">
+                <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                {user.department}
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Assigned Assets</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 font-bold">
+                {user.assignedAssets}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex w-full flex-col gap-2">
+            <button
+              onClick={() => onViewDetails(user)}
+              className="w-full rounded-full bg-emerald-600 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-emerald-500 active:scale-95"
+            >
+              View Details
+            </button>
+            {user.assignedAssets > 0 && (
+              <button
+                onClick={() => onViewAssets(user)}
+                className="w-full rounded-full border border-emerald-600/30 py-2.5 text-sm font-medium text-emerald-600 transition-all hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30 active:scale-95"
+              >
+                View Assets
+              </button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -220,6 +294,7 @@ function UserAvatar({ name }: { name: string }) {
 // ---------------------------------------------------------------------------
 
 export default function AdminUsersPage() {
+  const [viewMode, setViewMode] = React.useState<"table" | "grid">("table");
   const [isLoading, setIsLoading] = React.useState(true);
   const [users, setUsers] = React.useState<UserItem[]>(INITIAL_USERS);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -304,19 +379,22 @@ export default function AdminUsersPage() {
     <div className="w-full space-y-6">
       {/* KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {kpis.map((k) => (
-          <Card key={k.label} className="rounded-2xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-medium text-muted-foreground">
-                {k.label}
-              </CardTitle>
-              <k.icon className="h-8 w-8 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold">{k.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+        {kpis.map((k) => {
+          const Icon = k.icon;
+          return (
+            <Card key={k.label} className="rounded-2xl">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-base font-medium text-muted-foreground">
+                  {k.label}
+                </CardTitle>
+                <Icon className="h-8 w-8 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold">{k.value}</div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Search + filter bar */}
@@ -372,7 +450,30 @@ export default function AdminUsersPage() {
               </SelectContent>
             </Select>
 
-            <Button onClick={() => setIsAddDialogOpen(true)} className="ml-auto">
+            <div className="flex items-center gap-1 rounded-xl border bg-muted/50 p-1">
+              <button
+                onClick={() => setViewMode("table")}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg transition-all ${viewMode === "table"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-muted"
+                  }`}
+                title="Table View"
+              >
+                <List className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg transition-all ${viewMode === "grid"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-muted"
+                  }`}
+                title="Grid View"
+              >
+                <LayoutGrid className="h-5 w-5" />
+              </button>
+            </div>
+
+            <Button onClick={() => setIsAddDialogOpen(true)} className="ml-auto bg-emerald-600 hover:bg-emerald-500">
               <UserPlus className="mr-2 h-4 w-4" />
               Add User
             </Button>
@@ -380,94 +481,113 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      {/* Users table */}
-      <Card className="rounded-2xl">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="min-w-60 pl-6">User</TableHead>
-                  <TableHead className="w-25">Role</TableHead>
-                  <TableHead className="w-40">Department</TableHead>
-                  <TableHead className="w-25">Status</TableHead>
-                  <TableHead className="w-35">Assigned Assets</TableHead>
-                  <TableHead className="w-45">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {filteredUsers.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="h-24 text-center text-muted-foreground"
-                    >
-                      No users found.
-                    </TableCell>
+      {/* Content Rendering (Table or Grid) */}
+      {viewMode === "table" ? (
+        <Card className="rounded-2xl">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="min-w-60 pl-6">User</TableHead>
+                    <TableHead className="w-25">Role</TableHead>
+                    <TableHead className="w-40">Department</TableHead>
+                    <TableHead className="w-25">Status</TableHead>
+                    <TableHead className="w-35 text-center">Assigned Assets</TableHead>
+                    <TableHead className="w-45">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="pl-6">
-                        <div className="flex items-center gap-3">
-                          <UserAvatar name={user.name} />
-                          <div className="min-w-0">
-                            <p className="truncate text-base font-medium">
-                              {user.name}
-                            </p>
-                            <p className="truncate text-sm text-muted-foreground">
-                              {user.email}
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
+                </TableHeader>
 
-                      <TableCell>
-                        <RoleBadge role={user.role} />
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-base">
-                          <Building2 className="h-4 w-4 text-muted-foreground" />
-                          {user.department}
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <StatusBadge status={user.status} />
-                      </TableCell>
-
-                      <TableCell className="text-center text-base">
-                        {user.assignedAssets}
-                      </TableCell>
-
-                      <TableCell className="pr-6">
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => handleViewDetails(user)}
-                            className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
-                          >
-                            View Details
-                          </button>
-                          {user.assignedAssets > 0 && (
-                            <button
-                              onClick={() => handleViewAssets(user)}
-                              className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
-                            >
-                              View Assets
-                            </button>
-                          )}
-                        </div>
+                <TableBody>
+                  {filteredUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="h-24 text-center text-muted-foreground"
+                      >
+                        No users found.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  ) : (
+                    filteredUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="pl-6">
+                          <div className="flex items-center gap-3">
+                            <UserAvatar name={user.name} />
+                            <div className="min-w-0">
+                              <p className="truncate text-base font-medium">
+                                {user.name}
+                              </p>
+                              <p className="truncate text-sm text-muted-foreground">
+                                {user.email}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <RoleBadge role={user.role} />
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="flex items-center gap-2 text-base">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            {user.department}
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <StatusBadge status={user.status} />
+                        </TableCell>
+
+                        <TableCell className="text-center text-base">
+                          {user.assignedAssets}
+                        </TableCell>
+
+                        <TableCell className="pr-6">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleViewDetails(user)}
+                              className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
+                            >
+                              View Details
+                            </button>
+                            {user.assignedAssets > 0 && (
+                              <button
+                                onClick={() => handleViewAssets(user)}
+                                className="rounded-full border border-emerald-600 px-3 py-1 text-sm font-medium text-emerald-600 shadow-sm transition-colors hover:bg-emerald-50"
+                              >
+                                View Assets
+                              </button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredUsers.length === 0 ? (
+            <div className="col-span-full flex h-48 items-center justify-center rounded-2xl border-2 border-dashed border-muted text-muted-foreground">
+              No users found.
+            </div>
+          ) : (
+            filteredUsers.map((user) => (
+              <UserCard
+                key={user.id}
+                user={user}
+                onViewDetails={handleViewDetails}
+                onViewAssets={handleViewAssets}
+              />
+            ))
+          )}
+        </div>
+      )}
 
       {/* Add User Dialog */}
       <AddUserDialog
@@ -501,10 +621,10 @@ export default function AdminUsersPage() {
         onBackToDetails={
           assetsUser
             ? () => {
-                const user = assetsUser;
-                setAssetsUser(null);
-                setDetailsUser(user);
-              }
+              const user = assetsUser;
+              setAssetsUser(null);
+              setDetailsUser(user);
+            }
             : undefined
         }
       />

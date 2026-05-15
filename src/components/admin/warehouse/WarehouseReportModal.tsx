@@ -121,14 +121,27 @@ function KpiRow({ label, val, color }: { label: string; val?: string | number; c
   );
 }
 
-function CTip({ active, payload, label }: any) {
+interface CTipPayloadItem {
+  color?: string;
+  fill?: string;
+  name?: React.ReactNode;
+  value?: number | string;
+}
+
+interface CTipProps {
+  active?: boolean;
+  payload?: CTipPayloadItem[];
+  label?: React.ReactNode;
+}
+
+function CTip({ active, payload, label }: CTipProps) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 py-2 text-xs shadow-lg">
       {label && <div className="font-semibold mb-1">{label}</div>}
-      {payload.map((p: any, i: number) => (
+      {payload.map((p, i: number) => (
         <div key={i} style={{ color: p.color || p.fill }}>
-          {p.name ?? "Value"}: <strong>{(p.value as number)?.toLocaleString()}</strong>
+          {p.name ?? "Value"}: <strong>{typeof p.value === "number" ? p.value.toLocaleString() : p.value}</strong>
         </div>
       ))}
     </div>
@@ -255,7 +268,7 @@ function LoadingStep() {
     "Analyzing data patterns…",
     "Generating report sections…",
   ], []);
-  
+
   React.useEffect(() => {
     if (!steps || steps.length === 0) return;
 
@@ -341,7 +354,7 @@ function ErrorStep({ error, onRetry, onClose }: { error: string; onRetry: () => 
 function ReportStep({
   data, onRegenerate, onClose,
 }: {
-  data: { ai_sections: AISections; context: Ctx; kb_annotations?: any };
+  data: { ai_sections: AISections; context: Ctx; kb_annotations?: WarehouseKbAnnotations };
   onRegenerate: () => void;
   onClose: () => void;
 }) {
@@ -349,7 +362,7 @@ function ReportStep({
   const reportContentRef = React.useRef<HTMLDivElement>(null);
   const ctx = data.context;
   const ai  = data.ai_sections;
-  const kb  = data.kb_annotations || {};
+  const kb: WarehouseKbAnnotations = data.kb_annotations ?? {};
   const cur = ctx.currency ?? "LKR";
 
   const riskData        = toChart(ctx.risk_breakdown);
@@ -538,7 +551,7 @@ function ReportStep({
     //   })),
     // };
     
-    downloadProfessionalPDF(pdfData as any, filename);
+    downloadProfessionalPDF(pdfData as Parameters<typeof downloadProfessionalPDF>[0], filename);
     
     // Trigger Server Notification
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;

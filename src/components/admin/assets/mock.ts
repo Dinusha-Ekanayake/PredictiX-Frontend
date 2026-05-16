@@ -4,33 +4,29 @@ export const ASSETS: Asset[] = [
   {
     id: "A-001",
     name: "Forklift FL-22",
-    description: "Electric forklift used for pallet movement in Zone A.",
+    description:
+      "Electric forklift used for pallet movement in Zone A. High-cycle asset with elevated wear on hydraulic components.",
     images: [],
     status: "CRITICAL",
-
-    healthScore: 68,
-    failureProbability8w: 0.62,
+    healthScore: 38,
+    failureProbability8w: 0.72,
     predictionConfidence: 0.84,
-
     warehouse: { id: "WH-A", name: "Warehouse A" },
     location: "Zone A • Aisle 2 • Bay 4",
     assignedPerson: { id: "U-14", name: "Sahan Silva" },
-
     lastMaintenanceDate: "2026-01-18",
     nextMaintenanceDate: "2026-02-20",
-
     scheduledMaintenanceDate: "2026-02-18",
-    predictedMaintenanceDate: "2026-02-16",
-
+    predictedMaintenanceDate: "2026-02-09",
     estimatedCost: 1250,
     costVariance30d: 0.18,
-
     maintenanceLogs: [
       {
         id: "ML-1",
         date: "2026-01-18",
         type: "CORRECTIVE",
-        notes: "Replaced hydraulic seal, checked pressure.",
+        notes:
+          "Replaced hydraulic seal, checked pressure. Residual wear detected on mast guide rails.",
         performedBy: { id: "U-07", name: "Dinithi Jay" },
         cost: 980,
       },
@@ -38,7 +34,7 @@ export const ASSETS: Asset[] = [
         id: "ML-2",
         date: "2025-12-05",
         type: "PREVENTIVE",
-        notes: "Battery health check and lubrication.",
+        notes: "Battery health check and lubrication. Battery capacity at 74%.",
         performedBy: { id: "U-09", name: "Nimal Perera" },
         cost: 220,
       },
@@ -67,33 +63,28 @@ export const ASSETS: Asset[] = [
   {
     id: "A-002",
     name: "Conveyor C-09",
-    description: "Main conveyor belt line for outbound sorting.",
+    description:
+      "Main conveyor belt line for outbound sorting. Handles 1,200 parcels/hr at peak.",
     images: [],
     status: "MAINTENANCE",
-
-    healthScore: 74,
+    healthScore: 61,
     failureProbability8w: 0.41,
     predictionConfidence: 0.79,
-
     warehouse: { id: "WH-B", name: "Warehouse B" },
     location: "Outbound Line • Section 3",
     assignedPerson: null,
-
     lastMaintenanceDate: "2026-01-28",
     nextMaintenanceDate: "2026-02-22",
-
     scheduledMaintenanceDate: "2026-02-22",
     predictedMaintenanceDate: "2026-02-24",
-
     estimatedCost: 760,
     costVariance30d: -0.06,
-
     maintenanceLogs: [
       {
         id: "ML-3",
         date: "2026-01-28",
         type: "INSPECTION",
-        notes: "Checked belt tension; minor wear detected.",
+        notes: "Checked belt tension; minor wear detected on roller bearings.",
         performedBy: { id: "U-07", name: "Dinithi Jay" },
         cost: 120,
       },
@@ -105,29 +96,150 @@ export const ASSETS: Asset[] = [
   {
     id: "A-003",
     name: "Generator G-11",
-    description: "Backup generator for cold-storage power continuity.",
+    description:
+      "Backup generator for cold-storage power continuity. 500 kVA rated capacity.",
     images: [],
     status: "OPERATIONAL",
-
-    healthScore: 88,
-    failureProbability8w: 0.12,
-    predictionConfidence: 0.86,
-
+    healthScore: 91,
+    failureProbability8w: 0.08,
+    predictionConfidence: 0.91,
     warehouse: { id: "WH-C", name: "Warehouse C" },
     location: "Utility Room • North Wing",
     assignedPerson: { id: "U-22", name: "Kavindu Perera" },
-
     lastMaintenanceDate: "2026-01-12",
     nextMaintenanceDate: "2026-03-01",
-
     scheduledMaintenanceDate: "2026-03-01",
     predictedMaintenanceDate: "2026-03-04",
-
     estimatedCost: 540,
     costVariance30d: 0.03,
-
     maintenanceLogs: [],
     assignmentHistory: [],
     auditTrail: [],
+  },
+
+  {
+    id: "A-004",
+    name: "Reach Truck RT-07",
+    description:
+      "Narrow-aisle reach truck for high-rack retrieval in Zone B. Equipped with height sensor.",
+    images: [],
+    status: "OPERATIONAL",
+    healthScore: 82,
+    failureProbability8w: 0.14,
+    predictionConfidence: 0.88,
+    warehouse: { id: "WH-A", name: "Warehouse A" },
+    location: "Zone B • High Rack • Bay 1–6",
+    assignedPerson: { id: "U-18", name: "Amara Bandara" },
+    lastMaintenanceDate: "2025-12-20",
+    nextMaintenanceDate: "2026-03-15",
+    scheduledMaintenanceDate: "2026-03-15",
+    predictedMaintenanceDate: "2026-03-12",
+    estimatedCost: 420,
+    costVariance30d: -0.02,
+    maintenanceLogs: [
+      {
+        id: "ML-4",
+        date: "2025-12-20",
+        type: "PREVENTIVE",
+        notes: "Mast lubrication, battery cell inspection. All nominal.",
+        performedBy: { id: "U-09", name: "Nimal Perera" },
+        cost: 180,
+      },
+    ],
+    assignmentHistory: [
+      {
+        id: "AH-2",
+        date: "2025-10-04",
+        action: "ASSIGNED",
+        user: { id: "U-18", name: "Amara Bandara" },
+        byAdmin: { id: "U-01", name: "Admin" },
+      },
+    ],
+    auditTrail: [],
+  },
+
+  {
+    id: "A-005",
+    name: "HVAC Unit HV-03",
+    description:
+      "Climate control unit for cold-storage bay. Target: 2–4 °C continuous.",
+    images: [],
+    status: "CRITICAL",
+    healthScore: 29,
+    failureProbability8w: 0.86,
+    predictionConfidence: 0.77,
+    warehouse: { id: "WH-B", name: "Warehouse B" },
+    location: "Cold Storage • Bay 7",
+    assignedPerson: null,
+    lastMaintenanceDate: "2025-11-30",
+    nextMaintenanceDate: "2026-01-30",
+    scheduledMaintenanceDate: "2026-01-30",
+    predictedMaintenanceDate: "2026-01-22",
+    estimatedCost: 2100,
+    costVariance30d: 0.34,
+    maintenanceLogs: [
+      {
+        id: "ML-5",
+        date: "2025-11-30",
+        type: "CORRECTIVE",
+        notes:
+          "Refrigerant top-up after leak detected. Compressor showing stress.",
+        performedBy: { id: "U-07", name: "Dinithi Jay" },
+        cost: 1400,
+      },
+    ],
+    assignmentHistory: [],
+    auditTrail: [
+      {
+        id: "AT-2",
+        date: "2026-01-15",
+        field: "status",
+        oldValue: "OPERATIONAL",
+        newValue: "CRITICAL",
+        by: { id: "U-01", name: "Admin" },
+      },
+    ],
+  },
+
+  {
+    id: "A-006",
+    name: "Pallet Wrapper PW-01",
+    description: "Automatic stretch-wrap machine for outbound pallets.",
+    images: [],
+    status: "OFFLINE",
+    healthScore: 14,
+    failureProbability8w: 0.95,
+    predictionConfidence: 0.68,
+    warehouse: { id: "WH-C", name: "Warehouse C" },
+    location: "Dispatch Area • Dock 2",
+    assignedPerson: null,
+    lastMaintenanceDate: "2025-10-10",
+    nextMaintenanceDate: null,
+    scheduledMaintenanceDate: null,
+    predictedMaintenanceDate: null,
+    estimatedCost: 3200,
+    costVariance30d: 0.55,
+    maintenanceLogs: [
+      {
+        id: "ML-6",
+        date: "2025-10-10",
+        type: "CORRECTIVE",
+        notes:
+          "Motor replacement attempted but part unavailable. Unit grounded.",
+        performedBy: { id: "U-09", name: "Nimal Perera" },
+        cost: 650,
+      },
+    ],
+    assignmentHistory: [],
+    auditTrail: [
+      {
+        id: "AT-3",
+        date: "2025-10-12",
+        field: "status",
+        oldValue: "CRITICAL",
+        newValue: "OFFLINE",
+        by: { id: "U-01", name: "Admin" },
+      },
+    ],
   },
 ];

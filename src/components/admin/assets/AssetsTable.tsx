@@ -82,7 +82,7 @@ function HealthBar({ band }: { band: string | null }) {
 // ── Loading skeleton ───────────────────────────────────────────────────────────
 function TableSkeleton() {
   return (
-    <div className="divide-y divide-slate-100 dark:divide-white/[0.04]">
+    <div className="divide-y divide-slate-100 dark:divide-white/4">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="grid grid-cols-12 items-center gap-2 px-4 py-3.5">
           <div className="col-span-5 space-y-1.5">
@@ -141,7 +141,7 @@ export default function AssetsTable({ assets, selectedId, onSelect, loading }: P
             No assets match your filters.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-white/[0.04]">
+          <div className="divide-y divide-slate-100 dark:divide-white/4">
             {assets.map((a) => {
               const active = selectedId === a.id;
               const displayName = a.asset_name;
@@ -159,9 +159,9 @@ export default function AssetsTable({ assets, selectedId, onSelect, loading }: P
                   onClick={() => onSelect(a.id)}
                   className={cn(
                     "w-full grid grid-cols-12 items-center gap-2 px-4 py-3.5 text-left transition-all duration-150",
-                    "hover:bg-slate-50 dark:hover:bg-white/[0.03]",
+                    "hover:bg-slate-50 dark:hover:bg-white/3",
                     active
-                      ? "bg-primary/[0.04] dark:bg-white/6 border-l-2 border-l-primary"
+                      ? "bg-primary/4 dark:bg-white/6 border-l-2 border-l-primary"
                       : "border-l-2 border-l-transparent",
                   )}
                 >

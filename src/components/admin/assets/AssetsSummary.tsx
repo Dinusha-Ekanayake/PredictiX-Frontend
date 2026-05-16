@@ -10,8 +10,8 @@ import {
   Activity,
 } from "lucide-react";
 import type { Asset } from "./types";
+import { deriveHealthScore } from "./assetService";
 
-/* ── Summary card matching dashboard KPI style ─────────────────────────────── */
 function SummaryCard({
   label,
   value,
@@ -24,8 +24,8 @@ function SummaryCard({
   value: string | number;
   sub?: string;
   icon: React.ReactNode;
-  accentClass: string;   // bg colour for icon wrapper — light mode
-  iconClass: string;     // icon colour
+  accentClass: string;
+  iconClass: string;
 }) {
   return (
     <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card p-4 transition-all">
@@ -37,10 +37,7 @@ function SummaryCard({
             <div className="mt-1 text-[11px] text-muted-foreground/70">{sub}</div>
           )}
         </div>
-
-        <div
-          className={`shrink-0 rounded-xl p-2.5 ${accentClass} dark:bg-white/[0.06]`}
-        >
+        <div className={`shrink-0 rounded-xl p-2.5 ${accentClass} dark:bg-white/[0.06]`}>
           <div className={iconClass}>{icon}</div>
         </div>
       </div>
@@ -48,17 +45,38 @@ function SummaryCard({
   );
 }
 
-/* ── Component ─────────────────────────────────────────────────────────────── */
-export default function AssetsSummary({ assets }: { assets: Asset[] }) {
+export default function AssetsSummary({
+  assets,
+}: {
+  assets: Asset[];
+}) {
   const total = assets.length;
-  const operational = assets.filter((a) => a.status === "OPERATIONAL").length;
-  const maintenance = assets.filter((a) => a.status === "MAINTENANCE").length;
-  const critical = assets.filter((a) => a.status === "CRITICAL").length;
-  const offline = assets.filter((a) => a.status === "OFFLINE").length;
 
+  // Status counts — backend uses lowercase strings
+  const operational = assets.filter(
+    (a) => a.status === "active" || a.status === "operational",
+  ).length;
+  const maintenance = assets.filter(
+    (a) => a.status === "maintenance" || a.status === "in_maintenance",
+  ).length;
+  const critical = assets.filter((a) => a.health_band === "critical").length;
+  const offline = assets.filter(
+    (a) => a.status === "inactive" || a.status === "retired" || a.status === "offline",
+  ).length;
+
+  // Average health from health_band mapping (no prediction data here to keep summary fast)
+  const bandScore: Record<string, number> = {
+    excellent: 90, good: 72, moderate: 52, poor: 30, critical: 12,
+  };
   const avgHealth =
     total > 0
-      ? Math.round(assets.reduce((s, a) => s + a.healthScore, 0) / total)
+      ? Math.round(
+          assets.reduce((s, a) => {
+            const hs =
+              a.health_band ? (bandScore[a.health_band.toLowerCase()] ?? 50) : 50;
+            return s + hs;
+          }, 0) / total,
+        )
       : 0;
 
   return (
@@ -96,9 +114,9 @@ export default function AssetsSummary({ assets }: { assets: Asset[] }) {
         iconClass="text-amber-600 dark:text-amber-400"
       />
       <SummaryCard
-        label="Critical"
+        label="Critical Band"
         value={critical}
-        sub="Needs attention"
+        sub="Health critical"
         icon={<AlertTriangle className="h-4 w-4" />}
         accentClass="bg-red-50"
         iconClass="text-red-600 dark:text-red-400"
@@ -106,7 +124,7 @@ export default function AssetsSummary({ assets }: { assets: Asset[] }) {
       <SummaryCard
         label="Offline"
         value={offline}
-        sub="Out of service"
+        sub="Inactive / retired"
         icon={<WifiOff className="h-4 w-4" />}
         accentClass="bg-slate-100"
         iconClass="text-slate-500 dark:text-slate-400"

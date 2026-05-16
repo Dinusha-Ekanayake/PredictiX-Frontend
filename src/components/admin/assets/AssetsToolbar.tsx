@@ -52,7 +52,7 @@ export default function AssetsToolbar({
           <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
-              className="h-9 rounded-xl pl-8 text-sm bg-background/60 dark:bg-white/[0.04] border-slate-200 dark:border-slate-700"
+              className="h-9 rounded-xl pl-8 text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700"
               placeholder="Search by name, code, VIN…"
               value={filters.query}
               onChange={(e) =>
@@ -68,7 +68,7 @@ export default function AssetsToolbar({
               setFilters((prev) => ({ ...prev, status: v }))
             }
           >
-            <SelectTrigger className="h-9 w-[145px] rounded-xl text-sm bg-background/60 dark:bg-white/[0.04] border-slate-200 dark:border-slate-700">
+            <SelectTrigger className="h-9 w-[145px] rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -87,7 +87,7 @@ export default function AssetsToolbar({
               setFilters((prev) => ({ ...prev, health_band: v }))
             }
           >
-            <SelectTrigger className="h-9 w-[158px] rounded-xl text-sm bg-background/60 dark:bg-white/[0.04] border-slate-200 dark:border-slate-700">
+            <SelectTrigger className="h-9 w-[158px] rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
               <SelectValue placeholder="Health Band" />
             </SelectTrigger>
             <SelectContent>
@@ -107,7 +107,7 @@ export default function AssetsToolbar({
               setFilters((prev) => ({ ...prev, warehouse_id: v }))
             }
           >
-            <SelectTrigger className="h-9 w-[158px] rounded-xl text-sm bg-background/60 dark:bg-white/[0.04] border-slate-200 dark:border-slate-700">
+            <SelectTrigger className="h-9 w-[158px] rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
               <SelectValue placeholder="Warehouse" />
             </SelectTrigger>
             <SelectContent>
@@ -121,7 +121,7 @@ export default function AssetsToolbar({
           </Select>
 
           {/* Count pill */}
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-muted/40 dark:bg-white/[0.04] px-3 py-1 text-xs font-medium text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-muted/40 dark:bg-white/4 px-3 py-1 text-xs font-medium text-muted-foreground">
             <SlidersHorizontal className="h-3 w-3" />
             {loading ? "…" : `${resultsCount} asset${resultsCount !== 1 ? "s" : ""}`}
           </span>

@@ -26,12 +26,12 @@ const STATUS_META: Record<string, { label: string; dot: string; bg: string }> = 
   inactive: {
     label: "Inactive",
     dot: "bg-slate-400",
-    bg: "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400 dark:ring-white/10",
+    bg: "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
   },
   retired: {
     label: "Retired",
     dot: "bg-slate-400",
-    bg: "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400 dark:ring-white/10",
+    bg: "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
   },
 };
 
@@ -39,7 +39,7 @@ function StatusPill({ status }: { status: string }) {
   const m = STATUS_META[status.toLowerCase()] ?? {
     label: status,
     dot: "bg-slate-400",
-    bg: "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400",
+    bg: "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400",
   };
   return (
     <span
@@ -68,7 +68,7 @@ function HealthBar({ band }: { band: string | null }) {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 flex-1 rounded-full bg-slate-200/60 dark:bg-white/[0.08] overflow-hidden">
+      <div className="h-1.5 flex-1 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
         <div
           className={cn("h-full rounded-full transition-all duration-500", meta.color)}
           style={{ width: `${meta.score}%` }}
@@ -117,7 +117,7 @@ export default function AssetsTable({ assets, selectedId, onSelect, loading }: P
   return (
     <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden flex flex-col transition-all">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200/80 dark:border-white/[0.06]">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200/80 dark:border-white/6">
         <h2 className="text-sm font-semibold">Asset List</h2>
         <span className="text-[11px] text-muted-foreground font-medium tabular-nums">
           {loading ? "Loading…" : `${assets.length} asset${assets.length !== 1 ? "s" : ""}`}
@@ -125,7 +125,7 @@ export default function AssetsTable({ assets, selectedId, onSelect, loading }: P
       </div>
 
       {/* Column labels */}
-      <div className="grid grid-cols-12 px-4 py-2 border-b border-slate-200/80 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.02] text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+      <div className="grid grid-cols-12 px-4 py-2 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
         <div className="col-span-5">Asset</div>
         <div className="col-span-3">Type / Make</div>
         <div className="col-span-2">Status</div>
@@ -161,7 +161,7 @@ export default function AssetsTable({ assets, selectedId, onSelect, loading }: P
                     "w-full grid grid-cols-12 items-center gap-2 px-4 py-3.5 text-left transition-all duration-150",
                     "hover:bg-slate-50 dark:hover:bg-white/[0.03]",
                     active
-                      ? "bg-primary/[0.04] dark:bg-white/[0.06] border-l-2 border-l-primary"
+                      ? "bg-primary/[0.04] dark:bg-white/6 border-l-2 border-l-primary"
                       : "border-l-2 border-l-transparent",
                   )}
                 >

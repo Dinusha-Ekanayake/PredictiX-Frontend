@@ -37,7 +37,7 @@ function SummaryCard({
             <div className="mt-1 text-[11px] text-muted-foreground/70">{sub}</div>
           )}
         </div>
-        <div className={`shrink-0 rounded-xl p-2.5 ${accentClass} dark:bg-white/[0.06]`}>
+        <div className={`shrink-0 rounded-xl p-2.5 ${accentClass} dark:bg-white/6`}>
           <div className={iconClass}>{icon}</div>
         </div>
       </div>

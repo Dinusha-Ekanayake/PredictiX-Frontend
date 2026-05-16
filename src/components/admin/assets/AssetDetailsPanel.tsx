@@ -5,10 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  MapPin, User, Building2, Calendar, CalendarClock, DollarSign,
+  MapPin, User, Building2, Calendar, CalendarClock,
   TrendingUp, TrendingDown, Minus, Pencil, Trash2, Bot,
   ClipboardList, Users, ShieldCheck, Zap, AlertTriangle,
-  RefreshCw, ExternalLink, Ticket, ChevronRight, Loader2,
+  RefreshCw, Ticket, ChevronRight, Loader2,
   Info, Gauge, Hash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -37,8 +37,8 @@ const STATUS_BG: Record<string, string> = {
   active:       "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
   maintenance:  "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
   in_maintenance:"bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
-  inactive:     "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400 dark:ring-white/10",
-  retired:      "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400 dark:ring-white/10",
+  inactive:     "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
+  retired:      "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
 };
 const STATUS_DOT: Record<string, string> = {
   active: "bg-emerald-500", maintenance: "bg-amber-500",
@@ -71,7 +71,7 @@ function HealthRing({ score }: { score: number }) {
       <div className="relative" style={{ width: 96, height: 96 }}>
         <svg width={96} height={96} viewBox="0 0 96 96">
           <circle cx={48} cy={48} r={r} fill="none" stroke="currentColor" strokeWidth={7}
-            className="text-slate-200/60 dark:text-white/[0.08]" />
+            className="text-slate-200/60 dark:text-white/8" />
           <circle cx={48} cy={48} r={r} fill="none" stroke={color} strokeWidth={7}
             strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round"
             transform="rotate(-90 48 48)"
@@ -97,7 +97,7 @@ function RiskGauge({ probability }: { probability: number }) {
         <span className="text-muted-foreground">Failure risk (8 weeks)</span>
         <span className="font-bold tabular-nums">{pct}%</span>
       </div>
-      <div className="h-2 rounded-full bg-slate-200/60 dark:bg-white/[0.08] overflow-hidden">
+      <div className="h-2 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
         <div className={cn("h-full rounded-full transition-all duration-500", color)}
           style={{ width: `${pct}%` }} />
       </div>
@@ -110,7 +110,7 @@ function InfoField({ icon, label, value, mono, valueClass }: {
   icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.02] p-3 flex items-start gap-2.5">
+    <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
       {icon && <div className="mt-0.5 text-muted-foreground/60 shrink-0">{icon}</div>}
       <div className="min-w-0">
         <div className="text-[11px] text-muted-foreground/80 font-medium">{label}</div>
@@ -125,7 +125,7 @@ function InfoField({ icon, label, value, mono, valueClass }: {
 /* ── Empty state ─────────────────────────────────────────────────────────────── */
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08] p-8 text-center text-sm text-muted-foreground/60">
+    <div className="rounded-xl border border-dashed border-slate-200 dark:border-white/8 p-8 text-center text-sm text-muted-foreground/60">
       {message}
     </div>
   );
@@ -157,7 +157,7 @@ const TICKET_STATUS_META: Record<string, string> = {
   open:        "bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20",
   in_progress: "bg-violet-50 text-violet-700 ring-violet-200/60 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20",
   resolved:    "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
-  closed:      "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400 dark:ring-white/10",
+  closed:      "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
 };
 
 function TicketStatusPill({ status }: { status: string }) {
@@ -178,13 +178,13 @@ function TicketStatusPill({ status }: { status: string }) {
 export function AssetDetailsSkeleton() {
   return (
     <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/[0.06]">
+      <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/6">
         <div className="space-y-2">
           <Skeleton className="h-5 w-48 rounded" />
           <Skeleton className="h-3.5 w-80 rounded" />
         </div>
       </div>
-      <div className="px-5 py-5 border-b border-slate-200/80 dark:border-white/[0.06]">
+      <div className="px-5 py-5 border-b border-slate-200/80 dark:border-white/6">
         <div className="flex gap-6">
           <Skeleton className="h-24 w-24 rounded-full shrink-0" />
           <div className="flex-1 space-y-3 pt-2">
@@ -266,16 +266,16 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
   return (
     <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden transition-all">
       {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200/80 dark:border-white/[0.06] bg-slate-50/40 dark:bg-white/[0.02]">
+      <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/40 dark:bg-white/2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-bold truncate">{asset.asset_name}</h2>
             <StatusPill status={asset.status} />
-            <span className="text-[11px] font-mono text-muted-foreground/70 bg-slate-100 dark:bg-white/[0.06] px-2 py-0.5 rounded-full">
+            <span className="text-[11px] font-mono text-muted-foreground/70 bg-slate-100 dark:bg-white/6 px-2 py-0.5 rounded-full">
               {asset.asset_code}
             </span>
             {asset.registration_number && (
-              <span className="text-[11px] font-mono text-muted-foreground/60 bg-slate-100 dark:bg-white/[0.06] px-2 py-0.5 rounded-full">
+              <span className="text-[11px] font-mono text-muted-foreground/60 bg-slate-100 dark:bg-white/6 px-2 py-0.5 rounded-full">
                 {asset.registration_number}
               </span>
             )}
@@ -320,11 +320,11 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
       </div>
 
       {/* ── AI Metrics strip ── */}
-      <div className="px-5 py-5 border-b border-slate-200/80 dark:border-white/[0.06]">
+      <div className="px-5 py-5 border-b border-slate-200/80 dark:border-white/6">
         {prediction ? (
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
             <HealthRing score={healthScore} />
-            <div className="hidden sm:block h-24 w-px bg-slate-200/80 dark:bg-white/[0.06]" />
+            <div className="hidden sm:block h-24 w-px bg-slate-200/80 dark:bg-white/6" />
             <div className="flex-1 space-y-3.5 w-full">
               <RiskGauge probability={failureProb} />
               <div className="flex items-center justify-between text-xs">
@@ -360,7 +360,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-4 rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08] p-4">
+          <div className="flex items-center gap-4 rounded-xl border border-dashed border-slate-200 dark:border-white/8 p-4">
             <Bot className="h-8 w-8 text-muted-foreground/20 shrink-0" />
             <div>
               <p className="text-sm text-muted-foreground/70">No prediction data yet.</p>
@@ -373,7 +373,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
       </div>
 
       {/* ── Fields grid ── */}
-      <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/[0.06]">
+      <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           <InfoField
             icon={<Building2 className="h-3.5 w-3.5" />}
@@ -424,7 +424,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
             value={fmt(prediction?.predicted_maintenance_date)}
           />
           {/* Cost prediction */}
-          <div className="rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.02] p-3 flex items-start gap-2.5">
+          <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
             <div className={cn("mt-0.5 shrink-0", costDeltaColor)}>
               <CostDeltaIcon className="h-3.5 w-3.5" />
             </div>
@@ -457,7 +457,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
       {/* ── Tabs ── */}
       <div className="px-5 pb-5 pt-4">
         <Tabs defaultValue="insights">
-          <TabsList className="rounded-xl w-full justify-start overflow-x-auto bg-slate-100/60 dark:bg-white/[0.04]">
+          <TabsList className="rounded-xl w-full justify-start overflow-x-auto bg-slate-100/60 dark:bg-white/4">
             {[
               { value: "insights", icon: Bot, label: "Predictive Insights" },
               {
@@ -487,7 +487,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
                 <Icon className="h-3.5 w-3.5" />
                 {label}
                 {count !== undefined && count > 0 && (
-                  <span className="ml-1 rounded-full bg-slate-200/60 dark:bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-semibold">
+                  <span className="ml-1 rounded-full bg-slate-200/60 dark:bg-white/8 px-1.5 py-0.5 text-[10px] font-semibold">
                     {count}
                   </span>
                 )}
@@ -504,7 +504,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
               ].map((title) => (
                 <div
                   key={title}
-                  className="rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08] bg-slate-50/30 dark:bg-white/[0.02] p-4 flex flex-col items-center justify-center gap-2"
+                  className="rounded-xl border border-dashed border-slate-200 dark:border-white/8 bg-slate-50/30 dark:bg-white/2 p-4 flex flex-col items-center justify-center gap-2"
                   style={{ height: 180 }}
                 >
                   <Bot className="h-7 w-7 text-muted-foreground/20" />
@@ -518,7 +518,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
             </div>
 
             {/* Dynamic AI summary bullets */}
-            <div className="rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/30 dark:bg-white/[0.02] p-4 space-y-3">
+            <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
               <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
                 AI Insight Summary
               </div>
@@ -581,7 +581,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
                 <button
                   key={t.id}
                   onClick={() => goToTicket(t.id)}
-                  className="w-full text-left ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/[0.06] p-4 transition-all hover:border-primary/30 group"
+                  className="w-full text-left ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all hover:border-primary/30 group"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -621,7 +621,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
               maintenanceEvents.map((e) => (
                 <div
                   key={e.id}
-                  className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/[0.06] p-4 space-y-2 transition-all"
+                  className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 space-y-2 transition-all"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -662,7 +662,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
               assignments.map((a) => (
                 <div
                   key={a.id}
-                  className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/[0.06] p-4 transition-all"
+                  className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -670,7 +670,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
                         "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
                         a.is_active
                           ? "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20"
-                          : "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400",
+                          : "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400",
                       )}>
                         {a.is_active ? "Active" : "Past"}
                       </span>

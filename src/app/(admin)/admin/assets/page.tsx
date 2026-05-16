@@ -151,7 +151,7 @@ export default function AdminAssetsPage() {
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-primary/10 dark:bg-white/[0.06] p-2.5">
+            <div className="rounded-xl bg-primary/10 dark:bg-white/6 p-2.5">
               <Boxes className="h-5 w-5 text-primary dark:text-white/70" />
             </div>
             <div>
@@ -167,11 +167,11 @@ export default function AdminAssetsPage() {
               <Skeleton className="h-7 w-24 rounded-full" />
             ) : (
               <>
-                <Badge variant="outline" className="gap-1.5 rounded-full px-3 py-1 text-xs font-medium border-slate-200 dark:border-slate-700 bg-background/60 dark:bg-white/[0.04]">
+                <Badge variant="outline" className="gap-1.5 rounded-full px-3 py-1 text-xs font-medium border-slate-200 dark:border-slate-700 bg-background/60 dark:bg-white/4">
                   <Boxes className="h-3 w-3" />
                   {assets.length} assets
                 </Badge>
-                <Badge variant="outline" className="gap-1.5 rounded-full px-3 py-1 text-xs font-medium border-slate-200 dark:border-slate-700 bg-background/60 dark:bg-white/[0.04]">
+                <Badge variant="outline" className="gap-1.5 rounded-full px-3 py-1 text-xs font-medium border-slate-200 dark:border-slate-700 bg-background/60 dark:bg-white/4">
                   Avg. Health: {avgHealth}%
                 </Badge>
                 {criticalCount > 0 && (

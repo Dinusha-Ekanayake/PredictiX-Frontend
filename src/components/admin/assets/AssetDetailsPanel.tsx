@@ -1,183 +1,96 @@
 "use client";
 
 import * as React from "react";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  MapPin,
-  User,
-  Building2,
-  Calendar,
-  CalendarClock,
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Pencil,
-  Trash2,
-  Bot,
-  ClipboardList,
-  Users,
-  ShieldCheck,
-  Zap,
-  AlertTriangle,
+  MapPin, User, Building2, Calendar, CalendarClock, DollarSign,
+  TrendingUp, TrendingDown, Minus, Pencil, Trash2, Bot,
+  ClipboardList, Users, ShieldCheck, Zap, AlertTriangle,
+  RefreshCw, ExternalLink, Ticket, ChevronRight, Loader2,
+  Info, Gauge, Hash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Asset } from "./types";
+import { useNavRouter } from "@/components/navigation/useNavRouter";
+import type { AssetDetail } from "./types";
+import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
 
 /* ══════════════════════════════════════════════════════════════════════════════
    Helpers
    ══════════════════════════════════════════════════════════════════════════════ */
 
-const STATUS_META: Record<
-  Asset["status"],
-  { label: string; dot: string; bg: string }
-> = {
-  OPERATIONAL: {
-    label: "Operational",
-    dot: "bg-emerald-500",
-    bg: "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
-  },
-  MAINTENANCE: {
-    label: "Maintenance",
-    dot: "bg-amber-500",
-    bg: "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
-  },
-  CRITICAL: {
-    label: "Critical",
-    dot: "bg-red-500",
-    bg: "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20",
-  },
-  OFFLINE: {
-    label: "Offline",
-    dot: "bg-slate-400",
-    bg: "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400 dark:ring-white/10",
-  },
+function fmt(d: string | null | undefined): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB", {
+    day: "2-digit", month: "short", year: "numeric",
+  });
+}
+
+function fmtCost(n: number | null | undefined, currency = "LKR"): string {
+  if (n == null) return "—";
+  return `${currency} ${Number(n).toLocaleString()}`;
+}
+
+/* ── Status pill ─────────────────────────────────────────────────────────────── */
+const STATUS_BG: Record<string, string> = {
+  active:       "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
+  maintenance:  "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  in_maintenance:"bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  inactive:     "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400 dark:ring-white/10",
+  retired:      "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400 dark:ring-white/10",
+};
+const STATUS_DOT: Record<string, string> = {
+  active: "bg-emerald-500", maintenance: "bg-amber-500",
+  in_maintenance: "bg-amber-500", inactive: "bg-slate-400", retired: "bg-slate-400",
 };
 
-function StatusPill({ s }: { s: Asset["status"] }) {
-  const m = STATUS_META[s];
+function StatusPill({ status }: { status: string }) {
+  const key = status.toLowerCase();
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset leading-none",
-        m.bg,
-      )}
-    >
-      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", m.dot)} />
-      {m.label}
+    <span className={cn(
+      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset leading-none",
+      STATUS_BG[key] ?? "bg-muted text-muted-foreground ring-border",
+    )}>
+      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", STATUS_DOT[key] ?? "bg-slate-400")} />
+      {status.charAt(0).toUpperCase() + status.slice(1).replace("_", " ")}
     </span>
   );
 }
 
-function fmt(d: string | null) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function fmtCost(n: number) {
-  return `$${n.toLocaleString()}`;
-}
-
-/* ── Health Ring (SVG) ─────────────────────────────────────────────────────── */
+/* ── Health Ring ─────────────────────────────────────────────────────────────── */
 function HealthRing({ score }: { score: number }) {
   const r = 38;
   const circ = 2 * Math.PI * r;
   const filled = (score / 100) * circ;
-
-  const color =
-    score >= 80
-      ? "#10b981"
-      : score >= 60
-        ? "#84cc16"
-        : score >= 40
-          ? "#f59e0b"
-          : score >= 20
-            ? "#f97316"
-            : "#ef4444";
-
-  const label =
-    score >= 80
-      ? "Excellent"
-      : score >= 60
-        ? "Good"
-        : score >= 40
-          ? "Moderate"
-          : score >= 20
-            ? "Poor"
-            : "Critical";
+  const color = score >= 80 ? "#10b981" : score >= 60 ? "#84cc16" : score >= 40 ? "#f59e0b" : score >= 20 ? "#f97316" : "#ef4444";
+  const label = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Moderate" : score >= 20 ? "Poor" : "Critical";
 
   return (
     <div className="flex flex-col items-center gap-1.5">
       <div className="relative" style={{ width: 96, height: 96 }}>
         <svg width={96} height={96} viewBox="0 0 96 96">
-          {/* Track */}
-          <circle
-            cx={48}
-            cy={48}
-            r={r}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={7}
-            className="text-slate-200/60 dark:text-white/[0.08]"
-          />
-          {/* Glow */}
-          <circle
-            cx={48}
-            cy={48}
-            r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth={7}
-            strokeDasharray={`${filled} ${circ - filled}`}
-            strokeLinecap="round"
+          <circle cx={48} cy={48} r={r} fill="none" stroke="currentColor" strokeWidth={7}
+            className="text-slate-200/60 dark:text-white/[0.08]" />
+          <circle cx={48} cy={48} r={r} fill="none" stroke={color} strokeWidth={7}
+            strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round"
             transform="rotate(-90 48 48)"
-            style={{ filter: "drop-shadow(0 0 6px " + color + "40)" }}
-          />
+            style={{ filter: `drop-shadow(0 0 6px ${color}40)` }} />
         </svg>
-        {/* Center label */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xl font-bold leading-none tracking-tight">
-            {score}
-          </span>
-          <span className="text-[10px] text-muted-foreground/60 mt-0.5">
-            / 100
-          </span>
+          <span className="text-xl font-bold leading-none">{score}</span>
+          <span className="text-[10px] text-muted-foreground/60 mt-0.5">/ 100</span>
         </div>
       </div>
-      <span className="text-[11px] font-semibold" style={{ color }}>
-        {label}
-      </span>
+      <span className="text-[11px] font-semibold" style={{ color }}>{label}</span>
     </div>
   );
 }
 
-/* ── Risk gauge ────────────────────────────────────────────────────────────── */
+/* ── Risk gauge ──────────────────────────────────────────────────────────────── */
 function RiskGauge({ probability }: { probability: number }) {
   const pct = Math.round(probability * 100);
-  const color =
-    pct >= 70
-      ? "bg-red-500"
-      : pct >= 40
-        ? "bg-amber-500"
-        : "bg-emerald-500";
-
-  const glow =
-    pct >= 70
-      ? "shadow-[0_0_8px_rgba(239,68,68,0.3)]"
-      : pct >= 40
-        ? "shadow-[0_0_8px_rgba(245,158,11,0.3)]"
-        : "";
-
+  const color = pct >= 70 ? "bg-red-500" : pct >= 40 ? "bg-amber-500" : "bg-emerald-500";
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
@@ -185,49 +98,23 @@ function RiskGauge({ probability }: { probability: number }) {
         <span className="font-bold tabular-nums">{pct}%</span>
       </div>
       <div className="h-2 rounded-full bg-slate-200/60 dark:bg-white/[0.08] overflow-hidden">
-        <div
-          className={cn(
-            "h-full rounded-full transition-all duration-500",
-            color,
-            glow,
-          )}
-          style={{ width: `${pct}%` }}
-        />
+        <div className={cn("h-full rounded-full transition-all duration-500", color)}
+          style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
 }
 
-/* ── Info field ─────────────────────────────────────────────────────────────── */
-function InfoField({
-  icon,
-  label,
-  value,
-  mono,
-  valueClass,
-}: {
-  icon?: React.ReactNode;
-  label: string;
-  value: string;
-  mono?: boolean;
-  valueClass?: string;
+/* ── Info field ──────────────────────────────────────────────────────────────── */
+function InfoField({ icon, label, value, mono, valueClass }: {
+  icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.02] p-3 flex items-start gap-2.5 transition-colors">
-      {icon && (
-        <div className="mt-0.5 text-muted-foreground/60 shrink-0">{icon}</div>
-      )}
+    <div className="rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.02] p-3 flex items-start gap-2.5">
+      {icon && <div className="mt-0.5 text-muted-foreground/60 shrink-0">{icon}</div>}
       <div className="min-w-0">
-        <div className="text-[11px] text-muted-foreground/80 font-medium">
-          {label}
-        </div>
-        <div
-          className={cn(
-            "text-sm font-medium mt-0.5 truncate",
-            mono && "font-mono text-xs",
-            valueClass,
-          )}
-        >
+        <div className="text-[11px] text-muted-foreground/80 font-medium">{label}</div>
+        <div className={cn("text-sm font-medium mt-0.5 truncate", mono && "font-mono text-xs", valueClass)}>
           {value}
         </div>
       </div>
@@ -235,57 +122,7 @@ function InfoField({
   );
 }
 
-/* ── Log / Event type pills ────────────────────────────────────────────────── */
-const LOG_TYPE_META: Record<string, { label: string; cls: string }> = {
-  PREVENTIVE: {
-    label: "Preventive",
-    cls: "bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20",
-  },
-  CORRECTIVE: {
-    label: "Corrective",
-    cls: "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20",
-  },
-  INSPECTION: {
-    label: "Inspection",
-    cls: "bg-violet-50 text-violet-700 ring-violet-200/60 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20",
-  },
-};
-
-const ACTION_META: Record<string, { label: string; cls: string }> = {
-  ASSIGNED: {
-    label: "Assigned",
-    cls: "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
-  },
-  UNASSIGNED: {
-    label: "Unassigned",
-    cls: "bg-slate-100 text-slate-600 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400 dark:ring-white/10",
-  },
-  REASSIGNED: {
-    label: "Reassigned",
-    cls: "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
-  },
-};
-
-function TypePill({
-  type,
-  meta,
-}: {
-  type: string;
-  meta: Record<string, { label: string; cls: string }>;
-}) {
-  const m = meta[type] ?? { label: type, cls: "" };
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset leading-none",
-        m.cls,
-      )}
-    >
-      {m.label}
-    </span>
-  );
-}
-
+/* ── Empty state ─────────────────────────────────────────────────────────────── */
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08] p-8 text-center text-sm text-muted-foreground/60">
@@ -294,39 +131,137 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+/* ── Ticket priority pill ────────────────────────────────────────────────────── */
+const PRIORITY_META: Record<string, string> = {
+  critical: "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20",
+  high:     "bg-orange-50 text-orange-700 ring-orange-200/60 dark:bg-orange-500/10 dark:text-orange-400 dark:ring-orange-500/20",
+  medium:   "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  low:      "bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20",
+};
+
+function PriorityPill({ priority }: { priority: string | null }) {
+  if (!priority) return <span className="text-xs text-muted-foreground/50">—</span>;
+  const key = priority.toLowerCase();
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
+      PRIORITY_META[key] ?? "bg-muted text-muted-foreground ring-border",
+    )}>
+      {priority}
+    </span>
+  );
+}
+
+/* ── Ticket status pill ───────────────────────────────────────────────────────── */
+const TICKET_STATUS_META: Record<string, string> = {
+  open:        "bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20",
+  in_progress: "bg-violet-50 text-violet-700 ring-violet-200/60 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20",
+  resolved:    "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
+  closed:      "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400 dark:ring-white/10",
+};
+
+function TicketStatusPill({ status }: { status: string }) {
+  const key = status.toLowerCase();
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
+      TICKET_STATUS_META[key] ?? "bg-muted text-muted-foreground ring-border",
+    )}>
+      {status.replace("_", " ")}
+    </span>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Loading skeleton
+   ══════════════════════════════════════════════════════════════════════════════ */
+export function AssetDetailsSkeleton() {
+  return (
+    <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/[0.06]">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-48 rounded" />
+          <Skeleton className="h-3.5 w-80 rounded" />
+        </div>
+      </div>
+      <div className="px-5 py-5 border-b border-slate-200/80 dark:border-white/[0.06]">
+        <div className="flex gap-6">
+          <Skeleton className="h-24 w-24 rounded-full shrink-0" />
+          <div className="flex-1 space-y-3 pt-2">
+            <Skeleton className="h-3 w-full rounded" />
+            <Skeleton className="h-3 w-3/4 rounded" />
+            <Skeleton className="h-8 w-full rounded-xl" />
+          </div>
+        </div>
+      </div>
+      <div className="px-5 py-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════════════════════════
    Main Component
    ══════════════════════════════════════════════════════════════════════════════ */
-export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
-  const daysUntilMaint = asset.scheduledMaintenanceDate
-    ? Math.ceil(
-        (new Date(asset.scheduledMaintenanceDate).getTime() - Date.now()) /
-          86_400_000,
-      )
+type Props = {
+  detail: AssetDetail;
+  onRefresh: () => void;
+  onDelete: (id: string) => void;
+};
+
+export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props) {
+  const { asset, prediction, costPrediction, maintenanceEvents, tickets, assignments } = detail;
+  const router = useNavRouter();
+
+  const [runningPrediction, setRunningPrediction] = React.useState(false);
+
+  const healthScore = deriveHealthScore(asset, prediction);
+  const failureProb = deriveFailureProbability(prediction);
+
+  const daysUntilMaint = asset.next_service_date
+    ? Math.ceil((new Date(asset.next_service_date).getTime() - Date.now()) / 86_400_000)
     : null;
 
   const predDiff =
-    asset.scheduledMaintenanceDate && asset.predictedMaintenanceDate
+    asset.next_service_date && prediction?.predicted_maintenance_date
       ? Math.ceil(
-          (new Date(asset.predictedMaintenanceDate).getTime() -
-            new Date(asset.scheduledMaintenanceDate).getTime()) /
-            86_400_000,
+          (new Date(prediction.predicted_maintenance_date).getTime() -
+            new Date(asset.next_service_date).getTime()) / 86_400_000,
         )
       : null;
 
-  const CostDeltaIcon =
-    asset.costVariance30d > 0.05
-      ? TrendingUp
-      : asset.costVariance30d < -0.05
-        ? TrendingDown
-        : Minus;
+  const costVariance =
+    costPrediction?.estimated_cost && costPrediction?.min_cost
+      ? (Number(costPrediction.estimated_cost) - Number(costPrediction.min_cost)) /
+        (Number(costPrediction.min_cost) || 1)
+      : 0;
 
+  const CostDeltaIcon =
+    costVariance > 0.05 ? TrendingUp : costVariance < -0.05 ? TrendingDown : Minus;
   const costDeltaColor =
-    asset.costVariance30d > 0.05
-      ? "text-red-500"
-      : asset.costVariance30d < -0.05
-        ? "text-emerald-500"
-        : "text-muted-foreground";
+    costVariance > 0.05 ? "text-red-500" : costVariance < -0.05 ? "text-emerald-500" : "text-muted-foreground";
+
+  async function handleRunPrediction() {
+    setRunningPrediction(true);
+    try {
+      await runVehiclePrediction(asset.id);
+      onRefresh();
+    } catch (e) {
+      console.error("Prediction failed:", e);
+    } finally {
+      setRunningPrediction(false);
+    }
+  }
+
+  // Navigate to tickets page with the ticket pre-opened
+  function goToTicket(ticketId: string) {
+    router.push(`/admin/tickets?ticket_id=${ticketId}`);
+  }
 
   return (
     <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden transition-all">
@@ -334,17 +269,36 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
       <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200/80 dark:border-white/[0.06] bg-slate-50/40 dark:bg-white/[0.02]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-bold truncate">{asset.name}</h2>
-            <StatusPill s={asset.status} />
+            <h2 className="text-base font-bold truncate">{asset.asset_name}</h2>
+            <StatusPill status={asset.status} />
             <span className="text-[11px] font-mono text-muted-foreground/70 bg-slate-100 dark:bg-white/[0.06] px-2 py-0.5 rounded-full">
-              {asset.id}
+              {asset.asset_code}
             </span>
+            {asset.registration_number && (
+              <span className="text-[11px] font-mono text-muted-foreground/60 bg-slate-100 dark:bg-white/[0.06] px-2 py-0.5 rounded-full">
+                {asset.registration_number}
+              </span>
+            )}
           </div>
-          <p className="mt-1.5 text-[13px] text-muted-foreground leading-relaxed">
-            {asset.description}
-          </p>
+          {asset.description && (
+            <p className="mt-1.5 text-[13px] text-muted-foreground leading-relaxed line-clamp-2">
+              {asset.description}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-xl gap-1.5 text-xs border-slate-200 dark:border-slate-700"
+            onClick={handleRunPrediction}
+            disabled={runningPrediction}
+          >
+            {runningPrediction
+              ? <Loader2 className="h-3 w-3 animate-spin" />
+              : <RefreshCw className="h-3 w-3" />}
+            {runningPrediction ? "Running…" : "Run AI"}
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -357,6 +311,7 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
             variant="destructive"
             size="sm"
             className="h-8 rounded-xl gap-1.5 text-xs"
+            onClick={() => onDelete(asset.id)}
           >
             <Trash2 className="h-3 w-3" />
             Delete
@@ -366,53 +321,55 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
 
       {/* ── AI Metrics strip ── */}
       <div className="px-5 py-5 border-b border-slate-200/80 dark:border-white/[0.06]">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-          {/* Health ring */}
-          <HealthRing score={asset.healthScore} />
-
-          {/* Vertical divider */}
-          <div className="hidden sm:block h-24 w-px bg-slate-200/80 dark:bg-white/[0.06]" />
-
-          {/* Right-side metrics */}
-          <div className="flex-1 space-y-3.5 w-full">
-            <RiskGauge probability={asset.failureProbability8w} />
-
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground flex items-center gap-1.5">
-                <Bot className="h-3.5 w-3.5" />
-                Model confidence
-              </span>
-              <span className="font-bold tabular-nums">
-                {Math.round(asset.predictionConfidence * 100)}%
-              </span>
-            </div>
-
-            {/* AI maintenance gap callout */}
-            {predDiff !== null && (
-              <div
-                className={cn(
+        {prediction ? (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+            <HealthRing score={healthScore} />
+            <div className="hidden sm:block h-24 w-px bg-slate-200/80 dark:bg-white/[0.06]" />
+            <div className="flex-1 space-y-3.5 w-full">
+              <RiskGauge probability={failureProb} />
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Bot className="h-3.5 w-3.5" />
+                  Model confidence
+                </span>
+                <span className="font-bold tabular-nums">
+                  {prediction.confidence != null
+                    ? `${Math.round(Number(prediction.confidence) * 100)}%`
+                    : "—"}
+                </span>
+              </div>
+              {predDiff !== null && (
+                <div className={cn(
                   "flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-medium",
                   predDiff < 0
                     ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400"
                     : predDiff > 0
                       ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
                       : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
-                )}
-              >
-                {predDiff < 0 ? (
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                ) : (
-                  <Zap className="h-3.5 w-3.5 shrink-0" />
-                )}
-                {predDiff < 0
-                  ? `AI predicts failure ${Math.abs(predDiff)} days before scheduled maintenance`
-                  : predDiff > 0
-                    ? `Asset may last ${predDiff} days beyond scheduled maintenance`
-                    : "AI prediction aligns with schedule"}
-              </div>
-            )}
+                )}>
+                  {predDiff < 0
+                    ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    : <Zap className="h-3.5 w-3.5 shrink-0" />}
+                  {predDiff < 0
+                    ? `AI predicts failure ${Math.abs(predDiff)} days before scheduled service`
+                    : predDiff > 0
+                      ? `Asset may last ${predDiff} days beyond scheduled service`
+                      : "AI prediction aligns with schedule"}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center gap-4 rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08] p-4">
+            <Bot className="h-8 w-8 text-muted-foreground/20 shrink-0" />
+            <div>
+              <p className="text-sm text-muted-foreground/70">No prediction data yet.</p>
+              <p className="text-[12px] text-muted-foreground/50 mt-0.5">
+                Click <strong>Run AI</strong> to generate a prediction for this asset.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Fields grid ── */}
@@ -420,66 +377,80 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           <InfoField
             icon={<Building2 className="h-3.5 w-3.5" />}
-            label="Warehouse"
-            value={asset.warehouse.name}
+            label="Warehouse ID"
+            value={asset.warehouse_id}
+            mono
           />
           <InfoField
             icon={<MapPin className="h-3.5 w-3.5" />}
-            label="Location"
-            value={asset.location}
+            label="Vehicle Type"
+            value={[asset.vehicle_type, asset.asset_type].filter(Boolean).join(" · ") || "—"}
           />
           <InfoField
             icon={<User className="h-3.5 w-3.5" />}
             label="Assigned To"
-            value={asset.assignedPerson?.name ?? "Unassigned"}
+            value={asset.assigned_to ?? "Unassigned"}
+            mono={!!asset.assigned_to}
+          />
+          <InfoField
+            icon={<Gauge className="h-3.5 w-3.5" />}
+            label="Make / Model"
+            value={[asset.make, asset.model, asset.manufacture_year].filter(Boolean).join(" ") || "—"}
+          />
+          <InfoField
+            icon={<Hash className="h-3.5 w-3.5" />}
+            label="VIN"
+            value={asset.vin ?? "—"}
+            mono
           />
           <InfoField
             icon={<Calendar className="h-3.5 w-3.5" />}
-            label="Last Maintenance"
-            value={fmt(asset.lastMaintenanceDate)}
+            label="Last Service"
+            value={fmt(asset.last_service_date)}
           />
           <InfoField
             icon={<CalendarClock className="h-3.5 w-3.5" />}
-            label="Scheduled Maintenance"
+            label="Next Scheduled Service"
             value={
-              asset.scheduledMaintenanceDate
-                ? `${fmt(asset.scheduledMaintenanceDate)}${
-                    daysUntilMaint !== null
-                      ? ` (${
-                          daysUntilMaint > 0
-                            ? `in ${daysUntilMaint}d`
-                            : `${Math.abs(daysUntilMaint)}d ago`
-                        })`
-                      : ""
-                  }`
+              asset.next_service_date
+                ? `${fmt(asset.next_service_date)}${daysUntilMaint !== null ? ` (${daysUntilMaint > 0 ? `in ${daysUntilMaint}d` : `${Math.abs(daysUntilMaint)}d overdue`})` : ""}`
                 : "—"
             }
+            valueClass={daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
           />
           <InfoField
             icon={<Bot className="h-3.5 w-3.5" />}
             label="AI-Predicted Maintenance"
-            value={fmt(asset.predictedMaintenanceDate)}
+            value={fmt(prediction?.predicted_maintenance_date)}
           />
-          <InfoField
-            icon={<DollarSign className="h-3.5 w-3.5" />}
-            label="Estimated Cost"
-            value={fmtCost(asset.estimatedCost)}
-          />
-          {/* Cost variance — custom to show colour */}
-          <div className="rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.02] p-3 flex items-start gap-2.5 transition-colors">
+          {/* Cost prediction */}
+          <div className="rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.02] p-3 flex items-start gap-2.5">
             <div className={cn("mt-0.5 shrink-0", costDeltaColor)}>
               <CostDeltaIcon className="h-3.5 w-3.5" />
             </div>
             <div>
-              <div className="text-[11px] text-muted-foreground/80 font-medium">
-                Cost Variance (30d)
+              <div className="text-[11px] text-muted-foreground/80 font-medium">Est. Maintenance Cost</div>
+              <div className="text-sm font-semibold mt-0.5">
+                {fmtCost(costPrediction?.estimated_cost, costPrediction?.currency ?? "LKR")}
               </div>
-              <div className={cn("text-sm font-semibold mt-0.5", costDeltaColor)}>
-                {asset.costVariance30d >= 0 ? "+" : ""}
-                {Math.round(asset.costVariance30d * 100)}%
-              </div>
+              {costPrediction && (
+                <div className="text-[11px] text-muted-foreground/60 mt-0.5">
+                  Range: {fmtCost(costPrediction.min_cost, costPrediction.currency ?? "LKR")} –{" "}
+                  {fmtCost(costPrediction.max_cost, costPrediction.currency ?? "LKR")}
+                </div>
+              )}
             </div>
           </div>
+          <InfoField
+            icon={<Info className="h-3.5 w-3.5" />}
+            label="Odometer"
+            value={asset.current_mileage != null ? `${Number(asset.current_mileage).toLocaleString()} km` : "—"}
+          />
+          <InfoField
+            icon={<ShieldCheck className="h-3.5 w-3.5" />}
+            label="Warranty Expiry"
+            value={fmt(asset.warranty_expiry_date)}
+          />
         </div>
       </div>
 
@@ -487,156 +458,197 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
       <div className="px-5 pb-5 pt-4">
         <Tabs defaultValue="insights">
           <TabsList className="rounded-xl w-full justify-start overflow-x-auto bg-slate-100/60 dark:bg-white/[0.04]">
-            <TabsTrigger
-              value="insights"
-              className="gap-1.5 text-xs rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-white/[0.08]"
-            >
-              <Bot className="h-3.5 w-3.5" />
-              Predictive Insights
-            </TabsTrigger>
-            <TabsTrigger
-              value="history"
-              className="gap-1.5 text-xs rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-white/[0.08]"
-            >
-              <ClipboardList className="h-3.5 w-3.5" />
-              Maintenance Logs
-              {asset.maintenanceLogs.length > 0 && (
-                <span className="ml-1 rounded-full bg-slate-200/60 dark:bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-semibold">
-                  {asset.maintenanceLogs.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger
-              value="assignments"
-              className="gap-1.5 text-xs rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-white/[0.08]"
-            >
-              <Users className="h-3.5 w-3.5" />
-              Assignments
-            </TabsTrigger>
-            <TabsTrigger
-              value="audit"
-              className="gap-1.5 text-xs rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-white/[0.08]"
-            >
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Audit Trail
-            </TabsTrigger>
+            {[
+              { value: "insights", icon: Bot, label: "Predictive Insights" },
+              {
+                value: "tickets",
+                icon: Ticket,
+                label: "Tickets",
+                count: tickets.length,
+              },
+              {
+                value: "maintenance",
+                icon: ClipboardList,
+                label: "Maintenance Logs",
+                count: maintenanceEvents.length,
+              },
+              {
+                value: "assignments",
+                icon: Users,
+                label: "Assignments",
+                count: assignments.length,
+              },
+            ].map(({ value, icon: Icon, label, count }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="gap-1.5 text-xs rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-white/[0.08]"
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+                {count !== undefined && count > 0 && (
+                  <span className="ml-1 rounded-full bg-slate-200/60 dark:bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-semibold">
+                    {count}
+                  </span>
+                )}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           {/* ═══ Insights ═══ */}
           <TabsContent value="insights" className="mt-4 space-y-3">
-            {/* Placeholder charts */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div
-                className="rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08] bg-slate-50/30 dark:bg-white/[0.02] p-4 flex flex-col items-center justify-center gap-2"
-                style={{ height: 180 }}
-              >
-                <Bot className="h-7 w-7 text-muted-foreground/20" />
-                <div className="text-xs text-muted-foreground/60 text-center">
-                  Health Score Trend & Forecast
-                  <br />
-                  <span className="text-[10px] opacity-70">
-                    (XGBoost prediction — coming soon)
-                  </span>
+              {[
+                "Health Score Trend & Forecast",
+                "Failure Probability (8-week)",
+              ].map((title) => (
+                <div
+                  key={title}
+                  className="rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08] bg-slate-50/30 dark:bg-white/[0.02] p-4 flex flex-col items-center justify-center gap-2"
+                  style={{ height: 180 }}
+                >
+                  <Bot className="h-7 w-7 text-muted-foreground/20" />
+                  <div className="text-xs text-muted-foreground/60 text-center">
+                    {title}
+                    <br />
+                    <span className="text-[10px] opacity-70">(XGBoost — coming soon)</span>
+                  </div>
                 </div>
-              </div>
-              <div
-                className="rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08] bg-slate-50/30 dark:bg-white/[0.02] p-4 flex flex-col items-center justify-center gap-2"
-                style={{ height: 180 }}
-              >
-                <Bot className="h-7 w-7 text-muted-foreground/20" />
-                <div className="text-xs text-muted-foreground/60 text-center">
-                  Failure Probability (8-week)
-                  <br />
-                  <span className="text-[10px] opacity-70">
-                    (XGBoost prediction — coming soon)
-                  </span>
-                </div>
-              </div>
+              ))}
             </div>
 
-            {/* Insight bullets — dynamically generated */}
+            {/* Dynamic AI summary bullets */}
             <div className="rounded-xl border border-slate-200/80 dark:border-white/[0.06] bg-slate-50/30 dark:bg-white/[0.02] p-4 space-y-3">
               <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
                 AI Insight Summary
               </div>
               <div className="space-y-2.5">
-                {predDiff !== null && predDiff < 0 && (
+                {!prediction && (
+                  <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
+                    <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>No prediction available. Click <strong>Run AI</strong> to generate insights.</span>
+                  </div>
+                )}
+                {prediction && predDiff !== null && predDiff < 0 && (
                   <div className="flex items-start gap-2.5 text-sm text-red-600 dark:text-red-400">
                     <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>
-                      AI predicts maintenance is needed{" "}
-                      <strong>{Math.abs(predDiff)} days earlier</strong> than
-                      currently scheduled.
-                    </span>
+                    <span>AI predicts maintenance needed <strong>{Math.abs(predDiff)} days earlier</strong> than scheduled.</span>
                   </div>
                 )}
-                {asset.failureProbability8w > 0.6 && (
+                {prediction && failureProb > 0.6 && (
                   <div className="flex items-start gap-2.5 text-sm text-amber-600 dark:text-amber-400">
                     <Zap className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>
-                      High failure probability (
-                      {Math.round(asset.failureProbability8w * 100)}%) —
-                      consider immediate inspection.
-                    </span>
+                    <span>High failure probability ({Math.round(failureProb * 100)}%) — consider immediate inspection.</span>
                   </div>
                 )}
-                {asset.costVariance30d > 0.1 && (
-                  <div className="flex items-start gap-2.5 text-sm text-orange-600 dark:text-orange-400">
-                    <TrendingUp className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>
-                      Maintenance costs running{" "}
-                      {Math.round(asset.costVariance30d * 100)}% above
-                      baseline.
-                    </span>
-                  </div>
-                )}
-                {asset.healthScore >= 80 && (
+                {prediction && healthScore >= 80 && (
                   <div className="flex items-start gap-2.5 text-sm text-emerald-600 dark:text-emerald-400">
                     <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>Asset health is excellent. No immediate action required.</span>
+                  </div>
+                )}
+                {prediction && (
+                  <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
+                    <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                     <span>
-                      Asset health is excellent. No immediate action required.
+                      Model confidence:{" "}
+                      {prediction.confidence != null
+                        ? `${Math.round(Number(prediction.confidence) * 100)}%`
+                        : "N/A"}
+                      . Risk level: <strong>{prediction.risk_level ?? "Unknown"}</strong>.
                     </span>
                   </div>
                 )}
-                <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
-                  <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  <span>
-                    Model confidence at{" "}
-                    {Math.round(asset.predictionConfidence * 100)}% — based on
-                    available sensor and maintenance log data.
-                  </span>
-                </div>
+                {asset.lifetime_breakdown_count != null && asset.lifetime_breakdown_count > 0 && (
+                  <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
+                    <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      Lifetime breakdowns: <strong>{asset.lifetime_breakdown_count}</strong> · Services:{" "}
+                      <strong>{asset.lifetime_service_count ?? "—"}</strong>
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </TabsContent>
 
-          {/* ═══ Maintenance Logs ═══ */}
-          <TabsContent value="history" className="mt-4 space-y-3">
-            {asset.maintenanceLogs.length === 0 ? (
-              <EmptyState message="No maintenance logs available for this asset." />
+          {/* ═══ Tickets ═══ */}
+          <TabsContent value="tickets" className="mt-4 space-y-3">
+            {tickets.length === 0 ? (
+              <EmptyState message="No tickets raised for this asset." />
             ) : (
-              asset.maintenanceLogs.map((l) => (
+              tickets.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => goToTicket(t.id)}
+                  className="w-full text-left ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/[0.06] p-4 transition-all hover:border-primary/30 group"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono text-muted-foreground/60">
+                          {t.ticket_number}
+                        </span>
+                        <TicketStatusPill status={t.status} />
+                        <PriorityPill priority={t.final_priority ?? t.predicted_priority ?? t.priority} />
+                        {t.final_category && (
+                          <span className="text-[10px] text-muted-foreground/60 bg-muted/50 px-2 py-0.5 rounded-full">
+                            {t.final_category}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1.5 text-sm font-semibold truncate">{t.title}</div>
+                      <div className="text-[12px] text-muted-foreground/70 mt-0.5 line-clamp-1">
+                        {t.description}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground/50 mt-1">
+                        Opened {fmt(t.opened_at)}
+                        {t.resolved_at && ` · Resolved ${fmt(t.resolved_at)}`}
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary/60 transition-colors shrink-0 mt-1" />
+                  </div>
+                </button>
+              ))
+            )}
+          </TabsContent>
+
+          {/* ═══ Maintenance Logs ═══ */}
+          <TabsContent value="maintenance" className="mt-4 space-y-3">
+            {maintenanceEvents.length === 0 ? (
+              <EmptyState message="No maintenance events recorded for this asset." />
+            ) : (
+              maintenanceEvents.map((e) => (
                 <div
-                  key={l.id}
+                  key={e.id}
                   className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/[0.06] p-4 space-y-2 transition-all"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <TypePill type={l.type} meta={LOG_TYPE_META} />
+                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20">
+                        {e.event_type}
+                      </span>
+                      <div className="text-sm font-semibold">{e.title}</div>
                       <div className="text-[11px] text-muted-foreground/70">
-                        {fmt(l.date)} · Performed by{" "}
-                        <span className="font-medium text-foreground/80">
-                          {l.performedBy?.name ?? "—"}
-                        </span>
+                        {e.performed_at ? fmt(e.performed_at) : fmt(e.scheduled_date)}
+                        {e.vendor_name && ` · ${e.vendor_name}`}
                       </div>
                     </div>
-                    <span className="text-sm font-bold shrink-0 tabular-nums">
-                      {fmtCost(l.cost)}
-                    </span>
+                    <div className="text-sm font-bold shrink-0 tabular-nums">
+                      {e.cost_amount != null
+                        ? fmtCost(e.cost_amount, e.currency)
+                        : "—"}
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground/80 leading-relaxed">
-                    {l.notes}
-                  </p>
+                  {e.notes && (
+                    <p className="text-sm text-muted-foreground/80 leading-relaxed">{e.notes}</p>
+                  )}
+                  {e.odometer_reading != null && (
+                    <div className="text-[11px] text-muted-foreground/50">
+                      Odometer: {Number(e.odometer_reading).toLocaleString()} km
+                      {e.downtime_hours != null && ` · Downtime: ${e.downtime_hours}h`}
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -644,62 +656,36 @@ export default function AssetDetailsPanel({ asset }: { asset: Asset }) {
 
           {/* ═══ Assignments ═══ */}
           <TabsContent value="assignments" className="mt-4 space-y-3">
-            {asset.assignmentHistory.length === 0 ? (
+            {assignments.length === 0 ? (
               <EmptyState message="No assignment history for this asset." />
             ) : (
-              asset.assignmentHistory.map((e) => (
-                <div
-                  key={e.id}
-                  className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/[0.06] p-4 transition-all"
-                >
-                  <TypePill type={e.action} meta={ACTION_META} />
-                  <div className="mt-1.5 text-sm font-medium">
-                    {e.user?.name ?? "—"}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground/70 mt-0.5">
-                    {fmt(e.date)} · by{" "}
-                    <span className="font-medium text-foreground/80">
-                      {e.byAdmin?.name ?? "—"}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </TabsContent>
-
-          {/* ═══ Audit Trail ═══ */}
-          <TabsContent value="audit" className="mt-4 space-y-3">
-            {asset.auditTrail.length === 0 ? (
-              <EmptyState message="No audit events recorded for this asset." />
-            ) : (
-              asset.auditTrail.map((a) => (
+              assignments.map((a) => (
                 <div
                   key={a.id}
                   className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/[0.06] p-4 transition-all"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-xs text-muted-foreground/70">
-                        Field:{" "}
-                        <span className="font-semibold text-foreground/90 font-mono">
-                          {a.field}
-                        </span>
+                      <span className={cn(
+                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
+                        a.is_active
+                          ? "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20"
+                          : "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/[0.06] dark:text-slate-400",
+                      )}>
+                        {a.is_active ? "Active" : "Past"}
+                      </span>
+                      <div className="mt-1 text-xs font-mono text-muted-foreground/70">
+                        User: {a.user_id}
                       </div>
-                      <div className="text-[11px] text-muted-foreground/60 mt-0.5">
-                        {fmt(a.date)} · by{" "}
-                        <span className="font-medium text-foreground/80">
-                          {a.by?.name ?? "—"}
-                        </span>
+                      <div className="text-[11px] text-muted-foreground/50 mt-0.5">
+                        Assigned {fmt(a.assigned_at)}
+                        {a.unassigned_at && ` · Removed ${fmt(a.unassigned_at)}`}
                       </div>
                     </div>
                   </div>
-                  <div className="mt-2 flex items-center gap-2 text-sm">
-                    <span className="line-through text-muted-foreground/50">
-                      {a.oldValue}
-                    </span>
-                    <span className="text-muted-foreground/40">→</span>
-                    <span className="font-semibold">{a.newValue}</span>
-                  </div>
+                  {a.notes && (
+                    <p className="mt-2 text-sm text-muted-foreground/70">{a.notes}</p>
+                  )}
                 </div>
               ))
             )}

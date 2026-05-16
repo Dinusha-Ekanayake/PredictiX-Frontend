@@ -10,7 +10,6 @@ import {
   Activity,
 } from "lucide-react";
 import type { Asset } from "./types";
-import { deriveHealthScore } from "./assetService";
 
 function SummaryCard({
   label,

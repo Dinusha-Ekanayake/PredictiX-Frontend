@@ -482,7 +482,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
               <TabsTrigger
                 key={value}
                 value={value}
-                className="gap-1.5 text-xs rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-white/[0.08]"
+                className="gap-1.5 text-xs rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-white/8"
               >
                 <Icon className="h-3.5 w-3.5" />
                 {label}

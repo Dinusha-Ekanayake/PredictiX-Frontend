@@ -49,7 +49,7 @@ export default function AssetsToolbar({
         {/* Filters */}
         <div className="flex flex-1 flex-wrap items-center gap-2.5">
           {/* Search */}
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <div className="relative flex-1 min-w-50 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
               className="h-9 rounded-xl pl-8 text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700"
@@ -68,7 +68,7 @@ export default function AssetsToolbar({
               setFilters((prev) => ({ ...prev, status: v }))
             }
           >
-            <SelectTrigger className="h-9 w-[145px] rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
+            <SelectTrigger className="h-9 w-36 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -87,7 +87,7 @@ export default function AssetsToolbar({
               setFilters((prev) => ({ ...prev, health_band: v }))
             }
           >
-            <SelectTrigger className="h-9 w-[158px] rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
+            <SelectTrigger className="h-9 w-40 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
               <SelectValue placeholder="Health Band" />
             </SelectTrigger>
             <SelectContent>
@@ -107,7 +107,7 @@ export default function AssetsToolbar({
               setFilters((prev) => ({ ...prev, warehouse_id: v }))
             }
           >
-            <SelectTrigger className="h-9 w-[158px] rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
+            <SelectTrigger className="h-9 w-40 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
               <SelectValue placeholder="Warehouse" />
             </SelectTrigger>
             <SelectContent>

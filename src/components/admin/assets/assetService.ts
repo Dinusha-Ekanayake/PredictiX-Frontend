@@ -4,7 +4,7 @@
  * Uses apiGet / apiPost / apiPut / apiDelete from apiClient so JWT is auto-attached.
  */
 
-import { apiGet, apiPost, apiPut, apiFetch } from "@/lib/apiClient";
+import { apiGet, apiFetch } from "@/lib/apiClient";
 import type {
   Asset,
   AssetDetail,

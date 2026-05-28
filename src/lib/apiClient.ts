@@ -160,7 +160,7 @@ export type ChatbotAskResponse = {
 };
 
 export async function askChatbot(question: string): Promise<ChatbotAskResponse> {
-  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || "http://localhost:8002";
+  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const url = `${chatbotUrl}/chatbot/ask`;
 
   const response = await fetch(url, {

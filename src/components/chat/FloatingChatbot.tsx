@@ -39,7 +39,7 @@ const PANEL_GAP = 12;
 const CHATBOT_API_BASE =
   process.env.NEXT_PUBLIC_CHATBOT_API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://127.0.0.1:8002";
+  "http://127.0.0.1:8000";
 const CHATBOT_ENDPOINTS = [
   "/chatbot/ask",
   "/chatbot",

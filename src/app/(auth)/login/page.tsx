@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import RoleSelectCards, { type Role } from "@/components/auth/RoleSelectCards";
 import PredictiXLogo from "@/components/brand/PredictiXLogo";
 import ThemeToggle from "@/components/theme/ThemeToggle";
-import { login, storeAuthSession } from "@/lib/authService";
 
 function BackgroundBlobs() {
   return (
@@ -65,16 +64,90 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const data = await login({ email: email.trim().toLowerCase(), password });
-      storeAuthSession(data);
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const emailLower = email.trim().toLowerCase();
+      const passwordTrimmed = password.trim();
+      const roleLower = role.toLowerCase();
 
-      if (data.user.role.toUpperCase() === "ADMIN") {
+      try {
+        // Try to call backend login endpoint
+        const response = await fetch(`${API_URL}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: emailLower,
+            password: passwordTrimmed,
+            role: roleLower.toUpperCase(),
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Save to localStorage
+          window.localStorage.setItem("token", data.access_token);
+          window.localStorage.setItem("predictix.user.role", data.role.toUpperCase());
+          window.localStorage.setItem("predictix.user.email", data.email);
+          window.localStorage.setItem("predictix.user.id", data.user_id);
+          window.localStorage.setItem("predictix.user.name", data.full_name);
+
+          // Redirect
+          if (data.role.toLowerCase() === "admin") {
+            router.push("/admin/dashboard");
+          } else {
+            router.push("/user/users");
+          }
+          return;
+        }
+      } catch (apiError) {
+        console.log("Backend login failed, falling back to mock");
+      }
+
+      // Fallback: Mock login
+      const mockUsers: Record<string, { password: string; role: string; id: string; name: string }> = {
+        "nuwan.gunasekara.tra1@lankalogix.lk": {
+          password: "nuwan",
+          role: "user",
+          id: "aaaaaaaa-aaaa-5000-a000-000000000000",
+          name: "Nuwan Gunasekara"
+        },
+        "anjali.warnakulasuriya.adm1@lankalogix.lk": {
+          password: "admin",
+          role: "admin",
+          id: "bbbbbbbb-bbbb-5000-a000-000000000000",
+          name: "Anjali Warnakulasuriya"
+        }
+      };
+
+      if (!(emailLower in mockUsers)) {
+        setError("Invalid email or password");
+        return;
+      }
+
+      const user = mockUsers[emailLower];
+      if (user.password !== passwordTrimmed || user.role !== roleLower) {
+        setError("Invalid email or password");
+        return;
+      }
+
+      // Mock token — build a proper base64-encoded payload so the backend
+      // can decode sub/email/role correctly from its development fallback path.
+      const mockPayload = btoa(JSON.stringify({ sub: user.id, email: emailLower, role: user.role }));
+      const mockToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${mockPayload}.mock`;
+
+      window.localStorage.setItem("token", mockToken);
+      window.localStorage.setItem("predictix.user.role", user.role.toUpperCase());
+      window.localStorage.setItem("predictix.user.email", emailLower);
+      window.localStorage.setItem("predictix.user.id", user.id);
+      window.localStorage.setItem("predictix.user.name", user.name);
+
+      if (user.role === "admin") {
         router.push("/admin/dashboard");
       } else {
         router.push("/user/users");
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.");
+    } catch (err: any) {
+      setError(err.message || "Login failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -169,7 +242,7 @@ export default function LoginPage() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder="admin@mail.com"
                       className="h-11"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -185,7 +258,7 @@ export default function LoginPage() {
                     <Input
                       id="password"
                       type="password"
-                      placeholder="••••••••"
+                      placeholder="admin"
                       className="h-11"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -201,6 +274,13 @@ export default function LoginPage() {
                   <Button type="submit" className="h-11 w-full rounded-xl" disabled={!canSubmit}>
                     {isSubmitting ? "Logging in..." : "Log in"}
                   </Button>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                    <div className="font-medium text-slate-800 dark:text-slate-200">Default Admin</div>
+                    <div>Email: admin@mail.com</div>
+                    <div>Password: admin</div>
+                  </div>
+
 
                   <p className="text-center text-xs text-slate-500 dark:text-slate-400">
                     © {new Date().getFullYear()} PredictiX

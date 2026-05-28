@@ -20,33 +20,46 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Loader2, Plus } from "lucide-react";
+import { apiGet } from "@/lib/apiClient";
+import { createTicket, type Ticket, type TicketPriority, type TicketCategory } from "@/lib/ticketService";
+
+type Asset = {
+  id: string;
+  asset_name: string;
+};
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: (ticket: Ticket) => void;
 };
 
-function generateId() {
-  return `T${Math.floor(Math.random() * 9000) + 100}`;
-}
-
-export default function NewTicketDialog({ open, onOpenChange }: Props) {
-  const [asset, setAsset] = React.useState("");
+export default function NewTicketDialog({ open, onOpenChange, onCreated }: Props) {
+  const [assetId, setAssetId] = React.useState("");
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [priority, setPriority] = React.useState("");
-  const [category, setCategory] = React.useState("");
+  const [priority, setPriority] = React.useState<TicketPriority | "">("");
+  const [category, setCategory] = React.useState<TicketCategory | "">("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [assets, setAssets] = React.useState<Asset[]>([]);
+  const [assetsLoading, setAssetsLoading] = React.useState(false);
 
   React.useEffect(() => {
-    if (!open) {
+    if (open) {
+      setAssetsLoading(true);
+      apiGet<Asset[]>("/assets/")
+        .then((data) => setAssets(data))
+        .catch(() => toast.error("Failed to load assets"))
+        .finally(() => setAssetsLoading(false));
+    } else {
       const t = setTimeout(() => {
-        setAsset("");
+        setAssetId("");
         setTitle("");
         setDescription("");
         setPriority("");
         setCategory("");
         setIsSubmitting(false);
+        setAssets([]);
       }, 200);
       return () => clearTimeout(t);
     }
@@ -60,21 +73,22 @@ export default function NewTicketDialog({ open, onOpenChange }: Props) {
     }
 
     setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 800));
-
-    const newTicket = {
-      id: generateId(),
-      asset: asset || "Unknown",
-      title: title.trim(),
-      description: description.trim(),
-      priority: priority || "Medium",
-      category: category || "General",
-      createdAt: new Date().toISOString(),
-    };
-
-    setIsSubmitting(false);
-    onOpenChange(false);
-    toast.success("Ticket created", { description: `${newTicket.id} — ${newTicket.title}` });
+    try {
+      const ticket = await createTicket({
+        asset_id: assetId || null,
+        title: title.trim(),
+        description: description.trim(),
+        priority: (priority as TicketPriority) || "Medium",
+        category: (category as TicketCategory) || "Mechanical",
+      });
+      toast.success("Ticket created", { description: ticket.title });
+      onCreated?.(ticket);
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error("Failed to create ticket", { description: err?.message });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -91,21 +105,38 @@ export default function NewTicketDialog({ open, onOpenChange }: Props) {
         <form onSubmit={handleSubmit} className="grid gap-3 pt-2">
           <div>
             <p className="text-sm text-muted-foreground mb-2">Asset</p>
-            <Select value={asset} onValueChange={(v) => setAsset(v)}>
+            <Select value={assetId} onValueChange={(v) => setAssetId(v)} disabled={assetsLoading}>
               <SelectTrigger className="w-full bg-background">
-                <SelectValue placeholder="Select an asset" />
+                {assetsLoading ? (
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading assets…
+                  </span>
+                ) : (
+                  <SelectValue placeholder="Select an asset" />
+                )}
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Compressor A-14">Compressor A-14</SelectItem>
-                <SelectItem value="Pump P-09">Pump P-09</SelectItem>
-                <SelectItem value="Motor M-02">Motor M-02</SelectItem>
+              <SelectContent className="max-h-64">
+                {assets.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">No assets found</div>
+                ) : (
+                  assets.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.asset_name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
 
           <div>
             <p className="text-sm text-muted-foreground mb-2">Title</p>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Short title for the ticket" />
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Short title for the ticket"
+            />
           </div>
 
           <div>
@@ -121,7 +152,7 @@ export default function NewTicketDialog({ open, onOpenChange }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-muted-foreground mb-2">Priority</p>
-              <Select value={priority} onValueChange={(v) => setPriority(v)}>
+              <Select value={priority} onValueChange={(v) => setPriority(v as TicketPriority)}>
                 <SelectTrigger className="w-full bg-background">
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
@@ -135,14 +166,13 @@ export default function NewTicketDialog({ open, onOpenChange }: Props) {
 
             <div>
               <p className="text-sm text-muted-foreground mb-2">Category</p>
-              <Select value={category} onValueChange={(v) => setCategory(v)}>
+              <Select value={category} onValueChange={(v) => setCategory(v as TicketCategory)}>
                 <SelectTrigger className="w-full bg-background">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Mechanical">Mechanical</SelectItem>
                   <SelectItem value="Electrical">Electrical</SelectItem>
-                  <SelectItem value="Software">Software</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -151,15 +181,11 @@ export default function NewTicketDialog({ open, onOpenChange }: Props) {
           <div className="grid grid-cols-2 gap-3 pt-2">
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating…</>
               ) : (
                 "Create Ticket"
               )}
             </Button>
-
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} className="w-full">
               Cancel
             </Button>

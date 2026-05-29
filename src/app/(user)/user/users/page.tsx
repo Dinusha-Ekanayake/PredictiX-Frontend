@@ -22,6 +22,9 @@ import {
   Save,
   X,
   Search,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   Table,
@@ -37,6 +40,7 @@ import {
   fetchMyStats,
   updateMyProfile,
   getTeamMembers,
+  generateAssetSummary,
   UserProfileData,
   UserAssetData,
   UserStatsData,
@@ -86,6 +90,9 @@ export default function UserProfilePage() {
   const [showAssetsDialog, setShowAssetsDialog] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [teamMembersSearchQuery, setTeamMembersSearchQuery] = React.useState("");
+
+  // AI summaries per asset: { [asset_id]: { loading, text, expanded } }
+  const [summaries, setSummaries] = React.useState<Record<string, { loading: boolean; text: string; expanded: boolean }>>({});
 
   // Load profile, assets, and stats on mount
   React.useEffect(() => {
@@ -154,6 +161,31 @@ export default function UserProfilePage() {
       toast.error(err.message || "Failed to update profile");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  // Fetch AI summary for a single asset (on demand)
+  async function fetchSummary(asset: UserAssetData) {
+    const id = asset.asset_id;
+    if (summaries[id]?.text || summaries[id]?.loading) return;
+    setSummaries((prev) => ({ ...prev, [id]: { loading: true, text: "", expanded: true } }));
+    try {
+      const text = await generateAssetSummary(asset);
+      setSummaries((prev) => ({ ...prev, [id]: { loading: false, text, expanded: true } }));
+    } catch {
+      setSummaries((prev) => ({ ...prev, [id]: { loading: false, text: "Summary unavailable.", expanded: true } }));
+    }
+  }
+
+  function toggleSummary(asset: UserAssetData) {
+    const id = asset.asset_id;
+    if (!summaries[id]?.text && !summaries[id]?.loading) {
+      fetchSummary(asset);
+    } else {
+      setSummaries((prev) => ({
+        ...prev,
+        [id]: { ...prev[id], expanded: !prev[id]?.expanded },
+      }));
     }
   }
 
@@ -447,45 +479,82 @@ export default function UserProfilePage() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto overflow-y-auto scrollbar-styled max-h-96">
+              <div className="overflow-x-auto overflow-y-auto scrollbar-styled max-h-[32rem]">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Asset Name</TableHead>
+                      <TableHead>Asset</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Location</TableHead>
                       <TableHead className="text-right">Health</TableHead>
+                      <TableHead className="text-right">AI Summary</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAssets.map((asset) => (
-                      <TableRow key={asset.asset_id}>
-                        <TableCell className="font-medium">{asset.name}</TableCell>
-                        <TableCell>{asset.category || "—"}</TableCell>
-                        <TableCell>{asset.location}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <div className="w-24 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                              <div
-                                className={`h-2 rounded-full ${
-                                  asset.healthPercent >= 80
-                                    ? "bg-emerald-500"
-                                    : asset.healthPercent >= 60
-                                    ? "bg-amber-500"
-                                    : "bg-red-500"
-                                }`}
-                                style={{
-                                  width: `${asset.healthPercent}%`,
-                                }}
-                              ></div>
-                            </div>
-                            <span className="text-sm font-medium w-12 text-right">
-                              {Math.round(asset.healthPercent)}%
-                            </span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredAssets.map((asset) => {
+                      const sum = summaries[asset.asset_id];
+                      return (
+                        <React.Fragment key={asset.asset_id}>
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              <div>
+                                <p>{asset.name}</p>
+                                <p className="text-xs text-muted-foreground">{asset.asset_code}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>{asset.category || "—"}</TableCell>
+                            <TableCell>{asset.location}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <div className="w-20 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                                  <div
+                                    className={`h-2 rounded-full ${
+                                      asset.healthPercent >= 80
+                                        ? "bg-emerald-500"
+                                        : asset.healthPercent >= 60
+                                        ? "bg-amber-500"
+                                        : "bg-red-500"
+                                    }`}
+                                    style={{ width: `${Math.min(asset.healthPercent, 100)}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm font-medium w-10 text-right">
+                                  {Math.round(asset.healthPercent)}%
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="gap-1.5 text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950/30"
+                                onClick={() => toggleSummary(asset)}
+                              >
+                                <Sparkles className="h-3.5 w-3.5" />
+                                {sum?.loading ? "Generating…" : sum?.text ? (sum.expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />) : "Summarize"}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          {sum?.expanded && (sum.loading || sum.text) && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="bg-violet-50/60 dark:bg-violet-950/20 py-3 px-4">
+                                {sum.loading ? (
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Sparkles className="h-4 w-4 animate-pulse text-violet-500" />
+                                    Generating AI summary…
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-2">
+                                    <Sparkles className="h-4 w-4 mt-0.5 shrink-0 text-violet-500" />
+                                    <p className="text-sm text-foreground leading-relaxed">{sum.text}</p>
+                                  </div>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

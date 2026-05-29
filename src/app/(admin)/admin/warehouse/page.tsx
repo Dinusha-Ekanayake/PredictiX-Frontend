@@ -7,6 +7,9 @@ import { RefreshCw, FileText } from "lucide-react";
 import WarehouseOverviewCards from "@/components/admin/warehouse/WarehouseOverviewCards";
 import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsightsSection";
 import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
+import WarehouseComponentHealth from "@/components/admin/warehouse/WarehouseComponentHealth";
+import WarehouseRecentMaintenance from "@/components/admin/warehouse/WarehouseRecentMaintenance";
+import { getMaintenanceSchedule } from "@/lib/warehouseService";
 
 // ── Warehouse Report (my section — warehouse components only) ──
 import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
@@ -16,27 +19,33 @@ const REPORT_API = "http://127.0.0.1:8000/warehouse-dashboard/generate-report";
 export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
   const [data, setData] = React.useState<any>(null);
+  const [maintenanceSchedule, setMaintenanceSchedule] = React.useState<any[]>([]);
   const [refreshing, setRefreshing] = React.useState(true);
 
   async function fetchData() {
     setRefreshing(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/warehouse-dashboard/summary", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      // Fetch summary and maintenance schedule in parallel
+      const [summaryRes, scheduleData] = await Promise.allSettled([
+        fetch("http://127.0.0.1:8000/warehouse-dashboard/summary", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }),
+        getMaintenanceSchedule(),
+      ]);
+
+      if (summaryRes.status === "fulfilled" && summaryRes.value.ok) {
+        setData(await summaryRes.value.json());
+      } else {
+        if (summaryRes.status === "rejected") {
+          console.warn("Warehouse summary unavailable:", summaryRes.reason?.message);
+        }
+        setData(null);
       }
-      
-      const result = await response.json();
-      setData(result);
-    } catch (e) {
-      console.error("Failed to fetch warehouse data:", e);
-      setData(null);
+
+      setMaintenanceSchedule(
+        scheduleData.status === "fulfilled" ? scheduleData.value : []
+      );
     } finally {
       setRefreshing(false);
     }
@@ -73,7 +82,7 @@ export default function WarehousePage() {
       setReportData(result);
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : String(e);
-      console.error("Report generation error:", errorMsg);
+      // Error is surfaced in the modal UI — no need to also log to console
       setReportError(errorMsg);
     } finally {
       setGenerating(false);
@@ -129,8 +138,22 @@ export default function WarehousePage() {
       <WarehouseOverviewCards data={data} isLoading={refreshing && !data} />
       {data && <WarehouseInsightsSection data={data} />}
 
+      {/* ── Component Health Overview (sensor_readings) ── */}
+      <WarehouseComponentHealth
+        componentHealth={data?.componentHealth}
+        totalFaultCodes={data?.totalFaultCodes}
+        assetsWithSensors={data?.assetsWithSensors}
+        isLoading={refreshing && !data}
+      />
+
       {/* ── Predictive Maintenance Schedule Chart ── */}
-      <WarehouseMaintenanceSchedule />
+      <WarehouseMaintenanceSchedule data={maintenanceSchedule} />
+
+      {/* ── Recent Maintenance Events (maintenance_events) ── */}
+      <WarehouseRecentMaintenance
+        events={data?.recentMaintenance}
+        isLoading={refreshing && !data}
+      />
 
       <div className="h-20" />
 
@@ -140,6 +163,7 @@ export default function WarehousePage() {
         generating={generating}
         reportData={reportData}
         reportError={reportError}
+        maintenanceSchedule={maintenanceSchedule}
         onGenerate={handleGenerate}
         onClose={closeModal}
         onRegenerate={handleGenerate}

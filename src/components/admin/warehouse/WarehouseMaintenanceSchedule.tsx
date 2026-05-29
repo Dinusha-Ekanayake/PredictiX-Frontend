@@ -25,31 +25,34 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   
-  const [allData, setAllData] = useState<any[]>(propsData || []);
+  // If an array is passed (even empty), it means the parent manages the data — never self-fetch.
+  const managedExternally = Array.isArray(propsData);
+
+  const [allData, setAllData] = useState<any[]>(propsData ?? []);
   const [displayData, setDisplayData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(!propsData || propsData.length === 0);
+  const [loading, setLoading] = useState(!managedExternally);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("urgent");
   const [itemsToShow, setItemsToShow] = useState(15);
 
-  // Fetch maintenance schedule data if not provided via props
+  // Sync externally-managed data into local state
   useEffect(() => {
-    if (propsData && propsData.length > 0) {
-      setAllData(propsData);
+    if (managedExternally) {
+      setAllData(propsData!);
       setLoading(false);
       return;
     }
 
+    // No prop passed — self-fetch as fallback
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
         const fetchedData = await getMaintenanceSchedule();
-        console.log('[DEBUG] WarehouseMaintenanceSchedule received data:', fetchedData);
         setAllData(fetchedData);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load maintenance schedule';
-        console.error('[ERROR] WarehouseMaintenanceSchedule fetch failed:', err);
+        console.warn('[WarehouseMaintenanceSchedule] fetch failed:', errorMessage);
         setError(errorMessage);
         setAllData([]);
       } finally {
@@ -58,7 +61,7 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
     };
 
     fetchData();
-  }, [propsData]);
+  }, [propsData, managedExternally]);
 
   // Update display data based on sort and filter
   useEffect(() => {

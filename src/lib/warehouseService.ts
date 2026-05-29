@@ -43,7 +43,8 @@ export async function getMaintenanceSchedule() {
     console.log('[DEBUG] Maintenance schedule data received:', data);
     return data;
   } catch (error) {
-    console.error('[ERROR] Failed to fetch maintenance schedule:', error);
+    // Backend unreachable — expected when server is not running
+    console.warn('[warehouseService] Maintenance schedule unavailable:', (error as Error).message);
     return [];
   }
 }

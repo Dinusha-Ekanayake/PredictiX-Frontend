@@ -65,11 +65,28 @@ interface Ctx {
   active_tickets?: number; resolved_tickets?: number; closed_tickets?: number;
   high_priority_active_tickets?: number;
   ticket_priority_breakdown?: Record<string, number>;
+  ticket_final_priority_breakdown?: Record<string, number>;
   ticket_category_breakdown?: Record<string, number>;
   ticket_trend_last_3m?: { month: string; tickets: number }[];
   ticket_trend_direction?: string;
   total_users?: number; active_users?: number; inactive_users?: number;
   admin_users?: number; standard_users?: number;
+  // Phase B — extended DB fields
+  fleet_age_distribution?: Record<string, number>;
+  warranty_expiring_90d?: number;
+  component_health?: { avg_tire?: number; avg_brake?: number; avg_battery?: number; avg_oil?: number; avg_hydraulic?: number };
+  total_fault_codes?: number;
+  avg_fault_codes_per_asset?: number;
+  vendor_breakdown?: { vendor: string; events: number; cost: number }[];
+  avg_resolution_hours?: number;
+  avg_resolution_days?: number;
+  mttr_by_priority?: { priority: string; avg_hours: number }[];
+}
+
+interface MaintenanceScheduleItem {
+  asset: string;
+  predicted: number;
+  scheduled: number;
 }
 
 interface Props {
@@ -77,6 +94,7 @@ interface Props {
   generating: boolean;
   reportData: { ai_sections: AISections; context: Ctx; kb_annotations?: any } | null;
   reportError: string | null;
+  maintenanceSchedule?: MaintenanceScheduleItem[];
   onGenerate: () => void;
   onClose: () => void;
   onRegenerate: () => void;
@@ -334,13 +352,15 @@ function ErrorStep({ error, onRetry, onClose }: { error: string; onRetry: () => 
 // ─────────────────────────────────────────────────────────
 
 function ReportStep({
-  data, onRegenerate, onClose,
+  data, onRegenerate, onClose, maintenanceSchedule = [],
 }: {
   data: { ai_sections: AISections; context: Ctx; kb_annotations?: any };
   onRegenerate: () => void;
   onClose: () => void;
+  maintenanceSchedule?: MaintenanceScheduleItem[];
 }) {
   const [sourcesOpen, setSourcesOpen] = React.useState(false);
+  const [pdfLoading, setPdfLoading] = React.useState(false);
   const reportContentRef = React.useRef<HTMLDivElement>(null);
   const ctx = data.context;
   const ai  = data.ai_sections;
@@ -360,10 +380,45 @@ function ReportStep({
     name: f.replace(/_/g, " ").slice(0, 22), value: c,
   }));
 
-  const handlePDFExport = () => {
+  const handlePDFExport = async () => {
+    setPdfLoading(true);
     const warehouseName = ctx.warehouse_name || "Warehouse";
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const filename = `${warehouseName}-Report-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    // Fetch AI summaries for top critical assets before building PDF
+    const criticalList = ctx.critical_assets || [];
+    const summaryMap: Record<string, string> = {};
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const token = typeof window !== "undefined"
+      ? (localStorage.getItem("token") || localStorage.getItem("predictix.access_token"))
+      : null;
+    await Promise.allSettled(
+      criticalList.slice(0, 10).map(async (asset) => {
+        try {
+          const input = [
+            `Vehicle: ${asset.code}`,
+            `Type: ${asset.type}`,
+            `Status: ${asset.status}`,
+            `Health score: ${asset.health}`,
+            `Failure probability: ${asset.failure_prob}`,
+            `Risk: ${asset.risk}`,
+          ].filter(Boolean).join(" | ");
+          const res = await fetch(`${API_BASE}/asset-summaries/generate`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ input_text: input }),
+          });
+          if (res.ok) {
+            const d = await res.json();
+            summaryMap[asset.code] = d.summary;
+          }
+        } catch { /* skip if model unavailable */ }
+      })
+    );
     
     // Prepare structured report data with ALL warehouse context data
     const pdfData = {
@@ -376,10 +431,10 @@ function ReportStep({
         fleetHealth: Math.round(ctx.avg_health_pct || 0),
         failureProb: Math.round(ctx.avg_failure_prob_pct || 0),
         critical: ctx.critical_count || 0,
-        urgent: ctx.urgent_count || 0,
+        urgent: ctx.urgent_maintenance_count || 0,
         activeTickets: ctx.active_tickets || 0,
         activeUsers: ctx.active_users || 0,
-        maintenanceCost: `LKR ${(ctx.monthly_maintenance_cost || 0).toLocaleString()}`,
+        maintenanceCost: `LKR ${(ctx.total_estimated_cost || 0).toLocaleString()}`,
       },
       kbAnnotations: kb,
       // AI Content Sections - from data parameter
@@ -397,6 +452,9 @@ function ReportStep({
         underMaintenanceAssets: ctx.under_maintenance_assets || 0,
         retiredAssets: ctx.retired_assets || 0,
         avgVehicleAge: ctx.avg_vehicle_age_years || 0,
+        // Phase B additions
+        fleetAgeDist: ctx.fleet_age_distribution ?? {},
+        warrantyExpiring90d: ctx.warranty_expiring_90d ?? 0,
       },
       // Maintenance Details
       maintenanceDetail: {
@@ -405,6 +463,15 @@ function ReportStep({
         actualCost3m: `LKR ${(ctx.actual_cost_3m || 0).toLocaleString()}`,
         maintenanceEvents3m: ctx.total_maintenance_events_3m || 0,
         avgDowntimeHours: ctx.avg_downtime_hours || 0,
+        // Phase A fixes — previously unmapped
+        preventiveCount: ctx.maintenance_type_breakdown?.['Preventive'] ?? ctx.maintenance_type_breakdown?.['preventive'] ?? 0,
+        correctiveCount: ctx.maintenance_type_breakdown?.['Corrective'] ?? ctx.maintenance_type_breakdown?.['corrective'] ?? 0,
+        monthlyTrend: ctx.monthly_maintenance_trend ?? [],
+        // Phase A fix — cost range was in Ctx but never sent to PDF
+        minCostEstimate: ctx.min_cost_estimate ?? 0,
+        maxCostEstimate: ctx.max_cost_estimate ?? 0,
+        // Phase B addition
+        vendorBreakdown: ctx.vendor_breakdown ?? [],
       },
       // Ticket Details
       ticketDetail: {
@@ -414,8 +481,15 @@ function ReportStep({
         resolvedTickets: ctx.resolved_tickets || 0,
         closedTickets: ctx.closed_tickets || 0,
         highPriorityTickets: ctx.high_priority_active_tickets || 0,
-        mediumPriorityTickets: ctx.ticket_priority_breakdown?.['Medium'] || ctx.ticket_final_priority_breakdown?.['Medium'] || 0,
-        lowPriorityTickets: ctx.ticket_priority_breakdown?.['Low'] || ctx.ticket_final_priority_breakdown?.['Low'] || 0,
+        mediumPriorityTickets: ctx.ticket_priority_breakdown?.['Medium'] || 0,
+        lowPriorityTickets: ctx.ticket_priority_breakdown?.['Low'] || 0,
+        // Phase A fix — previously unmapped
+        monthlyTrend: ctx.ticket_trend_last_3m ?? [],
+        // Phase B additions
+        avgResolutionDays: ctx.avg_resolution_days ?? 0,
+        mttrByPriority: ctx.mttr_by_priority ?? [],
+        // AI reclassified priority
+        finalPriorityBreakdown: ctx.ticket_final_priority_breakdown ?? {},
       },
       // User Details
       userDetail: {
@@ -424,6 +498,14 @@ function ReportStep({
         standardUsers: ctx.standard_users || 0,
         inactiveUsers: ctx.inactive_users || 0,
       },
+      // Phase B — Component & Operational data
+      operationsDetail: {
+        componentHealth: ctx.component_health ?? {},
+        totalFaultCodes: ctx.total_fault_codes ?? 0,
+        avgFaultCodesPerAsset: ctx.avg_fault_codes_per_asset ?? 0,
+      },
+      // Predictive Maintenance Schedule (from /maintenance-schedule endpoint — warehouse only)
+      maintenanceSchedule: maintenanceSchedule.slice(0, 20),
       // Chart Sections
       sections: {
         assetStatus: Object.entries(ctx.asset_status_breakdown || {}).map(([name, value]) => ({ name, value })),
@@ -440,6 +522,7 @@ function ReportStep({
           health: asset.health || "N/A",
           priority: Math.round(parseFloat(asset.failure_prob || "0")) > 50 ? "High" : "Medium",
           status: asset.status || "Unknown",
+          summary: summaryMap[asset.code] || undefined,
         })),
       },
       // Trends Data
@@ -455,11 +538,11 @@ function ReportStep({
     };
     
     downloadProfessionalPDF(pdfData as any, filename);
-    
+    setPdfLoading(false);
+
     // Trigger Server Notification
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (token) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/warehouse-dashboard/notify-print`, {
+      fetch(`${API_BASE}/warehouse-dashboard/notify-print`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -487,8 +570,9 @@ function ReportStep({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handlePDFExport} className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-            <Download className="h-3.5 w-3.5" /> PDF
+          <button onClick={handlePDFExport} disabled={pdfLoading} className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+            {pdfLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            {pdfLoading ? "Generating…" : "PDF"}
           </button>
           <button onClick={onRegenerate} className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors">
             <RefreshCw className="h-3.5 w-3.5" /> Regenerate
@@ -582,7 +666,7 @@ function ReportStep({
                               {d.name.replace(/_/g, " ")}
                             </td>
                             <td className="py-2.5 text-right font-semibold">{d.value}</td>
-                            <td className="py-2.5 text-right text-muted-foreground">{Math.round((d.value / Math.max(ctx.total_assets, 1)) * 100)}%</td>
+                            <td className="py-2.5 text-right text-muted-foreground">{Math.round((d.value / Math.max(ctx.total_assets ?? 0, 1)) * 100)}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -625,7 +709,7 @@ function ReportStep({
                                </div>
                             </td>
                             <td className="py-2.5 text-right font-semibold text-slate-800 dark:text-slate-200">{d.value}</td>
-                            <td className="py-2.5 text-right text-muted-foreground">{Math.round((d.value / Math.max(ctx.total_assets, 1)) * 100)}%</td>
+                            <td className="py-2.5 text-right text-muted-foreground">{Math.round((d.value / Math.max(ctx.total_assets ?? 0, 1)) * 100)}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -663,6 +747,37 @@ function ReportStep({
               </div>
             )}
           </div>
+
+          {/* Fleet Age Distribution */}
+          {Object.keys(ctx.fleet_age_distribution ?? {}).length > 0 && (
+            <>
+              <Divider label="Fleet Age Distribution" />
+              <div className="grid grid-cols-4 gap-3">
+                {Object.entries(ctx.fleet_age_distribution ?? {}).map(([band, cnt]) => {
+                  const total = Object.values(ctx.fleet_age_distribution ?? {}).reduce((a, b) => a + (b as number), 0);
+                  const pct = total > 0 ? Math.round((cnt as number) / total * 100) : 0;
+                  const isOld = band.startsWith('10');
+                  return (
+                    <div key={band} className="rounded-xl border p-3 text-center" style={{ borderColor: isOld && pct > 20 ? '#fca5a5' : '#e2e8f0', background: isOld && pct > 20 ? '#fff5f5' : undefined }}>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{band}</div>
+                      <div className="text-xl font-bold" style={{ color: isOld && pct > 20 ? '#dc2626' : isOld && pct > 10 ? '#ea580c' : P.teal }}>{cnt as number}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">{pct}% of fleet</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Warranty Expiry Alert */}
+          {(ctx.warranty_expiring_90d ?? 0) > 0 && (
+            <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 flex items-start gap-3 mt-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                <strong>{ctx.warranty_expiring_90d} asset{(ctx.warranty_expiring_90d ?? 0) > 1 ? 's' : ''}</strong> have warranty expiring within the next 90 days. Schedule pre-expiry inspections.
+              </p>
+            </div>
+          )}
         </Section>
 
         {/* ── S3: Health & Risk Analysis ── */}
@@ -779,6 +894,44 @@ function ReportStep({
               </table>
             </div>
           ) : <p className="text-sm text-muted-foreground italic text-center py-3">No critical assets found.</p>}
+
+          {/* Component Health Matrix */}
+          {ctx.component_health && Object.values(ctx.component_health).some(v => (v ?? 0) > 0) && (
+            <>
+              <Divider label="Component Health Matrix" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {[
+                  { label: "Tire",      val: ctx.component_health.avg_tire      ?? 0 },
+                  { label: "Brake",     val: ctx.component_health.avg_brake     ?? 0 },
+                  { label: "Battery",   val: ctx.component_health.avg_battery   ?? 0 },
+                  { label: "Oil",       val: ctx.component_health.avg_oil       ?? 0 },
+                  { label: "Hydraulic", val: ctx.component_health.avg_hydraulic ?? 0 },
+                ].map(({ label, val }) => {
+                  const color = val >= 80 ? P.emerald : val >= 60 ? P.amber : P.rose;
+                  return (
+                    <div key={label} className="rounded-xl border border-slate-100 dark:border-slate-800 p-3 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
+                        <span className="text-sm font-bold" style={{ color }}>{val.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(val, 100)}%`, backgroundColor: color }} />
+                      </div>
+                      <span className="text-[9px] text-muted-foreground">{val >= 80 ? 'Good' : val >= 60 ? 'Monitor' : 'Action Required'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {((ctx.total_fault_codes ?? 0) > 0 || (ctx.avg_fault_codes_per_asset ?? 0) > 0) && (
+                <div className="mt-2 rounded-xl border border-rose-100 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-950/10 px-4 py-2.5 flex items-center gap-4 text-xs">
+                  <span className="font-semibold text-rose-700 dark:text-rose-400">Fleet Fault Codes:</span>
+                  <span className="font-bold text-rose-800 dark:text-rose-300">{ctx.total_fault_codes ?? 0} total</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-muted-foreground">{(ctx.avg_fault_codes_per_asset ?? 0).toFixed(2)} avg per asset</span>
+                </div>
+              )}
+            </>
+          )}
         </Section>
 
         {/* ── S4: Maintenance ── */}
@@ -794,6 +947,8 @@ function ReportStep({
                 { l: "Events (3 months)",          v: ctx.total_maintenance_events_3m,    c: P.teal },
                 { l: "Avg Downtime/Event",         v: `${ctx.avg_downtime_hours}h`,       c: P.slate },
                 { l: `Est. Cost (${cur})`,         v: (ctx.total_estimated_cost ?? 0).toLocaleString(),   c: P.violet },
+                { l: `Min Estimate (${cur})`,      v: (ctx.min_cost_estimate ?? 0).toLocaleString(),      c: P.sky },
+                { l: `Max Estimate (${cur})`,      v: (ctx.max_cost_estimate ?? 0).toLocaleString(),      c: P.rose },
                 { l: `Actual Spend 3M (${cur})`,   v: (ctx.actual_cost_3m ?? 0).toLocaleString(),         c: P.emerald },
                 { l: `Avg per Asset (${cur})`,     v: (ctx.avg_cost_per_asset ?? 0).toLocaleString(),     c: P.indigo },
               ].map(({ l, v, c }) => <KpiRow key={l} label={l} val={v} color={c} />)}
@@ -825,6 +980,78 @@ function ReportStep({
                   <Bar dataKey="events" name="Events" fill={P.amber} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </>
+          )}
+
+          {/* Vendor Analysis */}
+          {(ctx.vendor_breakdown?.length ?? 0) > 0 && (
+            <>
+              <Divider label="Vendor & Service Provider Analysis" />
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      {["Vendor", "Events", `Total Cost (${cur})`].map(h => (
+                        <th key={h} className="pb-2 pr-4 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ctx.vendor_breakdown!.map((v, i) => (
+                      <tr key={i} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                        <td className="py-2 pr-4 font-medium">{v.vendor}</td>
+                        <td className="py-2 pr-4 font-semibold" style={{ color: P.amber }}>{v.events}</td>
+                        <td className="py-2 font-semibold" style={{ color: P.emerald }}>{v.cost.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {/* Predictive Maintenance Schedule */}
+          {maintenanceSchedule.length > 0 && (
+            <>
+              <Divider label="Predictive Maintenance Schedule (Predicted vs Scheduled)" />
+              <p className="text-[11px] text-muted-foreground mb-3">
+                Predicted weeks from ML model vs scheduled weeks from fleet average interval. Negative gap = overdue relative to schedule.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      {["Asset", "Predicted (wks)", "Scheduled (wks)", "Gap (wks)", "Status"].map(h => (
+                        <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {maintenanceSchedule.slice(0, 15).map((r, i) => {
+                      const gap = r.predicted - r.scheduled;
+                      const isOverdue = gap < -2;
+                      const isDue = gap < 0 && !isOverdue;
+                      const gapColor = isOverdue ? P.rose : isDue ? P.amber : P.emerald;
+                      const statusLabel = isOverdue ? '⚠ Overdue' : isDue ? 'Due Soon' : 'On Track';
+                      return (
+                        <tr key={i} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                          <td className="py-2 pr-3 font-medium text-xs">{r.asset}</td>
+                          <td className="py-2 pr-3 font-semibold tabular-nums" style={{ color: P.sky }}>{r.predicted.toFixed(1)}</td>
+                          <td className="py-2 pr-3 font-semibold tabular-nums" style={{ color: P.teal }}>{r.scheduled.toFixed(1)}</td>
+                          <td className="py-2 pr-3 font-bold tabular-nums" style={{ color: gapColor }}>
+                            {gap >= 0 ? '+' : ''}{gap.toFixed(1)}
+                          </td>
+                          <td className="py-2">
+                            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{
+                              backgroundColor: `${gapColor}20`, color: gapColor,
+                            }}>{statusLabel}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
         </Section>
@@ -902,6 +1129,80 @@ function ReportStep({
                     </div>
                   ))}
                 </div>
+              </div>
+            </>
+          )}
+
+          {/* MTTR / Resolution Performance */}
+          {(ctx.avg_resolution_days ?? 0) > 0 && (
+            <>
+              <Divider label="Resolution Performance (MTTR)" />
+              <div className="grid gap-3 sm:grid-cols-2 mb-3">
+                <div className="rounded-xl border border-slate-100 dark:border-slate-800 p-4 flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Avg Resolution Time</span>
+                  <span className="text-2xl font-bold" style={{ color: P.sky }}>{ctx.avg_resolution_days?.toFixed(1)} days</span>
+                  <span className="text-[10px] text-muted-foreground">{ctx.avg_resolution_hours?.toFixed(1)} hours</span>
+                </div>
+                {(ctx.mttr_by_priority?.length ?? 0) > 0 && (
+                  <div className="rounded-xl border border-slate-100 dark:border-slate-800 p-4 flex flex-col gap-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Fastest Priority</span>
+                    {ctx.mttr_by_priority!.slice(-1).map(p => (
+                      <div key={p.priority}>
+                        <span className="text-lg font-bold" style={{ color: P.emerald }}>{p.priority}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{p.avg_hours.toFixed(1)}h avg</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {(ctx.mttr_by_priority?.length ?? 0) > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100 dark:border-slate-800">
+                        {["Priority", "Avg Resolution (hrs)"].map(h => (
+                          <th key={h} className="pb-2 pr-4 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ctx.mttr_by_priority!.map((p, i) => (
+                        <tr key={i} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                          <td className="py-2 pr-4">
+                            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{
+                              backgroundColor: p.priority === 'High' ? `${P.rose}20` : p.priority === 'Medium' ? `${P.amber}20` : `${P.slate}20`,
+                              color: p.priority === 'High' ? P.rose : p.priority === 'Medium' ? P.amber : P.slate,
+                            }}>{p.priority}</span>
+                          </td>
+                          <td className="py-2 font-semibold" style={{ color: P.sky }}>{p.avg_hours.toFixed(1)}h</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* AI Priority Reclassification */}
+          {Object.keys(ctx.ticket_final_priority_breakdown ?? {}).length > 0 && (
+            <>
+              <Divider label="AI Priority Reclassification" />
+              <p className="text-[11px] text-muted-foreground mb-3">
+                PredictiX AI re-scores each ticket using sensor telemetry and SHAP models. Compare against original filed priority to identify under-triaged issues.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {Object.entries(ctx.ticket_final_priority_breakdown ?? {}).map(([pri, cnt]) => {
+                  const color = pri.toLowerCase() === 'high' || pri.toLowerCase() === 'critical'
+                    ? P.rose : pri.toLowerCase() === 'medium' ? P.amber : P.emerald;
+                  return (
+                    <div key={pri} className="rounded-xl border p-3 text-center" style={{ borderColor: `${color}40`, background: `${color}10` }}>
+                      <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color }}>{pri}</div>
+                      <div className="text-2xl font-bold" style={{ color }}>{cnt as number}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">AI-classified</div>
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}
@@ -1166,6 +1467,7 @@ function ReportStep({
 
 export default function WarehouseReportModal({
   open, generating, reportData, reportError,
+  maintenanceSchedule = [],
   onGenerate, onClose, onRegenerate,
 }: Props) {
   React.useEffect(() => {
@@ -1193,7 +1495,7 @@ export default function WarehouseReportModal({
         {showConfirm && <ConfirmStep onGenerate={onGenerate} onClose={onClose} />}
         {showLoading && <LoadingStep />}
         {showError   && <ErrorStep error={reportError!} onRetry={onRegenerate} onClose={onClose} />}
-        {showReport  && <ReportStep data={reportData!} onRegenerate={onRegenerate} onClose={onClose} />}
+        {showReport  && <ReportStep data={reportData!} onRegenerate={onRegenerate} onClose={onClose} maintenanceSchedule={maintenanceSchedule} />}
       </div>
     </div>
   );

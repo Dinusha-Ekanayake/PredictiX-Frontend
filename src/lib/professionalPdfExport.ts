@@ -496,27 +496,69 @@ function chartBox(title: string, svgContent: string, caption?: string): string {
 
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  @page { size: A4; margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 210mm;
+    margin: 0;
+    padding: 0;
+    background: #f1f5f9;
+  }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     color: ${C.text};
-    background: white;
-    font-size: 11px;
-    line-height: 1.6;
+    font-size: 10.5px;
+    line-height: 1.55;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
   .page {
-    max-width: 790px;
-    margin: 0 auto;
-    padding: 44px 56px;
-    min-height: 100vh;
+    width: 210mm;
+    height: 297mm;
+    padding: 18mm 16mm 22mm;
+    margin: 0 auto 10mm;
+    background: white;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.08);
+    page-break-after: always;
+    break-after: page;
+    position: relative;
+    overflow: hidden;
   }
+  .page:last-child { page-break-after: avoid; break-after: auto; }
+  .page.cover { padding: 0; }
+  .page::before {
+    content: '';
+    position: absolute;
+    inset: 10mm;
+    border: 1.2px solid ${C.navy};
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .page::after {
+    content: '';
+    position: absolute;
+    inset: 12mm;
+    border: 0.4px solid ${C.teal};
+    border-radius: 1px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .page > * { position: relative; z-index: 1; }
+  .page.cover::before { inset: 8mm;  border-color: ${C.teal}; border-width: 1.5px; }
+  .page.cover::after  { inset: 10mm; border-color: ${C.navy}; border-width: 0.5px; }
   table { width: 100%; border-collapse: collapse; }
+  tr, img { page-break-inside: avoid; break-inside: avoid; }
+  h1, h2, h3 { page-break-after: avoid; break-after: avoid; }
   @media print {
-    body { margin: 0; background: white; }
-    .page { page-break-after: always; min-height: auto; padding: 32px 44px; }
-    .page:last-child { page-break-after: avoid; }
+    html, body { background: white; width: 210mm; }
+    .page {
+      margin: 0;
+      box-shadow: none;
+      width: 210mm;
+      height: 297mm;
+      overflow: hidden;
+    }
   }
 `;
 
@@ -590,7 +632,7 @@ export function generateProfessionalHTML(data: ReportData): string {
 
   // ── COVER PAGE ─────────────────────────────────────────────────
   const coverPage = `
-  <div class="page" style="padding:0;min-height:100vh;display:flex;flex-direction:column;background:${C.white};">
+  <div class="page cover" style="display:flex;flex-direction:column;background:${C.white};">
     <!-- Top accent bar -->
     <div style="height:6px;background:linear-gradient(90deg,${C.teal},${C.tealLight},${C.blue});"></div>
 
@@ -656,7 +698,7 @@ export function generateProfessionalHTML(data: ReportData): string {
 
   </div>`;
 
-  // ── §1 & §2: EXECUTIVE SUMMARY + FLEET OVERVIEW ────────────────
+  // ── §1: EXECUTIVE SUMMARY ──────────────────────────────────────
   const section1 = `
   <div class="page">
     ${pageHeader(data.warehouseName, '§1 Executive Insight Summary')}
@@ -678,8 +720,12 @@ export function generateProfessionalHTML(data: ReportData): string {
     ${ai.insight_summary ? narrativePara(ai.insight_summary) : ''}
     ${benchmarkAlert ? alertBox(benchmarkAlert.message, 'benchmark') : ''}
     ${highAlert ? alertBox(highAlert.message, 'alert') : ''}
+  </div>`;
 
-    <!-- §2 Fleet Overview on same page -->
+  // ── §2: FLEET ASSET OVERVIEW ───────────────────────────────────
+  const section2 = `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§2 Fleet Asset Overview')}
     ${sectionHeader('2', 'Fleet Asset Overview')}
 
     ${subHeader('2.1 Fleet Composition by Asset Type')}
@@ -736,9 +782,14 @@ export function generateProfessionalHTML(data: ReportData): string {
         )}
       </div>
     </div>
+  </div>`;
+
+  const section2b = `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§2 Fleet Asset Overview (cont.)')}
 
     ${Object.keys(ad.fleetAgeDist || {}).length > 0 ? `
-      <div style="margin-top:16px;">
+      <div>
         ${subHeader('Fleet Age Distribution')}
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0;">
           ${Object.entries(ad.fleetAgeDist || {}).map(([band, cnt]) => {
@@ -779,7 +830,7 @@ export function generateProfessionalHTML(data: ReportData): string {
           : 'Optimal — continue standard intervals',
       }));
 
-  const section3 = `
+  const section3a = `
   <div class="page">
     ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis')}
     ${sectionHeader('3', 'Health & Risk Analysis', 'SHAP Failure Drivers · Critical Asset Watch')}
@@ -810,6 +861,11 @@ export function generateProfessionalHTML(data: ReportData): string {
       ),
       chartBox('', svgDonut(riskData, 240, 210, 110, 90, 74, 36), 'Figure 3.2 — Risk level distribution')
     )}
+  </div>`;
+
+  const section3b = `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis (cont.)')}
 
     ${ai.risk_analysis ? narrativePara(ai.risk_analysis) : ''}
 
@@ -830,6 +886,11 @@ export function generateProfessionalHTML(data: ReportData): string {
         ])
       )}
     ` : ''}
+  </div>`;
+
+  const section3c = `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis (cont.)')}
 
     ${criticalAssets.length > 0 ? `
       ${subHeader('3.5 Critical Asset Watch — Immediate Intervention Required', C.red)}
@@ -904,7 +965,7 @@ export function generateProfessionalHTML(data: ReportData): string {
   </div>`;
 
   // ── §4: MAINTENANCE INTELLIGENCE ──────────────────────────────
-  const section4 = `
+  const section4a = `
   <div class="page">
     ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence')}
     ${sectionHeader('4', 'Maintenance Intelligence')}
@@ -946,6 +1007,11 @@ export function generateProfessionalHTML(data: ReportData): string {
           <div style="font-size:17px;font-weight:800;color:${c.color};">${c.value}</div>
         </div>`).join('')}
     </div>
+  </div>`;
+
+  const section4a2 = `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
 
     ${mainTrend.length > 0 ? `
       ${subHeader('4.4 Monthly Maintenance Trend (3 Months)')}
@@ -959,6 +1025,11 @@ export function generateProfessionalHTML(data: ReportData): string {
         mainTrend.map(m => [m.month, fmtN(m.events), m.cost.toLocaleString()])
       )}
     ` : ''}
+  </div>`;
+
+  const section4b = `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
 
     ${(md.vendorBreakdown || []).length > 0 ? `
       ${subHeader('4.5 Vendor & Service Provider Analysis')}
@@ -1020,7 +1091,7 @@ export function generateProfessionalHTML(data: ReportData): string {
 
   const catSlices = s.ticketsByCategory.map(c => ({ name: c.name, value: c.value }));
 
-  const section5 = `
+  const section5a = `
   <div class="page">
     ${pageHeader(data.warehouseName, '§5 Ticket Management Status')}
     ${sectionHeader('5', 'Ticket Management Status')}
@@ -1084,6 +1155,11 @@ export function generateProfessionalHTML(data: ReportData): string {
         ticketTrend.map(t => [t.month, fmtN(t.tickets)])
       )}
     ` : ''}
+  </div>`;
+
+  const section5b = `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§5 Ticket Management Status (cont.)')}
 
     ${(td.avgResolutionDays || 0) > 0 ? `
       ${subHeader('5.5 Ticket Resolution Performance (MTTR)')}
@@ -1238,9 +1314,16 @@ export function generateProfessionalHTML(data: ReportData): string {
   ${coverPage}
   ${tocPage}
   ${section1}
-  ${section3}
-  ${section4}
-  ${section5}
+  ${section2}
+  ${section2b}
+  ${section3a}
+  ${section3b}
+  ${section3c}
+  ${section4a}
+  ${section4a2}
+  ${section4b}
+  ${section5a}
+  ${section5b}
   ${section6}
   ${section7}
 </body>

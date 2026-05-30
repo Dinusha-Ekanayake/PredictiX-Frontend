@@ -4,14 +4,18 @@ import * as React from "react";
 import { usePathname } from "next/navigation";
 import {
   GripHorizontal,
+  Loader2,
   MessageCircle,
   SendHorizontal,
   Trash2,
   X,
 } from "lucide-react";
 
+import { askChatbot, type ChatbotSource } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -20,16 +24,27 @@ type Position = {
   y: number;
 };
 
-type LocalMessage = {
+type ChatMessage = {
   id: string;
+  role: "user" | "assistant";
   text: string;
   createdAt: number;
+  sources?: ChatbotSource[];
 };
 
 const STORAGE_KEY = "predictix.chatbot.launcher.position";
 const LAUNCHER_SIZE = 56;
 const LAUNCHER_MARGIN = 20;
 const PANEL_GAP = 12;
+const CHATBOT_API_BASE =
+  process.env.NEXT_PUBLIC_CHATBOT_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://127.0.0.1:8002";
+const CHATBOT_ENDPOINTS = [
+  "/chatbot/ask",
+  "/chatbot",
+  "/chatbot/message",
+];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -49,6 +64,30 @@ function sanitizePosition(raw: Position, viewportWidth: number, viewportHeight: 
   };
 }
 
+function extractAssistantReply(payload: unknown): string {
+  if (!payload) return "";
+  if (typeof payload === "string") return payload;
+
+  if (typeof payload === "object") {
+    const obj = payload as Record<string, unknown>;
+    const directKeys = ["reply", "response", "answer", "message", "text"];
+
+    for (const key of directKeys) {
+      const value = obj[key];
+      if (typeof value === "string" && value.trim()) {
+        return value;
+      }
+    }
+
+    if (obj.data && typeof obj.data === "object") {
+      const nested = extractAssistantReply(obj.data);
+      if (nested) return nested;
+    }
+  }
+
+  return "";
+}
+
 const AUTH_ROUTE_PREFIXES = [
   "/login",
   "/register",
@@ -63,12 +102,16 @@ export default function FloatingChatbot() {
   const [isMounted, setIsMounted] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
+  const [isSending, setIsSending] = React.useState(false);
   const [draft, setDraft] = React.useState("");
-  const [messages, setMessages] = React.useState<LocalMessage[]>([]);
+  const [messages, setMessages] = React.useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
   const [position, setPosition] = React.useState<Position>({ x: 0, y: 0 });
 
   const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const messageEndRef = React.useRef<HTMLDivElement | null>(null);
   const dragRef = React.useRef({
     active: false,
     moved: false,
@@ -153,6 +196,14 @@ export default function FloatingChatbot() {
     };
   }, [isOpen]);
 
+  React.useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [isLoading, isOpen, messages]);
+
   const panelDimensions = React.useMemo(() => {
     const width = Math.min(380, Math.max(320, viewport.width - 24));
     const height = Math.min(520, Math.max(360, viewport.height - 100));
@@ -186,21 +237,93 @@ export default function FloatingChatbot() {
     viewport.width,
   ]);
 
-  const addDraftMessage = () => {
+  const sendMessage = async () => {
     const text = draft.trim();
-    if (!text) {
+    if (!text || isSending) {
       return;
     }
 
+    setIsSending(true);
+    const userMessage: LocalMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      text,
+      createdAt: Date.now(),
+    };
+
     setMessages((current) => [
       ...current,
-      {
-        id: crypto.randomUUID(),
-        text,
-        createdAt: Date.now(),
-      },
+      userMessage,
     ]);
     setDraft("");
+
+    try {
+      const token = window.localStorage.getItem("token") || window.localStorage.getItem("predictix.access_token");
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      let replyText = "";
+      let lastError = "";
+
+      for (const path of CHATBOT_ENDPOINTS) {
+        try {
+          const response = await fetch(`${CHATBOT_API_BASE}${path}`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                  question: text,
+              }),
+          });
+
+          if (!response.ok) {
+            lastError = `${response.status} ${response.statusText}`;
+            continue;
+          }
+
+          const payload = await response.json();
+          replyText = extractAssistantReply(payload);
+          if (replyText) {
+            break;
+          }
+
+          lastError = "Chat endpoint returned no reply text";
+        } catch (error) {
+          lastError = error instanceof Error ? error.message : "Network error";
+        }
+      }
+
+      if (!replyText) {
+        throw new Error(lastError || "Unable to get chatbot response");
+      }
+
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          text: replyText,
+          createdAt: Date.now(),
+        },
+      ]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to connect to chatbot backend";
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          text: `Connection error: ${errorMessage}`,
+          createdAt: Date.now(),
+        },
+      ]);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const onLauncherPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -293,7 +416,7 @@ export default function FloatingChatbot() {
             height: `${panelDimensions.height}px`,
           }}
         >
-          <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-sm motion-reduce:transition-none">
+          <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-sm motion-reduce:transition-none">
             <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
               <div className="flex items-center gap-2">
                 <div className="rounded-full bg-primary/15 p-1.5 text-primary">
@@ -301,7 +424,7 @@ export default function FloatingChatbot() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground">Chatbot</p>
-                  <p className="text-xs text-muted-foreground">UI preview mode</p>
+                  <p className="text-xs text-muted-foreground">Live backend mode</p>
                 </div>
               </div>
 
@@ -330,54 +453,107 @@ export default function FloatingChatbot() {
             <ScrollArea className="flex-1 px-3 py-4">
               {messages.length === 0 ? (
                 <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                  Type a message to preview the chatbot interface. No backend call is made.
+                  Ask a question to send it to the backend chatbot.
                 </div>
               ) : (
                 <div className="space-y-3 pb-2">
                   {messages.map((message) => (
-                    <div key={message.id} className="flex justify-end">
-                      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3 py-2 text-sm text-primary-foreground shadow-sm">
+                    <div
+                      key={message.id}
+                      className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}
+                    >
+                      <div
+                        className={cn(
+                          "max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm",
+                          message.role === "user"
+                            ? "rounded-br-md bg-primary text-primary-foreground"
+                            : "rounded-bl-md border border-border/70 bg-muted text-foreground"
+                        )}
+                      >
                         <p>{message.text}</p>
-                        <p className="mt-1 text-[10px] text-primary-foreground/70">
+                        <p
+                          className={cn(
+                            "mt-1 text-[10px]",
+                            message.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                          )}
+                        >
                           {new Date(message.createdAt).toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}
                         </p>
+
+                        {message.role === "assistant" && message.sources && message.sources.length > 0 ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {message.sources.map((source, index) => (
+                              <button
+                                key={`${message.id}-${source.title}-${index}`}
+                                type="button"
+                                className="rounded-md"
+                                onClick={() => handleSourceClick(source)}
+                                aria-label={`Use source ${source.title}`}
+                              >
+                                <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
+                                  {source.title} - {source.category}
+                                </Badge>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   ))}
+
+                  {isLoading ? (
+                    <div className="flex justify-start">
+                      <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm text-foreground shadow-sm">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="size-4 animate-spin" />
+                          <span>Thinking...</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div ref={messageEndRef} />
                 </div>
               )}
             </ScrollArea>
 
             <form
               className="border-t border-border/60 p-3"
-              onSubmit={(event) => {
+              onSubmit={async (event) => {
                 event.preventDefault();
-                addDraftMessage();
+                void sendMessage();
               }}
             >
+              {errorMessage ? (
+                <p className="mb-2 text-xs text-destructive" role="alert">
+                  {errorMessage}
+                </p>
+              ) : null}
+
               <div className="flex items-center gap-2">
                 <Input
                   ref={inputRef}
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Type your message"
+                  placeholder="Ask a question..."
                   aria-label="Chatbot draft message"
                   className="h-10"
+                  disabled={isSending}
                 />
                 <Button
                   type="submit"
                   size="icon-sm"
-                  aria-label="Add local message"
-                  disabled={!draft.trim()}
+                  aria-label="Send chatbot message"
+                  disabled={!draft.trim() || isSending}
                 >
-                  <SendHorizontal className="size-4" />
+                  {isLoading ? <Loader2 className="size-4 animate-spin" /> : <SendHorizontal className="size-4" />}
                 </Button>
               </div>
             </form>
-          </div>
+          </Card>
         </div>
       ) : null}
 

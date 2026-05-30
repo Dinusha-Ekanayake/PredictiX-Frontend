@@ -263,13 +263,33 @@ export async function generateAssetSummary(asset: UserAssetData): Promise<string
     .filter(Boolean)
     .join(" | ");
 
+  console.log(`[AssetSummary] Generating summary for ${asset.asset_code}:`, parts.slice(0, 100));
+
   const res = await fetch(`${API_URL}/asset-summaries/generate`, {
     method: "POST",
     headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ input_text: parts }),
   });
 
-  if (!res.ok) throw new Error("Summary generation failed");
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const errorMsg = errorData.detail || errorData.error || `HTTP ${res.status}`;
+    
+    console.error(`[AssetSummary] ✗ Failed for ${asset.asset_code}:`, errorMsg);
+    
+    if (res.status === 503) {
+      throw new Error("Model is loading, please try again in a few seconds");
+    } else if (res.status === 429) {
+      throw new Error("Rate limit exceeded, please try again later");
+    } else if (res.status === 401 || res.status === 403) {
+      throw new Error("Authentication failed");
+    } else if (res.status === 404) {
+      throw new Error("Summary model not found");
+    }
+    throw new Error(`Summary generation failed: ${errorMsg}`);
+  }
+  
   const data = await res.json();
+  console.log(`[AssetSummary] ✓ Generated for ${asset.asset_code}`);
   return data.summary as string;
 }

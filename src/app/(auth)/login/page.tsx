@@ -65,7 +65,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const data = await login({ email: email.trim().toLowerCase(), password });
+      const data = await login({ email: email.trim().toLowerCase(), password, role });
       storeAuthSession(data);
 
       if (data.user.role.toUpperCase() === "ADMIN") {

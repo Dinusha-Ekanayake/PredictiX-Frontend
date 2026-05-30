@@ -148,3 +148,31 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
 
   return response.json();
 }
+
+export type ChatbotSource = {
+  title: string;
+  category: string;
+};
+
+export type ChatbotAskResponse = {
+  answer: string;
+  sources: ChatbotSource[];
+};
+
+export async function askChatbot(question: string): Promise<ChatbotAskResponse> {
+  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || "http://localhost:8002";
+  const url = `${chatbotUrl}/chatbot/ask`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Chatbot request failed: ${response.status} ${response.statusText} — ${errorText}`);
+  }
+
+  return response.json();
+}

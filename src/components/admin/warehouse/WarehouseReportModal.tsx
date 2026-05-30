@@ -274,6 +274,8 @@ function LoadingStep() {
     "Generating report sections…",
   ], []);
   
+  const [step, setStep] = React.useState(0);
+  
   React.useEffect(() => {
     if (!steps || steps.length === 0) return;
 
@@ -372,34 +374,36 @@ function ReportStep({
   const kb  = data.kb_annotations || {};
   const cur = ctx.currency ?? "LKR";
 
-  const riskData        = toChart(ctx.risk_breakdown);
-  const healthDistData  = toChart(ctx.health_score_distribution);
-  const assetTypeData   = toChart(ctx.asset_type_breakdown);
-  const assetStatusData = toChart(ctx.asset_status_breakdown);
-  const ticketPriData   = toChart(ctx.ticket_priority_breakdown);
-  const ticketCatData   = toChart(ctx.ticket_category_breakdown).slice(0, 6);
-  const maintenTypeData = toChart(ctx.maintenance_type_breakdown);
-  const ticketTrend     = ctx.ticket_trend_last_3m ?? [];
-  const maintenTrend    = ctx.monthly_maintenance_trend ?? [];
-  const shapData        = (ctx.top_shap_features ?? []).slice(0, 6).map(([f, c]) => ({
-    name: f.replace(/_/g, " ").slice(0, 22), value: c,
-  }));
+  // ── Asset summary selection ──────────────────────────────
+  // User ticks the critical assets they want AI summaries for; only the
+  // ticked assets are summarised, and only those summaries reach the PDF.
+  const criticalAssets = ctx.critical_assets ?? [];
+  const [selectedCodes, setSelectedCodes] = React.useState<Set<string>>(new Set());
+  const [summaries, setSummaries] = React.useState<Record<string, string>>({});
+  const [summarizing, setSummarizing] = React.useState(false);
 
-  const handlePDFExport = async () => {
-    setPdfLoading(true);
-    const warehouseName = ctx.warehouse_name || "Warehouse";
-    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const filename = `${warehouseName}-Report-${new Date().toISOString().split('T')[0]}.pdf`;
+  const toggleAsset = (code: string) =>
+    setSelectedCodes((prev) => {
+      const next = new Set(prev);
+      next.has(code) ? next.delete(code) : next.add(code);
+      return next;
+    });
 
-    // Fetch AI summaries for top critical assets before building PDF
-    const criticalList = ctx.critical_assets || [];
-    const summaryMap: Record<string, string> = {};
+  const allSelected = criticalAssets.length > 0 && selectedCodes.size === criticalAssets.length;
+  const toggleAll = () =>
+    setSelectedCodes(allSelected ? new Set() : new Set(criticalAssets.map((a) => a.code)));
+
+  const generateSummaries = async () => {
+    const targets = criticalAssets.filter((a) => selectedCodes.has(a.code));
+    if (targets.length === 0) return;
+    setSummarizing(true);
     const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     const token = typeof window !== "undefined"
       ? (localStorage.getItem("token") || localStorage.getItem("predictix.access_token"))
       : null;
+    const results: Record<string, string> = {};
     await Promise.allSettled(
-      criticalList.slice(0, 10).map(async (asset) => {
+      targets.map(async (asset) => {
         try {
           const input = [
             `Vehicle: ${asset.code}`,
@@ -419,12 +423,47 @@ function ReportStep({
           });
           if (res.ok) {
             const d = await res.json();
-            summaryMap[asset.code] = d.summary;
+            results[asset.code] = d.summary;
+          } else {
+            console.warn(`[AssetSummary] ✗ Failed for ${asset.code}: Status ${res.status}`);
           }
-        } catch { /* skip if model unavailable */ }
+        } catch (err) {
+          console.error(`[AssetSummary] ✗ Error for ${asset.code}:`, err);
+        }
       })
     );
-    
+    setSummaries((prev) => ({ ...prev, ...results }));
+    setSummarizing(false);
+  };
+
+  const riskData        = toChart(ctx.risk_breakdown);
+  const healthDistData  = toChart(ctx.health_score_distribution);
+  const assetTypeData   = toChart(ctx.asset_type_breakdown);
+  const assetStatusData = toChart(ctx.asset_status_breakdown);
+  const ticketPriData   = toChart(ctx.ticket_priority_breakdown);
+  const ticketCatData   = toChart(ctx.ticket_category_breakdown).slice(0, 6);
+  const maintenTypeData = toChart(ctx.maintenance_type_breakdown);
+  const ticketTrend     = ctx.ticket_trend_last_3m ?? [];
+  const maintenTrend    = ctx.monthly_maintenance_trend ?? [];
+  const shapData        = (ctx.top_shap_features ?? []).slice(0, 6).map(([f, c]) => ({
+    name: f.replace(/_/g, " ").slice(0, 22), value: c,
+  }));
+
+  const handlePDFExport = async () => {
+    setPdfLoading(true);
+    const warehouseName = ctx.warehouse_name || "Warehouse";
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const filename = `${warehouseName}-Report-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const token = typeof window !== "undefined"
+      ? (localStorage.getItem("token") || localStorage.getItem("predictix.access_token"))
+      : null;
+
+    // Only the assets the user ticked (and summarised) carry a summary into the PDF.
+    const summaryMap: Record<string, string> = summaries;
+    console.log("[AssetSummary] Including", Object.keys(summaryMap).length, "ticked asset summaries in PDF");
+
     // Prepare structured report data with ALL warehouse context data
     const pdfData = {
       title: "Warehouse Report",
@@ -937,47 +976,95 @@ function ReportStep({
 
           <Divider label="Critical Assets (Lowest Health)" />
           {(ctx.critical_assets?.length ?? 0) > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800">
-                    {["Code", "Name / Type", "Health", "Fail Prob", "Risk", "Days to Svc", "Status"].map((h) => (
-                      <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ctx.critical_assets!.map((a) => (
-                    <tr key={a.code} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                      <td className="py-2 pr-3 font-mono font-bold text-rose-600">{a.code}</td>
-                      <td className="py-2 pr-3"><div className="font-medium">{a.name}</div><div className="text-muted-foreground">{a.type}</div></td>
-                      <td className="py-2 pr-3">
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-1.5 w-14 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                            <div className="h-full rounded-full" style={{
-                              width: `${a.health_score}%`,
-                              backgroundColor: a.health_score < 50 ? P.rose : a.health_score < 70 ? P.amber : P.emerald,
-                            }} />
-                          </div>
-                          <span className="font-semibold">{a.health}</span>
-                        </div>
-                      </td>
-                      <td className="py-2 pr-3 font-semibold" style={{ color: P.rose }}>{a.failure_prob}</td>
-                      <td className="py-2 pr-3">
-                        <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${P.rose}20`, color: P.rose }}>{a.risk}</span>
-                      </td>
-                      <td className="py-2 pr-3 font-semibold" style={{
-                        color: a.days_to_service != null && a.days_to_service <= 7 ? P.rose
-                          : a.days_to_service != null && a.days_to_service <= 30 ? P.amber : P.slate,
-                      }}>
-                        {a.days_to_service != null ? `${a.days_to_service}d` : "N/A"}
-                      </td>
-                      <td className="py-2 capitalize text-muted-foreground">{a.status}</td>
+            <>
+              {/* Tick assets → generate summaries only for the ticked ones */}
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <p className="text-[11px] text-muted-foreground">
+                  Tick the assets you want AI summaries for — summaries appear below and are included in the PDF.
+                  {selectedCodes.size > 0 && <span className="ml-1 font-semibold text-violet-600">{selectedCodes.size} selected</span>}
+                </p>
+                <button
+                  type="button"
+                  onClick={generateSummaries}
+                  disabled={selectedCodes.size === 0 || summarizing}
+                  className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {summarizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
+                  {summarizing ? "Summarising…" : "Summarise ticked assets"}
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="pb-2 pr-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={toggleAll}
+                          className="h-3.5 w-3.5 cursor-pointer accent-violet-600"
+                          title="Select all"
+                        />
+                      </th>
+                      {["Code", "Name / Type", "Health", "Fail Prob", "Risk", "Days to Svc", "Status"].map((h) => (
+                        <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {ctx.critical_assets!.map((a) => (
+                      <React.Fragment key={a.code}>
+                        <tr className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                          <td className="py-2 pr-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedCodes.has(a.code)}
+                              onChange={() => toggleAsset(a.code)}
+                              className="h-3.5 w-3.5 cursor-pointer accent-violet-600"
+                            />
+                          </td>
+                          <td className="py-2 pr-3 font-mono font-bold text-rose-600">{a.code}</td>
+                          <td className="py-2 pr-3"><div className="font-medium">{a.name}</div><div className="text-muted-foreground">{a.type}</div></td>
+                          <td className="py-2 pr-3">
+                            <div className="flex items-center gap-1.5">
+                              <div className="h-1.5 w-14 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                                <div className="h-full rounded-full" style={{
+                                  width: `${a.health_score}%`,
+                                  backgroundColor: a.health_score < 50 ? P.rose : a.health_score < 70 ? P.amber : P.emerald,
+                                }} />
+                              </div>
+                              <span className="font-semibold">{a.health}</span>
+                            </div>
+                          </td>
+                          <td className="py-2 pr-3 font-semibold" style={{ color: P.rose }}>{a.failure_prob}</td>
+                          <td className="py-2 pr-3">
+                            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${P.rose}20`, color: P.rose }}>{a.risk}</span>
+                          </td>
+                          <td className="py-2 pr-3 font-semibold" style={{
+                            color: a.days_to_service != null && a.days_to_service <= 7 ? P.rose
+                              : a.days_to_service != null && a.days_to_service <= 30 ? P.amber : P.slate,
+                          }}>
+                            {a.days_to_service != null ? `${a.days_to_service}d` : "N/A"}
+                          </td>
+                          <td className="py-2 capitalize text-muted-foreground">{a.status}</td>
+                        </tr>
+                        {summaries[a.code] && (
+                          <tr className="border-b border-slate-50 dark:border-slate-800/50 bg-violet-50/40 dark:bg-violet-950/10">
+                            <td />
+                            <td colSpan={7} className="py-2 pr-3">
+                              <div className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
+                                <Brain className="h-3.5 w-3.5 shrink-0 mt-0.5 text-violet-500" />
+                                <span><span className="font-semibold text-violet-600">AI Summary:</span> {summaries[a.code]}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : <p className="text-sm text-muted-foreground italic text-center py-3">No critical assets found.</p>}
 
           {/* Component Health Matrix */}
@@ -1056,14 +1143,14 @@ function ReportStep({
           {maintenTrend.length > 0 && (
             <>
               <Divider label="Monthly Events (3 Months)" />
-              <ResponsiveContainer width="100%" height={140}>
-                <BarChart data={maintenTrend} margin={{ left: -10 }}>
+              <ResponsiveContainer width="100%" height={150}>
+                <LineChart data={maintenTrend} margin={{ left: -10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="month" tick={{ fontSize: 9 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip content={<CTip />} />
-                  <Bar dataKey="events" name="Events" fill={P.amber} radius={[4, 4, 0, 0]} />
-                </BarChart>
+                  <Line type="monotone" dataKey="events" name="Events" stroke={P.amber} strokeWidth={2.5} dot={{ r: 4, fill: P.amber }} />
+                </LineChart>
               </ResponsiveContainer>
             </>
           )}

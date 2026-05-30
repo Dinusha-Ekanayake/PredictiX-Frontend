@@ -32,16 +32,17 @@ interface RegisterPayload {
 interface LoginPayload {
   email: string;
   password: string;
+  role?: string;
 }
 
 /**
  * Login user - returns JWT tokens + user info
  */
-export async function login({ email, password }: LoginPayload): Promise<LoginResponse> {
+export async function login({ email, password, role }: LoginPayload): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, role: role || "user" }),
   });
 
   if (!response.ok) {

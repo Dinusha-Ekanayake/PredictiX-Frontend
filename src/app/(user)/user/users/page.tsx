@@ -38,6 +38,8 @@ import {
   fetchMyProfile,
   fetchMyAssets,
   fetchMyStats,
+  fetchUserAssets,
+  fetchAllUsers,
   updateMyProfile,
   getTeamMembers,
   generateAssetSummary,
@@ -100,16 +102,92 @@ export default function UserProfilePage() {
       try {
         setIsLoading(true);
         setError("");
-        
-        const [profileData, assetsData, statsData] = await Promise.all([
-          fetchMyProfile(),
-          fetchMyAssets(),
-          fetchMyStats(),
-        ]);
-        
+
+        // Profile first — its assignedAssetsCount already covers both direct
+        // (assets.assigned_to) and AssetAssignment-table assignments via max().
+        const profileData = await fetchMyProfile();
         setProfile(profileData);
-        setAssets(assetsData);
-        setStats(statsData);
+
+        const [assetsDirect, assetsViaId, statsData] = await Promise.all([
+          fetchMyAssets().catch(() => []),
+          fetchUserAssets(profileData.id).catch(() => []),
+          fetchMyStats().catch(() => ({ assignedAssets: 0, activeAssets: 0 })),
+        ]);
+
+        // Merge unique by asset_id (prefer the richer /me/assets entries).
+        const byId = new Map<string, UserAssetData>();
+        for (const a of assetsViaId) byId.set(a.asset_id, a);
+        for (const a of assetsDirect) byId.set(a.asset_id, a);
+        let mergedAssets = Array.from(byId.values());
+
+        // Fallback: when there are no direct/assignment-table assignments,
+        // show assets in the user's warehouse so the section isn't blank
+        // (relevant for admins / managers who oversee a warehouse).
+        if (mergedAssets.length === 0 && profileData.warehouse_id) {
+          const API =
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+          const token =
+            typeof window !== "undefined"
+              ? localStorage.getItem("token") ||
+                localStorage.getItem("predictix.access_token")
+              : null;
+          try {
+            const res = await fetch(
+              `${API}/assets/?warehouse_id=${encodeURIComponent(
+                profileData.warehouse_id,
+              )}&limit=500`,
+              {
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+              },
+            );
+            if (res.ok) {
+              const raw: any[] = await res.json();
+              const loc = profileData.warehouse || "";
+              mergedAssets = raw
+                .filter((a) => (a.status || "").toLowerCase() !== "retired")
+                .map((a) => ({
+                  assignment_id: String(a.id),
+                  asset_id: String(a.id),
+                  asset_code: a.asset_code || "",
+                  name: a.asset_name || "",
+                  asset_type: a.vehicle_type || a.asset_type || "",
+                  category: a.category || null,
+                  make: a.make || "",
+                  model: a.model || "",
+                  location: loc,
+                  status: a.status || "active",
+                  healthPercent:
+                    a.criticality_score != null
+                      ? Number(a.criticality_score)
+                      : 100,
+                  nextServiceDate: a.next_service_date || null,
+                  sensorHealth: null,
+                }));
+            }
+          } catch {
+            // ignore — keep mergedAssets empty
+          }
+        }
+
+        setAssets(mergedAssets);
+        setStats({
+          assignedAssets: Math.max(
+            profileData.assignedAssetsCount || 0,
+            statsData.assignedAssets || 0,
+            mergedAssets.length,
+          ),
+          activeAssets: Math.max(
+            statsData.activeAssets || 0,
+            mergedAssets.filter((a) =>
+              ["active", "operational", "critical"].includes(
+                (a.status || "").toLowerCase(),
+              ),
+            ).length,
+          ),
+        });
         
         // Initialize edit form
         setEditForm({
@@ -119,10 +197,38 @@ export default function UserProfilePage() {
           address: profileData.address || "",
         });
         
-        // Load team members
+        // Load team members. /me/colleagues matches by department_id, which
+        // can return [] when the current user's department_id doesn't match
+        // the seeded department row (e.g. test users). Fall back to listing
+        // all users and filtering by department NAME, which matches what the
+        // UI shows in the profile card.
         try {
           setTeamMembersLoading(true);
-          const teamData = await getTeamMembers();
+          let teamData = await getTeamMembers().catch(() => []);
+
+          if (teamData.length === 0 && profileData.department) {
+            const allUsers = await fetchAllUsers().catch(() => []);
+            const myDept = profileData.department.trim().toLowerCase();
+            teamData = allUsers
+              .filter(
+                (u) =>
+                  u.id !== profileData.id &&
+                  (u.department || "").trim().toLowerCase() === myDept,
+              )
+              .map<TeamMemberData>((u) => ({
+                id: u.id,
+                employee_id: null,
+                firstName: u.firstName,
+                lastName: u.lastName,
+                name: u.name,
+                email: u.email,
+                contactNumber: u.contactNumber || null,
+                department: u.department,
+                role: u.role,
+                status: u.status,
+              }));
+          }
+
           setTeamMembers(teamData);
         } catch (tmErr) {
           console.error("Failed to load team members:", tmErr);
@@ -164,13 +270,90 @@ export default function UserProfilePage() {
     }
   }
 
+  // Enrich an asset with the latest sensor reading + real criticality score
+  // before sending it to the AI summary model. Needed for warehouse-fallback
+  // assets, which arrive without sensor data and with a default 100% health.
+  async function enrichAssetForSummary(
+    asset: UserAssetData,
+  ): Promise<UserAssetData> {
+    const hasSensors =
+      asset.sensorHealth &&
+      Object.values(asset.sensorHealth).some((v) => v != null);
+    if (hasSensors && asset.healthPercent !== 100) {
+      return asset;
+    }
+
+    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("token") ||
+          localStorage.getItem("predictix.access_token")
+        : null;
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    const [sensorRes, assetRes] = await Promise.all([
+      fetch(`${API}/sensor-readings/asset/${asset.asset_id}`, { headers }).catch(
+        () => null,
+      ),
+      fetch(`${API}/assets/${asset.asset_id}`, { headers }).catch(() => null),
+    ]);
+
+    let sensorHealth = asset.sensorHealth;
+    if (sensorRes && sensorRes.ok) {
+      const rows: any[] = await sensorRes.json().catch(() => []);
+      const latest = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      if (latest) {
+        const num = (v: any) =>
+          v == null ? null : Number.parseFloat(String(v));
+        sensorHealth = {
+          tire: num(latest.tire_health_pct),
+          brake: num(latest.brake_health_pct),
+          battery: num(latest.battery_health_pct),
+          oil: num(latest.oil_life_pct),
+          hydraulic: num(latest.hydraulic_health_pct),
+        };
+      }
+    }
+
+    let healthPercent = asset.healthPercent;
+    let make = asset.make;
+    let model = asset.model;
+    let assetType = asset.asset_type;
+    if (assetRes && assetRes.ok) {
+      const full: any = await assetRes.json().catch(() => null);
+      if (full) {
+        if (full.criticality_score != null) {
+          healthPercent = Number.parseFloat(String(full.criticality_score));
+        }
+        if (!make && full.make) make = full.make;
+        if (!model && full.model) model = full.model;
+        if (!assetType && (full.vehicle_type || full.asset_type)) {
+          assetType = full.vehicle_type || full.asset_type;
+        }
+      }
+    }
+
+    return {
+      ...asset,
+      asset_type: assetType,
+      make,
+      model,
+      healthPercent,
+      sensorHealth,
+    };
+  }
+
   // Fetch AI summary for a single asset (on demand)
   async function fetchSummary(asset: UserAssetData) {
     const id = asset.asset_id;
     if (summaries[id]?.text || summaries[id]?.loading) return;
     setSummaries((prev) => ({ ...prev, [id]: { loading: true, text: "", expanded: true } }));
     try {
-      const text = await generateAssetSummary(asset);
+      const enriched = await enrichAssetForSummary(asset);
+      const text = await generateAssetSummary(enriched);
       setSummaries((prev) => ({ ...prev, [id]: { loading: false, text, expanded: true } }));
     } catch {
       setSummaries((prev) => ({ ...prev, [id]: { loading: false, text: "Summary unavailable.", expanded: true } }));
@@ -247,6 +430,12 @@ export default function UserProfilePage() {
     );
   }
 
+  // True when the asset list comes from the warehouse fallback rather than
+  // direct user assignments (e.g. admins overseeing a warehouse).
+  const isWarehouseFallback =
+    assets.length > 0 &&
+    (profile?.assignedAssetsCount ?? 0) === 0;
+
   return (
     <div className="w-full space-y-6">
       {/* KPI Cards */}
@@ -254,13 +443,17 @@ export default function UserProfilePage() {
         <Card className="rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-base font-medium text-muted-foreground">
-              My Assets
+              {isWarehouseFallback ? "Warehouse Assets" : "My Assets"}
             </CardTitle>
             <Boxes className="h-8 w-8 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold">{stats?.assignedAssets || 0}</div>
-            <p className="text-sm text-muted-foreground mt-1">Assigned to you</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isWarehouseFallback
+                ? `In ${profile?.warehouse || "your warehouse"}`
+                : "Assigned to you"}
+            </p>
           </CardContent>
         </Card>
 
@@ -456,7 +649,12 @@ export default function UserProfilePage() {
       {/* My Assigned Assets Section */}
       <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle className="text-lg">My Assigned Assets ({assets.length})</CardTitle>
+          <CardTitle className="text-lg">
+            {isWarehouseFallback
+              ? `Assets in ${profile?.warehouse || "My Warehouse"}`
+              : "My Assigned Assets"}{" "}
+            ({assets.length})
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">

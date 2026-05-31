@@ -9,13 +9,14 @@ import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsi
 import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
 
 // ── Warehouse Report (my section — warehouse components only) ──
-import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
+import WarehouseReportModal, { type WarehouseReportPayload } from "@/components/admin/warehouse/WarehouseReportModal";
+import type { WarehouseSummaryData } from "@/lib/warehouseService";
 
 const REPORT_API = "http://127.0.0.1:8000/warehouse-dashboard/generate-report";
 
 export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
-  const [data, setData] = React.useState<any>(null);
+  const [data, setData] = React.useState<WarehouseSummaryData | null>(null);
   const [refreshing, setRefreshing] = React.useState(true);
 
   async function fetchData() {
@@ -49,7 +50,7 @@ export default function WarehousePage() {
   // ── Report modal state ──
   const [modalOpen, setModalOpen] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
-  const [reportData, setReportData] = React.useState<any>(null);
+  const [reportData, setReportData] = React.useState<WarehouseReportPayload | null>(null);
   const [reportError, setReportError] = React.useState<string | null>(null);
 
   async function handleGenerate() {

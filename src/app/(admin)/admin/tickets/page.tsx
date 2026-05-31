@@ -67,8 +67,10 @@ export default function AdminTicketsPage() {
       setTotal(t);
       setTickets((prev) => (reset ? rows : [...prev, ...rows]));
       setPage(pageNum);
-    } catch (err: any) {
-      toast.error("Failed to load tickets", { description: err?.message });
+    } catch (err) {
+      toast.error("Failed to load tickets", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setIsLoading(false);
       setLoadingMore(false);
@@ -97,8 +99,10 @@ export default function AdminTicketsPage() {
       setSelectedTicket(null);
       setDetailOpen(false);
       toast.success("Ticket deleted");
-    } catch (err: any) {
-      toast.error("Failed to delete ticket", { description: err?.message });
+    } catch (err) {
+      toast.error("Failed to delete ticket", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     }
   }
 

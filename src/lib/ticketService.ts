@@ -42,22 +42,30 @@ function uiPriority(p: string): TicketPriority {
   return map[p?.toLowerCase()] ?? "Medium";
 }
 
-function uiCategory(c: string | null): TicketCategory {
-  if (!c) return "General";
-  const map: Record<string, TicketCategory> = {
-    mechanical: "Mechanical",
-    electrical: "Electrical",
-    software: "Software",
-  };
-  return map[c.toLowerCase()] ?? "General";
+interface TicketRow {
+  id: string;
+  ticket_number: string | null;
+  asset_id: string | null;
+  assets?: { asset_name?: string | null } | null;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  predicted_category: string | null;
+  final_category: string | null;
+  created_by: string | null;
+  assigned_to: string | null;
+  opened_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-function mapRow(row: any): Ticket {
+function mapRow(row: TicketRow): Ticket {
   return {
     id: row.id,
     ticket_number: row.ticket_number,
     asset_id: row.asset_id,
-    asset_name: row.assets?.asset_name ?? null,
+    asset_name: row.assets?.asset_name ?? undefined,
     title: row.title,
     description: row.description,
     status: uiStatus(row.status),

@@ -15,6 +15,10 @@ export default function ThemeToggle({ className, size = 20 }: Props) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
   const [bubbleActive, setBubbleActive] = React.useState(false);
+  const [bubblePos, setBubblePos] = React.useState<{ left: number | string; top: number | string }>({
+    left: "50%",
+    top: "50%",
+  });
   const buttonRef = React.useRef<HTMLButtonElement>(null);
 
   React.useEffect(() => setMounted(true), []);
@@ -23,6 +27,14 @@ export default function ThemeToggle({ className, size = 20 }: Props) {
   const isDark = resolvedTheme === "dark";
 
   const handleClick = () => {
+    // Capture the button center now (refs must not be read during render).
+    const btn = buttonRef.current;
+    if (btn) {
+      setBubblePos({
+        left: btn.offsetLeft + btn.offsetWidth / 2,
+        top: btn.offsetTop + btn.offsetHeight / 2,
+      });
+    }
     setBubbleActive(true);
     // toggle theme immediately
     setTheme(isDark ? "light" : "dark");
@@ -37,13 +49,9 @@ export default function ThemeToggle({ className, size = 20 }: Props) {
         <div
           className="pointer-events-none fixed inset-0 rounded-full animate-theme-bubble"
           style={{
-            // position bubble at button center
-            left: buttonRef.current?.offsetLeft
-              ? buttonRef.current.offsetLeft + buttonRef.current.offsetWidth / 2
-              : "50%",
-            top: buttonRef.current?.offsetTop
-              ? buttonRef.current.offsetTop + buttonRef.current.offsetHeight / 2
-              : "50%",
+            // position bubble at button center (captured on click)
+            left: bubblePos.left,
+            top: bubblePos.top,
             transform: "translate(-50%, -50%)",
             background:
               "radial-gradient(circle, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.) 70%)",

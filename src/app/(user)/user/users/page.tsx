@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,7 +60,6 @@ function getInitials(name: string): string {
 // ---------------------------------------------------------------------------
 
 export default function UserProfilePage() {
-  const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   
@@ -123,9 +121,9 @@ export default function UserProfilePage() {
         } finally {
           setTeamMembersLoading(false);
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error("Failed to load profile:", err);
-        setError(err.message || "Failed to load profile data");
+        setError(err instanceof Error ? err.message : "Failed to load profile data");
       } finally {
         setIsLoading(false);
       }
@@ -150,8 +148,8 @@ export default function UserProfilePage() {
       setProfile(updatedProfile);
       setIsEditMode(false);
       toast.success("Profile updated successfully!");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update profile");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update profile");
     } finally {
       setIsSaving(false);
     }

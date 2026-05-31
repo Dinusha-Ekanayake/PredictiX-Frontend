@@ -84,8 +84,10 @@ export default function NewTicketDialog({ open, onOpenChange, onCreated }: Props
       toast.success("Ticket created", { description: ticket.title });
       onCreated?.(ticket);
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error("Failed to create ticket", { description: err?.message });
+    } catch (err) {
+      toast.error("Failed to create ticket", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setIsSubmitting(false);
     }

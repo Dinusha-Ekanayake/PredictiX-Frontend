@@ -1,5 +1,6 @@
 // ─── Asset (from models.py Asset + AssetOut schema) ───────────────────────────
 export type Asset = {
+<<<<<<< HEAD
   id: string;
   asset_code: string;
   warehouse_id: string;
@@ -30,6 +31,48 @@ export type Asset = {
   lifetime_breakdown_count: number | null;
   created_at: string;
   updated_at: string;
+=======
+  id: string; // asset id
+  name: string;
+  description: string;
+  images: string[]; // urls (can be empty)
+  status: AssetStatus;
+
+  healthScore: number; // 0-100
+  failureProbability8w: number; // 0-1
+  predictionConfidence: number; // 0-1
+
+  warehouse: { id: string; name: string };
+  location: string; // e.g. "Aisle 2 / Rack 4"
+  assignedPerson: { id: string; name: string } | null;
+
+  lastMaintenanceDate: string | null;
+  nextMaintenanceDate: string | null;
+
+  scheduledMaintenanceDate: string | null;
+  predictedMaintenanceDate: string | null;
+
+  estimatedCost: number;
+  costVariance30d: number; // +/- percentage (e.g. 0.12 = +12%)
+
+  maintenanceLogs: MaintenanceLog[];
+  assignmentHistory: AssignmentEvent[];
+  auditTrail: AssetAuditEvent[];
+
+  // Added fields from AddAsset form
+  type?: string;
+  technicalDetails?: {
+    manufacturer: string;
+    modelNumber: string;
+    serialNumber: string;
+    powerType: string;
+  };
+  usageDetails?: {
+    machineAge: number;
+    usageHours: number;
+    maintenanceCount: number;
+  };
+>>>>>>> feature/asset-section-ui
 };
 
 // ─── Failure Prediction (from AssetFailurePredictionOut) ───────────────────────

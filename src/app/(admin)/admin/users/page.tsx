@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,8 @@ import ViewAssignedAssetsDialog, {
   getMockAssetsForUser,
 } from "@/components/admin/users/ViewAssignedAssetsDialog";
 
+import { fetchAllUsers } from "@/lib/api/userProfileApi";
+
 import {
   Users,
   UserCheck,
@@ -39,13 +42,6 @@ import {
   Search,
   Building2,
 } from "lucide-react";
-
-/**
- * Admin Users Management Page (PredictiX)
- * Matches Figma spec exactly.
- * - Uses mock data now
- * - Replace mock data with API calls later (FastAPI)
- */
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,83 +66,6 @@ type UserItem = {
 };
 
 // ---------------------------------------------------------------------------
-// Initial mock data
-// ---------------------------------------------------------------------------
-
-const INITIAL_USERS: UserItem[] = [
-  {
-    id: "U0001O",
-    firstName: "John",
-    lastName: "Smith",
-    name: "John Smith",
-    email: "john.smith@warehouse.com",
-    address: "No. 12, First Lane, Colombo",
-    contactNumber: "0711234567",
-    warehouse: "Main Branch - Colombo",
-    role: "user",
-    department: "Administrative",
-    status: "active",
-    assignedAssets: 3,
-  },
-  {
-    id: "A0001M",
-    firstName: "Sarah",
-    lastName: "Johnson",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@warehouse.com",
-    address: "No. 22, Lake Road, Kandy",
-    contactNumber: "0772345678",
-    warehouse: "Main Branch - Colombo",
-    role: "admin",
-    department: "Mechanical",
-    status: "active",
-    assignedAssets: 0,
-  },
-  {
-    id: "U0002M",
-    firstName: "Mike",
-    lastName: "Davis",
-    name: "Mike Davis",
-    email: "mike.davis@warehouse.com",
-    address: "No. 5, Palm Gardens, Galle",
-    contactNumber: "0753456789",
-    warehouse: "Galle",
-    role: "user",
-    department: "Mechanical",
-    status: "active",
-    assignedAssets: 2,
-  },
-  {
-    id: "U0003E",
-    firstName: "Emily",
-    lastName: "Chen",
-    name: "Emily Chen",
-    email: "emily.chen@warehouse.com",
-    address: "No. 8, Rose Avenue, Colombo",
-    contactNumber: "0724567890",
-    warehouse: "Main Branch - Colombo",
-    role: "user",
-    department: "Electrical",
-    status: "active",
-    assignedAssets: 5,
-  },
-  {
-    id: "U0004M",
-    firstName: "David",
-    lastName: "Wilson",
-    name: "David Wilson",
-    email: "david.wilson@warehouse.com",
-    address: "No. 16, Temple Road, Galle",
-    contactNumber: "0765678901",
-    warehouse: "Galle",
-    role: "user",
-    department: "Maintenance",
-    status: "inactive",
-    assignedAssets: 1,
-  },
-];
-
-// ---------------------------------------------------------------------------
 // KPI helpers
 // ---------------------------------------------------------------------------
 
@@ -165,7 +84,7 @@ function computeKpis(users: UserItem[]) {
 }
 
 // ---------------------------------------------------------------------------
-// Sub-components: Badges (solid fills matching Figma)
+// Badges
 // ---------------------------------------------------------------------------
 
 function RoleBadge({ role }: { role: UserRole }) {
@@ -191,13 +110,11 @@ function StatusBadge({ status }: { status: UserStatus }) {
       </Badge>
     );
   }
-  return (
-    <Badge variant="secondary">inactive</Badge>
-  );
+  return <Badge variant="secondary">inactive</Badge>;
 }
 
 // ---------------------------------------------------------------------------
-// Sub-component: User avatar
+// User avatar
 // ---------------------------------------------------------------------------
 
 function UserAvatar({ name }: { name: string }) {
@@ -221,7 +138,7 @@ function UserAvatar({ name }: { name: string }) {
 
 export default function AdminUsersPage() {
   const [isLoading, setIsLoading] = React.useState(true);
-  const [users, setUsers] = React.useState<UserItem[]>(INITIAL_USERS);
+  const [users, setUsers] = React.useState<UserItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = React.useState<string>("all");
@@ -230,51 +147,38 @@ export default function AdminUsersPage() {
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
 
-  function generateUserId(role: UserRole, department: string): string {
-    const roleLetter = role === "admin" ? "A" : "U";
-    const deptLetter = department.charAt(0).toUpperCase() || "X";
-
-    const relevantUsers = users.filter((u) => u.id.startsWith(roleLetter));
-    let maxNumber = 0;
-
-    for (const u of relevantUsers) {
-      const match = u.id.match(/^[AU](\d{4})[A-Z]?$/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (!Number.isNaN(num) && num > maxNumber) {
-          maxNumber = num;
-        }
+  // Load users from backend on mount
+  React.useEffect(() => {
+    async function loadUsers() {
+      try {
+        const data = await fetchAllUsers();
+        setUsers(data);
+      } catch (err) {
+        console.error("Failed to load users:", err);
+        toast.error("Failed to load users.", {
+          description: "Could not connect to the server.",
+        });
+      } finally {
+        setIsLoading(false);
       }
     }
-
-    const next = String(maxNumber + 1).padStart(4, "0");
-    return `${roleLetter}${next}${deptLetter}`;
-  }
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
+    loadUsers();
   }, []);
 
   const filteredUsers = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-
     return users.filter((user) => {
       const matchesSearch =
         query === "" ||
         user.name.toLowerCase().includes(query) ||
         user.email.toLowerCase().includes(query) ||
         user.id.toLowerCase().includes(query);
-
       const matchesRole = roleFilter === "all" || user.role === roleFilter;
       const matchesDepartment =
         departmentFilter === "all" || user.department === departmentFilter;
       const matchesStatus =
         statusFilter === "all" || user.status === statusFilter;
-
-      return (
-        matchesSearch && matchesRole && matchesDepartment && matchesStatus
-      );
+      return matchesSearch && matchesRole && matchesDepartment && matchesStatus;
     });
   }, [users, searchQuery, roleFilter, departmentFilter, statusFilter]);
 
@@ -344,10 +248,7 @@ export default function AdminUsersPage() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={departmentFilter}
-              onValueChange={setDepartmentFilter}
-            >
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Departments" />
               </SelectTrigger>
@@ -469,12 +370,11 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      {/* Add User Dialog */}
+      {/* Add User Dialog — no generateUserId prop */}
       <AddUserDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
         onUserAdded={handleUserAdded}
-        generateUserId={generateUserId}
       />
 
       {/* View User Details Dialog */}
@@ -501,10 +401,10 @@ export default function AdminUsersPage() {
         onBackToDetails={
           assetsUser
             ? () => {
-                const user = assetsUser;
-                setAssetsUser(null);
-                setDetailsUser(user);
-              }
+              const user = assetsUser;
+              setAssetsUser(null);
+              setDetailsUser(user);
+            }
             : undefined
         }
       />

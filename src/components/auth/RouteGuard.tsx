@@ -52,6 +52,8 @@ export function RouteGuard({
       return;
     }
 
+    // localStorage is only readable on the client, so this gate runs after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAuthorized(true);
   }, [requireAuth, requireAdmin, requireUser, redirectPath, router]);
 

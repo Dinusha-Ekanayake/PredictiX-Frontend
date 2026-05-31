@@ -208,7 +208,7 @@ export async function fetchUserAssets(userId: string): Promise<UserAssetData[]> 
   return res.json();
 }
 
-export async function updateUser(userId: string, data: any): Promise<UserItemOut> {
+export async function updateUser(userId: string, data: Partial<UserItemOut>): Promise<UserItemOut> {
   const res = await fetch(`${API_URL}/user-profile/users/${userId}`, {
     method: "PUT",
     headers: {

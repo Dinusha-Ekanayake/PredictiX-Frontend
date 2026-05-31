@@ -699,8 +699,8 @@ import {
   Activity, AlertTriangle, ArrowUpRight, Bot, Brain,
   ChevronRight, Clock, ExternalLink, Flame, Package,
   RefreshCw, ShieldAlert, Ticket, TrendingDown, TrendingUp,
-  Warehouse, Wrench, Zap, CheckCircle2, Timer, BarChart2,
-  ThumbsUp, CircleDot,
+  Wrench, Zap, CheckCircle2, Timer, BarChart2,
+  ThumbsUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

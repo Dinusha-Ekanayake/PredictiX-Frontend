@@ -138,9 +138,9 @@ export default function ViewUserDetailsDialog({
       });
       if (onUserUpdated) onUserUpdated();
       onOpenChange(false);
-    } catch (err: any) {
+    } catch (err) {
       toast.error("Failed to update status", {
-        description: err.message || "An error occurred while communicating with PostgreSQL.",
+        description: err instanceof Error ? err.message : "An error occurred while communicating with PostgreSQL.",
       });
     } finally {
       setIsUpdating(false);

@@ -18,7 +18,6 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
-  Gauge,
   DollarSign,
   Ticket,
   Clock,
@@ -186,12 +185,26 @@ function useToggle(init = false) {
 }
 
 // Custom tooltip for recharts
-function CustomTooltip({ active, payload, label }: any) {
+interface TooltipPayloadItem {
+  color?: string;
+  name?: React.ReactNode;
+  value?: number | string;
+}
+
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+  label?: React.ReactNode;
+}) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 py-2 text-xs shadow-lg">
       {label && <div className="font-semibold mb-1">{label}</div>}
-      {payload.map((p: any, i: number) => (
+      {payload.map((p, i) => (
         <div key={i} style={{ color: p.color }}>
           {p.name}: <strong>{p.value?.toLocaleString()}</strong>
         </div>

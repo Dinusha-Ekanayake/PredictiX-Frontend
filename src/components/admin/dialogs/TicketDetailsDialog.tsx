@@ -75,9 +75,11 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
       const updated: Ticket = { ...ticket, status: newStatus };
       onUpdated?.(updated);
       toast.success("Status updated");
-    } catch (err: any) {
+    } catch (err) {
       setLocalStatus(prev);
-      toast.error("Failed to update status", { description: err?.message });
+      toast.error("Failed to update status", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setStatusUpdating(false);
     }

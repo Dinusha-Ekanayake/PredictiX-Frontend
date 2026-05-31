@@ -38,7 +38,7 @@ Two roles are supported:
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16 (App Router) |
 | Language | TypeScript 5 |
 | UI Library | React 19 |
 | Styling | Tailwind CSS v4 + Radix UI |

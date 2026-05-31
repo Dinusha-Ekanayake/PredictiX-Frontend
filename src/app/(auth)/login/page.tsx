@@ -342,8 +342,8 @@ export default function LoginPage() {
           }
           return;
         }
-      } catch (apiError) {
-        console.log("Backend login failed, falling back to mock");
+      } catch {
+        console.warn("Backend login failed, falling back to mock");
       }
 
       // Fallback: Mock login
@@ -387,8 +387,8 @@ export default function LoginPage() {
       } else {
         router.push("/user/users");
       }
-    } catch (err: any) {
-      setError(err.message || "Login failed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setIsSubmitting(false);
     }

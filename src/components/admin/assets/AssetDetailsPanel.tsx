@@ -1,259 +1,697 @@
 "use client";
 
-import type { ComponentProps } from "react";
-import SectionCard from "@/components/admin/common/SectionCard";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import * as React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  MapPin, User, Building2, Calendar, CalendarClock,
+  TrendingUp, TrendingDown, Minus, Pencil, Trash2, Bot,
+  ClipboardList, Users, ShieldCheck, Zap, AlertTriangle,
+  RefreshCw, Ticket, ChevronRight, Loader2,
+  Info, Gauge, Hash,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useNavRouter } from "@/components/navigation/useNavRouter";
+import type { AssetDetail } from "./types";
+import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
 
-import type { Asset } from "./types";
+/* ══════════════════════════════════════════════════════════════════════════════
+   Helpers
+   ══════════════════════════════════════════════════════════════════════════════ */
 
-type BadgeVariant = ComponentProps<typeof Badge>["variant"];
-
-function StatusBadge({ s }: { s: Asset["status"] }) {
-  const variant: BadgeVariant =
-    s === "CRITICAL"
-      ? "destructive"
-      : s === "MAINTENANCE"
-        ? "secondary"
-        : "default";
-
-  return <Badge variant={variant}>{s}</Badge>;
+function fmt(d: string | null | undefined): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB", {
+    day: "2-digit", month: "short", year: "numeric",
+  });
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function fmtCost(n: number | null | undefined, currency = "LKR"): string {
+  if (n == null) return "—";
+  return `${currency} ${Number(n).toLocaleString()}`;
+}
+
+/* ── Status pill ─────────────────────────────────────────────────────────────── */
+const STATUS_BG: Record<string, string> = {
+  active:       "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
+  maintenance:  "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  in_maintenance:"bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  inactive:     "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
+  retired:      "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
+};
+const STATUS_DOT: Record<string, string> = {
+  active: "bg-emerald-500", maintenance: "bg-amber-500",
+  in_maintenance: "bg-amber-500", inactive: "bg-slate-400", retired: "bg-slate-400",
+};
+
+function StatusPill({ status }: { status: string }) {
+  const key = status.toLowerCase();
   return (
-    <div className="rounded-2xl border p-3">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-sm font-medium">{value}</div>
+    <span className={cn(
+      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset leading-none",
+      STATUS_BG[key] ?? "bg-muted text-muted-foreground ring-border",
+    )}>
+      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", STATUS_DOT[key] ?? "bg-slate-400")} />
+      {status.charAt(0).toUpperCase() + status.slice(1).replace("_", " ")}
+    </span>
+  );
+}
+
+/* ── Health Ring ─────────────────────────────────────────────────────────────── */
+function HealthRing({ score }: { score: number }) {
+  const r = 38;
+  const circ = 2 * Math.PI * r;
+  const filled = (score / 100) * circ;
+  const color = score >= 80 ? "#10b981" : score >= 60 ? "#84cc16" : score >= 40 ? "#f59e0b" : score >= 20 ? "#f97316" : "#ef4444";
+  const label = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Moderate" : score >= 20 ? "Poor" : "Critical";
+
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="relative" style={{ width: 96, height: 96 }}>
+        <svg width={96} height={96} viewBox="0 0 96 96">
+          <circle cx={48} cy={48} r={r} fill="none" stroke="currentColor" strokeWidth={7}
+            className="text-slate-200/60 dark:text-white/8" />
+          <circle cx={48} cy={48} r={r} fill="none" stroke={color} strokeWidth={7}
+            strokeDasharray={`${filled} ${circ - filled}`} strokeLinecap="round"
+            transform="rotate(-90 48 48)"
+            style={{ filter: `drop-shadow(0 0 6px ${color}40)` }} />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-xl font-bold leading-none">{score}</span>
+          <span className="text-[10px] text-muted-foreground/60 mt-0.5">/ 100</span>
+        </div>
+      </div>
+      <span className="text-[11px] font-semibold" style={{ color }}>{label}</span>
     </div>
   );
 }
 
-type AssetDetailsPanelProps = {
-  asset: Asset;
+/* ── Risk gauge ──────────────────────────────────────────────────────────────── */
+function RiskGauge({ probability }: { probability: number }) {
+  const pct = Math.round(probability * 100);
+  const color = pct >= 70 ? "bg-red-500" : pct >= 40 ? "bg-amber-500" : "bg-emerald-500";
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">Failure risk (8 weeks)</span>
+        <span className="font-bold tabular-nums">{pct}%</span>
+      </div>
+      <div className="h-2 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
+        <div className={cn("h-full rounded-full transition-all duration-500", color)}
+          style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/* ── Info field ──────────────────────────────────────────────────────────────── */
+function InfoField({ icon, label, value, mono, valueClass }: {
+  icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
+      {icon && <div className="mt-0.5 text-muted-foreground/60 shrink-0">{icon}</div>}
+      <div className="min-w-0">
+        <div className="text-[11px] text-muted-foreground/80 font-medium">{label}</div>
+        <div className={cn("text-sm font-medium mt-0.5 truncate", mono && "font-mono text-xs", valueClass)}>
+          {value}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────────── */
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-slate-200 dark:border-white/8 p-8 text-center text-sm text-muted-foreground/60">
+      {message}
+    </div>
+  );
+}
+
+/* ── Ticket priority pill ────────────────────────────────────────────────────── */
+const PRIORITY_META: Record<string, string> = {
+  critical: "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20",
+  high:     "bg-orange-50 text-orange-700 ring-orange-200/60 dark:bg-orange-500/10 dark:text-orange-400 dark:ring-orange-500/20",
+  medium:   "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  low:      "bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20",
 };
 
-export default function AssetDetailsPanel({
-  asset,
-}: AssetDetailsPanelProps) {
+function PriorityPill({ priority }: { priority: string | null }) {
+  if (!priority) return <span className="text-xs text-muted-foreground/50">—</span>;
+  const key = priority.toLowerCase();
   return (
-    <div className="space-y-6">
-      <SectionCard
-        title="Asset Details"
-        right={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="h-8 rounded-xl px-3 text-xs">
-              Edit
-            </Button>
-            <Button variant="destructive" className="h-8 rounded-xl px-3 text-xs">
-              Delete
-            </Button>
+    <span className={cn(
+      "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
+      PRIORITY_META[key] ?? "bg-muted text-muted-foreground ring-border",
+    )}>
+      {priority}
+    </span>
+  );
+}
+
+/* ── Ticket status pill ───────────────────────────────────────────────────────── */
+const TICKET_STATUS_META: Record<string, string> = {
+  open:        "bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20",
+  in_progress: "bg-violet-50 text-violet-700 ring-violet-200/60 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20",
+  resolved:    "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
+  closed:      "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
+};
+
+function TicketStatusPill({ status }: { status: string }) {
+  const key = status.toLowerCase();
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
+      TICKET_STATUS_META[key] ?? "bg-muted text-muted-foreground ring-border",
+    )}>
+      {status.replace("_", " ")}
+    </span>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Loading skeleton
+   ══════════════════════════════════════════════════════════════════════════════ */
+export function AssetDetailsSkeleton() {
+  return (
+    <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/6">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-48 rounded" />
+          <Skeleton className="h-3.5 w-80 rounded" />
+        </div>
+      </div>
+      <div className="px-5 py-5 border-b border-slate-200/80 dark:border-white/6">
+        <div className="flex gap-6">
+          <Skeleton className="h-24 w-24 rounded-full shrink-0" />
+          <div className="flex-1 space-y-3 pt-2">
+            <Skeleton className="h-3 w-full rounded" />
+            <Skeleton className="h-3 w-3/4 rounded" />
+            <Skeleton className="h-8 w-full rounded-xl" />
           </div>
-        }
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="text-base font-semibold">{asset.name}</div>
-              <StatusBadge s={asset.status} />
-              <Badge variant="secondary">ID: {asset.id}</Badge>
-            </div>
-            <div className="mt-1 text-sm text-muted-foreground">
+        </div>
+      </div>
+      <div className="px-5 py-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Main Component
+   ══════════════════════════════════════════════════════════════════════════════ */
+type Props = {
+  detail: AssetDetail;
+  onRefresh: () => void;
+  onDelete: (id: string) => void;
+};
+
+export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props) {
+  const { asset, prediction, costPrediction, maintenanceEvents, tickets, assignments } = detail;
+  const router = useNavRouter();
+
+  const [runningPrediction, setRunningPrediction] = React.useState(false);
+
+  const healthScore = deriveHealthScore(asset, prediction);
+  const failureProb = deriveFailureProbability(prediction);
+
+  const daysUntilMaint = asset.next_service_date
+    ? Math.ceil((new Date(asset.next_service_date).getTime() - Date.now()) / 86_400_000)
+    : null;
+
+  const predDiff =
+    asset.next_service_date && prediction?.predicted_maintenance_date
+      ? Math.ceil(
+          (new Date(prediction.predicted_maintenance_date).getTime() -
+            new Date(asset.next_service_date).getTime()) / 86_400_000,
+        )
+      : null;
+
+  const costVariance =
+    costPrediction?.estimated_cost && costPrediction?.min_cost
+      ? (Number(costPrediction.estimated_cost) - Number(costPrediction.min_cost)) /
+        (Number(costPrediction.min_cost) || 1)
+      : 0;
+
+  const CostDeltaIcon =
+    costVariance > 0.05 ? TrendingUp : costVariance < -0.05 ? TrendingDown : Minus;
+  const costDeltaColor =
+    costVariance > 0.05 ? "text-red-500" : costVariance < -0.05 ? "text-emerald-500" : "text-muted-foreground";
+
+  async function handleRunPrediction() {
+    setRunningPrediction(true);
+    try {
+      await runVehiclePrediction(asset.id);
+      onRefresh();
+    } catch (e) {
+      console.error("Prediction failed:", e);
+    } finally {
+      setRunningPrediction(false);
+    }
+  }
+
+  // Navigate to tickets page with the ticket pre-opened
+  function goToTicket(ticketId: string) {
+    router.push(`/admin/tickets?ticket_id=${ticketId}`);
+  }
+
+  return (
+    <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden transition-all">
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/40 dark:bg-white/2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-bold truncate">{asset.asset_name}</h2>
+            <StatusPill status={asset.status} />
+            <span className="text-[11px] font-mono text-muted-foreground/70 bg-slate-100 dark:bg-white/6 px-2 py-0.5 rounded-full">
+              {asset.asset_code}
+            </span>
+            {asset.registration_number && (
+              <span className="text-[11px] font-mono text-muted-foreground/60 bg-slate-100 dark:bg-white/6 px-2 py-0.5 rounded-full">
+                {asset.registration_number}
+              </span>
+            )}
+          </div>
+          {asset.description && (
+            <p className="mt-1.5 text-[13px] text-muted-foreground leading-relaxed line-clamp-2">
               {asset.description}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-xl gap-1.5 text-xs border-slate-200 dark:border-slate-700"
+            onClick={handleRunPrediction}
+            disabled={runningPrediction}
+          >
+            {runningPrediction
+              ? <Loader2 className="h-3 w-3 animate-spin" />
+              : <RefreshCw className="h-3 w-3" />}
+            {runningPrediction ? "Running…" : "Run AI"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-xl gap-1.5 text-xs border-slate-200 dark:border-slate-700"
+          >
+            <Pencil className="h-3 w-3" />
+            Edit
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-8 rounded-xl gap-1.5 text-xs"
+            onClick={() => onDelete(asset.id)}
+          >
+            <Trash2 className="h-3 w-3" />
+            Delete
+          </Button>
+        </div>
+      </div>
+
+      {/* ── AI Metrics strip ── */}
+      <div className="px-5 py-5 border-b border-slate-200/80 dark:border-white/6">
+        {prediction ? (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+            <HealthRing score={healthScore} />
+            <div className="hidden sm:block h-24 w-px bg-slate-200/80 dark:bg-white/6" />
+            <div className="flex-1 space-y-3.5 w-full">
+              <RiskGauge probability={failureProb} />
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Bot className="h-3.5 w-3.5" />
+                  Model confidence
+                </span>
+                <span className="font-bold tabular-nums">
+                  {prediction.confidence != null
+                    ? `${Math.round(Number(prediction.confidence) * 100)}%`
+                    : "—"}
+                </span>
+              </div>
+              {predDiff !== null && (
+                <div className={cn(
+                  "flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-medium",
+                  predDiff < 0
+                    ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400"
+                    : predDiff > 0
+                      ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                      : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
+                )}>
+                  {predDiff < 0
+                    ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    : <Zap className="h-3.5 w-3.5 shrink-0" />}
+                  {predDiff < 0
+                    ? `AI predicts failure ${Math.abs(predDiff)} days before scheduled service`
+                    : predDiff > 0
+                      ? `Asset may last ${predDiff} days beyond scheduled service`
+                      : "AI prediction aligns with schedule"}
+                </div>
+              )}
             </div>
           </div>
+        ) : (
+          <div className="flex items-center gap-4 rounded-xl border border-dashed border-slate-200 dark:border-white/8 p-4">
+            <Bot className="h-8 w-8 text-muted-foreground/20 shrink-0" />
+            <div>
+              <p className="text-sm text-muted-foreground/70">No prediction data yet.</p>
+              <p className="text-[12px] text-muted-foreground/50 mt-0.5">
+                Click <strong>Run AI</strong> to generate a prediction for this asset.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Fields grid ── */}
+      <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          <InfoField
+            icon={<Building2 className="h-3.5 w-3.5" />}
+            label="Warehouse ID"
+            value={asset.warehouse_id}
+            mono
+          />
+          <InfoField
+            icon={<MapPin className="h-3.5 w-3.5" />}
+            label="Vehicle Type"
+            value={[asset.vehicle_type, asset.asset_type].filter(Boolean).join(" · ") || "—"}
+          />
+          <InfoField
+            icon={<User className="h-3.5 w-3.5" />}
+            label="Assigned To"
+            value={asset.assigned_to ?? "Unassigned"}
+            mono={!!asset.assigned_to}
+          />
+          <InfoField
+            icon={<Gauge className="h-3.5 w-3.5" />}
+            label="Make / Model"
+            value={[asset.make, asset.model, asset.manufacture_year].filter(Boolean).join(" ") || "—"}
+          />
+          <InfoField
+            icon={<Hash className="h-3.5 w-3.5" />}
+            label="VIN"
+            value={asset.vin ?? "—"}
+            mono
+          />
+          <InfoField
+            icon={<Calendar className="h-3.5 w-3.5" />}
+            label="Last Service"
+            value={fmt(asset.last_service_date)}
+          />
+          <InfoField
+            icon={<CalendarClock className="h-3.5 w-3.5" />}
+            label="Next Scheduled Service"
+            value={
+              asset.next_service_date
+                ? `${fmt(asset.next_service_date)}${daysUntilMaint !== null ? ` (${daysUntilMaint > 0 ? `in ${daysUntilMaint}d` : `${Math.abs(daysUntilMaint)}d overdue`})` : ""}`
+                : "—"
+            }
+            valueClass={daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
+          />
+          <InfoField
+            icon={<Bot className="h-3.5 w-3.5" />}
+            label="AI-Predicted Maintenance"
+            value={fmt(prediction?.predicted_maintenance_date)}
+          />
+          {/* Cost prediction */}
+          <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
+            <div className={cn("mt-0.5 shrink-0", costDeltaColor)}>
+              <CostDeltaIcon className="h-3.5 w-3.5" />
+            </div>
+            <div>
+              <div className="text-[11px] text-muted-foreground/80 font-medium">Est. Maintenance Cost</div>
+              <div className="text-sm font-semibold mt-0.5">
+                {fmtCost(costPrediction?.estimated_cost, costPrediction?.currency ?? "LKR")}
+              </div>
+              {costPrediction && (
+                <div className="text-[11px] text-muted-foreground/60 mt-0.5">
+                  Range: {fmtCost(costPrediction.min_cost, costPrediction.currency ?? "LKR")} –{" "}
+                  {fmtCost(costPrediction.max_cost, costPrediction.currency ?? "LKR")}
+                </div>
+              )}
+            </div>
+          </div>
+          <InfoField
+            icon={<Info className="h-3.5 w-3.5" />}
+            label="Odometer"
+            value={asset.current_mileage != null ? `${Number(asset.current_mileage).toLocaleString()} km` : "—"}
+          />
+          <InfoField
+            icon={<ShieldCheck className="h-3.5 w-3.5" />}
+            label="Warranty Expiry"
+            value={fmt(asset.warranty_expiry_date)}
+          />
         </div>
+      </div>
 
-        <Separator className="my-4" />
-
-        <div className="grid grid-cols-12 gap-3">
-          <div className="col-span-12 md:col-span-4">
-            <Field label="Warehouse" value={asset.warehouse.name} />
-          </div>
-          <div className="col-span-12 md:col-span-4">
-            <Field label="Location" value={asset.location} />
-          </div>
-          <div className="col-span-12 md:col-span-4">
-            <Field
-              label="Assigned Person"
-              value={asset.assignedPerson?.name ?? "Unassigned"}
-            />
-          </div>
-
-          <div className="col-span-12 md:col-span-4">
-            <Field label="Health Score" value={`${asset.healthScore}%`} />
-          </div>
-          <div className="col-span-12 md:col-span-4">
-            <Field
-              label="Failure Probability (8w)"
-              value={`${(asset.failureProbability8w * 100).toFixed(0)}%`}
-            />
-          </div>
-          <div className="col-span-12 md:col-span-4">
-            <Field
-              label="Prediction Confidence"
-              value={`${(asset.predictionConfidence * 100).toFixed(0)}%`}
-            />
-          </div>
-
-          <div className="col-span-12 md:col-span-6">
-            <Field
-              label="Last Maintenance"
-              value={asset.lastMaintenanceDate ?? "—"}
-            />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <Field
-              label="Next Maintenance"
-              value={asset.nextMaintenanceDate ?? "—"}
-            />
-          </div>
-
-          <div className="col-span-12 md:col-span-6">
-            <Field
-              label="Scheduled Maintenance"
-              value={asset.scheduledMaintenanceDate ?? "—"}
-            />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <Field
-              label="Predicted Maintenance"
-              value={asset.predictedMaintenanceDate ?? "—"}
-            />
-          </div>
-
-          <div className="col-span-12 md:col-span-6">
-            <Field
-              label="Estimated Cost"
-              value={`$${asset.estimatedCost.toLocaleString()}`}
-            />
-          </div>
-          <div className="col-span-12 md:col-span-6">
-            <Field
-              label="Cost Variance (30d)"
-              value={`${asset.costVariance30d >= 0 ? "+" : ""}${(
-                asset.costVariance30d * 100
-              ).toFixed(0)}%`}
-            />
-          </div>
-        </div>
-
-        <Separator className="my-4" />
-
+      {/* ── Tabs ── */}
+      <div className="px-5 pb-5 pt-4">
         <Tabs defaultValue="insights">
-          <TabsList className="rounded-xl">
-            <TabsTrigger value="insights">Predictive Insights</TabsTrigger>
-            <TabsTrigger value="history">Maintenance Logs</TabsTrigger>
-            <TabsTrigger value="assignments">Assignments</TabsTrigger>
-            <TabsTrigger value="audit">Audit Trail</TabsTrigger>
+          <TabsList className="rounded-xl w-full justify-start overflow-x-auto bg-slate-100/60 dark:bg-white/4">
+            {[
+              { value: "insights", icon: Bot, label: "Predictive Insights" },
+              {
+                value: "tickets",
+                icon: Ticket,
+                label: "Tickets",
+                count: tickets.length,
+              },
+              {
+                value: "maintenance",
+                icon: ClipboardList,
+                label: "Maintenance Logs",
+                count: maintenanceEvents.length,
+              },
+              {
+                value: "assignments",
+                icon: Users,
+                label: "Assignments",
+                count: assignments.length,
+              },
+            ].map(({ value, icon: Icon, label, count }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="gap-1.5 text-xs rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-white/8"
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+                {count !== undefined && count > 0 && (
+                  <span className="ml-1 rounded-full bg-slate-200/60 dark:bg-white/8 px-1.5 py-0.5 text-[10px] font-semibold">
+                    {count}
+                  </span>
+                )}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
-          <TabsContent value="insights" className="mt-4 space-y-4">
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 lg:col-span-6">
-                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
-                  Health Score Trend & Forecast (placeholder)
+          {/* ═══ Insights ═══ */}
+          <TabsContent value="insights" className="mt-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                "Health Score Trend & Forecast",
+                "Failure Probability (8-week)",
+              ].map((title) => (
+                <div
+                  key={title}
+                  className="rounded-xl border border-dashed border-slate-200 dark:border-white/8 bg-slate-50/30 dark:bg-white/2 p-4 flex flex-col items-center justify-center gap-2"
+                  style={{ height: 180 }}
+                >
+                  <Bot className="h-7 w-7 text-muted-foreground/20" />
+                  <div className="text-xs text-muted-foreground/60 text-center">
+                    {title}
+                    <br />
+                    <span className="text-[10px] opacity-70">(XGBoost — coming soon)</span>
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            {/* Dynamic AI summary bullets */}
+            <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
+              <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
+                AI Insight Summary
               </div>
-              <div className="col-span-12 lg:col-span-6">
-                <div className="h-55 rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
-                  Failure Probability Forecast (8 weeks) (placeholder)
-                </div>
-              </div>
-              <div className="col-span-12">
-                <div className="rounded-2xl border p-4">
-                  <div className="text-sm font-medium">Insight Summary</div>
-                  <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                    <li>
-                      Predicted maintenance earlier than scheduled (based on risk
-                      trend).
-                    </li>
-                    <li>Confidence reflects available sensor/log coverage.</li>
-                    <li>
-                      Estimated cost variance indicates recent maintenance cost
-                      deviation.
-                    </li>
-                  </ul>
-                </div>
+              <div className="space-y-2.5">
+                {!prediction && (
+                  <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
+                    <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>No prediction available. Click <strong>Run AI</strong> to generate insights.</span>
+                  </div>
+                )}
+                {prediction && predDiff !== null && predDiff < 0 && (
+                  <div className="flex items-start gap-2.5 text-sm text-red-600 dark:text-red-400">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>AI predicts maintenance needed <strong>{Math.abs(predDiff)} days earlier</strong> than scheduled.</span>
+                  </div>
+                )}
+                {prediction && failureProb > 0.6 && (
+                  <div className="flex items-start gap-2.5 text-sm text-amber-600 dark:text-amber-400">
+                    <Zap className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>High failure probability ({Math.round(failureProb * 100)}%) — consider immediate inspection.</span>
+                  </div>
+                )}
+                {prediction && healthScore >= 80 && (
+                  <div className="flex items-start gap-2.5 text-sm text-emerald-600 dark:text-emerald-400">
+                    <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>Asset health is excellent. No immediate action required.</span>
+                  </div>
+                )}
+                {prediction && (
+                  <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
+                    <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      Model confidence:{" "}
+                      {prediction.confidence != null
+                        ? `${Math.round(Number(prediction.confidence) * 100)}%`
+                        : "N/A"}
+                      . Risk level: <strong>{prediction.risk_level ?? "Unknown"}</strong>.
+                    </span>
+                  </div>
+                )}
+                {asset.lifetime_breakdown_count != null && asset.lifetime_breakdown_count > 0 && (
+                  <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
+                    <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      Lifetime breakdowns: <strong>{asset.lifetime_breakdown_count}</strong> · Services:{" "}
+                      <strong>{asset.lifetime_service_count ?? "—"}</strong>
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="history" className="mt-4 space-y-3">
-            {asset.maintenanceLogs.length === 0 ? (
-              <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
-                No maintenance logs available.
-              </div>
+          {/* ═══ Tickets ═══ */}
+          <TabsContent value="tickets" className="mt-4 space-y-3">
+            {tickets.length === 0 ? (
+              <EmptyState message="No tickets raised for this asset." />
             ) : (
-              asset.maintenanceLogs.map((l) => (
-                <div key={l.id} className="rounded-2xl border p-4">
+              tickets.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => goToTicket(t.id)}
+                  className="w-full text-left ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all hover:border-primary/30 group"
+                >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold">{l.type}</div>
-                      <div className="text-xs text-muted-foreground">{l.date}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono text-muted-foreground/60">
+                          {t.ticket_number}
+                        </span>
+                        <TicketStatusPill status={t.status} />
+                        <PriorityPill priority={t.final_priority ?? t.predicted_priority ?? t.priority} />
+                        {t.final_category && (
+                          <span className="text-[10px] text-muted-foreground/60 bg-muted/50 px-2 py-0.5 rounded-full">
+                            {t.final_category}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1.5 text-sm font-semibold truncate">{t.title}</div>
+                      <div className="text-[12px] text-muted-foreground/70 mt-0.5 line-clamp-1">
+                        {t.description}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground/50 mt-1">
+                        Opened {fmt(t.opened_at)}
+                        {t.resolved_at && ` · Resolved ${fmt(t.resolved_at)}`}
+                      </div>
                     </div>
-                    <Badge variant="secondary">${l.cost.toLocaleString()}</Badge>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary/60 transition-colors shrink-0 mt-1" />
                   </div>
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    {l.notes}
+                </button>
+              ))
+            )}
+          </TabsContent>
+
+          {/* ═══ Maintenance Logs ═══ */}
+          <TabsContent value="maintenance" className="mt-4 space-y-3">
+            {maintenanceEvents.length === 0 ? (
+              <EmptyState message="No maintenance events recorded for this asset." />
+            ) : (
+              maintenanceEvents.map((e) => (
+                <div
+                  key={e.id}
+                  className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 space-y-2 transition-all"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20">
+                        {e.event_type}
+                      </span>
+                      <div className="text-sm font-semibold">{e.title}</div>
+                      <div className="text-[11px] text-muted-foreground/70">
+                        {e.performed_at ? fmt(e.performed_at) : fmt(e.scheduled_date)}
+                        {e.vendor_name && ` · ${e.vendor_name}`}
+                      </div>
+                    </div>
+                    <div className="text-sm font-bold shrink-0 tabular-nums">
+                      {e.cost_amount != null
+                        ? fmtCost(e.cost_amount, e.currency)
+                        : "—"}
+                    </div>
                   </div>
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Performed by: {l.performedBy?.name ?? "—"}
-                  </div>
+                  {e.notes && (
+                    <p className="text-sm text-muted-foreground/80 leading-relaxed">{e.notes}</p>
+                  )}
+                  {e.odometer_reading != null && (
+                    <div className="text-[11px] text-muted-foreground/50">
+                      Odometer: {Number(e.odometer_reading).toLocaleString()} km
+                      {e.downtime_hours != null && ` · Downtime: ${e.downtime_hours}h`}
+                    </div>
+                  )}
                 </div>
               ))
             )}
           </TabsContent>
 
+          {/* ═══ Assignments ═══ */}
           <TabsContent value="assignments" className="mt-4 space-y-3">
-            {asset.assignmentHistory.length === 0 ? (
-              <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
-                No assignment history available.
-              </div>
+            {assignments.length === 0 ? (
+              <EmptyState message="No assignment history for this asset." />
             ) : (
-              asset.assignmentHistory.map((e) => (
-                <div key={e.id} className="rounded-2xl border p-4">
-                  <div className="flex items-start justify-between gap-3">
+              assignments.map((a) => (
+                <div
+                  key={a.id}
+                  className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all"
+                >
+                  <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-semibold">{e.action}</div>
-                      <div className="text-xs text-muted-foreground">{e.date}</div>
+                      <span className={cn(
+                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
+                        a.is_active
+                          ? "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20"
+                          : "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400",
+                      )}>
+                        {a.is_active ? "Active" : "Past"}
+                      </span>
+                      <div className="mt-1 text-xs font-mono text-muted-foreground/70">
+                        User: {a.user_id}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground/50 mt-0.5">
+                        Assigned {fmt(a.assigned_at)}
+                        {a.unassigned_at && ` · Removed ${fmt(a.unassigned_at)}`}
+                      </div>
                     </div>
-                    <Badge variant="secondary">{e.user?.name ?? "—"}</Badge>
                   </div>
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Changed by: {e.byAdmin?.name ?? "—"}
-                  </div>
-                </div>
-              ))
-            )}
-          </TabsContent>
-
-          <TabsContent value="audit" className="mt-4 space-y-3">
-            {asset.auditTrail.length === 0 ? (
-              <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
-                No audit events available.
-              </div>
-            ) : (
-              asset.auditTrail.map((a) => (
-                <div key={a.id} className="rounded-2xl border p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold">{a.field}</div>
-                      <div className="text-xs text-muted-foreground">{a.date}</div>
-                    </div>
-                    <Badge variant="secondary">{a.by?.name ?? "—"}</Badge>
-                  </div>
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    {a.oldValue} → <span className="font-medium">{a.newValue}</span>
-                  </div>
+                  {a.notes && (
+                    <p className="mt-2 text-sm text-muted-foreground/70">{a.notes}</p>
+                  )}
                 </div>
               ))
             )}
           </TabsContent>
         </Tabs>
-      </SectionCard>
+      </div>
     </div>
   );
 }

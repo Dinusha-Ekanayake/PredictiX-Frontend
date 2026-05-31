@@ -1,0 +1,167 @@
+/**
+ * Asset Service
+ * All API calls for the admin assets section.
+ * Uses apiGet / apiPost / apiPut / apiDelete from apiClient so JWT is auto-attached.
+ */
+
+import { apiGet, apiFetch } from "@/lib/apiClient";
+import type {
+  Asset,
+  AssetDetail,
+  AssetFilters,
+  FailurePrediction,
+  CostPrediction,
+  MaintenanceEvent,
+  Ticket,
+  AssetAssignment,
+  VehiclePredictionResult,
+} from "./types";
+
+// ─── List / filter assets ──────────────────────────────────────────────────────
+
+export async function listAssets(filters: AssetFilters): Promise<Asset[]> {
+  const params = new URLSearchParams();
+
+  if (filters.query) params.set("search", filters.query);
+  if (filters.status && filters.status !== "all") params.set("status", filters.status);
+  if (filters.health_band && filters.health_band !== "all")
+    params.set("health_band", filters.health_band);
+  if (filters.warehouse_id && filters.warehouse_id !== "all")
+    params.set("warehouse_id", filters.warehouse_id);
+
+  params.set("limit", "200");
+  params.set("sort_by", "created_at");
+  params.set("sort_order", "desc");
+
+  return apiGet<Asset[]>(`/assets/?${params.toString()}`);
+}
+
+// ─── Single asset ──────────────────────────────────────────────────────────────
+
+export async function getAsset(assetId: string): Promise<Asset> {
+  return apiGet<Asset>(`/assets/${assetId}`);
+}
+
+// ─── Maintenance events for an asset ──────────────────────────────────────────
+
+export async function getMaintenanceEvents(assetId: string): Promise<MaintenanceEvent[]> {
+  // The maintenance router lists by asset_id query param
+  return apiGet<MaintenanceEvent[]>(`/maintenance/?asset_id=${assetId}`);
+}
+
+// ─── Tickets for an asset ──────────────────────────────────────────────────────
+
+export async function getAssetTickets(assetId: string): Promise<Ticket[]> {
+  return apiGet<Ticket[]>(`/tickets/?asset_id=${assetId}&limit=100`);
+}
+
+// ─── Asset assignments ─────────────────────────────────────────────────────────
+
+export async function getAssetAssignments(assetId: string): Promise<AssetAssignment[]> {
+  return apiGet<AssetAssignment[]>(`/asset-assignments/?asset_id=${assetId}`);
+}
+
+// ─── Latest failure prediction for an asset ───────────────────────────────────
+
+export async function getFailurePrediction(assetId: string): Promise<FailurePrediction | null> {
+  try {
+    return await apiGet<FailurePrediction>(`/predictions/failure/${assetId}`);
+  } catch {
+    return null; // 404 means no prediction yet — not an error
+  }
+}
+
+// ─── Latest cost prediction for an asset ──────────────────────────────────────
+
+export async function getCostPrediction(assetId: string): Promise<CostPrediction | null> {
+  try {
+    return await apiGet<CostPrediction>(`/predictions/cost/${assetId}`);
+  } catch {
+    return null;
+  }
+}
+
+// ─── Run new prediction for an asset (POST to vehicle-predictions) ─────────────
+
+export async function runVehiclePrediction(
+  assetId: string,
+  requestedBy?: string,
+): Promise<VehiclePredictionResult> {
+  const params = requestedBy ? `?requested_by=${requestedBy}` : "";
+  const response = await apiFetch(`/vehicle-predictions/${assetId}${params}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Prediction failed" }));
+    throw new Error(err.detail || "Prediction failed");
+  }
+  return response.json() as Promise<VehiclePredictionResult>;
+}
+
+// ─── Load full asset detail (asset + predictions + maintenance + tickets + assignments) ──
+
+export async function getAssetDetail(assetId: string): Promise<AssetDetail> {
+  // Run all fetches in parallel for speed
+  const [asset, prediction, costPrediction, maintenanceEvents, tickets, assignments] =
+    await Promise.all([
+      getAsset(assetId),
+      getFailurePrediction(assetId),
+      getCostPrediction(assetId),
+      getMaintenanceEvents(assetId).catch(() => [] as MaintenanceEvent[]),
+      getAssetTickets(assetId).catch(() => [] as Ticket[]),
+      getAssetAssignments(assetId).catch(() => [] as AssetAssignment[]),
+    ]);
+
+  return { asset, prediction, costPrediction, maintenanceEvents, tickets, assignments };
+}
+
+// ─── Update asset status ───────────────────────────────────────────────────────
+
+export async function updateAssetStatus(assetId: string, status: string): Promise<Asset> {
+  const response = await apiFetch(`/assets/${assetId}/status?status=${status}`, {
+    method: "PATCH",
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Update failed" }));
+    throw new Error(err.detail || "Update failed");
+  }
+  return response.json();
+}
+
+// ─── Delete asset ──────────────────────────────────────────────────────────────
+
+export async function deleteAsset(assetId: string): Promise<void> {
+  const response = await apiFetch(`/assets/${assetId}`, { method: "DELETE" });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Delete failed" }));
+    throw new Error(err.detail || "Delete failed");
+  }
+}
+
+// ─── Derive health score (0–100) from health_band or criticality_score ─────────
+// The real health_score comes from the prediction; fall back to band mapping.
+
+export function deriveHealthScore(asset: Asset, prediction: FailurePrediction | null): number {
+  if (prediction?.health_score != null) return Math.round(Number(prediction.health_score));
+
+  const bandMap: Record<string, number> = {
+    excellent: 90,
+    good: 72,
+    moderate: 52,
+    poor: 30,
+    critical: 12,
+  };
+  if (asset.health_band) return bandMap[asset.health_band.toLowerCase()] ?? 50;
+  if (asset.criticality_score != null) {
+    // criticality_score is 0–100, higher = worse → invert for health
+    return Math.max(0, Math.min(100, Math.round(100 - Number(asset.criticality_score))));
+  }
+  return 50;
+}
+
+// ─── Derive failure probability ────────────────────────────────────────────────
+
+export function deriveFailureProbability(prediction: FailurePrediction | null): number {
+  if (prediction?.failure_probability != null) return Number(prediction.failure_probability);
+  return 0;
+}

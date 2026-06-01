@@ -26,9 +26,18 @@ import {
 import AddUserDialog from "@/components/admin/users/AddUserDialog";
 import type { NewUser } from "@/components/admin/users/AddUserDialog";
 import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
-import ViewAssignedAssetsDialog, {
-  getMockAssetsForUser,
-} from "@/components/admin/users/ViewAssignedAssetsDialog";
+import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
+import type { AssetItem } from "@/components/admin/users/ViewAssignedAssetsDialog";
+import { toast } from "sonner";
+
+import {
+  listUsers,
+  createUser,
+  getUserAssets,
+  type UserItem,
+  type UserRole,
+  type UserStatus,
+} from "@/lib/userService";
 
 import {
   Users,
@@ -42,109 +51,8 @@ import {
 
 /**
  * Admin Users Management Page (PredictiX)
- * Matches Figma spec exactly.
- * - Uses mock data now
- * - Replace mock data with API calls later (FastAPI)
+ * Fetches real users from the backend /users API.
  */
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type UserRole = "admin" | "user";
-type UserStatus = "active" | "inactive";
-
-type UserItem = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  name: string;
-  email: string;
-  address: string;
-  contactNumber: string;
-  warehouse: string;
-  role: UserRole;
-  department: string;
-  status: UserStatus;
-  assignedAssets: number;
-};
-
-// ---------------------------------------------------------------------------
-// Initial mock data
-// ---------------------------------------------------------------------------
-
-const INITIAL_USERS: UserItem[] = [
-  {
-    id: "U0001O",
-    firstName: "John",
-    lastName: "Smith",
-    name: "John Smith",
-    email: "john.smith@warehouse.com",
-    address: "No. 12, First Lane, Colombo",
-    contactNumber: "0711234567",
-    warehouse: "Main Branch - Colombo",
-    role: "user",
-    department: "Administrative",
-    status: "active",
-    assignedAssets: 3,
-  },
-  {
-    id: "A0001M",
-    firstName: "Sarah",
-    lastName: "Johnson",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@warehouse.com",
-    address: "No. 22, Lake Road, Kandy",
-    contactNumber: "0772345678",
-    warehouse: "Main Branch - Colombo",
-    role: "admin",
-    department: "Mechanical",
-    status: "active",
-    assignedAssets: 0,
-  },
-  {
-    id: "U0002M",
-    firstName: "Mike",
-    lastName: "Davis",
-    name: "Mike Davis",
-    email: "mike.davis@warehouse.com",
-    address: "No. 5, Palm Gardens, Galle",
-    contactNumber: "0753456789",
-    warehouse: "Galle",
-    role: "user",
-    department: "Mechanical",
-    status: "active",
-    assignedAssets: 2,
-  },
-  {
-    id: "U0003E",
-    firstName: "Emily",
-    lastName: "Chen",
-    name: "Emily Chen",
-    email: "emily.chen@warehouse.com",
-    address: "No. 8, Rose Avenue, Colombo",
-    contactNumber: "0724567890",
-    warehouse: "Main Branch - Colombo",
-    role: "user",
-    department: "Electrical",
-    status: "active",
-    assignedAssets: 5,
-  },
-  {
-    id: "U0004M",
-    firstName: "David",
-    lastName: "Wilson",
-    name: "David Wilson",
-    email: "david.wilson@warehouse.com",
-    address: "No. 16, Temple Road, Galle",
-    contactNumber: "0765678901",
-    warehouse: "Galle",
-    role: "user",
-    department: "Maintenance",
-    status: "inactive",
-    assignedAssets: 1,
-  },
-];
 
 // ---------------------------------------------------------------------------
 // KPI helpers
@@ -221,7 +129,7 @@ function UserAvatar({ name }: { name: string }) {
 
 export default function AdminUsersPage() {
   const [isLoading, setIsLoading] = React.useState(true);
-  const [users, setUsers] = React.useState<UserItem[]>(INITIAL_USERS);
+  const [users, setUsers] = React.useState<UserItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = React.useState<string>("all");
@@ -229,6 +137,8 @@ export default function AdminUsersPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
+  const [assignedAssets, setAssignedAssets] = React.useState<AssetItem[]>([]);
+  const [assetsLoading, setAssetsLoading] = React.useState(false);
 
   function generateUserId(role: UserRole, department: string): string {
     const roleLetter = role === "admin" ? "A" : "U";
@@ -252,8 +162,26 @@ export default function AdminUsersPage() {
   }
 
   React.useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const data = await listUsers();
+        if (!cancelled) setUsers(data);
+      } catch (err) {
+        if (!cancelled) {
+          toast.error("Failed to load users", {
+            description: err instanceof Error ? err.message : undefined,
+          });
+          setUsers([]);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filteredUsers = React.useMemo(() => {
@@ -280,16 +208,57 @@ export default function AdminUsersPage() {
 
   const kpis = computeKpis(users);
 
-  function handleUserAdded(newUser: NewUser) {
-    setUsers((prev) => [newUser, ...prev]);
+  async function handleUserAdded(newUser: NewUser) {
+    try {
+      const created = await createUser({
+        id: newUser.id,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        name: newUser.name,
+        email: newUser.email,
+        address: newUser.address,
+        contactNumber: newUser.contactNumber,
+        warehouse: newUser.warehouse,
+        role: newUser.role,
+        department: newUser.department,
+        status: newUser.status,
+      });
+      setUsers((prev) => [created, ...prev]);
+      toast.success("User created", { description: `${created.name} added.` });
+    } catch (err) {
+      toast.error("Failed to create user", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
   }
 
   function handleViewDetails(user: UserItem) {
     setDetailsUser(user);
   }
 
-  function handleViewAssets(user: UserItem) {
+  async function handleViewAssets(user: UserItem) {
     setAssetsUser(user);
+    setAssignedAssets([]);
+    setAssetsLoading(true);
+    try {
+      const rows = await getUserAssets(user.id);
+      setAssignedAssets(
+        rows.map((a) => ({
+          id: a.asset_id,
+          name: a.name,
+          category: a.category ?? a.asset_type ?? "General",
+          location: a.location,
+          healthPercent: Math.round(a.healthPercent),
+        }))
+      );
+    } catch (err) {
+      toast.error("Failed to load assigned assets", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+      setAssignedAssets([]);
+    } finally {
+      setAssetsLoading(false);
+    }
   }
 
   if (isLoading) {
@@ -486,14 +455,15 @@ export default function AdminUsersPage() {
         }}
         onViewAssets={(user) => {
           setDetailsUser(null);
-          setAssetsUser(user);
+          handleViewAssets(user);
         }}
       />
 
       {/* View Assigned Assets Dialog */}
       <ViewAssignedAssetsDialog
         userName={assetsUser?.name ?? ""}
-        assets={assetsUser ? getMockAssetsForUser(assetsUser.id) : []}
+        assets={assignedAssets}
+        loading={assetsLoading}
         open={assetsUser !== null}
         onOpenChange={(open) => {
           if (!open) setAssetsUser(null);

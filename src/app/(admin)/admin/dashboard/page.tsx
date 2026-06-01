@@ -554,7 +554,11 @@ export default function AdminDashboardPage() {
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
                       {a.location}
-                      {a.daysToMaintenance != null && ` · ${a.daysToMaintenance}d to maintenance`}
+                      {a.daysToMaintenance != null && (
+                        a.daysToMaintenance < 0
+                          ? ` · maintenance overdue ${Math.abs(a.daysToMaintenance)}d`
+                          : ` · ${a.daysToMaintenance}d to maintenance`
+                      )}
                       {` · ${Math.round(a.failureProbability * 100)}% fail prob.`}
                     </p>
                   </div>

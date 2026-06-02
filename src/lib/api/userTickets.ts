@@ -198,6 +198,21 @@ export async function listMyTickets(
   return request<UserTicketListResponse>(`/user/tickets${toQuery(params)}`);
 }
 
+export interface UserTicketStats {
+  open: number;
+  in_progress: number;
+  pending: number;
+  resolved: number;
+  closed: number;
+  cancelled: number;
+  total: number;
+}
+
+/** Authoritative status counts for the current user's own tickets (unfiltered). */
+export async function getMyTicketStats(): Promise<UserTicketStats> {
+  return request<UserTicketStats>(`/user/tickets/stats`);
+}
+
 export async function getMyTicket(ticketId: string): Promise<UserTicketDetail> {
   return request<UserTicketDetail>(`/user/tickets/${ticketId}`);
 }

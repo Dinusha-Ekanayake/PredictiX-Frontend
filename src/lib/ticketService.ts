@@ -42,30 +42,12 @@ function uiPriority(p: string): TicketPriority {
   return map[p?.toLowerCase()] ?? "Medium";
 }
 
-interface TicketRow {
-  id: string;
-  ticket_number: string | null;
-  asset_id: string | null;
-  assets?: { asset_name?: string | null } | null;
-  title: string;
-  description: string | null;
-  status: string;
-  priority: string;
-  predicted_category: string | null;
-  final_category: string | null;
-  created_by: string | null;
-  assigned_to: string | null;
-  opened_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-function mapRow(row: TicketRow): Ticket {
+function mapRow(row: any): Ticket {
   return {
     id: row.id,
     ticket_number: row.ticket_number,
     asset_id: row.asset_id,
-    asset_name: row.assets?.asset_name ?? undefined,
+    asset_name: row.assets?.asset_name ?? null,
     title: row.title,
     description: row.description,
     status: uiStatus(row.status),
@@ -115,17 +97,12 @@ export async function fetchTickets(
   };
 }
 
-function dbCategory(c: TicketCategory) {
-  return c === "General" ? "mechanical" : c.toLowerCase();
-}
-
 export async function createTicket(payload: {
   asset_id: string | null;
   title: string;
   description: string;
   priority: TicketPriority;
   category: TicketCategory;
-  created_by?: string | null;
 }): Promise<Ticket> {
   if (!supabase) throw new Error("Supabase not configured");
 
@@ -137,8 +114,7 @@ export async function createTicket(payload: {
       description: payload.description,
       status: "open",
       priority: dbPriority(payload.priority),
-      predicted_category: dbCategory(payload.category),
-      created_by: payload.created_by ?? null,
+      predicted_category: payload.category === "General" ? "mechanical" : payload.category.toLowerCase(),
       opened_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -150,67 +126,24 @@ export async function createTicket(payload: {
   return mapRow(data);
 }
 
-/**
- * Fetch tickets CREATED BY a specific user (ownership-scoped — used by the
- * non-admin user tickets page, where a user may only see their own tickets).
- */
-export async function fetchMyTickets(
-  userId: string,
-  page: number,
-  search: string,
-  status: string,
-  priority: string
-): Promise<{ tickets: Ticket[]; total: number }> {
+export async function fetchTicketStatusCounts(): Promise<Record<string, number>> {
   if (!supabase) throw new Error("Supabase not configured");
 
-  const from = page * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
+  const statuses = ["open", "in_progress", "resolved", "closed"];
+  const counts: Record<string, number> = { open: 0, "in-progress": 0, resolved: 0, closed: 0 };
 
-  let query = supabase
-    .from("tickets")
-    .select("*, assets(asset_name)", { count: "exact" })
-    .eq("created_by", userId)
-    .order("created_at", { ascending: false });
+  await Promise.all(
+    statuses.map(async (s) => {
+      const { count } = await supabase!
+        .from("tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("status", s);
+      const uiKey = s === "in_progress" ? "in-progress" : s;
+      counts[uiKey] = count ?? 0;
+    })
+  );
 
-  if (search.trim()) {
-    query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
-  }
-  if (status && status !== "all") query = query.eq("status", dbStatus(status));
-  if (priority && priority !== "all") query = query.eq("priority", dbPriority(priority));
-
-  const { data, error, count } = await query.range(from, to);
-  if (error) throw error;
-
-  return { tickets: (data ?? []).map(mapRow), total: count ?? 0 };
-}
-
-/** Full edit of a ticket's editable fields (title/description/priority/category). */
-export async function updateTicket(
-  id: string,
-  fields: {
-    title?: string;
-    description?: string;
-    priority?: TicketPriority;
-    category?: TicketCategory;
-  }
-): Promise<Ticket> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (fields.title !== undefined) updates.title = fields.title;
-  if (fields.description !== undefined) updates.description = fields.description;
-  if (fields.priority) updates.priority = dbPriority(fields.priority);
-  if (fields.category) updates.predicted_category = dbCategory(fields.category);
-
-  const { data, error } = await supabase
-    .from("tickets")
-    .update(updates)
-    .eq("id", id)
-    .select("*, assets(asset_name)")
-    .single();
-
-  if (error) throw error;
-  return mapRow(data);
+  return counts;
 }
 
 export async function updateTicketStatus(id: string, status: TicketStatus): Promise<void> {
@@ -225,6 +158,15 @@ export async function updateTicketStatus(id: string, status: TicketStatus): Prom
   if (status === "in-progress") updates.reviewed_at = new Date().toISOString();
 
   const { error } = await supabase.from("tickets").update(updates).eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateTicketPriority(id: string, priority: TicketPriority): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase
+    .from("tickets")
+    .update({ priority: dbPriority(priority), updated_at: new Date().toISOString() })
+    .eq("id", id);
   if (error) throw error;
 }
 

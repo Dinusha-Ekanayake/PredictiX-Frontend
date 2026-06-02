@@ -323,7 +323,7 @@ export default function LoginPage() {
       if (data.role.toLowerCase() === "admin") {
         router.push("/admin/dashboard");
       } else {
-        router.push("/user/users");
+        router.push("/user/dashboard");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.");

@@ -44,7 +44,9 @@ import {
 } from "@/components/ui/select";
 import {
   listMyTickets,
+  getMyTicketStats,
   type UserTicketSummary,
+  type UserTicketStats,
 } from "@/lib/api/userTickets";
 
 // Values must match the Postgres ENUM labels (`ticket_status`,
@@ -122,6 +124,7 @@ function formatDate(iso: string) {
 
 export default function UserTicketsPage() {
   const [tickets, setTickets] = React.useState<UserTicketSummary[]>([]);
+  const [stats, setStats] = React.useState<UserTicketStats | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
@@ -151,15 +154,22 @@ export default function UserTicketsPage() {
       else setRefreshing(true);
       setErrorMsg(null);
       try {
-        const res = await listMyTickets({
-          status: selectedStatus !== "all" ? selectedStatus : undefined,
-          priority: selectedPriority !== "all" ? selectedPriority : undefined,
-          search: query.trim() || undefined,
-          sort_by: "created_at",
-          sort_dir: "desc",
-          page_size: 100,
-        });
+        // The list respects the active filters; the KPI stats are fetched
+        // separately so they always show the user's TRUE totals from the DB,
+        // independent of the current filter/search/pagination.
+        const [res, statsRes] = await Promise.all([
+          listMyTickets({
+            status: selectedStatus !== "all" ? selectedStatus : undefined,
+            priority: selectedPriority !== "all" ? selectedPriority : undefined,
+            search: query.trim() || undefined,
+            sort_by: "created_at",
+            sort_dir: "desc",
+            page_size: 100,
+          }),
+          getMyTicketStats(),
+        ]);
         setTickets(res.items);
+        setStats(statsRes);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to load tickets";
         setErrorMsg(msg);
@@ -185,20 +195,6 @@ export default function UserTicketsPage() {
     }, 300);
     return () => clearTimeout(t);
   }, [selectedStatus, selectedPriority, query, loadTickets]);
-
-  const stats = React.useMemo(() => {
-    const s: Record<string, number> = {
-      open: 0,
-      "in-progress": 0,
-      resolved: 0,
-      closed: 0,
-    };
-    for (const t of tickets) {
-      const key = t.status === "in_progress" ? "in-progress" : t.status;
-      s[key] = (s[key] || 0) + 1;
-    }
-    return s;
-  }, [tickets]);
 
   function openDetail(id: string) {
     setActiveTicketId(id);
@@ -296,7 +292,7 @@ export default function UserTicketsPage() {
             <AlertCircle className="h-6 w-6 text-red-500" />
             <div>
               <div className="text-sm text-muted-foreground">Open</div>
-              <div className="text-xl font-semibold">{stats.open}</div>
+              <div className="text-xl font-semibold">{stats?.open ?? 0}</div>
             </div>
           </CardContent>
         </Card>
@@ -306,7 +302,7 @@ export default function UserTicketsPage() {
             <RefreshCw className="h-6 w-6 text-amber-500" />
             <div>
               <div className="text-sm text-muted-foreground">In Progress</div>
-              <div className="text-xl font-semibold">{stats["in-progress"]}</div>
+              <div className="text-xl font-semibold">{stats?.in_progress ?? 0}</div>
             </div>
           </CardContent>
         </Card>
@@ -316,7 +312,7 @@ export default function UserTicketsPage() {
             <CheckCircle className="h-6 w-6 text-emerald-500" />
             <div>
               <div className="text-sm text-muted-foreground">Resolved</div>
-              <div className="text-xl font-semibold">{stats.resolved}</div>
+              <div className="text-xl font-semibold">{stats?.resolved ?? 0}</div>
             </div>
           </CardContent>
         </Card>
@@ -326,7 +322,7 @@ export default function UserTicketsPage() {
             <XCircle className="h-6 w-6 text-slate-500" />
             <div>
               <div className="text-sm text-muted-foreground">Closed</div>
-              <div className="text-xl font-semibold">{stats.closed}</div>
+              <div className="text-xl font-semibold">{stats?.closed ?? 0}</div>
             </div>
           </CardContent>
         </Card>

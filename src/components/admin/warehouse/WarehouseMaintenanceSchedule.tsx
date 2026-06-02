@@ -14,19 +14,19 @@ import {
 } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarClock, Lightbulb, Loader2, ArrowUpDown } from "lucide-react";
+import { CalendarClock, Lightbulb, ArrowUpDown } from "lucide-react";
 import { useTheme } from "next-themes";
-import { getMaintenanceSchedule } from "@/lib/warehouseService";
+import { getMaintenanceSchedule, type MaintenanceScheduleItem } from "@/lib/warehouseService";
 import { Button } from "@/components/ui/button";
 
 type SortBy = "urgent" | "alphabetical";
 
-export default function WarehouseMaintenanceSchedule({ data: propsData }: { data?: any[] } = {}) {
+export default function WarehouseMaintenanceSchedule({ data: propsData }: { data?: MaintenanceScheduleItem[] } = {}) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
-  
-  const [allData, setAllData] = useState<any[]>(propsData || []);
-  const [displayData, setDisplayData] = useState<any[]>([]);
+
+  const [allData, setAllData] = useState<MaintenanceScheduleItem[]>(propsData || []);
+  const [displayData, setDisplayData] = useState<MaintenanceScheduleItem[]>([]);
   const [loading, setLoading] = useState(!propsData || propsData.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("urgent");
@@ -45,11 +45,10 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
         setLoading(true);
         setError(null);
         const fetchedData = await getMaintenanceSchedule();
-        console.log('[DEBUG] WarehouseMaintenanceSchedule received data:', fetchedData);
         setAllData(fetchedData);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load maintenance schedule';
-        console.error('[ERROR] WarehouseMaintenanceSchedule fetch failed:', err);
+        console.error('Maintenance schedule fetch failed:', err);
         setError(errorMessage);
         setAllData([]);
       } finally {
@@ -62,7 +61,7 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
 
   // Update display data based on sort and filter
   useEffect(() => {
-    let sorted = [...allData];
+    const sorted = [...allData];
 
     if (sortBy === "urgent") {
       // Sort by urgency: where predicted < scheduled (needs maintenance sooner)
@@ -229,7 +228,7 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
               <span className="font-medium text-foreground">Quick Tips:</span>
               <ul className="mt-1 space-y-1 list-disc list-inside">
                 <li>Red bars shorter than green = needs maintenance sooner than scheduled</li>
-                <li>Click "Most Urgent First" to prioritize high-risk assets</li>
+                <li>Click &ldquo;Most Urgent First&rdquo; to prioritize high-risk assets</li>
                 <li>Use the number buttons to show more assets at once</li>
               </ul>
             </div>

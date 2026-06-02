@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import {
-  Brain, AlertTriangle, Wrench, TrendingUp, Download,
-  RefreshCw, BookOpen, Users, Activity, ShieldAlert,
+  Brain, AlertTriangle, Wrench, Download,
+  RefreshCw, BookOpen, Activity, ShieldAlert,
   CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp,
   FileText, DollarSign, Clock, ClipboardList, Database, Cpu, X,
 } from "lucide-react";
@@ -72,10 +72,35 @@ interface Ctx {
   admin_users?: number; standard_users?: number;
 }
 
+/** KB enrichments computed by the backend (kb_annotator). */
+interface WarehouseKbAnnotations {
+  shap_enriched?: {
+    feature: string;
+    impact_pct: number;
+    kb_threshold: string;
+    action: string;
+    standard?: string;
+  }[];
+  benchmark_alerts?: { type?: string; message: string }[];
+  recommendations?: {
+    critical?: string[];
+    high?: string[];
+    medium?: string[];
+    kb_alert?: string;
+  };
+  service_interval_text?: string;
+}
+
+export interface WarehouseReportPayload {
+  ai_sections: AISections;
+  context: Ctx;
+  kb_annotations?: WarehouseKbAnnotations;
+}
+
 interface Props {
   open: boolean;
   generating: boolean;
-  reportData: { ai_sections: AISections; context: Ctx; kb_annotations?: any } | null;
+  reportData: WarehouseReportPayload | null;
   reportError: string | null;
   onGenerate: () => void;
   onClose: () => void;
@@ -261,6 +286,7 @@ function ConfirmStep({ onGenerate, onClose }: { onGenerate: () => void; onClose:
 // ─────────────────────────────────────────────────────────
 
 function LoadingStep() {
+  const [step, setStep] = React.useState(0);
   const steps = React.useMemo(() => [
     "Connecting to database…",
     "Aggregating asset health & failure data…",
@@ -439,12 +465,12 @@ function ReportStep({
       },
       sections: {
         assetStatus: Object.entries(ctx.asset_status_breakdown || {}).map(([name, value]) => ({ name, value })),
-        ticketPriority: toChart(ctx.ticket_priority_breakdown || {}),
+        ticketsByPriority: toChart(ctx.ticket_priority_breakdown || {}),
         ticketsByCategory: toChart(ctx.ticket_category_breakdown || {}),
         assetsByType: toChart(ctx.asset_type_breakdown || {}),
         healthScoreDistribution: Object.entries(ctx.health_score_distribution || {}).map(([bucket, count]) => ({ bucket, count })),
-        maintenanceTypes: Object.entries(ctx.maintenance_type_breakdown || {}).map(([name, value]) => ({ name, value })),
-        riskBreakdown: Object.entries(ctx.risk_breakdown || {}).map(([name, value]) => ({ name, value })),
+        maintenanceByType: Object.entries(ctx.maintenance_type_breakdown || {}).map(([name, value]) => ({ name, value })),
+        riskDistribution: Object.entries(ctx.risk_breakdown || {}).map(([name, value]) => ({ name, value })),
         criticaAssets: (ctx.critical_assets || []).map(asset => ({
           id: asset.code || "N/A",
           vehicle: asset.name || "Unknown",
@@ -463,98 +489,11 @@ function ReportStep({
         importance: importance,
       })),
     };
-    // const pdfData = {
-    //   title: "Warehouse Report",
-    //   warehouseName: warehouseName,
-    //   warehouseCity: ctx.warehouse_city,
-    //   generatedDate: date,
-    //   summary: {
-    //     totalAssets: ctx.total_assets || 0,
-    //     fleetHealth: Math.round(ctx.avg_health_pct || 0),
-    //     failureProb: Math.round(ctx.avg_failure_prob_pct || 0),
-    //     critical: ctx.critical_count || 0,
-    //     urgent: ctx.urgent_count || 0,
-    //     activeTickets: ctx.active_tickets || 0,
-    //     activeUsers: ctx.active_users || 0,
-    //     maintenanceCost: `LKR ${(ctx.monthly_maintenance_cost || 0).toLocaleString()}`,
-    //   },
-    //   kbAnnotations: kb,
-    //   // AI Content Sections - from data parameter
-    //   aiContent: {
-    //     insight_summary: ai.insight_summary || "",
-    //     risk_analysis: ai.risk_analysis || "",
-    //     maintenance_intelligence: ai.maintenance_intelligence || "",
-    //     pattern_and_trend: ai.pattern_and_trend || "",
-    //     conclusion: ai.conclusion || "",
-    //   },
-    //   // Asset Details
-    //   assetDetail: {
-    //     activeAssets: ctx.active_assets || 0,
-    //     inactiveAssets: ctx.inactive_assets || 0,
-    //     underMaintenanceAssets: ctx.under_maintenance_assets || 0,
-    //     retiredAssets: ctx.retired_assets || 0,
-    //     avgVehicleAge: ctx.avg_vehicle_age_years || 0,
-    //   },
-    //   // Maintenance Details
-    //   maintenanceDetail: {
-    //     estimatedCost: `LKR ${(ctx.total_estimated_cost || 0).toLocaleString()}`,
-    //     avgCostPerAsset: `LKR ${(ctx.avg_cost_per_asset || 0).toLocaleString()}`,
-    //     actualCost3m: `LKR ${(ctx.actual_cost_3m || 0).toLocaleString()}`,
-    //     maintenanceEvents3m: ctx.total_maintenance_events_3m || 0,
-    //     avgDowntimeHours: ctx.avg_downtime_hours || 0,
-    //   },
-    //   // Ticket Details
-    //   ticketDetail: {
-    //     totalTickets: ctx.total_tickets || 0,
-    //     openTickets: ctx.open_tickets || 0,
-    //     inProgressTickets: ctx.in_progress_tickets || 0,
-    //     resolvedTickets: ctx.resolved_tickets || 0,
-    //     closedTickets: ctx.closed_tickets || 0,
-    //     highPriorityTickets: ctx.high_priority_active_tickets || 0,
-    //     mediumPriorityTickets: ctx.ticket_priority_breakdown?.['Medium'] || ctx.ticket_final_priority_breakdown?.['Medium'] || 0,
-    //     lowPriorityTickets: ctx.ticket_priority_breakdown?.['Low'] || ctx.ticket_final_priority_breakdown?.['Low'] || 0,
-    //   },
-    //   // User Details
-    //   userDetail: {
-    //     totalUsers: ctx.total_users || 0,
-    //     adminUsers: ctx.admin_users || 0,
-    //     standardUsers: ctx.standard_users || 0,
-    //     inactiveUsers: ctx.inactive_users || 0,
-    //   },
-    //   // Chart Sections
-    //   sections: {
-    //     assetStatus: Object.entries(ctx.asset_status_breakdown || {}).map(([name, value]) => ({ name, value })),
-    //     ticketPriority: toChart(ctx.ticket_priority_breakdown || {}),
-    //     ticketsByCategory: toChart(ctx.ticket_category_breakdown || {}),
-    //     assetsByType: toChart(ctx.asset_type_breakdown || {}),
-    //     healthScoreDistribution: Object.entries(ctx.health_score_distribution || {}).map(([bucket, count]) => ({ bucket, count })),
-    //     maintenanceTypes: Object.entries(ctx.maintenance_type_breakdown || {}).map(([name, value]) => ({ name, value })),
-    //     riskBreakdown: Object.entries(ctx.risk_breakdown || {}).map(([name, value]) => ({ name, value })),
-    //     criticaAssets: (ctx.critical_assets || []).map(asset => ({
-    //       id: asset.code || "N/A",
-    //       vehicle: asset.name || "Unknown",
-    //       component: asset.type || "General",
-    //       health: asset.health || "N/A",
-    //       priority: Math.round(parseFloat(asset.failure_prob || "0")) > 50 ? "High" : "Medium",
-    //       status: asset.status || "Unknown",
-    //     })),
-    //   },
-    //   // Trends Data
-    //   trends: {
-    //     ticketTrend: ctx.ticket_trend_last_3m || [],
-    //     maintenanceTrend: ctx.monthly_maintenance_trend || [],
-    //   },
-    //   // SHAP Features (Top Failure Drivers)
-    //   shapFeatures: (ctx.top_shap_features || []).slice(0, 8).map(([feature, importance]) => ({
-    //     feature: feature.replace(/_/g, " "),
-    //     importance: importance,
-    //   })),
-    // };
-    
-    downloadProfessionalPDF(pdfData as Parameters<typeof downloadProfessionalPDF>[0], filename);
-    
+
+    downloadProfessionalPDF(pdfData as unknown as Parameters<typeof downloadProfessionalPDF>[0], filename);
+
     // Trigger Server Notification
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('predictix.access_token') : null;
     if (token) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/warehouse-dashboard/notify-print`, {
         method: 'POST',
@@ -636,7 +575,7 @@ function ReportStep({
         {/* ── S1: Executive Summary ── */}
         <Section icon={Brain} accent={P.violet} title="1. Executive Insight Summary" subtitle="Top-level AI intelligence & benchmark context">
           <AIBlock text={ai.insight_summary} />
-          {kb.benchmark_alerts?.map((a: any, i: number) => (
+          {kb.benchmark_alerts?.map((a, i) => (
             <div key={i} className="my-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
               <span className="font-bold flex items-center gap-1.5"><AlertTriangle className="h-4 w-4" /> Benchmark Alert</span>
               <p className="mt-1">{a.message}</p>
@@ -755,7 +694,7 @@ function ReportStep({
                   <span className="text-[10px] font-bold uppercase tracking-widest text-sky-800 dark:text-sky-300">Service Interval Standard</span>
                 </div>
                 <p className="text-xs text-sky-700 dark:text-sky-400 italic leading-relaxed">
-                  "{kb.service_interval_text}"
+                  &ldquo;{kb.service_interval_text}&rdquo;
                 </p>
               </div>
             )}
@@ -803,7 +742,7 @@ function ReportStep({
               <div className="lg:col-span-2">
                 <CLabel text="Enriched SHAP Failure Drivers" />
                 <div className="mt-2 space-y-2">
-                  {kb.shap_enriched.slice(0, 4).map((f: any, i: number) => (
+                  {kb.shap_enriched.slice(0, 4).map((f, i) => (
                     <div key={i} className="flex flex-col gap-1 rounded-lg border border-slate-100 bg-slate-50/50 p-2 dark:border-slate-800 dark:bg-slate-800/20 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-slate-700 dark:text-slate-200">{f.feature}</span>
@@ -1008,27 +947,27 @@ function ReportStep({
         <Section icon={ShieldAlert} accent={P.emerald} title="6. Recommendations" subtitle="Data-driven prescriptive actions">
           {kb.recommendations ? (
             <div className="grid gap-4">
-              {kb.recommendations.critical?.length > 0 && (
+              {(kb.recommendations.critical?.length ?? 0) > 0 && (
                 <div className="rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/20 overflow-hidden text-xs">
                   <div className="bg-rose-600 px-3 py-1.5 font-bold text-white tracking-widest uppercase text-[10px]">Critical (0-7 Days)</div>
                   <ul className="px-5 py-3 list-disc space-y-1.5 text-rose-900 dark:text-rose-200">
-                    {kb.recommendations.critical.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                    {(kb.recommendations.critical ?? []).map((r, i) => <li key={i}>{r}</li>)}
                   </ul>
                 </div>
               )}
-              {kb.recommendations.high?.length > 0 && (
+              {(kb.recommendations.high?.length ?? 0) > 0 && (
                 <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 overflow-hidden text-xs">
                   <div className="bg-amber-500 px-3 py-1.5 font-bold text-white tracking-widest uppercase text-[10px]">High (7-30 Days)</div>
                   <ul className="px-5 py-3 list-disc space-y-1.5 text-amber-900 dark:text-amber-200">
-                    {kb.recommendations.high.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                    {(kb.recommendations.high ?? []).map((r, i) => <li key={i}>{r}</li>)}
                   </ul>
                 </div>
               )}
-              {kb.recommendations.medium?.length > 0 && (
+              {(kb.recommendations.medium?.length ?? 0) > 0 && (
                 <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20 overflow-hidden text-xs">
                   <div className="bg-emerald-600 px-3 py-1.5 font-bold text-white tracking-widest uppercase text-[10px]">Medium (30-90 Days)</div>
                   <ul className="px-5 py-3 list-disc space-y-1.5 text-emerald-900 dark:text-emerald-200">
-                    {kb.recommendations.medium.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                    {(kb.recommendations.medium ?? []).map((r, i) => <li key={i}>{r}</li>)}
                   </ul>
                 </div>
               )}

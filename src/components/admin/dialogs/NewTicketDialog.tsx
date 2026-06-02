@@ -12,13 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import { Loader2, Plus } from "lucide-react";
 import { apiGet } from "@/lib/apiClient";
 import { createTicket, type Ticket, type TicketPriority, type TicketCategory } from "@/lib/ticketService";
@@ -32,16 +25,14 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (ticket: Ticket) => void;
-  /** Set the ticket's creator (used by the non-admin user tickets page). */
-  createdBy?: string | null;
   /** Preselect an asset (e.g. "create ticket on this asset" from the assets page). */
   presetAssetId?: string;
   presetAssetName?: string;
   /** Lock the asset selector to the preset asset. */
   lockAsset?: boolean;
   /**
-   * Override the create call (e.g. the user section routes creation through
-   * the backend /tickets/mine endpoint so ownership is enforced server-side).
+   * Override the create call: the user section routes creation through the
+   * backend /tickets/mine endpoint so ownership is enforced server-side.
    * When omitted, the default Supabase createTicket is used (admin).
    */
   createFn?: (payload: {
@@ -53,8 +44,11 @@ type Props = {
   }) => Promise<Ticket>;
 };
 
+const selectCls =
+  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring focus:border-ring disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer h-9";
+
 export default function NewTicketDialog({
-  open, onOpenChange, onCreated, createdBy, presetAssetId, presetAssetName, lockAsset, createFn,
+  open, onOpenChange, onCreated, presetAssetId, presetAssetName, lockAsset, createFn,
 }: Props) {
   const [assetId, setAssetId] = React.useState("");
   const [title, setTitle] = React.useState("");
@@ -69,9 +63,12 @@ export default function NewTicketDialog({
     if (open) {
       if (presetAssetId) setAssetId(presetAssetId);
       setAssetsLoading(true);
-      apiGet<Asset[]>("/assets/")
-        .then((data) => setAssets(data))
-        .catch(() => toast.error("Failed to load assets"))
+      apiGet<Asset[]>("/assets/dropdown")
+        .then((data) => setAssets(data ?? []))
+        .catch((err) => {
+          console.error("Failed to load assets:", err);
+          toast.error("Failed to load assets", { description: err?.message });
+        })
         .finally(() => setAssetsLoading(false));
     } else {
       const t = setTimeout(() => {
@@ -105,14 +102,12 @@ export default function NewTicketDialog({
       };
       const ticket = createFn
         ? await createFn(createArgs)
-        : await createTicket({ ...createArgs, created_by: createdBy ?? null });
+        : await createTicket(createArgs);
       toast.success("Ticket created", { description: ticket.title });
       onCreated?.(ticket);
       onOpenChange(false);
-    } catch (err) {
-      toast.error("Failed to create ticket", {
-        description: err instanceof Error ? err.message : undefined,
-      });
+    } catch (err: any) {
+      toast.error("Failed to create ticket", { description: err?.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -130,35 +125,40 @@ export default function NewTicketDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid gap-3 pt-2">
+          {/* Asset */}
           <div>
             <p className="text-sm text-muted-foreground mb-2">
               Asset{lockAsset && presetAssetName ? ` · ${presetAssetName}` : ""}
             </p>
-            <Select value={assetId} onValueChange={(v) => setAssetId(v)} disabled={assetsLoading || lockAsset}>
-              <SelectTrigger className="w-full bg-background">
-                {assetsLoading ? (
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Loading assets…
-                  </span>
+            {assetsLoading && !lockAsset ? (
+              <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input text-sm text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading assets…
+              </div>
+            ) : (
+              <select
+                value={assetId}
+                onChange={(e) => setAssetId(e.target.value)}
+                className={selectCls}
+                disabled={lockAsset}
+              >
+                {lockAsset && presetAssetId ? (
+                  <option value={presetAssetId}>{presetAssetName ?? "Selected asset"}</option>
                 ) : (
-                  <SelectValue placeholder="Select an asset" />
+                  <>
+                    <option value="">Select an asset (optional)</option>
+                    {assets.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.asset_name}
+                      </option>
+                    ))}
+                  </>
                 )}
-              </SelectTrigger>
-              <SelectContent className="max-h-64">
-                {assets.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">No assets found</div>
-                ) : (
-                  assets.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.asset_name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+              </select>
+            )}
           </div>
 
+          {/* Title */}
           <div>
             <p className="text-sm text-muted-foreground mb-2">Title</p>
             <Input
@@ -168,45 +168,49 @@ export default function NewTicketDialog({
             />
           </div>
 
+          {/* Description */}
           <div>
             <p className="text-sm text-muted-foreground mb-2">Description</p>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base min-h-[110px] resize-vertical"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base min-h-[110px] resize-vertical outline-none focus:ring-2 focus:ring-ring"
               placeholder="Describe the issue in detail"
             />
           </div>
 
+          {/* Priority + Category */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-muted-foreground mb-2">Priority</p>
-              <Select value={priority} onValueChange={(v) => setPriority(v as TicketPriority)}>
-                <SelectTrigger className="w-full bg-background">
-                  <SelectValue placeholder="Select priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="Low">Low</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as TicketPriority)}
+                className={selectCls}
+              >
+                <option value="">Select priority</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
             </div>
 
             <div>
               <p className="text-sm text-muted-foreground mb-2">Category</p>
-              <Select value={category} onValueChange={(v) => setCategory(v as TicketCategory)}>
-                <SelectTrigger className="w-full bg-background">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Mechanical">Mechanical</SelectItem>
-                  <SelectItem value="Electrical">Electrical</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as TicketCategory)}
+                className={selectCls}
+              >
+                <option value="">Select category</option>
+                <option value="Mechanical">Mechanical</option>
+                <option value="Electrical">Electrical</option>
+                <option value="Software">Software</option>
+              </select>
             </div>
           </div>
 
+          {/* Actions */}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (

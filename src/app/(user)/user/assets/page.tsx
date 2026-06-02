@@ -12,7 +12,7 @@ import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
 import { fetchMyAssets, type UserAssetData } from "@/lib/api/userProfileApi";
 import { listAssets } from "@/components/admin/assets/assetService";
 import type { Asset } from "@/components/admin/assets/types";
-import { getUser } from "@/lib/authService";
+import { createMyTicket } from "@/lib/userTicketService";
 
 function healthColor(p: number) {
   return p >= 80 ? "#10b981" : p >= 60 ? "#f59e0b" : "#ef4444";
@@ -35,8 +35,6 @@ type Row = {
 };
 
 export default function UserAssetsPage() {
-  const userId = React.useMemo(() => getUser()?.id ?? null, []);
-
   const [mine, setMine] = React.useState<UserAssetData[]>([]);
   const [loadingMine, setLoadingMine] = React.useState(true);
 
@@ -186,7 +184,7 @@ export default function UserAssetsPage() {
       <NewTicketDialog
         open={ticketAsset !== null}
         onOpenChange={(o) => { if (!o) setTicketAsset(null); }}
-        createdBy={userId}
+        createFn={createMyTicket}
         presetAssetId={ticketAsset?.id}
         presetAssetName={ticketAsset?.name}
         lockAsset

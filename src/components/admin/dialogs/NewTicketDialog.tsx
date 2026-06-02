@@ -39,10 +39,22 @@ type Props = {
   presetAssetName?: string;
   /** Lock the asset selector to the preset asset. */
   lockAsset?: boolean;
+  /**
+   * Override the create call (e.g. the user section routes creation through
+   * the backend /tickets/mine endpoint so ownership is enforced server-side).
+   * When omitted, the default Supabase createTicket is used (admin).
+   */
+  createFn?: (payload: {
+    asset_id: string | null;
+    title: string;
+    description: string;
+    priority: TicketPriority;
+    category: TicketCategory;
+  }) => Promise<Ticket>;
 };
 
 export default function NewTicketDialog({
-  open, onOpenChange, onCreated, createdBy, presetAssetId, presetAssetName, lockAsset,
+  open, onOpenChange, onCreated, createdBy, presetAssetId, presetAssetName, lockAsset, createFn,
 }: Props) {
   const [assetId, setAssetId] = React.useState("");
   const [title, setTitle] = React.useState("");
@@ -84,14 +96,16 @@ export default function NewTicketDialog({
 
     setIsSubmitting(true);
     try {
-      const ticket = await createTicket({
+      const createArgs = {
         asset_id: assetId || null,
         title: title.trim(),
         description: description.trim(),
         priority: (priority as TicketPriority) || "Medium",
         category: (category as TicketCategory) || "Mechanical",
-        created_by: createdBy ?? null,
-      });
+      };
+      const ticket = createFn
+        ? await createFn(createArgs)
+        : await createTicket({ ...createArgs, created_by: createdBy ?? null });
       toast.success("Ticket created", { description: ticket.title });
       onCreated?.(ticket);
       onOpenChange(false);

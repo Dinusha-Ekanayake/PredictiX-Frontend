@@ -12,9 +12,8 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
-import {
-  updateTicket, type Ticket, type TicketPriority, type TicketCategory,
-} from "@/lib/ticketService";
+import type { Ticket, TicketPriority, TicketCategory } from "@/lib/ticketService";
+import { updateMyTicket } from "@/lib/userTicketService";
 
 type Props = {
   open: boolean;
@@ -57,7 +56,7 @@ export default function EditTicketDialog({ open, onOpenChange, ticket, onUpdated
     }
     setSaving(true);
     try {
-      const updated = await updateTicket(ticket.id, {
+      const updated = await updateMyTicket(ticket.id, {
         title: title.trim(),
         description: description.trim(),
         priority,

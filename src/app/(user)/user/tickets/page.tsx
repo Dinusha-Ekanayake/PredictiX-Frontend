@@ -4,9 +4,8 @@ import * as React from "react";
 import { toast } from "sonner";
 import {
   Search, AlertCircle, RefreshCw, CheckCircle, XCircle, AlertTriangle,
-  Plus, Pencil, Trash2, Loader2, Ticket as TicketIcon,
+  Plus, Pencil, Trash2, Ticket as TicketIcon,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,8 @@ import {
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
 import EditTicketDialog from "@/components/user/tickets/EditTicketDialog";
-import { fetchMyTickets, deleteTicket, type Ticket } from "@/lib/ticketService";
+import type { Ticket } from "@/lib/ticketService";
+import { fetchMyTickets, createMyTicket, deleteMyTicket } from "@/lib/userTicketService";
 import { getUser } from "@/lib/authService";
 
 const PRI_CLS: Record<string, string> = {
@@ -29,13 +29,10 @@ const STATUS_ICON: Record<string, React.ElementType> = {
 };
 
 export default function UserTicketsPage() {
-  const userId = React.useMemo(() => getUser()?.id ?? null, []);
+  const loggedIn = React.useMemo(() => !!getUser(), []);
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
-  const [total, setTotal] = React.useState(0);
-  const [page, setPage] = React.useState(0);
-  const [loadingMore, setLoadingMore] = React.useState(false);
 
   const [query, setQuery] = React.useState("");
   const [debouncedQuery, setDebouncedQuery] = React.useState("");
@@ -50,34 +47,22 @@ export default function UserTicketsPage() {
     return () => clearTimeout(t);
   }, [query]);
 
-  const loadPage = React.useCallback(
-    async (pageNum: number, reset: boolean) => {
-      if (!userId) return;
-      if (pageNum === 0) setIsLoading(true); else setLoadingMore(true);
-      try {
-        const { tickets: rows, total: t } = await fetchMyTickets(userId, pageNum, debouncedQuery, status, priority);
-        setTotal(t);
-        setTickets((prev) => (reset ? rows : [...prev, ...rows]));
-        setPage(pageNum);
-      } catch (err) {
-        toast.error("Failed to load your tickets", { description: err instanceof Error ? err.message : undefined });
-      } finally {
-        setIsLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [userId, debouncedQuery, status, priority],
-  );
+  const load = React.useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const rows = await fetchMyTickets(debouncedQuery, status, priority);
+      setTickets(rows);
+    } catch (err) {
+      toast.error("Failed to load your tickets", { description: err instanceof Error ? err.message : undefined });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [debouncedQuery, status, priority]);
 
-  React.useEffect(() => {
-    setPage(0);
-    setTickets([]);
-    loadPage(0, true);
-  }, [loadPage]);
+  React.useEffect(() => { load(); }, [load]);
 
   function handleCreated(ticket: Ticket) {
     setTickets((prev) => [ticket, ...prev]);
-    setTotal((t) => t + 1);
   }
   function handleUpdated(updated: Ticket) {
     setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
@@ -85,16 +70,15 @@ export default function UserTicketsPage() {
   async function handleDelete(t: Ticket) {
     if (!confirm(`Delete ticket "${t.title}"? This cannot be undone.`)) return;
     try {
-      await deleteTicket(t.id);
+      await deleteMyTicket(t.id);
       setTickets((prev) => prev.filter((x) => x.id !== t.id));
-      setTotal((c) => Math.max(0, c - 1));
       toast.success("Ticket deleted");
     } catch (err) {
       toast.error("Failed to delete ticket", { description: err instanceof Error ? err.message : undefined });
     }
   }
 
-  if (!userId) {
+  if (!loggedIn) {
     return <div className="rounded-2xl border p-8 text-center text-muted-foreground">Please log in to view your tickets.</div>;
   }
   if (isLoading) {
@@ -104,8 +88,6 @@ export default function UserTicketsPage() {
       </div>
     );
   }
-
-  const hasMore = tickets.length < total;
 
   return (
     <div className="w-full space-y-6">
@@ -144,7 +126,7 @@ export default function UserTicketsPage() {
         </Button>
       </div>
 
-      <p className="text-sm text-muted-foreground">Showing {tickets.length} of {total} ticket{total !== 1 ? "s" : ""}</p>
+      <p className="text-sm text-muted-foreground">{tickets.length} ticket{tickets.length !== 1 ? "s" : ""}</p>
 
       {/* List */}
       <div className="flex flex-col gap-4">
@@ -194,15 +176,7 @@ export default function UserTicketsPage() {
         )}
       </div>
 
-      {hasMore && (
-        <div className="flex justify-center pt-2">
-          <Button variant="outline" onClick={() => loadPage(page + 1, false)} disabled={loadingMore} className="min-w-[160px]">
-            {loadingMore ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading…</> : `Load More (${total - tickets.length} remaining)`}
-          </Button>
-        </div>
-      )}
-
-      <NewTicketDialog open={newOpen} onOpenChange={setNewOpen} onCreated={handleCreated} createdBy={userId} />
+      <NewTicketDialog open={newOpen} onOpenChange={setNewOpen} onCreated={handleCreated} createFn={createMyTicket} />
       <EditTicketDialog open={editTicket !== null} onOpenChange={(o) => { if (!o) setEditTicket(null); }} ticket={editTicket} onUpdated={handleUpdated} />
     </div>
   );

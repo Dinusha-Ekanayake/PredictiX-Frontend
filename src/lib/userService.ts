@@ -5,7 +5,7 @@
  * with JWT auto-attached via apiClient.
  */
 
-import { apiGet, apiPost, apiPut } from "@/lib/apiClient";
+import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/apiClient";
 
 export type UserRole = "admin" | "user";
 export type UserStatus = "active" | "inactive";
@@ -71,4 +71,8 @@ export async function updateUser(
 
 export async function getUserAssets(userId: string): Promise<UserAssignedAsset[]> {
   return apiGet<UserAssignedAsset[]>(`/users/${userId}/assets`);
+}
+
+export async function deleteUser(userId: string): Promise<{ message: string; id: string }> {
+  return apiDelete<{ message: string; id: string }>(`/users/${userId}`);
 }

@@ -34,6 +34,7 @@ import {
   listUsers,
   createUser,
   getUserAssets,
+  deleteUser,
   type UserItem,
   type UserRole,
   type UserStatus,
@@ -47,6 +48,7 @@ import {
   UserPlus,
   Search,
   Building2,
+  Trash2,
 } from "lucide-react";
 
 /**
@@ -234,6 +236,19 @@ export default function AdminUsersPage() {
 
   function handleViewDetails(user: UserItem) {
     setDetailsUser(user);
+  }
+
+  async function handleDeleteUser(user: UserItem) {
+    if (!confirm(`Delete ${user.name}? This removes their login and profile. This cannot be undone.`)) return;
+    try {
+      await deleteUser(user.id);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      toast.success("User deleted", { description: user.name });
+    } catch (err) {
+      toast.error("Failed to delete user", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
   }
 
   async function handleViewAssets(user: UserItem) {
@@ -427,6 +442,14 @@ export default function AdminUsersPage() {
                               View Assets
                             </button>
                           )}
+                          <button
+                            onClick={() => handleDeleteUser(user)}
+                            title="Delete user"
+                            className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-500"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </button>
                         </div>
                       </TableCell>
                     </TableRow>

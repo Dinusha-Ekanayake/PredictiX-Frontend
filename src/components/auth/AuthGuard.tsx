@@ -33,7 +33,7 @@ export default function AuthGuard({ children, requiredRole }: Props) {
     const role = getUserRole();
     if (requiredRole && role !== requiredRole) {
       // Logged in but in the wrong area — send to their own home.
-      router.replace(role === "ADMIN" ? "/admin/dashboard" : "/user/users");
+      router.replace(role === "ADMIN" ? "/admin/dashboard" : "/user/dashboard");
       return;
     }
 

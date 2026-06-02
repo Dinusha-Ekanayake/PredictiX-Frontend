@@ -61,6 +61,9 @@ interface Ctx {
   total_maintenance_events_3m?: number; avg_downtime_hours?: number;
   maintenance_type_breakdown?: Record<string, number>;
   monthly_maintenance_trend?: { month: string; cost: number; events: number }[];
+  maintenance_trend_direction?: string; cost_trend_direction?: string;
+  maintenance_data_concentrated?: boolean;
+  scored_assets?: number; unscored_assets?: number;
   total_tickets?: number; open_tickets?: number; in_progress_tickets?: number;
   active_tickets?: number; resolved_tickets?: number; closed_tickets?: number;
   high_priority_active_tickets?: number;
@@ -77,6 +80,7 @@ interface Ctx {
   component_health?: { avg_tire?: number; avg_brake?: number; avg_battery?: number; avg_oil?: number; avg_hydraulic?: number };
   total_fault_codes?: number;
   avg_fault_codes_per_asset?: number;
+  monitored_assets?: number;
   vendor_breakdown?: { vendor: string; events: number; cost: number }[];
   avg_resolution_hours?: number;
   avg_resolution_days?: number;
@@ -513,6 +517,11 @@ function ReportStep({
         maxCostEstimate: ctx.max_cost_estimate ?? 0,
         // Phase B addition
         vendorBreakdown: ctx.vendor_breakdown ?? [],
+        // Trend honesty: deterministic directions + seed-data concentration flag
+        eventTrendDirection: ctx.maintenance_trend_direction,
+        costTrendDirection: ctx.cost_trend_direction,
+        dataConcentrated: ctx.maintenance_data_concentrated ?? false,
+        reportingPeriod: ctx.period,
       },
       ticketDetail: {
         totalTickets: ctx.total_tickets || 0,
@@ -542,6 +551,7 @@ function ReportStep({
         componentHealth: ctx.component_health ?? {},
         totalFaultCodes: ctx.total_fault_codes ?? 0,
         avgFaultCodesPerAsset: ctx.avg_fault_codes_per_asset ?? 0,
+        monitoredAssets: ctx.monitored_assets ?? 0,
       },
       // Predictive Maintenance Schedule (from /maintenance-schedule endpoint — warehouse only)
       maintenanceSchedule: maintenanceSchedule.slice(0, 20),
@@ -898,7 +908,7 @@ function ReportStep({
             <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 flex items-start gap-3 mt-2">
               <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
               <p className="text-xs text-amber-800 dark:text-amber-300">
-                <strong>{ctx.warranty_expiring_90d} asset{(ctx.warranty_expiring_90d ?? 0) > 1 ? 's' : ''}</strong> have warranty expiring within the next 90 days. Schedule pre-expiry inspections.
+                <strong>{ctx.warranty_expiring_90d} {(ctx.warranty_expiring_90d ?? 0) === 1 ? 'asset has' : 'assets have'}</strong> warranty expiring within the next 90 days. Schedule pre-expiry inspections.
               </p>
             </div>
           )}
@@ -1099,7 +1109,7 @@ function ReportStep({
                   <span className="font-semibold text-rose-700 dark:text-rose-400">Fleet Fault Codes:</span>
                   <span className="font-bold text-rose-800 dark:text-rose-300">{ctx.total_fault_codes ?? 0} total</span>
                   <span className="text-muted-foreground">|</span>
-                  <span className="text-muted-foreground">{(ctx.avg_fault_codes_per_asset ?? 0).toFixed(2)} avg per asset</span>
+                  <span className="text-muted-foreground">{(ctx.avg_fault_codes_per_asset ?? 0).toFixed(2)} avg per monitored asset{(ctx.monitored_assets ?? 0) > 0 ? ` (of ${ctx.monitored_assets})` : ""}</span>
                 </div>
               )}
             </>

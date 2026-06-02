@@ -55,6 +55,35 @@ interface KBAnnotations {
     kb_alert?: string;
   };
   service_interval_text?: string;
+  // ── Enhanced KB tables (statutory / OEM / FMEA / climate) ──
+  oem_intervals?: Array<{
+    asset_class: string;
+    source: string;
+    tiers: Array<{ cadence: string; trigger: string; scope: string }>;
+  }>;
+  statutory_compliance?: Array<{
+    equipment: string;
+    interval_months: number;
+    by: string;
+    record: string;
+    reference: string;
+  }>;
+  fmea_criticality?: Array<{
+    code: string;
+    name: string;
+    type: string;
+    health: string;
+    severity: number;
+    occurrence: number;
+    criticality: number;
+    band: string;
+    rationale: string;
+  }>;
+  climate_risk?: Array<{
+    driver: string;
+    metric: string;
+    action: string;
+  }>;
 }
 
 interface ReportData {
@@ -95,6 +124,10 @@ interface ReportData {
     minCostEstimate?: number;
     maxCostEstimate?: number;
     vendorBreakdown?: Array<{ vendor: string; events: number; cost: number }>;
+    eventTrendDirection?: string;
+    costTrendDirection?: string;
+    dataConcentrated?: boolean;
+    reportingPeriod?: string;
   };
   ticketDetail?: {
     totalTickets?: number;
@@ -121,6 +154,7 @@ interface ReportData {
     componentHealth?: { avg_tire?: number; avg_brake?: number; avg_battery?: number; avg_oil?: number; avg_hydraulic?: number };
     totalFaultCodes?: number;
     avgFaultCodesPerAsset?: number;
+    monitoredAssets?: number;
   };
   sections: {
     assetStatus: Array<{ name: string; value: number }>;
@@ -209,6 +243,33 @@ function fmtN(n?: number | null, dec = 0): string {
 }
 function fmtPct(n: number): string { return `${n.toFixed(1)}%`; }
 
+// Round a number to a "nice" 1/2/5 × 10^n value — used for chart axis steps so
+// gridline labels are round (e.g. 100/200/300) rather than auto-scaled (125/251/376).
+function niceNum(x: number, round: boolean): number {
+  if (x <= 0) return 1;
+  const exp = Math.floor(Math.log10(x));
+  const f = x / Math.pow(10, exp);
+  let nf: number;
+  if (round) nf = f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10;
+  else nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+  return nf * Math.pow(10, exp);
+}
+
+// Integer percentages that sum to exactly 100 (largest-remainder method) — avoids
+// donut slice labels summing to 100.8%.
+function pctsTo100(values: number[]): number[] {
+  const total = values.reduce((a, b) => a + (b || 0), 0);
+  if (total <= 0) return values.map(() => 0);
+  const raw = values.map(v => (v || 0) / total * 100);
+  const floored = raw.map(Math.floor);
+  let remainder = 100 - floored.reduce((a, b) => a + b, 0);
+  const order = raw
+    .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac);
+  for (let k = 0; k < remainder && k < order.length; k++) floored[order[k].i]++;
+  return floored;
+}
+
 
 // ══════════════════════════════════════════════════════════════════
 // SVG CHART GENERATORS
@@ -220,6 +281,9 @@ function svgDonut(
 ): string {
   const total = slices.reduce((s, d) => s + (d.value || 0), 0);
   if (!total) return `<svg width="${w}" height="${h}"><text x="${cx}" y="${cy}" text-anchor="middle" fill="${C.slateMid}" font-size="10">No data</text></svg>`;
+
+  // Integer label percentages that sum to exactly 100 (largest-remainder).
+  const labelPcts = pctsTo100(slices.map(s => s.value || 0));
 
   let angle = -90;
   const paths = slices.map((s, i) => {
@@ -237,7 +301,7 @@ function svgDonut(
     const midA = (startA + endA) / 2;
     const lx = cx + (r * 0.72) * Math.cos(rad(midA));
     const ly = cy + (r * 0.72) * Math.sin(rad(midA));
-    const label = pct >= 0.07 ? `${Math.round(pct * 100)}%` : '';
+    const label = pct >= 0.07 ? `${labelPcts[i]}%` : '';
     return `<path d="M${p1.x},${p1.y} A${r},${r} 0 ${large},1 ${p2.x},${p2.y} L${i2.x},${i2.y} A${innerR},${innerR} 0 ${large},0 ${i1.x},${i1.y} Z" fill="${col}"/>
             ${label ? `<text x="${lx}" y="${ly + 3.5}" text-anchor="middle" fill="white" font-size="8.5" font-weight="700">${label}</text>` : ''}`;
   }).join('');
@@ -260,15 +324,22 @@ function svgVBar(
   w = 540, h = 200, color?: string
 ): string {
   if (!bars.length) return `<svg width="${w}" height="${h}"></svg>`;
-  const maxVal = Math.max(...bars.map(b => b.value || 0), 1);
+  const dataMax = Math.max(...bars.map(b => b.value || 0), 1);
   const chartH = h - 52;
   const bw = Math.max(Math.floor((w - 70) / bars.length) - 8, 12);
   const gap = Math.floor((w - 70) / bars.length);
 
-  const gridLines = [0.25, 0.5, 0.75, 1.0].map(f => {
-    const y = 10 + chartH - chartH * f;
+  // Round axis: pick a nice step (~4 divisions) and round the top up to a multiple
+  // of it, so gridline labels are round numbers and bars scale to the same max.
+  const step = niceNum(dataMax / 4, true) || 1;
+  const maxVal = Math.max(step * Math.ceil(dataMax / step), step);
+  const ticks: number[] = [];
+  for (let v = step; v <= maxVal + step * 0.001; v += step) ticks.push(v);
+
+  const gridLines = ticks.map(v => {
+    const y = 10 + chartH - chartH * (v / maxVal);
     return `<line x1="44" y1="${y}" x2="${w - 10}" y2="${y}" stroke="${C.borderLight}" stroke-width="1"/>
-            <text x="40" y="${y + 3.5}" text-anchor="end" font-size="7" fill="${C.textLight}">${Math.round(maxVal * f)}</text>`;
+            <text x="40" y="${y + 3.5}" text-anchor="end" font-size="7" fill="${C.textLight}">${v.toLocaleString()}</text>`;
   }).join('');
 
   const rects = bars.map((b, i) => {
@@ -317,10 +388,21 @@ function svgLine(
   w = 540, h = 160, color = C.teal
 ): string {
   if (!points.length) return `<svg width="${w}" height="${h}"></svg>`;
-  const maxVal = Math.max(...points.map(p => p.value), 1);
+  const dataMax = Math.max(...points.map(p => p.value), 1);
   const chartH = h - 40;
   const chartW = w - 60;
   const step = chartW / Math.max(points.length - 1, 1);
+
+  // Round y-axis: scale to a nice max so gridlines/labels are round numbers.
+  const yStep = niceNum(dataMax / 4, true) || 1;
+  const maxVal = Math.max(yStep * Math.ceil(dataMax / yStep), yStep);
+  const yTicks: number[] = [];
+  for (let v = 0; v <= maxVal + yStep * 0.001; v += yStep) yTicks.push(v);
+  const gridLines = yTicks.map(v => {
+    const gy = 10 + chartH - chartH * (v / maxVal);
+    return `<line x1="38" y1="${gy}" x2="${w - 10}" y2="${gy}" stroke="${C.borderLight}" stroke-width="1"/>
+            <text x="34" y="${gy + 3}" text-anchor="end" font-size="7" fill="${C.textLight}">${v.toLocaleString()}</text>`;
+  }).join('');
 
   const coords = points.map((p, i) => ({
     x: 40 + i * step,
@@ -342,6 +424,7 @@ function svgLine(
   ).join('');
 
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+    ${gridLines}
     <path d="${area}" fill="${color}" opacity="0.08"/>
     <path d="${polyline}" stroke="${color}" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
     ${dots}${xLabels}
@@ -394,10 +477,11 @@ function narrativePara(text: string): string {
   </div>`;
 }
 
-function alertBox(text: string, type: 'benchmark' | 'alert' | 'info' = 'benchmark'): string {
+function alertBox(text: string, type: 'benchmark' | 'alert' | 'advisory' | 'info' = 'benchmark'): string {
   const styles: Record<string, { bg: string; border: string; color: string; label: string }> = {
     benchmark: { bg: C.tealBg,    border: C.teal,      color: '#065f46', label: 'Benchmark Context' },
     alert:     { bg: C.redLight,  border: C.red,        color: C.red,     label: '■ High Alert' },
+    advisory:  { bg: C.amberLight, border: C.amber,     color: C.amber,   label: 'Advisory' },
     info:      { bg: C.blueLight, border: C.blue,       color: C.blue,    label: 'Service Reference' },
   };
   const s = styles[type];
@@ -427,9 +511,10 @@ function darkTable(headers: string[], rows: string[][]): string {
   const trs = rows.map((row, ri) => {
     const bg = ri % 2 === 0 ? C.offWhite : C.white;
     const tds = row.map((cell, ci) => {
-      const isHealthCol = ci > 0 && typeof cell === 'string' && cell.includes('%') && parseFloat(cell) < 50 && ci === 2;
-      const isCritCol = typeof cell === 'string' && (cell === 'Critical' || cell === 'High');
-      const color = isHealthCol || isCritCol ? C.red : C.text;
+      // Only flag genuine danger labels red. (Previously any "% Fleet" value < 50
+      // was reddened, which painted even the healthiest bands red — misleading.)
+      const isCritCol = typeof cell === 'string' && (cell === 'Critical' || cell === 'High' || cell === 'Ground Now');
+      const color = isCritCol ? C.red : C.text;
       const fw = ci === 0 ? '600' : '400';
       return `<td style="padding:8px 11px;font-size:10px;border-bottom:1px solid ${C.border};border-right:1px solid ${C.borderLight};color:${color};font-weight:${fw};">${cell}</td>`;
     }).join('');
@@ -597,15 +682,25 @@ export function generateProfessionalHTML(data: ReportData): string {
 
   const totalEvents = fmt(md.maintenanceEvents3m);
   const prevCount   = fmt(md.preventiveCount ?? Math.round(totalEvents * 0.99));
-  const corrCount   = fmt(md.correctiveCount ?? Math.max(totalEvents - prevCount, 0));
-  const pmPct       = totalEvents > 0 ? (prevCount / totalEvents * 100) : 99.0;
-  const corrPct     = 100 - pmPct;
-  const pmRatio     = corrCount > 0 ? Math.round(prevCount / corrCount) : 100;
+  // All non-preventive events (repair + corrective + any other type), derived from
+  // the total so nothing is dropped. Using only the 'corrective' bucket previously
+  // hid repair events from the ratio and the KPI card (e.g. 360:1 instead of 360:5).
+  const nonPrevCount = Math.max(totalEvents - prevCount, 0);
+  const pmPct        = totalEvents > 0 ? (prevCount / totalEvents * 100) : 99.0;
+  const corrPct      = totalEvents > 0 ? (nonPrevCount / totalEvents * 100) : (100 - pmPct);
+  const pmRatio      = nonPrevCount > 0 ? Math.round(prevCount / nonPrevCount) : prevCount;
 
   const openT  = fmt(td.openTickets);
-  const highT  = fmt(td.highPriorityTickets);
-  const medT   = fmt(td.mediumPriorityTickets);
-  const lowT   = fmt(td.lowPriorityTickets);
+  // Priority counts come from the all-ticket priority breakdown for ALL three,
+  // so the cards, donut and §7 share one consistent population. (Previously
+  // "High" used the active-only count while Medium/Low were all-ticket counts,
+  // mixing two populations.)
+  const _prioMap: Record<string, number> = Object.fromEntries(
+    (s.ticketPriority || []).map(p => [String(p.name).toLowerCase(), p.value])
+  );
+  const highT  = fmt(_prioMap['high'] ?? td.highPriorityTickets);
+  const medT   = fmt(_prioMap['medium'] ?? td.mediumPriorityTickets);
+  const lowT   = fmt(_prioMap['low'] ?? td.lowPriorityTickets);
 
   const healthyAssets  = s.healthScoreDistribution.filter(h => !h.bucket.includes('Below') && parseFloat(h.bucket) >= 80).reduce((sum, h) => sum + h.count, 0);
   const degradedAssets = s.healthScoreDistribution.find(h => h.bucket.includes('Below'))?.count || 0;
@@ -671,8 +766,8 @@ export function generateProfessionalHTML(data: ReportData): string {
   const tocItems = [
     { num: '1', title: 'Executive Insight Summary',   sub: 'Fleet overview · KPI snapshot · Benchmark context' },
     { num: '2', title: 'Fleet Asset Overview',         sub: 'Composition · Status distribution · Workforce' },
-    { num: '3', title: 'Health & Risk Analysis',       sub: 'Health bands · SHAP drivers · Critical assets' },
-    { num: '4', title: 'Maintenance Intelligence',     sub: 'PM ratio · Cost metrics · Monthly trend' },
+    { num: '3', title: 'Health & Risk Analysis',       sub: 'Health bands · SHAP drivers · Critical assets · FMEA · Climate' },
+    { num: '4', title: 'Maintenance Intelligence',     sub: 'PM ratio · Cost · Trend · Compliance (statutory + OEM)' },
     { num: '5', title: 'Ticket Management Status',     sub: 'Priority · Category · 3-month ticket trend' },
     { num: '6', title: 'Recommendations',              sub: 'Critical / High / Medium priority actions' },
     { num: '7', title: 'Conclusion',                   sub: 'Executive summary · Final KPI dashboard' },
@@ -754,7 +849,13 @@ export function generateProfessionalHTML(data: ReportData): string {
       chartBox('', svgDonut(s.assetStatus, 240, 210, 110, 90, 74, 36), 'Figure 2.2 — Asset status distribution')
     )}
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+  </div>`;
+
+  const section2b = `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§2 Fleet Asset Overview (cont.)')}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:6px;">
       <div style="background:${C.offWhite};border:1px solid ${C.border};border-radius:8px;padding:16px;">
         ${subHeader('Workforce Overview')}
         ${lightTable(
@@ -782,11 +883,6 @@ export function generateProfessionalHTML(data: ReportData): string {
         )}
       </div>
     </div>
-  </div>`;
-
-  const section2b = `
-  <div class="page">
-    ${pageHeader(data.warehouseName, '§2 Fleet Asset Overview (cont.)')}
 
     ${Object.keys(ad.fleetAgeDist || {}).length > 0 ? `
       <div>
@@ -808,10 +904,17 @@ export function generateProfessionalHTML(data: ReportData): string {
       </div>
     ` : ''}
 
-    ${(ad.warrantyExpiring90d || 0) > 0 ? alertBox(
-      `<strong>${ad.warrantyExpiring90d} asset${(ad.warrantyExpiring90d || 0) > 1 ? 's' : ''}</strong> have warranty expiring within the next 90 days. Review service contracts and schedule pre-expiry inspections to ensure coverage continuity.`,
-      'alert'
-    ) : ''}
+    ${(ad.warrantyExpiring90d || 0) > 0 ? (() => {
+      const n = ad.warrantyExpiring90d || 0;
+      const plural = n === 1 ? 'asset has' : 'assets have';
+      // Warranty expiry is a planning advisory; only escalate to a red High Alert
+      // when it is material to the fleet (≥10 assets or ≥5% of the fleet).
+      const material = n >= Math.max(10, totalAssets * 0.05);
+      return alertBox(
+        `<strong>${n} ${plural}</strong> warranty expiring within the next 90 days. Review service contracts and schedule pre-expiry inspections to ensure coverage continuity.`,
+        material ? 'alert' : 'advisory'
+      );
+    })() : ''}
 
     ${kb.service_interval_text ? alertBox(kb.service_interval_text, 'info') : ''}
   </div>`;
@@ -823,12 +926,18 @@ export function generateProfessionalHTML(data: ReportData): string {
         band: h.bucket,
         count: h.count,
         pct_fleet: Math.round(h.count / Math.max(totalAssets, 1) * 1000) / 10,
-        kb_interpretation: h.bucket.includes('Below') ? 'Critical — immediate intervention required'
-          : h.bucket.startsWith('60') ? 'At-risk — service within 14 days'
+        kb_interpretation: h.bucket.includes('Below 50') ? 'Critical — immediate intervention required'
+          : h.bucket.startsWith('50') ? 'High Risk — service within 7 days'
+          : h.bucket.startsWith('60') ? 'At-Risk — schedule service within 14 days'
           : h.bucket.startsWith('70') ? 'Moderate — schedule within 30 days'
           : h.bucket.startsWith('80') ? 'Acceptable — maintain PM schedule'
           : 'Optimal — continue standard intervals',
       }));
+
+  // Health bands are derived from scored assets; show % of the scored population so
+  // the bands sum to 100%. "Critical" here = the Below-50% band (same as the §1 KPI).
+  const scoredFromBands = healthBands.reduce((sum, b) => sum + (b.count || 0), 0) || totalAssets;
+  const isCriticalBand = (band: string) => /below\s*50/i.test(band);
 
   const section3a = `
   <div class="page">
@@ -836,11 +945,15 @@ export function generateProfessionalHTML(data: ReportData): string {
     ${sectionHeader('3', 'Health & Risk Analysis', 'SHAP Failure Drivers · Critical Asset Watch')}
 
     ${subHeader('3.1 Health Score Distribution')}
+    <p style="font-size:9px;color:${C.textMuted};margin:0 0 6px;">Bands as % of the ${fmtN(scoredFromBands)} model-scored assets. "Critical" = health below 50% — the same definition used by the Critical-Assets KPI (§1) and Conclusion (§7).</p>
     ${darkTable(
-      ['Health Band', 'Assets', '% Fleet', 'Operational Interpretation'],
-      healthBands.map(b => [
-        b.band, fmtN(b.count), `${b.pct_fleet}%`, b.kb_interpretation,
-      ])
+      ['Health Band', 'Assets', '% Scored', 'Operational Interpretation'],
+      healthBands.map(b => {
+        const crit = isCriticalBand(b.band);
+        const bandCell = crit ? `<span style="color:${C.red};font-weight:700;">${b.band}</span>` : b.band;
+        const interp = crit ? `<span style="color:${C.red};">${b.kb_interpretation}</span>` : b.kb_interpretation;
+        return [bandCell, fmtN(b.count), `${(b.count / Math.max(scoredFromBands, 1) * 100).toFixed(1)}%`, interp];
+      })
     )}
 
     ${subHeader('3.2 Health Score — Visual Distribution')}
@@ -852,16 +965,28 @@ export function generateProfessionalHTML(data: ReportData): string {
       ),
       'Figure 3.1 — Asset count per health score band'
     )}
+  </div>`;
 
-    ${subHeader('3.3 Risk Level Distribution')}
+  // §3.3 — Risk Level Distribution (model risk_level over the whole fleet). The
+  // backend folds unscored assets into "Unknown", so the distribution covers every
+  // asset and "% Fleet" sums to 100%. Note: this risk_level "Critical" is the model's
+  // categorical label and may differ from the health-band "Critical" (<50%) in §3.1.
+  const section3a2 = (() => {
+    const riskTotal = riskData.reduce((sum, r) => sum + (r.value || 0), 0) || 1;
+    return `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis (cont.)')}
+    ${subHeader('3.3 Risk Level Distribution', C.navy)}
     ${twoCol(
       lightTable(
         ['Risk Level', 'Assets', '% Fleet'],
-        riskData.map(r => [r.name, fmtN(r.value), fmtPct((r.value / Math.max(totalAssets, 1)) * 100)])
+        riskData.map(r => [r.name, fmtN(r.value), fmtPct((r.value / riskTotal) * 100)])
       ),
       chartBox('', svgDonut(riskData, 240, 210, 110, 90, 74, 36), 'Figure 3.2 — Risk level distribution')
     )}
+    <p style="font-size:8px;color:${C.textLight};font-style:italic;margin:6px 2px 0;">Model risk_level over all ${fmtN(riskTotal)} assets; "Unknown" = not yet risk-scored. This categorical "Critical" is distinct from the health-band Critical (&lt;50%) in §3.1.</p>
   </div>`;
+  })();
 
   const section3b = `
   <div class="page">
@@ -872,15 +997,15 @@ export function generateProfessionalHTML(data: ReportData): string {
     ${shapSource.length > 0 ? `
       ${subHeader('3.4 SHAP Failure Prediction Drivers')}
       ${chartBox(
-        'Feature Importance (SHAP Impact %)',
+        'Relative SHAP Feature Importance',
         svgHBar(
           shapSource.map(f => ({ name: f.feature, value: f.impact_pct, label: `${f.impact_pct}%` })),
           640, 28
         ),
-        'Figure 3.3 — Top AI-identified failure drivers (CatBoost SHAP values)'
+        'Figure 3.3 — Relative global SHAP importance (mean |SHAP| per feature, normalised to 100%). Shows each driver\'s share of the model\'s output, not a probability decomposition of real-world failure.'
       )}
       ${darkTable(
-        ['SHAP Feature', 'Impact Score', 'Threshold Reference', 'Recommended Action'],
+        ['SHAP Feature', 'Relative Importance', 'Threshold Reference', 'Recommended Action'],
         shapSource.map(f => [
           f.feature, `${f.impact_pct}%`, f.kb_threshold, f.action,
         ])
@@ -893,8 +1018,8 @@ export function generateProfessionalHTML(data: ReportData): string {
     ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis (cont.)')}
 
     ${criticalAssets.length > 0 ? `
-      ${subHeader('3.5 Critical Asset Watch — Immediate Intervention Required', C.red)}
-      <p style="font-size:10px;color:${C.textMuted};margin-bottom:8px;">Assets with health scores below threshold requiring prioritised maintenance scheduling:</p>
+      ${subHeader(`3.5 Critical Asset Watch — Top ${criticalAssets.length} by Severity`, C.red)}
+      <p style="font-size:10px;color:${C.textMuted};margin-bottom:8px;">Showing the ${criticalAssets.length} lowest-health assets${critCount > criticalAssets.length ? ` of ${fmtN(critCount)} critical` : ''}, prioritised for immediate intervention:</p>
       <table style="width:100%;border-collapse:collapse;font-size:9.5px;">
         <thead>
           <tr style="background:${C.navy};color:white;">
@@ -948,7 +1073,7 @@ export function generateProfessionalHTML(data: ReportData): string {
             return `
             <div style="background:${C.offWhite};border:1px solid ${C.border};border-radius:8px;padding:12px 10px;text-align:center;">
               <div style="font-size:7px;font-weight:700;color:${C.textMuted};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">${c.label}</div>
-              <div style="font-size:22px;font-weight:800;color:${color};">${c.value}%</div>
+              <div style="font-size:22px;font-weight:800;color:${color};">${c.value.toFixed(1)}%</div>
               <div style="margin-top:6px;background:${C.border};border-radius:4px;height:5px;overflow:hidden;">
                 <div style="width:${barW}%;background:${color};height:100%;border-radius:4px;"></div>
               </div>
@@ -958,11 +1083,40 @@ export function generateProfessionalHTML(data: ReportData): string {
         ${(od.totalFaultCodes || 0) > 0 ? `
         <div style="background:${C.offWhite};border:1px solid ${C.border};border-radius:6px;padding:10px 14px;display:flex;gap:24px;font-size:9px;color:${C.textMuted};">
           <span><strong style="color:${C.navy};">Fleet Active Fault Codes:</strong> ${od.totalFaultCodes}</span>
-          <span><strong style="color:${C.navy};">Avg per Asset:</strong> ${od.avgFaultCodesPerAsset}</span>
+          <span><strong style="color:${C.navy};">Avg per Monitored Asset:</strong> ${od.avgFaultCodesPerAsset}</span>
+          ${(od.monitoredAssets || 0) > 0 ? `<span style="color:${C.textLight};">(component &amp; fault averages over ${fmtN(od.monitoredAssets)} assets with sensor data)</span>` : ''}
         </div>` : ''}
       `;
     })()}
   </div>`;
+
+  // ── §3 (cont.): FMEA CRITICALITY + CLIMATE RISK ───────────────
+  const fmeaRank = kb.fmea_criticality || [];
+  const climateRisk = kb.climate_risk || [];
+  const section3d = (fmeaRank.length || climateRisk.length) ? `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis (cont.)')}
+
+    ${fmeaRank.length ? `
+      ${subHeader('3.7 FMEA Criticality Ranking — Severity × Occurrence', C.red)}
+      <p style="font-size:10px;color:${C.textMuted};margin-bottom:8px;">FMECA-style prioritisation (ABS FMEA Guidance, 2015): criticality = consequence <strong>severity</strong> (1–10, weighted by asset type) × failure <strong>occurrence</strong> (1–10, from the predictive failure signal). The highest scores head the remediation queue — this orders the critical assets above by true risk, not health alone.</p>
+      ${darkTable(
+        ['Asset ID', 'Type', 'Health', 'Severity', 'Occurrence', 'Criticality', 'Action Band'],
+        fmeaRank.map(f => [
+          f.code, f.type, f.health, `${f.severity}/10`, `${f.occurrence}/10`, `${f.criticality}/100`, f.band,
+        ])
+      )}
+    ` : ''}
+
+    ${climateRisk.length ? `
+      ${subHeader('3.8 Colombo Climate Risk Flags', C.blue)}
+      <p style="font-size:10px;color:${C.textMuted};margin-bottom:8px;">Mapped from the Colombo Port (WCT-1) Climate Vulnerability &amp; Adaptation Plan (March 2023) onto live fleet component health — Colombo's rising heat, humidity and rainfall elevate these failure drivers above a temperate baseline.</p>
+      ${lightTable(
+        ['Climate Driver', 'Live Metric', 'Recommended Adaptation'],
+        climateRisk.map(c => [c.driver, c.metric, c.action])
+      )}
+    ` : ''}
+  </div>` : '';
 
   // ── §4: MAINTENANCE INTELLIGENCE ──────────────────────────────
   const section4a = `
@@ -973,14 +1127,14 @@ export function generateProfessionalHTML(data: ReportData): string {
     ${kpiGrid4(
       kpiCard('Total Events (3M)', fmtN(totalEvents), 'maintenance events', C.teal),
       kpiCard('Preventive (PM)', `${pmPct.toFixed(1)}%`, `${fmtN(prevCount)} events`, C.green, C.greenLight),
-      kpiCard('Corrective / Repair', `${corrPct.toFixed(1)}%`, `${fmtN(corrCount)} events`, C.orange),
+      kpiCard('Corrective / Repair', `${corrPct.toFixed(1)}%`, `${fmtN(nonPrevCount)} events`, C.orange),
       kpiCard('PM : Repair Ratio', `${pmRatio}:1`, 'target >9:1', C.teal),
     )}
 
     ${subHeader('4.1 Maintenance Type Breakdown')}
     <div style="background:${C.white};border:1px solid ${C.border};border-radius:8px;padding:18px;margin:10px 0;">
       ${progressBar('Preventive Maintenance', prevCount, totalEvents, C.green, pmPct)}
-      ${progressBar('Corrective / Repair', corrCount, totalEvents, C.orange, corrPct)}
+      ${progressBar('Corrective / Repair', nonPrevCount, totalEvents, C.orange, corrPct)}
       <div style="font-size:8.5px;color:${C.textLight};font-style:italic;text-align:center;margin-top:8px;">Figure 4.1 — PM vs corrective event breakdown for reporting period</div>
     </div>
 
@@ -1007,25 +1161,53 @@ export function generateProfessionalHTML(data: ReportData): string {
           <div style="font-size:17px;font-weight:800;color:${c.color};">${c.value}</div>
         </div>`).join('')}
     </div>
+    ${(() => {
+      const parseLKR = (v: unknown) => parseInt(String(v ?? '').replace(/[^0-9]/g, ''), 10) || 0;
+      const est = parseLKR(md.estimatedCost || data.summary?.maintenanceCost);
+      const act = parseLKR(md.actualCost3m);
+      if (est > 0 && act > 0) {
+        const gap = est - act;
+        const gapPct = Math.round(Math.abs(gap) / est * 100);
+        const dir = gap > 0 ? 'below' : 'above';
+        return `<p style="font-size:9px;color:${C.textMuted};font-style:italic;margin:4px 2px 0;">Estimated cost is a predictive-model forecast; actual spend reflects recorded maintenance events. Actual 3-month spend is LKR ${Math.abs(gap).toLocaleString()} (${gapPct}%) ${dir} the forecast — this may reflect forecast conservatism or deferred maintenance and should be reviewed before being read as net savings.</p>`;
+      }
+      return '';
+    })()}
   </div>`;
 
-  const section4a2 = `
+  const section4a2 = mainTrend.length > 0 ? `
   <div class="page">
     ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
+    ${subHeader(`4.4 Monthly Maintenance Trend${md.reportingPeriod ? ` (${md.reportingPeriod})` : ''}`)}
 
-    ${mainTrend.length > 0 ? `
-      ${subHeader('4.4 Monthly Maintenance Trend (3 Months)')}
-      ${chartBox(
-        'Event Volume Trend',
-        svgLine(mainTrend.map(m => ({ label: m.month.substring(0, 3), value: m.events })), 640, 170, C.teal),
-        'Figure 4.2 — Monthly maintenance event volume'
-      )}
-      ${lightTable(
-        ['Month', 'Events', 'Estimated Cost (LKR)'],
-        mainTrend.map(m => [m.month, fmtN(m.events), m.cost.toLocaleString()])
-      )}
-    ` : ''}
-  </div>`;
+    ${md.dataConcentrated ? alertBox(
+      `<strong>Demonstration-data notice:</strong> the maintenance history is concentrated in a single month, so the month-over-month change below is a <strong>data-loading artifact, not an operational trend</strong> — it must not be read as a change in workload or efficiency. With production data spread across the period this chart will reflect a genuine trend. Monthly figures sum exactly to the §4 headline total.`,
+      'advisory'
+    ) : ''}
+
+    ${twoCol(
+      chartBox(
+        'Maintenance Event Volume',
+        svgLine(mainTrend.map(m => ({ label: m.month.substring(0, 3), value: m.events })), 300, 170, C.teal),
+        'Figure 4.2 — Events per calendar month'
+      ),
+      chartBox(
+        'Maintenance Cost (LKR)',
+        svgLine(mainTrend.map(m => ({ label: m.month.substring(0, 3), value: m.cost })), 300, 170, C.violet),
+        'Figure 4.3 — Recorded cost per calendar month'
+      )
+    )}
+
+    ${lightTable(
+      ['Month', 'Events', 'Cost (LKR)'],
+      mainTrend.map(m => [m.month, fmtN(m.events), m.cost.toLocaleString()])
+    )}
+
+    ${(!md.dataConcentrated && (md.eventTrendDirection || md.costTrendDirection)) ? alertBox(
+      `Across the period, maintenance event volume is <strong>${md.eventTrendDirection ?? 'n/a'}</strong> and recorded maintenance cost is <strong>${md.costTrendDirection ?? 'n/a'}</strong>. Maintenance events and support tickets are <em>separate</em> series — ticket volume is reported in §5 and is not interchangeable with event counts.`,
+      'benchmark'
+    ) : ''}
+  </div>` : '';
 
   const section4b = `
   <div class="page">
@@ -1038,12 +1220,12 @@ export function generateProfessionalHTML(data: ReportData): string {
         (() => {
           const vd = md.vendorBreakdown || [];
           const totalEvt = vd.reduce((sum, v) => sum + v.events, 0);
-          return vd.map(v => [
-            v.vendor,
-            fmtN(v.events),
-            v.cost.toLocaleString(),
-            fmtPct(totalEvt > 0 ? (v.events / totalEvt * 100) : 0),
-          ]);
+          return vd.map(v => {
+            const pctVal = totalEvt > 0 ? (v.events / totalEvt * 100) : 0;
+            // Don't round a genuine entry down to "0.0%" — show "<0.1%" instead.
+            const pctStr = pctVal > 0 && pctVal < 0.05 ? '<0.1%' : fmtPct(pctVal);
+            return [v.vendor, fmtN(v.events), v.cost.toLocaleString(), pctStr];
+          });
         })()
       )}
     ` : ''}
@@ -1051,19 +1233,23 @@ export function generateProfessionalHTML(data: ReportData): string {
     ${ai.maintenance_intelligence ? narrativePara(ai.maintenance_intelligence) : ''}
 
     ${alertBox(
-      `At ${pmPct.toFixed(1)}% preventive maintenance coverage, PredictiX exceeds the SMRP gold standard of 90%. However, the presence of ${fmtN(critCount)} critical-status assets indicates PM scheduling may not be keeping pace with actual degradation — particularly for high-utilisation forklifts where the recommended interval is every <strong>500 engine hours</strong>. Cross-referencing engine-hour data against the top SHAP driver is the priority action item.`,
+      `At ${pmPct.toFixed(1)}% preventive maintenance coverage, PredictiX ${pmPct >= 90 ? 'exceeds' : 'falls short of'} the SMRP gold standard of 90%. However, the presence of ${fmtN(critCount)} critical-status assets indicates PM scheduling may not be keeping pace with actual degradation — particularly for high-utilisation forklifts where the recommended interval is every <strong>500 engine hours</strong>. Cross-referencing engine-hour data against the top SHAP driver is the priority action item.`,
       'benchmark'
     )}
 
-    ${msch.length > 0 ? `
+  </div>
+  ${msch.length > 0 ? `
+    <div class="page">
+      ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
       ${subHeader('4.6 Predictive Maintenance Schedule')}
       <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 10px;">
         Predicted (ML model) vs Scheduled (fleet avg interval) weeks to next service.
         Assets sorted by urgency gap — negative gap means maintenance is overdue relative to schedule.
+        ${msch.length > 18 ? `Showing the 18 most urgent of ${fmtN(msch.length)} assets.` : ''}
       </p>
       ${lightTable(
         ['Asset', 'Predicted (wks)', 'Scheduled (wks)', 'Gap (wks)', 'Status'],
-        msch.slice(0, 20).map(r => {
+        msch.slice(0, 18).map(r => {
           const gap = r.predicted - r.scheduled;
           const status = gap < -2 ? '⚠ Overdue' : gap < 0 ? 'Due Soon' : 'On Track';
           return [
@@ -1075,13 +1261,50 @@ export function generateProfessionalHTML(data: ReportData): string {
           ];
         })
       )}
-    ` : ''}
-  </div>`;
+    </div>` : ''}`;
+
+  // ── §4 (cont.): MAINTENANCE COMPLIANCE FRAMEWORK ──────────────
+  const statutory = kb.statutory_compliance || [];
+  const oemIntervals = kb.oem_intervals || [];
+
+  const section4c = statutory.length ? `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
+    ${subHeader('4.7 Maintenance Compliance Framework')}
+    <p style="font-size:10.5px;color:${C.textMuted};margin-bottom:6px;">Every asset must satisfy three stacked layers — the <strong>strictest applicable trigger binds</strong>: statutory law, then OEM schedules, then ISO 55000/55001 + SMRP predictive standards.</p>
+
+    ${subHeader('Layer 1 · Statutory Inspection — Sri Lanka Factories Ordinance No. 45 of 1942', C.red)}
+    <p style="font-size:10px;color:${C.textMuted};margin-bottom:8px;">Legally binding examination intervals for lifting equipment (forklifts are lifting machines). An asset overdue against these dates is non-compliant regardless of engine-hour status.</p>
+    ${darkTable(
+      ['Equipment', 'Interval', 'By / Method', 'Record Required', 'Reference'],
+      statutory.map(r => [
+        r.equipment, `Every ${r.interval_months} months`, r.by, r.record, r.reference,
+      ])
+    )}
+  </div>` : '';
+
+  const section4d = oemIntervals.length ? `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
+    ${subHeader('Layer 2 · OEM Periodic Maintenance Schedule', C.teal)}
+    <p style="font-size:10px;color:${C.textMuted};margin-bottom:10px;">Manufacturer-specified service tiers grounding the KB intervals — adherence is the primary lever for moving assets out of the Critical band.</p>
+    ${oemIntervals.map(cls => `
+      <div style="margin:14px 0 4px;font-size:11px;font-weight:700;color:${C.navy};">${cls.asset_class}<span style="font-weight:400;color:${C.textMuted};font-size:9px;"> · ${cls.source}</span></div>
+      ${lightTable(
+        ['Cadence', 'Trigger', 'Service Scope'],
+        cls.tiers.map(t => [t.cadence, t.trigger, t.scope])
+      )}
+    `).join('')}
+  </div>` : '';
 
   // ── §5: TICKET MANAGEMENT ──────────────────────────────────────
-  const highPct = openT > 0 ? Math.round(highT / openT * 1000) / 10 : 0;
-  const medPct  = openT > 0 ? Math.round(medT  / openT * 1000) / 10 : 0;
-  const lowPct  = openT > 0 ? Math.round(lowT  / openT * 1000) / 10 : 0;
+  // Percentages are the share of each priority within the prioritised tickets
+  // (High+Medium+Low) — NOT divided by the open-ticket count, which produced
+  // nonsensical shares summing to >100%.
+  const prioTotal = highT + medT + lowT;
+  const highPct = prioTotal > 0 ? Math.round(highT / prioTotal * 1000) / 10 : 0;
+  const medPct  = prioTotal > 0 ? Math.round(medT  / prioTotal * 1000) / 10 : 0;
+  const lowPct  = prioTotal > 0 ? Math.round(lowT  / prioTotal * 1000) / 10 : 0;
 
   const prioritySlices = [
     { name: `High`, value: highT },
@@ -1098,9 +1321,9 @@ export function generateProfessionalHTML(data: ReportData): string {
 
     ${kpiGrid4(
       kpiCard('Open Tickets',      fmtN(openT), 'awaiting resolution',    C.orange),
-      kpiCard('High Priority',     fmtN(highT), `${highPct}% of open`,    C.red, C.redLight),
-      kpiCard('Medium Priority',   fmtN(medT),  `${medPct}% of open`,     C.amber, C.amberLight),
-      kpiCard('Low Priority',      fmtN(lowT),  `${lowPct}% of open`,     C.green, C.greenLight),
+      kpiCard('High Priority',     fmtN(highT), `${highPct}% of prioritised`,    C.red, C.redLight),
+      kpiCard('Medium Priority',   fmtN(medT),  `${medPct}% of prioritised`,     C.amber, C.amberLight),
+      kpiCard('Low Priority',      fmtN(lowT),  `${lowPct}% of prioritised`,     C.green, C.greenLight),
     )}
 
     ${subHeader('5.1 Ticket Overview — Status Breakdown')}
@@ -1115,51 +1338,55 @@ export function generateProfessionalHTML(data: ReportData): string {
       ]
     )}
 
-    ${subHeader('5.2 Priority & Category Distribution')}
+    ${subHeader('5.2 Filed Priority & Category Distribution')}
     ${twoCol(
       chartBox(
-        'By Priority',
-        svgDonut(prioritySlices.length ? prioritySlices : [{ name: 'No Data', value: 1 }], 240, 210, 110, 90, 74, 36),
-        'Figure 5.1 — Open tickets by priority'
+        'By Filed Priority',
+        svgDonut(prioritySlices.length ? prioritySlices : [{ name: 'No Data', value: 1 }], 240, 190, 110, 80, 64, 30),
+        'Figure 5.1 — Tickets by filed priority'
       ),
       chartBox(
         'By Category',
-        svgDonut(catSlices.length ? catSlices : [{ name: 'No Data', value: 1 }], 240, 210, 110, 90, 74, 36),
-        'Figure 5.2 — Open tickets by category'
+        svgDonut(catSlices.length ? catSlices : [{ name: 'No Data', value: 1 }], 240, 190, 110, 80, 64, 30),
+        'Figure 5.2 — Tickets by category'
       )
     )}
 
     ${kb.ticket_category_kb?.length ? `
       ${subHeader('5.3 Ticket Categories — KB Cross-Reference')}
       ${darkTable(
-        ['Category', 'Count', '% Open', 'Maintenance Guidance'],
+        ['Category', 'Count', '% of Total', 'Maintenance Guidance'],
         kb.ticket_category_kb.map(c => [c.category, fmtN(c.count), `${c.pct_open}%`, c.kb_guidance])
       )}
     ` : s.ticketsByCategory.length ? `
       ${subHeader('5.3 Ticket Categories')}
       ${lightTable(
-        ['Category', 'Tickets', '% of Open'],
-        s.ticketsByCategory.map(c => [c.name, fmtN(c.value), fmtPct((c.value / Math.max(openT, 1)) * 100)])
+        ['Category', 'Tickets', '% of Total'],
+        (() => {
+          const catTotal = s.ticketsByCategory.reduce((sum, c) => sum + c.value, 0) || fmt(td.totalTickets);
+          return s.ticketsByCategory.map(c => [c.name, fmtN(c.value), fmtPct((c.value / Math.max(catTotal, 1)) * 100)]);
+        })()
       )}
     ` : ''}
 
+  </div>`;
+
+  const section5b = `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§5 Ticket Management Status (cont.)')}
+
     ${ticketTrend.length > 0 ? `
-      ${subHeader('5.4 Monthly Ticket Volume (3-Month Trend)')}
+      ${subHeader('5.4 Monthly Ticket Volume (New Tickets per Calendar Month)')}
       ${chartBox(
         '',
-        svgLine(ticketTrend.map(t => ({ label: t.month.substring(0, 3), value: t.tickets })), 640, 160, C.amber),
-        'Figure 5.3 — Monthly ticket volume (last 3 months)'
+        svgLine(ticketTrend.map(t => ({ label: t.month.substring(0, 3), value: t.tickets })), 640, 170, C.amber),
+        'Figure 5.3 — New support tickets per month (a separate series from maintenance events in §4)'
       )}
       ${lightTable(
         ['Month', 'New Tickets'],
         ticketTrend.map(t => [t.month, fmtN(t.tickets)])
       )}
     ` : ''}
-  </div>`;
-
-  const section5b = `
-  <div class="page">
-    ${pageHeader(data.warehouseName, '§5 Ticket Management Status (cont.)')}
 
     ${(td.avgResolutionDays || 0) > 0 ? `
       ${subHeader('5.5 Ticket Resolution Performance (MTTR)')}
@@ -1171,7 +1398,7 @@ export function generateProfessionalHTML(data: ReportData): string {
         </div>
         <div style="background:${C.offWhite};border:1px solid ${C.border};border-radius:8px;padding:14px 16px;">
           <div style="font-size:8.5px;font-weight:700;color:${C.textMuted};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Resolution Breakdown</div>
-          <div style="font-size:11px;color:${C.textMuted};">By priority level below</div>
+          <div style="font-size:11px;color:${C.textMuted};">${(td.mttrByPriority || []).length > 0 ? 'By priority level — see table below' : 'Per-priority breakdown not available for this period'}</div>
         </div>
       </div>
       ${(td.mttrByPriority || []).length > 0 ? lightTable(
@@ -1183,27 +1410,53 @@ export function generateProfessionalHTML(data: ReportData): string {
         ])
       ) : ''}
     ` : ''}
+  </div>`;
 
-    ${Object.keys(td.finalPriorityBreakdown || {}).length > 0 ? `
-      ${subHeader('5.6 AI Priority Reclassification')}
-      <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 10px;">
-        PredictiX AI re-scores each ticket using sensor telemetry and SHAP models.
-        Compare against original filed priority to identify under-triaged issues.
+  // §5.6 on its own page — the before/after comparison table + Unset advisory +
+  // trend narrative are substantial, so keep them off the §5.4/§5.5 page.
+  const section5c = `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§5 Ticket Management Status (cont.)')}
+
+    ${Object.keys(td.finalPriorityBreakdown || {}).length > 0 ? (() => {
+      // Before/after re-triage view: priority AS FILED (§5.2 source) vs the AI
+      // re-classification. Both columns cover the SAME ticket population, so the
+      // (previously contradictory-looking) 173-vs-228 difference reads as a feature.
+      const aiMap = td.finalPriorityBreakdown || {};
+      const aiByLower: Record<string, number> = Object.fromEntries(
+        Object.entries(aiMap).map(([k, v]) => [k.toLowerCase(), v as number])
+      );
+      const order = ['critical', 'high', 'medium', 'low', 'unset'];
+      const rank = (k: string) => { const i = order.indexOf(k); return i < 0 ? 99 : i; };
+      const keys = Array.from(new Set([...Object.keys(_prioMap), ...Object.keys(aiByLower)]))
+        .sort((a, b) => rank(a) - rank(b));
+      const filedTotal = Object.values(_prioMap).reduce((a, b) => a + b, 0);
+      const aiTotal = Object.values(aiByLower).reduce((a, b) => a + b, 0);
+      const rows = keys.map(k => {
+        const f = _prioMap[k] || 0;
+        const a = aiByLower[k] || 0;
+        const d = a - f;
+        const label = k.charAt(0).toUpperCase() + k.slice(1);
+        return [label, fmtN(f), fmtN(a), d === 0 ? '—' : `${d > 0 ? '+' : ''}${d}`];
+      });
+      rows.push(['Total', fmtN(filedTotal), fmtN(aiTotal),
+        filedTotal === aiTotal ? '—' : `${aiTotal - filedTotal > 0 ? '+' : ''}${aiTotal - filedTotal}`]);
+      const aiUnset = aiByLower['unset'] || 0;
+      const aiUnsetPct = aiTotal > 0 ? Math.round(aiUnset / aiTotal * 1000) / 10 : 0;
+      return `
+      ${subHeader('5.6 AI-Reclassified Priority (vs Filed)', C.navy)}
+      <p style="font-size:9px;color:${C.textMuted};margin:0 0 8px;">
+        PredictiX re-scores each ticket from sensor telemetry and SHAP models. The table compares the priority
+        <strong>as filed</strong> (the §5.2 distribution) against the <strong>AI re-classification</strong> to surface
+        under- or over-triaged tickets. Both columns cover the same ${fmtN(aiTotal)} tickets — they differ by
+        <em>re-grading</em>, not by counting different sets.
       </p>
-      <div style="display:grid;grid-template-columns:repeat(${Math.min(Object.keys(td.finalPriorityBreakdown || {}).length, 4)},1fr);gap:10px;margin-bottom:14px;">
-        ${Object.entries(td.finalPriorityBreakdown || {}).map(([pri, cnt]) => {
-          const col = pri.toLowerCase() === 'high' || pri.toLowerCase() === 'critical' ? C.red
-            : pri.toLowerCase() === 'medium' ? C.amber : C.green;
-          const bg  = pri.toLowerCase() === 'high' || pri.toLowerCase() === 'critical' ? C.redLight
-            : pri.toLowerCase() === 'medium' ? C.amberLight : C.greenLight;
-          return `<div style="background:${bg};border:1px solid ${col}40;border-radius:8px;padding:12px;text-align:center;">
-            <div style="font-size:9px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${pri}</div>
-            <div style="font-size:24px;font-weight:800;color:${col};">${fmtN(cnt as number)}</div>
-            <div style="font-size:7.5px;color:${C.textMuted};margin-top:3px;">AI-classified tickets</div>
-          </div>`;
-        }).join('')}
-      </div>
-    ` : ''}
+      ${darkTable(['Priority', 'Filed', 'AI-Reclassified', 'Change'], rows)}
+      ${aiUnset > 0 ? alertBox(
+        `<strong>${fmtN(aiUnset)} tickets (${aiUnsetPct}%) remain Unset by the AI classifier</strong> — a model-coverage limitation (low confidence or not yet scored), <em>not</em> a low-priority grade. These need manual triage; widening classifier coverage is a model-improvement action, and the share should be tracked down over time.`,
+        'advisory'
+      ) : ''}`;
+    })() : ''}
 
     ${ai.pattern_and_trend ? narrativePara(ai.pattern_and_trend) : ''}
   </div>`;
@@ -1286,7 +1539,7 @@ export function generateProfessionalHTML(data: ReportData): string {
 
     ${subHeader('7.2 Executive Conclusion')}
     ${ai.conclusion ? narrativePara(ai.conclusion) : narrativePara(
-      `The ${data.warehouseName} warehouse fleet of ${fmtN(totalAssets)} assets has an average health score of ${healthFleet}% with ${healthyPct}% of assets in the optimal-to-acceptable range. However, ${fmtN(critCount)} assets (${Math.round(critCount / Math.max(totalAssets, 1) * 100)}%) remain in the critical health band and require prioritised intervention. The 3-month maintenance record shows ${fmtN(totalEvents)} events at a ${pmPct.toFixed(1)}% PM ratio — exceeding the SMRP 90% gold standard — demonstrating a strong preventive maintenance culture. The ${fmtN(openT)} active tickets, ${highPct}% of which are high-priority, represent the immediate operational challenge. With ${fmtN(urgentCount)} assets requiring service within 7 days, expedited scheduling is critical to preventing further health degradation and unplanned downtime.`
+      `The ${data.warehouseName} warehouse fleet of ${fmtN(totalAssets)} assets has an average health score of ${healthFleet}% with ${healthyPct}% of assets in the optimal-to-acceptable range. However, ${fmtN(critCount)} assets (${Math.round(critCount / Math.max(totalAssets, 1) * 100)}%) remain in the critical health band and require prioritised intervention. The 3-month maintenance record shows ${fmtN(totalEvents)} events at a ${pmPct.toFixed(1)}% PM ratio${pmPct >= 90 ? ' — exceeding the SMRP 90% gold standard — demonstrating a strong preventive maintenance culture' : ' — below the SMRP 90% gold standard'}. The ${fmtN(openT)} open tickets, including ${fmtN(highT)} classified high-priority, represent the immediate operational challenge. With ${fmtN(urgentCount)} assets requiring service within 7 days, expedited scheduling is critical to preventing further health degradation and unplanned downtime.`
     )}
 
     <!-- Document footer -->
@@ -1317,13 +1570,18 @@ export function generateProfessionalHTML(data: ReportData): string {
   ${section2}
   ${section2b}
   ${section3a}
+  ${section3a2}
   ${section3b}
   ${section3c}
+  ${section3d}
   ${section4a}
   ${section4a2}
   ${section4b}
+  ${section4c}
+  ${section4d}
   ${section5a}
   ${section5b}
+  ${section5c}
   ${section6}
   ${section7}
 </body>

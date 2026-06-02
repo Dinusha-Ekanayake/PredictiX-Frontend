@@ -32,9 +32,18 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (ticket: Ticket) => void;
+  /** Set the ticket's creator (used by the non-admin user tickets page). */
+  createdBy?: string | null;
+  /** Preselect an asset (e.g. "create ticket on this asset" from the assets page). */
+  presetAssetId?: string;
+  presetAssetName?: string;
+  /** Lock the asset selector to the preset asset. */
+  lockAsset?: boolean;
 };
 
-export default function NewTicketDialog({ open, onOpenChange, onCreated }: Props) {
+export default function NewTicketDialog({
+  open, onOpenChange, onCreated, createdBy, presetAssetId, presetAssetName, lockAsset,
+}: Props) {
   const [assetId, setAssetId] = React.useState("");
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -46,6 +55,7 @@ export default function NewTicketDialog({ open, onOpenChange, onCreated }: Props
 
   React.useEffect(() => {
     if (open) {
+      if (presetAssetId) setAssetId(presetAssetId);
       setAssetsLoading(true);
       apiGet<Asset[]>("/assets/")
         .then((data) => setAssets(data))
@@ -80,6 +90,7 @@ export default function NewTicketDialog({ open, onOpenChange, onCreated }: Props
         description: description.trim(),
         priority: (priority as TicketPriority) || "Medium",
         category: (category as TicketCategory) || "Mechanical",
+        created_by: createdBy ?? null,
       });
       toast.success("Ticket created", { description: ticket.title });
       onCreated?.(ticket);
@@ -106,8 +117,10 @@ export default function NewTicketDialog({ open, onOpenChange, onCreated }: Props
 
         <form onSubmit={handleSubmit} className="grid gap-3 pt-2">
           <div>
-            <p className="text-sm text-muted-foreground mb-2">Asset</p>
-            <Select value={assetId} onValueChange={(v) => setAssetId(v)} disabled={assetsLoading}>
+            <p className="text-sm text-muted-foreground mb-2">
+              Asset{lockAsset && presetAssetName ? ` · ${presetAssetName}` : ""}
+            </p>
+            <Select value={assetId} onValueChange={(v) => setAssetId(v)} disabled={assetsLoading || lockAsset}>
               <SelectTrigger className="w-full bg-background">
                 {assetsLoading ? (
                   <span className="flex items-center gap-2 text-muted-foreground">

@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Ticket,
   Boxes,
-  Warehouse,
   Users,
   Menu,
 } from "lucide-react";
@@ -28,7 +27,6 @@ const NAV = [
   { href: "/user/dashboard", label: "Dashboard",  icon: LayoutDashboard },
   { href: "/user/tickets",   label: "Tickets",    icon: Ticket },
   { href: "/user/assets",    label: "Assets",     icon: Boxes },
-  { href: "/user/warehouse", label: "Warehouse",  icon: Warehouse },
   { href: "/user/users",     label: "Users",      icon: Users },
 ] as const;
 

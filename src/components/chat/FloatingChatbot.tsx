@@ -3,11 +3,14 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import {
-  GripHorizontal,
+  ChevronDown,
+  ChevronRight,
   Loader2,
   MessageCircle,
   SendHorizontal,
+  Sparkles,
   Trash2,
+  Wrench,
   X,
 } from "lucide-react";
 
@@ -24,13 +27,22 @@ type Position = {
   y: number;
 };
 
+type ToolTraceItem = {
+  name: string;
+  args: Record<string, unknown>;
+  result_preview: string;
+};
+
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
   createdAt: number;
   sources?: ChatbotSource[];
+  toolTrace?: ToolTraceItem[];
 };
+
+type LocalMessage = ChatMessage;
 
 const STORAGE_KEY = "predictix.chatbot.launcher.position";
 const LAUNCHER_SIZE = 56;
@@ -40,14 +52,38 @@ const CHATBOT_API_BASE =
   process.env.NEXT_PUBLIC_CHATBOT_API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
   "http://127.0.0.1:8000";
-const CHATBOT_ENDPOINTS = [
-  "/chatbot/ask",
-  "/chatbot",
-  "/chatbot/message",
-];
+const CHATBOT_AGENT_ENDPOINT = "/chatbot/agent";
+const CHATBOT_FALLBACK_ENDPOINTS = ["/chatbot/ask", "/chatbot", "/chatbot/message"];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function getCorners(viewportWidth: number, viewportHeight: number): Position[] {
+  const maxX = Math.max(LAUNCHER_MARGIN, viewportWidth - LAUNCHER_SIZE - LAUNCHER_MARGIN);
+  const maxY = Math.max(LAUNCHER_MARGIN, viewportHeight - LAUNCHER_SIZE - LAUNCHER_MARGIN);
+  return [
+    { x: LAUNCHER_MARGIN, y: LAUNCHER_MARGIN },
+    { x: maxX, y: LAUNCHER_MARGIN },
+    { x: LAUNCHER_MARGIN, y: maxY },
+    { x: maxX, y: maxY },
+  ];
+}
+
+function nearestCorner(raw: Position, viewportWidth: number, viewportHeight: number): Position {
+  const corners = getCorners(viewportWidth, viewportHeight);
+  let best = corners[0];
+  let bestDist = Infinity;
+  for (const c of corners) {
+    const dx = c.x - raw.x;
+    const dy = c.y - raw.y;
+    const d = dx * dx + dy * dy;
+    if (d < bestDist) {
+      bestDist = d;
+      best = c;
+    }
+  }
+  return best;
 }
 
 function getDefaultPosition(viewportWidth: number, viewportHeight: number): Position {
@@ -96,6 +132,8 @@ const AUTH_ROUTE_PREFIXES = [
   "/auth",
 ];
 
+const HELPDESK_ROUTE_PREFIXES = ["/help-desk", "/admin/help-desk", "/user/help-desk"];
+
 export default function FloatingChatbot() {
   const pathname = usePathname();
 
@@ -109,6 +147,8 @@ export default function FloatingChatbot() {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
   const [position, setPosition] = React.useState<Position>({ x: 0, y: 0 });
+
+  const [expandedTraces, setExpandedTraces] = React.useState<Record<string, boolean>>({});
 
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const messageEndRef = React.useRef<HTMLDivElement | null>(null);
@@ -125,6 +165,20 @@ export default function FloatingChatbot() {
       return pathname === prefix || pathname.startsWith(`${prefix}/`);
     });
   }, [pathname]);
+
+  const isHelpDeskRoute = React.useMemo(() => {
+    return HELPDESK_ROUTE_PREFIXES.some((prefix) => {
+      return pathname === prefix || pathname.startsWith(`${prefix}/`);
+    });
+  }, [pathname]);
+
+  // On help-desk routes, force chatbot to top-left so it can never overlap
+  // the floating Help Desk action button (which lives in the bottom-right).
+  React.useEffect(() => {
+    if (!isMounted || !isHelpDeskRoute) return;
+    setIsOpen(false);
+    setPosition({ x: LAUNCHER_MARGIN, y: LAUNCHER_MARGIN });
+  }, [isHelpDeskRoute, isMounted]);
 
   React.useEffect(() => {
     const width = window.innerWidth;
@@ -237,6 +291,11 @@ export default function FloatingChatbot() {
     viewport.width,
   ]);
 
+  function handleSourceClick(source: ChatbotSource) {
+    setDraft(source.title);
+    inputRef.current?.focus();
+  }
+
   const sendMessage = async () => {
     const text = draft.trim();
     if (!text || isSending) {
@@ -251,49 +310,71 @@ export default function FloatingChatbot() {
       createdAt: Date.now(),
     };
 
-    setMessages((current) => [
-      ...current,
-      userMessage,
-    ]);
+    // Snapshot history BEFORE appending the new user message so we don't
+    // duplicate it into the request body.
+    const historyForAgent = messages.map((m) => ({
+      role: m.role,
+      content: m.text,
+    }));
+
+    setMessages((current) => [...current, userMessage]);
     setDraft("");
 
     try {
-      const token = window.localStorage.getItem("token") || window.localStorage.getItem("predictix.access_token");
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      const token =
+        window.localStorage.getItem("token") ||
+        window.localStorage.getItem("predictix.access_token");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
 
       let replyText = "";
+      let toolTrace: ToolTraceItem[] | undefined;
+      let sources: ChatbotSource[] | undefined;
       let lastError = "";
 
-      for (const path of CHATBOT_ENDPOINTS) {
-        try {
-          const response = await fetch(`${CHATBOT_API_BASE}${path}`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-                  question: text,
-              }),
-          });
-
-          if (!response.ok) {
-            lastError = `${response.status} ${response.statusText}`;
-            continue;
-          }
-
+      // 1) Try the agentic endpoint first
+      try {
+        const response = await fetch(`${CHATBOT_API_BASE}${CHATBOT_AGENT_ENDPOINT}`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ question: text, history: historyForAgent }),
+        });
+        if (response.ok) {
           const payload = await response.json();
-          replyText = extractAssistantReply(payload);
-          if (replyText) {
-            break;
+          replyText = typeof payload?.answer === "string" ? payload.answer : "";
+          if (Array.isArray(payload?.tool_trace)) {
+            toolTrace = payload.tool_trace as ToolTraceItem[];
           }
+        } else {
+          lastError = `${response.status} ${response.statusText}`;
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : "Network error";
+      }
 
-          lastError = "Chat endpoint returned no reply text";
-        } catch (error) {
-          lastError = error instanceof Error ? error.message : "Network error";
+      // 2) Fall back to the legacy RAG endpoints if agent didn't reply
+      if (!replyText) {
+        for (const path of CHATBOT_FALLBACK_ENDPOINTS) {
+          try {
+            const response = await fetch(`${CHATBOT_API_BASE}${path}`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ question: text }),
+            });
+            if (!response.ok) {
+              lastError = `${response.status} ${response.statusText}`;
+              continue;
+            }
+            const payload = await response.json();
+            replyText = extractAssistantReply(payload);
+            if (Array.isArray((payload as { sources?: unknown })?.sources)) {
+              sources = (payload as { sources: ChatbotSource[] }).sources;
+            }
+            if (replyText) break;
+            lastError = "Chat endpoint returned no reply text";
+          } catch (error) {
+            lastError = error instanceof Error ? error.message : "Network error";
+          }
         }
       }
 
@@ -308,16 +389,18 @@ export default function FloatingChatbot() {
           role: "assistant",
           text: replyText,
           createdAt: Date.now(),
+          toolTrace,
+          sources,
         },
       ]);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unable to connect to chatbot backend";
+      const msg = error instanceof Error ? error.message : "Unable to connect to chatbot backend";
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: `Connection error: ${errorMessage}`,
+          text: `Connection error: ${msg}`,
           createdAt: Date.now(),
         },
       ]);
@@ -328,6 +411,10 @@ export default function FloatingChatbot() {
 
   const onLauncherPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+    if (isHelpDeskRoute) {
+      // Dragging is disabled on help desk routes — click only.
       return;
     }
 
@@ -379,7 +466,10 @@ export default function FloatingChatbot() {
     dragRef.current.moved = false;
     setIsDragging(false);
 
-    if (!wasDragged) {
+    if (wasDragged) {
+      // Snap to nearest corner once the mouse is released.
+      setPosition((current) => nearestCorner(current, viewport.width, viewport.height));
+    } else {
       setIsOpen((current) => !current);
     }
   };
@@ -416,15 +506,21 @@ export default function FloatingChatbot() {
             height: `${panelDimensions.height}px`,
           }}
         >
-          <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-sm motion-reduce:transition-none">
-            <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+          <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-md motion-reduce:transition-none">
+            <div className="relative flex items-center justify-between border-b border-border/60 px-4 py-3 bg-gradient-to-r from-violet-500/10 via-fuchsia-500/5 to-sky-500/10 dark:from-violet-500/15 dark:via-fuchsia-500/10 dark:to-sky-500/15">
               <div className="flex items-center gap-2">
-                <div className="rounded-full bg-primary/15 p-1.5 text-primary">
+                <div className="rounded-full bg-gradient-to-br from-violet-500 to-sky-500 p-1.5 text-white shadow-sm">
                   <MessageCircle className="size-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Chatbot</p>
-                  <p className="text-xs text-muted-foreground">Live backend mode</p>
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    PredictiX Assistant
+                    <Sparkles className="size-3 text-violet-500" />
+                  </p>
+                  <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Online
+                  </p>
                 </div>
               </div>
 
@@ -450,10 +546,18 @@ export default function FloatingChatbot() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1 px-3 py-4">
+            <ScrollArea className="flex-1 px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20">
               {messages.length === 0 ? (
-                <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                  Ask a question to send it to the backend chatbot.
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+                  <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3">
+                    <Sparkles className="size-6 text-violet-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">How can I help?</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Ask about assets, tickets, or maintenance.
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3 pb-2">
@@ -466,8 +570,8 @@ export default function FloatingChatbot() {
                         className={cn(
                           "max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm",
                           message.role === "user"
-                            ? "rounded-br-md bg-primary text-primary-foreground"
-                            : "rounded-bl-md border border-border/70 bg-muted text-foreground"
+                            ? "rounded-br-md bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white"
+                            : "rounded-bl-md border border-border/70 bg-card text-foreground dark:bg-slate-800/80"
                         )}
                       >
                         <p>{message.text}</p>
@@ -498,6 +602,55 @@ export default function FloatingChatbot() {
                                 </Badge>
                               </button>
                             ))}
+                          </div>
+                        ) : null}
+
+                        {message.role === "assistant" && message.toolTrace && message.toolTrace.length > 0 ? (
+                          <div className="mt-2 border-t border-border/40 pt-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedTraces((prev) => ({
+                                  ...prev,
+                                  [message.id]: !prev[message.id],
+                                }))
+                              }
+                              className="flex items-center gap-1 text-[10px] font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
+                            >
+                              {expandedTraces[message.id] ? (
+                                <ChevronDown className="size-3" />
+                              ) : (
+                                <ChevronRight className="size-3" />
+                              )}
+                              <Wrench className="size-3" />
+                              {message.toolTrace.length} tool{message.toolTrace.length === 1 ? "" : "s"} used
+                            </button>
+                            {expandedTraces[message.id] ? (
+                              <ul className="mt-1.5 space-y-1.5 pl-3">
+                                {message.toolTrace.map((step, i) => (
+                                  <li
+                                    key={`${message.id}-tool-${i}`}
+                                    className="rounded-md bg-muted/50 dark:bg-slate-900/50 px-2 py-1 text-[10px] font-mono"
+                                  >
+                                    <div className="flex items-center gap-1 text-violet-600 dark:text-violet-400 font-semibold">
+                                      <span>→</span>
+                                      <span>{step.name}</span>
+                                      <span className="text-muted-foreground font-normal">
+                                        ({Object.keys(step.args || {}).length
+                                          ? Object.entries(step.args)
+                                              .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+                                              .join(", ")
+                                          : ""}
+                                        )
+                                      </span>
+                                    </div>
+                                    <div className="mt-0.5 text-muted-foreground break-all">
+                                      {step.result_preview}
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
                           </div>
                         ) : null}
                       </div>
@@ -560,9 +713,14 @@ export default function FloatingChatbot() {
       <button
         type="button"
         className={cn(
-          "pointer-events-auto absolute flex items-center justify-center rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-xl",
-          "transition-transform duration-200 motion-reduce:transition-none",
-          isDragging ? "scale-105 cursor-grabbing" : "cursor-grab hover:scale-105"
+          "pointer-events-auto group absolute flex items-center justify-center rounded-full border border-white/20 text-white shadow-[0_10px_30px_-10px_rgba(124,58,237,0.6)]",
+          "bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500",
+          "motion-reduce:transition-none",
+          isDragging
+            ? "scale-105 cursor-grabbing transition-transform duration-100"
+            : isHelpDeskRoute
+            ? "cursor-pointer hover:scale-105 transition-all duration-300 ease-out"
+            : "cursor-grab hover:scale-105 transition-all duration-300 ease-out"
         )}
         style={{
           left: `${position.x}px`,
@@ -577,11 +735,10 @@ export default function FloatingChatbot() {
         aria-label={isOpen ? "Collapse chatbot" : "Open chatbot"}
       >
         <span className="sr-only">Chatbot launcher</span>
-        <MessageCircle className="size-6" />
-        <span className="absolute -bottom-7 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-card px-2 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm">
-          <GripHorizontal className="size-3" />
-          Drag
-        </span>
+        <span className="pointer-events-none absolute inset-0 rounded-full bg-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-violet-400/40 to-sky-400/40 blur-md opacity-60" />
+        <MessageCircle className="relative size-6 drop-shadow-sm" />
+        <Sparkles className="absolute -top-1 -right-1 size-3 text-white/90 drop-shadow" />
       </button>
     </div>
   );

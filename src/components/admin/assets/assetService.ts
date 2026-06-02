@@ -4,7 +4,7 @@
  * Uses apiGet / apiPost / apiPut / apiDelete from apiClient so JWT is auto-attached.
  */
 
-import { apiGet, apiFetch } from "@/lib/apiClient";
+import { apiGet, apiFetch, apiPost, apiPut } from "@/lib/apiClient";
 import type {
   Asset,
   AssetDetail,
@@ -16,6 +16,32 @@ import type {
   AssetAssignment,
   VehiclePredictionResult,
 } from "./types";
+
+// ─── Create / update payloads ────────────────────────────────────────────────
+// Mirrors the backend AssetCreate/AssetUpdate schema (editable subset).
+export interface AssetWritePayload {
+  asset_code: string;
+  asset_name: string;
+  warehouse_id: string;
+  department_id?: string | null;
+  asset_type?: string;
+  category?: string | null;
+  vehicle_type?: string | null;
+  make?: string | null;
+  model?: string | null;
+  manufacture_year?: number | null;
+  registration_number?: string | null;
+  vin?: string | null;
+  status?: string;
+  health_band?: string | null;
+  description?: string | null;
+}
+
+/** Lightweight {id,name} options for warehouse/department selects. */
+export interface IdNameOption {
+  id: string;
+  name: string;
+}
 
 // ─── List / filter assets ──────────────────────────────────────────────────────
 
@@ -113,6 +139,33 @@ export async function getAssetDetail(assetId: string): Promise<AssetDetail> {
     ]);
 
   return { asset, prediction, costPrediction, maintenanceEvents, tickets, assignments };
+}
+
+// ─── Create asset ────────────────────────────────────────────────────────────
+
+export async function createAsset(payload: AssetWritePayload): Promise<Asset> {
+  return apiPost<Asset>("/assets/", payload);
+}
+
+// ─── Update asset (full edit) ──────────────────────────────────────────────────
+
+export async function updateAsset(
+  assetId: string,
+  payload: Partial<AssetWritePayload>,
+): Promise<Asset> {
+  return apiPut<Asset>(`/assets/${assetId}`, payload);
+}
+
+// ─── Warehouse / department options (for select dropdowns) ─────────────────────
+
+export async function getWarehouseOptions(): Promise<IdNameOption[]> {
+  const rows = await apiGet<Array<{ id: string; name: string }>>("/warehouses/");
+  return rows.map((w) => ({ id: w.id, name: w.name }));
+}
+
+export async function getDepartmentOptions(): Promise<IdNameOption[]> {
+  const rows = await apiGet<Array<{ id: string; name: string }>>("/departments/");
+  return rows.map((d) => ({ id: d.id, name: d.name }));
 }
 
 // ─── Update asset status ───────────────────────────────────────────────────────

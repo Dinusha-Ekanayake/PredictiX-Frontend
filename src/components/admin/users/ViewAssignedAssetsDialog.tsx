@@ -30,42 +30,13 @@ export type AssetItem = {
 type Props = {
   userName: string;
   assets: AssetItem[];
+  /** Shows a loading state while assigned assets are being fetched. */
+  loading?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** When provided, shows a "Back to User Details" button. */
   onBackToDetails?: () => void;
 };
-
-// ---------------------------------------------------------------------------
-// Mock asset data keyed by user ID
-// ---------------------------------------------------------------------------
-
-const MOCK_ASSETS: Record<string, AssetItem[]> = {
-  "USR-001": [
-    { id: "A-001", name: "Forklift Alpha-01", category: "Material Handling", location: "Warehouse A - Bay 3", healthPercent: 92 },
-    { id: "A-002", name: "Conveyor Belt B-12", category: "Automation", location: "Warehouse A - Line 2", healthPercent: 68 },
-    { id: "A-003", name: "Pallet Jack PJ-05", category: "Material Handling", location: "Warehouse B - Zone 1", healthPercent: 88 },
-  ],
-  "USR-003": [
-    { id: "A-004", name: "Hydraulic Press HP-02", category: "Manufacturing", location: "Plant C - Station 4", healthPercent: 75 },
-    { id: "A-005", name: "CNC Router CR-07", category: "Machining", location: "Plant C - Bay 2", healthPercent: 94 },
-  ],
-  "USR-004": [
-    { id: "A-006", name: "Robotic Arm RA-03", category: "Automation", location: "Plant A - Cell 1", healthPercent: 97 },
-    { id: "A-007", name: "Laser Cutter LC-01", category: "Fabrication", location: "Plant A - Cell 3", healthPercent: 81 },
-    { id: "A-008", name: "3D Printer 3P-02", category: "Prototyping", location: "Lab B - Bench 4", healthPercent: 90 },
-    { id: "A-009", name: "Welding Station WS-05", category: "Fabrication", location: "Plant A - Bay 6", healthPercent: 73 },
-    { id: "A-010", name: "Inspection Camera IC-11", category: "Quality", location: "Plant A - Line 2", healthPercent: 99 },
-  ],
-  "USR-005": [
-    { id: "A-011", name: "HVAC Unit HV-04", category: "Facilities", location: "Building D - Roof", healthPercent: 56 },
-  ],
-};
-
-/** Get mock assets for a user ID. */
-export function getMockAssetsForUser(userId: string): AssetItem[] {
-  return MOCK_ASSETS[userId] ?? [];
-}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -136,6 +107,7 @@ function AssetCard({
 export default function ViewAssignedAssetsDialog({
   userName,
   assets: initialAssets,
+  loading = false,
   open,
   onOpenChange,
   onBackToDetails,
@@ -150,8 +122,8 @@ export default function ViewAssignedAssetsDialog({
   function handleRemove(assetId: string) {
     const removed = assets.find((a) => a.id === assetId);
     setAssets((prev) => prev.filter((a) => a.id !== assetId));
-    toast.success(`Removed ${removed?.name ?? "asset"}`, {
-      description: "Asset unassigned from user. (Mock — will sync with backend later.)",
+    toast.success(`Removed ${removed?.name ?? "asset"} from view`, {
+      description: "Unassignment is not yet persisted to the backend.",
     });
   }
 
@@ -166,7 +138,11 @@ export default function ViewAssignedAssetsDialog({
         </DialogHeader>
 
         {/* Asset cards list */}
-        {assets.length === 0 ? (
+        {loading ? (
+          <p className="py-6 text-center text-muted-foreground">
+            Loading assigned assets…
+          </p>
+        ) : assets.length === 0 ? (
           <p className="py-6 text-center text-muted-foreground">
             No assets currently assigned.
           </p>

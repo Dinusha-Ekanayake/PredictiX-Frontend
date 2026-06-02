@@ -62,7 +62,7 @@ export type TeamMemberData = {
 };
 
 export async function fetchMyProfile(): Promise<UserProfileData> {
-  const res = await fetch(`${API_URL}/user-profile/me`, {
+  const res = await fetch(`${API_URL}/profiles/me`, {
     headers: getAuthHeaders(),
   });
   
@@ -80,7 +80,7 @@ export async function updateMyProfile(data: {
   contactNumber?: string;
   address?: string;
 }): Promise<UserProfileData> {
-  const res = await fetch(`${API_URL}/user-profile/me`, {
+  const res = await fetch(`${API_URL}/profiles/me`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
@@ -95,7 +95,7 @@ export async function updateMyProfile(data: {
 }
 
 export async function fetchMyAssets(): Promise<UserAssetData[]> {
-  const res = await fetch(`${API_URL}/user-profile/me/assets`, {
+  const res = await fetch(`${API_URL}/profiles/me/assets`, {
     headers: getAuthHeaders(),
   });
   
@@ -108,7 +108,7 @@ export async function fetchMyAssets(): Promise<UserAssetData[]> {
 }
 
 export async function fetchMyStats(): Promise<UserStatsData> {
-  const res = await fetch(`${API_URL}/user-profile/me/stats`, {
+  const res = await fetch(`${API_URL}/profiles/me/stats`, {
     headers: getAuthHeaders(),
   });
   
@@ -136,7 +136,7 @@ export type UserItemOut = {
 };
 
 export async function fetchAllUsers(): Promise<UserItemOut[]> {
-  const res = await fetch(`${API_URL}/user-profile/users`, {
+  const res = await fetch(`${API_URL}/users/`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) {
@@ -147,7 +147,7 @@ export async function fetchAllUsers(): Promise<UserItemOut[]> {
 }
 
 export async function addUser(user: Omit<UserItemOut, "assignedAssets"> & { assignedAssets?: number }): Promise<UserItemOut> {
-  const res = await fetch(`${API_URL}/user-profile/users`, {
+  const res = await fetch(`${API_URL}/users/`, {
     method: "POST",
     headers: {
       ...getAuthHeaders(),
@@ -176,31 +176,35 @@ export async function addUser(user: Omit<UserItemOut, "assignedAssets"> & { assi
 }
 
 export async function fetchDepartments(): Promise<string[]> {
-  const res = await fetch(`${API_URL}/user-profile/departments`, {
+  const res = await fetch(`${API_URL}/departments/`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error("Failed to fetch departments");
-  return res.json();
+  const rows: Array<{ name?: string } | string> = await res.json();
+  // Endpoint returns Department objects; surface just the names.
+  return rows.map((d) => (typeof d === "string" ? d : d.name ?? "")).filter(Boolean);
 }
 
 export async function fetchWarehouses(): Promise<string[]> {
-  const res = await fetch(`${API_URL}/user-profile/warehouses`, {
+  const res = await fetch(`${API_URL}/warehouses/`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error("Failed to fetch warehouses");
-  return res.json();
+  const rows: Array<{ name?: string } | string> = await res.json();
+  // Endpoint returns Warehouse objects; surface just the names.
+  return rows.map((w) => (typeof w === "string" ? w : w.name ?? "")).filter(Boolean);
 }
 
 export async function fetchUserAssets(userId: string): Promise<UserAssetData[]> {
-  const res = await fetch(`${API_URL}/user-profile/users/${userId}/assets`, {
+  const res = await fetch(`${API_URL}/users/${userId}/assets`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error("Failed to fetch user assets");
   return res.json();
 }
 
-export async function updateUser(userId: string, data: any): Promise<UserItemOut> {
-  const res = await fetch(`${API_URL}/user-profile/users/${userId}`, {
+export async function updateUser(userId: string, data: Partial<UserItemOut>): Promise<UserItemOut> {
+  const res = await fetch(`${API_URL}/users/${userId}`, {
     method: "PUT",
     headers: {
       ...getAuthHeaders(),
@@ -216,7 +220,7 @@ export async function updateUser(userId: string, data: any): Promise<UserItemOut
 }
 
 export async function getTeamMembers(): Promise<TeamMemberData[]> {
-  const res = await fetch(`${API_URL}/user-profile/me/colleagues`, {
+  const res = await fetch(`${API_URL}/profiles/me/colleagues`, {
     method: "GET",
     headers: getAuthHeaders(),
   });

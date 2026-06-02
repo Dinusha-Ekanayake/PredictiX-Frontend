@@ -133,7 +133,7 @@ export default function AntigravityDotsBackground({
     parent.addEventListener("pointermove", onMove, { passive: true });
     parent.addEventListener("pointerleave", onLeave);
     return () => {
-      parent.removeEventListener("pointermove", onMove as any);
+      parent.removeEventListener("pointermove", onMove);
       parent.removeEventListener("pointerleave", onLeave);
     };
   }, []);

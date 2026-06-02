@@ -9,33 +9,26 @@ import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsi
 import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
 
 // ── Warehouse Report (my section — warehouse components only) ──
-import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
+import WarehouseReportModal, { type WarehouseReportPayload } from "@/components/admin/warehouse/WarehouseReportModal";
+import { getWarehouseSummary, type WarehouseSummaryData } from "@/lib/warehouseService";
 
-const REPORT_API = "http://127.0.0.1:8000/warehouse-dashboard/generate-report";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const REPORT_API = `${API_BASE_URL}/warehouse-dashboard/generate-report`;
 
 export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
-  const [data, setData] = React.useState<any>(null);
+  const [data, setData] = React.useState<WarehouseSummaryData | null>(null);
   const [refreshing, setRefreshing] = React.useState(true);
 
   async function fetchData() {
     setRefreshing(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/warehouse-dashboard/summary", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
+      const result = await getWarehouseSummary();
       setData(result);
     } catch (e) {
-      console.error("Failed to fetch warehouse data:", e);
+      // Backend may be offline in dev — log as a warning so it doesn't trip
+      // the Next.js error overlay, and render the empty/loading state instead.
+      console.warn("Failed to fetch warehouse data:", e);
       setData(null);
     } finally {
       setRefreshing(false);
@@ -49,7 +42,7 @@ export default function WarehousePage() {
   // ── Report modal state ──
   const [modalOpen, setModalOpen] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
-  const [reportData, setReportData] = React.useState<any>(null);
+  const [reportData, setReportData] = React.useState<WarehouseReportPayload | null>(null);
   const [reportError, setReportError] = React.useState<string | null>(null);
 
   async function handleGenerate() {

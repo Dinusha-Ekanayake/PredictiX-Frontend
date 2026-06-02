@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Boxes, ChevronRight, Radio, Box, AlertCircle, RefreshCw } from "lucide-react";
+import { Boxes, ChevronRight, Radio, Box, AlertCircle, RefreshCw, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +11,7 @@ import AssetsSummary from "@/components/admin/assets/AssetsSummary";
 import AssetsToolbar, { DEFAULT_FILTERS } from "@/components/admin/assets/AssetsToolbar";
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel, { AssetDetailsSkeleton } from "@/components/admin/assets/AssetDetailsPanel";
+import AssetFormDialog from "@/components/admin/assets/AssetFormDialog";
 
 import {
   listAssets,
@@ -43,6 +45,10 @@ export default function AdminAssetsPage() {
   const [detail, setDetail] = React.useState<AssetDetail | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
   const [detailError, setDetailError] = React.useState<string | null>(null);
+
+  // ── Create/edit dialog state ──────────────────────────────────────────────────
+  const [formOpen, setFormOpen] = React.useState(false);
+  const [editingAsset, setEditingAsset] = React.useState<Asset | null>(null);
 
   // ── Load asset list whenever filters change (debounced on query) ───────────────
   const queryRef = React.useRef(filters.query);
@@ -117,9 +123,29 @@ export default function AdminAssetsPage() {
       await deleteAsset(id);
       setAssets((prev) => prev.filter((a) => a.id !== id));
       if (selectedId === id) setSelectedId(assets.find((a) => a.id !== id)?.id ?? null);
+      toast.success("Asset deleted");
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Delete failed");
+      toast.error("Delete failed", { description: e instanceof Error ? e.message : undefined });
     }
+  }
+
+  // ── Create/edit handlers ────────────────────────────────────────────────────
+  function openCreate() {
+    setEditingAsset(null);
+    setFormOpen(true);
+  }
+  function openEdit(asset: Asset) {
+    setEditingAsset(asset);
+    setFormOpen(true);
+  }
+  function handleSaved(saved: Asset) {
+    setAssets((prev) => {
+      const exists = prev.some((a) => a.id === saved.id);
+      return exists ? prev.map((a) => (a.id === saved.id ? saved : a)) : [saved, ...prev];
+    });
+    setSelectedId(saved.id);
+    // refresh the detail panel for the saved asset
+    setSelectedId((id) => id);
   }
 
   // ── Derived stats for hero header ─────────────────────────────────────────────
@@ -185,6 +211,10 @@ export default function AdminAssetsPage() {
               <Radio className="h-3 w-3 animate-pulse" />
               Live
             </Badge>
+            <Button size="sm" className="h-7 gap-1.5 rounded-full" onClick={openCreate}>
+              <Plus className="h-3.5 w-3.5" />
+              Add Asset
+            </Button>
           </div>
         </div>
       </div>
@@ -253,6 +283,7 @@ export default function AdminAssetsPage() {
               detail={detail}
               onRefresh={refreshDetail}
               onDelete={handleDelete}
+              onEdit={openEdit}
             />
           ) : (
             <div className="card-dynamic flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-card px-6 py-24 text-center transition-all">
@@ -265,6 +296,14 @@ export default function AdminAssetsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Create / Edit dialog ── */}
+      <AssetFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        asset={editingAsset}
+        onSaved={handleSaved}
+      />
     </div>
   );
 }

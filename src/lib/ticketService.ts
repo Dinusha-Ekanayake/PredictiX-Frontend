@@ -42,30 +42,12 @@ function uiPriority(p: string): TicketPriority {
   return map[p?.toLowerCase()] ?? "Medium";
 }
 
-interface TicketRow {
-  id: string;
-  ticket_number: string | null;
-  asset_id: string | null;
-  assets?: { asset_name?: string | null } | null;
-  title: string;
-  description: string | null;
-  status: string;
-  priority: string;
-  predicted_category: string | null;
-  final_category: string | null;
-  created_by: string | null;
-  assigned_to: string | null;
-  opened_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-function mapRow(row: TicketRow): Ticket {
+function mapRow(row: any): Ticket {
   return {
     id: row.id,
     ticket_number: row.ticket_number,
     asset_id: row.asset_id,
-    asset_name: row.assets?.asset_name ?? undefined,
+    asset_name: row.assets?.asset_name ?? null,
     title: row.title,
     description: row.description,
     status: uiStatus(row.status),
@@ -144,6 +126,26 @@ export async function createTicket(payload: {
   return mapRow(data);
 }
 
+export async function fetchTicketStatusCounts(): Promise<Record<string, number>> {
+  if (!supabase) throw new Error("Supabase not configured");
+
+  const statuses = ["open", "in_progress", "resolved", "closed"];
+  const counts: Record<string, number> = { open: 0, "in-progress": 0, resolved: 0, closed: 0 };
+
+  await Promise.all(
+    statuses.map(async (s) => {
+      const { count } = await supabase!
+        .from("tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("status", s);
+      const uiKey = s === "in_progress" ? "in-progress" : s;
+      counts[uiKey] = count ?? 0;
+    })
+  );
+
+  return counts;
+}
+
 export async function updateTicketStatus(id: string, status: TicketStatus): Promise<void> {
   if (!supabase) throw new Error("Supabase not configured");
 
@@ -156,6 +158,15 @@ export async function updateTicketStatus(id: string, status: TicketStatus): Prom
   if (status === "in-progress") updates.reviewed_at = new Date().toISOString();
 
   const { error } = await supabase.from("tickets").update(updates).eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateTicketPriority(id: string, priority: TicketPriority): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase
+    .from("tickets")
+    .update({ priority: dbPriority(priority), updated_at: new Date().toISOString() })
+    .eq("id", id);
   if (error) throw error;
 }
 

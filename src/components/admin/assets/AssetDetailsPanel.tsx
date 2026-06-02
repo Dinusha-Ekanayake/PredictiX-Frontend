@@ -212,9 +212,10 @@ type Props = {
   detail: AssetDetail;
   onRefresh: () => void;
   onDelete: (id: string) => void;
+  onEdit: (asset: AssetDetail["asset"]) => void;
 };
 
-export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props) {
+export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit }: Props) {
   const { asset, prediction, costPrediction, maintenanceEvents, tickets, assignments } = detail;
   const router = useNavRouter();
 
@@ -303,6 +304,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete }: Props
             variant="outline"
             size="sm"
             className="h-8 rounded-xl gap-1.5 text-xs border-slate-200 dark:border-slate-700"
+            onClick={() => onEdit(asset)}
           >
             <Pencil className="h-3 w-3" />
             Edit

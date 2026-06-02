@@ -92,16 +92,24 @@ export function storeAuthSession(data: LoginResponse): void {
     full_name: data.full_name,
   };
 
+  // Canonical key + legacy "token" key (read by userProfileApi) — keep both in
+  // sync so every consumer finds the JWT regardless of which key it checks.
   localStorage.setItem("predictix.access_token", data.access_token);
+  localStorage.setItem("token", data.access_token);
   localStorage.setItem("predictix.user", JSON.stringify(user));
   localStorage.setItem("predictix.user.role", user.role);
   localStorage.setItem("predictix.user.email", user.email);
+  localStorage.setItem("predictix.user.id", user.id);
+  localStorage.setItem("predictix.user.name", user.full_name);
 }
 
 /** Return the stored JWT access token, or null. */
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("predictix.access_token");
+  return (
+    localStorage.getItem("predictix.access_token") ||
+    localStorage.getItem("token")
+  );
 }
 
 /** Return the stored user object, or null. */
@@ -119,9 +127,12 @@ export function getUser(): StoredUser | null {
 /** Remove all auth data (logout). */
 export function logout(): void {
   localStorage.removeItem("predictix.access_token");
+  localStorage.removeItem("token");
   localStorage.removeItem("predictix.user");
   localStorage.removeItem("predictix.user.role");
   localStorage.removeItem("predictix.user.email");
+  localStorage.removeItem("predictix.user.id");
+  localStorage.removeItem("predictix.user.name");
 }
 
 /** True if a JWT is present in localStorage. */

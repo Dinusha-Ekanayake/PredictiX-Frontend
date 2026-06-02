@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 
-import { askChatbot, type ChatbotSource } from "@/lib/apiClient";
+import { type ChatbotSource } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -143,8 +143,6 @@ export default function FloatingChatbot() {
   const [isSending, setIsSending] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
   const [position, setPosition] = React.useState<Position>({ x: 0, y: 0 });
 
@@ -256,7 +254,7 @@ export default function FloatingChatbot() {
     }
 
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [isLoading, isOpen, messages]);
+  }, [isSending, isOpen, messages]);
 
   const panelDimensions = React.useMemo(() => {
     const width = Math.min(380, Math.max(320, viewport.width - 24));
@@ -303,7 +301,7 @@ export default function FloatingChatbot() {
     }
 
     setIsSending(true);
-    const userMessage: LocalMessage = {
+    const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       text,
@@ -407,6 +405,11 @@ export default function FloatingChatbot() {
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleSourceClick = (source: ChatbotSource) => {
+    setDraft((current) => (current ? `${current} ${source.title}` : source.title));
+    inputRef.current?.focus();
   };
 
   const onLauncherPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -657,7 +660,7 @@ export default function FloatingChatbot() {
                     </div>
                   ))}
 
-                  {isLoading ? (
+                  {isSending ? (
                     <div className="flex justify-start">
                       <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm text-foreground shadow-sm">
                         <div className="flex items-center gap-2">
@@ -680,12 +683,6 @@ export default function FloatingChatbot() {
                 void sendMessage();
               }}
             >
-              {errorMessage ? (
-                <p className="mb-2 text-xs text-destructive" role="alert">
-                  {errorMessage}
-                </p>
-              ) : null}
-
               <div className="flex items-center gap-2">
                 <Input
                   ref={inputRef}
@@ -702,7 +699,7 @@ export default function FloatingChatbot() {
                   aria-label="Send chatbot message"
                   disabled={!draft.trim() || isSending}
                 >
-                  {isLoading ? <Loader2 className="size-4 animate-spin" /> : <SendHorizontal className="size-4" />}
+                  {isSending ? <Loader2 className="size-4 animate-spin" /> : <SendHorizontal className="size-4" />}
                 </Button>
               </div>
             </form>

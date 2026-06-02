@@ -20,6 +20,7 @@ import { useTheme } from "next-themes";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, PieChart as PieIcon, BarChart3 } from "lucide-react";
+import type { ChartDatum } from "@/lib/warehouseService";
 
 const healthMaintenanceTrends = [
   { month: "Jul", avgHealth: 86, maintenance: 1 },
@@ -73,7 +74,7 @@ function useChartStyles() {
   };
 }
 
-export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: any[] }) {
+export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: ChartDatum[] }) {
   const data = externalData || healthMaintenanceTrends;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 
@@ -125,7 +126,7 @@ export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: any
   );
 }
 
-export function AssetStatusDistributionCard({ data: externalData }: { data?: any[] }) {
+export function AssetStatusDistributionCard({ data: externalData }: { data?: ChartDatum[] }) {
   const data = externalData || assetStatus;
   const { axisColor, tooltipStyle } = useChartStyles();
 
@@ -173,7 +174,7 @@ export function AssetStatusDistributionCard({ data: externalData }: { data?: any
   );
 }
 
-export function HealthScoreDistributionCard({ data: externalData }: { data?: any[] }) {
+export function HealthScoreDistributionCard({ data: externalData }: { data?: ChartDatum[] }) {
   const data = externalData || healthScoreDist;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 
@@ -207,7 +208,7 @@ export function HealthScoreDistributionCard({ data: externalData }: { data?: any
   );
 }
 
-export function AssetsByTypeCard({ data: externalData }: { data?: any[] }) {
+export function AssetsByTypeCard({ data: externalData }: { data?: ChartDatum[] }) {
   const data = externalData || assetsByType;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 

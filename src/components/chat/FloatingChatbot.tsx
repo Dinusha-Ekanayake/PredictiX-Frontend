@@ -14,9 +14,7 @@ import {
   X,
 } from "lucide-react";
 
-import { type ChatbotSource } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,11 +35,8 @@ type ChatMessage = {
   role: "user" | "assistant";
   text: string;
   createdAt: number;
-  sources?: ChatbotSource[];
   toolTrace?: ToolTraceItem[];
 };
-
-type LocalMessage = ChatMessage;
 
 const STORAGE_KEY = "predictix.chatbot.launcher.position";
 const LAUNCHER_SIZE = 56;
@@ -53,6 +48,45 @@ const CHATBOT_API_BASE =
   "http://127.0.0.1:8000";
 const CHATBOT_AGENT_ENDPOINT = "/chatbot/agent";
 const CHATBOT_FALLBACK_ENDPOINTS = ["/chatbot/ask", "/chatbot", "/chatbot/message"];
+// Backend agent loops can take 30-60s when several tool calls chain together.
+// Default browser fetches don't time out but Next dev proxy + some networks
+// drop earlier — give the agent a generous 90s window before we abort.
+const REQUEST_TIMEOUT_MS = 180_000;
+
+// In-memory cache (per chat panel mount) — identical user questions return
+// instantly instead of re-running the agent.
+type CachedReply = {
+  text: string;
+  toolTrace?: ToolTraceItem[];
+  ts: number;
+};
+const REPLY_CACHE_TTL_MS = 5 * 60 * 1000;
+const replyCache = new Map<string, CachedReply>();
+
+function cacheKey(question: string): string {
+  return question.trim().toLowerCase();
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Suggested starter questions shown only on the empty state.
+const SUGGESTED_PROMPTS: string[] = [
+  "How many tickets do I have?",
+  "Show me ticket counts by category",
+  "Give me a dashboard overview",
+];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -285,8 +319,8 @@ export default function FloatingChatbot() {
     viewport.width,
   ]);
 
-  const sendMessage = async () => {
-    const text = draft.trim();
+  const sendMessage = async (overrideText?: string) => {
+    const text = (overrideText ?? draft).trim();
     if (!text || isSending) {
       return;
     }
@@ -309,6 +343,24 @@ export default function FloatingChatbot() {
     setMessages((current) => [...current, userMessage]);
     setDraft("");
 
+    // Cache short-circuit for identical questions in the same session.
+    const ckey = cacheKey(text);
+    const cached = replyCache.get(ckey);
+    if (cached && Date.now() - cached.ts < REPLY_CACHE_TTL_MS) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          text: cached.text,
+          createdAt: Date.now(),
+          toolTrace: cached.toolTrace,
+        },
+      ]);
+      setIsSending(false);
+      return;
+    }
+
     try {
       const token =
         window.localStorage.getItem("token") ||
@@ -318,16 +370,19 @@ export default function FloatingChatbot() {
 
       let replyText = "";
       let toolTrace: ToolTraceItem[] | undefined;
-      let sources: ChatbotSource[] | undefined;
       let lastError = "";
 
       // 1) Try the agentic endpoint first
       try {
-        const response = await fetch(`${CHATBOT_API_BASE}${CHATBOT_AGENT_ENDPOINT}`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ question: text, history: historyForAgent }),
-        });
+        const response = await fetchWithTimeout(
+          `${CHATBOT_API_BASE}${CHATBOT_AGENT_ENDPOINT}`,
+          {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ question: text, history: historyForAgent }),
+          },
+          REQUEST_TIMEOUT_MS,
+        );
         if (response.ok) {
           const payload = await response.json();
           replyText = typeof payload?.answer === "string" ? payload.answer : "";
@@ -345,20 +400,25 @@ export default function FloatingChatbot() {
       if (!replyText) {
         for (const path of CHATBOT_FALLBACK_ENDPOINTS) {
           try {
-            const response = await fetch(`${CHATBOT_API_BASE}${path}`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({ question: text }),
-            });
+            const response = await fetchWithTimeout(
+              `${CHATBOT_API_BASE}${path}`,
+              {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ question: text }),
+              },
+              REQUEST_TIMEOUT_MS,
+            );
             if (!response.ok) {
               lastError = `${response.status} ${response.statusText}`;
               continue;
             }
             const payload = await response.json();
             replyText = extractAssistantReply(payload);
-            if (Array.isArray((payload as { sources?: unknown })?.sources)) {
-              sources = (payload as { sources: ChatbotSource[] }).sources;
-            }
+            // Note: we intentionally drop the `sources` array from the legacy
+            // endpoint — they were rendering as noise at the end of every
+            // assistant message. Suggested prompts now live only on the
+            // empty state.
             if (replyText) break;
             lastError = "Chat endpoint returned no reply text";
           } catch (error) {
@@ -371,6 +431,8 @@ export default function FloatingChatbot() {
         throw new Error(lastError || "Unable to get chatbot response");
       }
 
+      replyCache.set(ckey, { text: replyText, toolTrace, ts: Date.now() });
+
       setMessages((current) => [
         ...current,
         {
@@ -379,28 +441,30 @@ export default function FloatingChatbot() {
           text: replyText,
           createdAt: Date.now(),
           toolTrace,
-          sources,
         },
       ]);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Unable to connect to chatbot backend";
+      const msg = error instanceof Error ? error.message.toLowerCase() : "";
+      let friendly: string;
+      if (msg.includes("abort") || msg.includes("timeout") || msg.includes("timed out")) {
+        friendly = "The assistant took a bit longer than usual. Please try again in a moment.";
+      } else if (msg.includes("failed to fetch") || msg.includes("network")) {
+        friendly = "I couldn't reach the server. Please check your connection and try again.";
+      } else {
+        friendly = "Something went wrong on my side. Please try again shortly.";
+      }
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: `Connection error: ${msg}`,
+          text: friendly,
           createdAt: Date.now(),
         },
       ]);
     } finally {
       setIsSending(false);
     }
-  };
-
-  const handleSourceClick = (source: ChatbotSource) => {
-    setDraft((current) => (current ? `${current} ${source.title}` : source.title));
-    inputRef.current?.focus();
   };
 
   const onLauncherPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -539,8 +603,20 @@ export default function FloatingChatbot() {
                   <div>
                     <p className="text-sm font-semibold text-foreground">How can I help?</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Ask about assets, tickets, or maintenance.
+                      Ask about assets, tickets, users, or warehouses.
                     </p>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+                    {SUGGESTED_PROMPTS.map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        onClick={() => void sendMessage(prompt)}
+                        className="rounded-full border border-violet-300/60 bg-violet-50/70 px-3 py-1 text-[11px] text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/20"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
                   </div>
                 </div>
               ) : (
@@ -570,24 +646,6 @@ export default function FloatingChatbot() {
                             minute: "2-digit",
                           })}
                         </p>
-
-                        {message.role === "assistant" && message.sources && message.sources.length > 0 ? (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {message.sources.map((source, index) => (
-                              <button
-                                key={`${message.id}-${source.title}-${index}`}
-                                type="button"
-                                className="rounded-md"
-                                onClick={() => handleSourceClick(source)}
-                                aria-label={`Use source ${source.title}`}
-                              >
-                                <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
-                                  {source.title} - {source.category}
-                                </Badge>
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
 
                         {message.role === "assistant" && message.toolTrace && message.toolTrace.length > 0 ? (
                           <div className="mt-2 border-t border-border/40 pt-2">

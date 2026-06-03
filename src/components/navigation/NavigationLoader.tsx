@@ -60,7 +60,7 @@ export default function PredictiXLoader({
                   "radial-gradient(closest-side, rgba(0,0,0,0.45), rgba(0,0,0,0))",
               }}
             />
-            <div className="relative flex h-[128px] w-[128px] items-center justify-center rounded-[28px] border bg-white shadow-md ring-1 ring-slate-200 dark:border-white/10 dark:bg-white/5 dark:ring-white/10">
+            <div className="relative flex h-[128px] w-32 items-center justify-center rounded-[28px] border bg-white shadow-md ring-1 ring-slate-200 dark:border-white/10 dark:bg-white/5 dark:ring-white/10">
               <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-linear-to-br from-white/60 via-transparent to-transparent dark:from-white/10" />
               <Image
                 src="/logo/predictix-icon.svg"

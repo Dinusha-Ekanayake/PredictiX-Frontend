@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import {
-  Brain, AlertTriangle, Wrench, Download,
-  RefreshCw, BookOpen, Activity, ShieldAlert,
+  Brain, AlertTriangle, Wrench, TrendingUp, Download,
+  RefreshCw, BookOpen, Users, Activity, ShieldAlert,
   CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp,
   FileText, DollarSign, Clock, ClipboardList, Database, Cpu, X,
 } from "lucide-react";
@@ -61,47 +61,44 @@ interface Ctx {
   total_maintenance_events_3m?: number; avg_downtime_hours?: number;
   maintenance_type_breakdown?: Record<string, number>;
   monthly_maintenance_trend?: { month: string; cost: number; events: number }[];
+  maintenance_trend_direction?: string; cost_trend_direction?: string;
+  maintenance_data_concentrated?: boolean;
+  scored_assets?: number; unscored_assets?: number;
   total_tickets?: number; open_tickets?: number; in_progress_tickets?: number;
   active_tickets?: number; resolved_tickets?: number; closed_tickets?: number;
   high_priority_active_tickets?: number;
   ticket_priority_breakdown?: Record<string, number>;
+  ticket_final_priority_breakdown?: Record<string, number>;
   ticket_category_breakdown?: Record<string, number>;
   ticket_trend_last_3m?: { month: string; tickets: number }[];
   ticket_trend_direction?: string;
   total_users?: number; active_users?: number; inactive_users?: number;
   admin_users?: number; standard_users?: number;
+  // Phase B — extended DB fields
+  fleet_age_distribution?: Record<string, number>;
+  warranty_expiring_90d?: number;
+  component_health?: { avg_tire?: number; avg_brake?: number; avg_battery?: number; avg_oil?: number; avg_hydraulic?: number };
+  total_fault_codes?: number;
+  avg_fault_codes_per_asset?: number;
+  monitored_assets?: number;
+  vendor_breakdown?: { vendor: string; events: number; cost: number }[];
+  avg_resolution_hours?: number;
+  avg_resolution_days?: number;
+  mttr_by_priority?: { priority: string; avg_hours: number }[];
 }
 
-/** KB enrichments computed by the backend (kb_annotator). */
-interface WarehouseKbAnnotations {
-  shap_enriched?: {
-    feature: string;
-    impact_pct: number;
-    kb_threshold: string;
-    action: string;
-    standard?: string;
-  }[];
-  benchmark_alerts?: { type?: string; message: string }[];
-  recommendations?: {
-    critical?: string[];
-    high?: string[];
-    medium?: string[];
-    kb_alert?: string;
-  };
-  service_interval_text?: string;
-}
-
-export interface WarehouseReportPayload {
-  ai_sections: AISections;
-  context: Ctx;
-  kb_annotations?: WarehouseKbAnnotations;
+interface MaintenanceScheduleItem {
+  asset: string;
+  predicted: number;
+  scheduled: number;
 }
 
 interface Props {
   open: boolean;
   generating: boolean;
-  reportData: WarehouseReportPayload | null;
+  reportData: { ai_sections: AISections; context: Ctx; kb_annotations?: any } | null;
   reportError: string | null;
+  maintenanceSchedule?: MaintenanceScheduleItem[];
   onGenerate: () => void;
   onClose: () => void;
   onRegenerate: () => void;
@@ -146,27 +143,14 @@ function KpiRow({ label, val, color }: { label: string; val?: string | number; c
   );
 }
 
-interface CTipPayloadItem {
-  color?: string;
-  fill?: string;
-  name?: React.ReactNode;
-  value?: number | string;
-}
-
-interface CTipProps {
-  active?: boolean;
-  payload?: CTipPayloadItem[];
-  label?: React.ReactNode;
-}
-
-function CTip({ active, payload, label }: CTipProps) {
+function CTip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 py-2 text-xs shadow-lg">
       {label && <div className="font-semibold mb-1">{label}</div>}
-      {payload.map((p, i: number) => (
+      {payload.map((p: any, i: number) => (
         <div key={i} style={{ color: p.color || p.fill }}>
-          {p.name ?? "Value"}: <strong>{typeof p.value === "number" ? p.value.toLocaleString() : p.value}</strong>
+          {p.name ?? "Value"}: <strong>{(p.value as number)?.toLocaleString()}</strong>
         </div>
       ))}
     </div>
@@ -286,7 +270,6 @@ function ConfirmStep({ onGenerate, onClose }: { onGenerate: () => void; onClose:
 // ─────────────────────────────────────────────────────────
 
 function LoadingStep() {
-  const [step, setStep] = React.useState(0);
   const steps = React.useMemo(() => [
     "Connecting to database…",
     "Aggregating asset health & failure data…",
@@ -294,7 +277,9 @@ function LoadingStep() {
     "Analyzing data patterns…",
     "Generating report sections…",
   ], []);
-
+  
+  const [step, setStep] = React.useState(0);
+  
   React.useEffect(() => {
     if (!steps || steps.length === 0) return;
 
@@ -378,18 +363,82 @@ function ErrorStep({ error, onRetry, onClose }: { error: string; onRetry: () => 
 // ─────────────────────────────────────────────────────────
 
 function ReportStep({
-  data, onRegenerate, onClose,
+  data, onRegenerate, onClose, maintenanceSchedule = [],
 }: {
-  data: { ai_sections: AISections; context: Ctx; kb_annotations?: WarehouseKbAnnotations };
+  data: { ai_sections: AISections; context: Ctx; kb_annotations?: any };
   onRegenerate: () => void;
   onClose: () => void;
+  maintenanceSchedule?: MaintenanceScheduleItem[];
 }) {
   const [sourcesOpen, setSourcesOpen] = React.useState(false);
+  const [pdfLoading, setPdfLoading] = React.useState(false);
   const reportContentRef = React.useRef<HTMLDivElement>(null);
   const ctx = data.context;
   const ai  = data.ai_sections;
-  const kb: WarehouseKbAnnotations = data.kb_annotations ?? {};
+  const kb  = data.kb_annotations || {};
   const cur = ctx.currency ?? "LKR";
+
+  // ── Asset summary selection ──────────────────────────────
+  // User ticks the critical assets they want AI summaries for; only the
+  // ticked assets are summarised, and only those summaries reach the PDF.
+  const criticalAssets = ctx.critical_assets ?? [];
+  const [selectedCodes, setSelectedCodes] = React.useState<Set<string>>(new Set());
+  const [summaries, setSummaries] = React.useState<Record<string, string>>({});
+  const [summarizing, setSummarizing] = React.useState(false);
+
+  const toggleAsset = (code: string) =>
+    setSelectedCodes((prev) => {
+      const next = new Set(prev);
+      next.has(code) ? next.delete(code) : next.add(code);
+      return next;
+    });
+
+  const allSelected = criticalAssets.length > 0 && selectedCodes.size === criticalAssets.length;
+  const toggleAll = () =>
+    setSelectedCodes(allSelected ? new Set() : new Set(criticalAssets.map((a) => a.code)));
+
+  const generateSummaries = async () => {
+    const targets = criticalAssets.filter((a) => selectedCodes.has(a.code));
+    if (targets.length === 0) return;
+    setSummarizing(true);
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const token = typeof window !== "undefined"
+      ? (localStorage.getItem("token") || localStorage.getItem("predictix.access_token"))
+      : null;
+    const results: Record<string, string> = {};
+    await Promise.allSettled(
+      targets.map(async (asset) => {
+        try {
+          const input = [
+            `Vehicle: ${asset.code}`,
+            `Type: ${asset.type}`,
+            `Status: ${asset.status}`,
+            `Health score: ${asset.health}`,
+            `Failure probability: ${asset.failure_prob}`,
+            `Risk: ${asset.risk}`,
+          ].filter(Boolean).join(" | ");
+          const res = await fetch(`${API_BASE}/asset-summaries/generate`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ input_text: input }),
+          });
+          if (res.ok) {
+            const d = await res.json();
+            results[asset.code] = d.summary;
+          } else {
+            console.warn(`[AssetSummary] ✗ Failed for ${asset.code}: Status ${res.status}`);
+          }
+        } catch (err) {
+          console.error(`[AssetSummary] ✗ Error for ${asset.code}:`, err);
+        }
+      })
+    );
+    setSummaries((prev) => ({ ...prev, ...results }));
+    setSummarizing(false);
+  };
 
   const riskData        = toChart(ctx.risk_breakdown);
   const healthDistData  = toChart(ctx.health_score_distribution);
@@ -404,11 +453,21 @@ function ReportStep({
     name: f.replace(/_/g, " ").slice(0, 22), value: c,
   }));
 
-  const handlePDFExport = () => {
+  const handlePDFExport = async () => {
+    setPdfLoading(true);
     const warehouseName = ctx.warehouse_name || "Warehouse";
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const filename = `${warehouseName}-Report-${new Date().toISOString().split('T')[0]}.pdf`;
-    
+
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const token = typeof window !== "undefined"
+      ? (localStorage.getItem("token") || localStorage.getItem("predictix.access_token"))
+      : null;
+
+    // Only the assets the user ticked (and summarised) carry a summary into the PDF.
+    const summaryMap: Record<string, string> = summaries;
+    console.log("[AssetSummary] Including", Object.keys(summaryMap).length, "ticked asset summaries in PDF");
+
     // Prepare structured report data with ALL warehouse context data
     const pdfData = {
       title: "Warehouse Report",
@@ -420,10 +479,10 @@ function ReportStep({
         fleetHealth: Math.round(ctx.avg_health_pct || 0),
         failureProb: Math.round(ctx.avg_failure_prob_pct || 0),
         critical: ctx.critical_count || 0,
-        urgent: ctx.urgent_count || 0,
+        urgent: ctx.urgent_maintenance_count || 0,
         activeTickets: ctx.active_tickets || 0,
         activeUsers: ctx.active_users || 0,
-        maintenanceCost: `LKR ${(ctx.monthly_maintenance_cost || 0).toLocaleString()}`,
+        maintenanceCost: `LKR ${(ctx.total_estimated_cost || 0).toLocaleString()}`,
       },
       kbAnnotations: kb,
       aiContent: {
@@ -439,6 +498,9 @@ function ReportStep({
         underMaintenanceAssets: ctx.under_maintenance_assets || 0,
         retiredAssets: ctx.retired_assets || 0,
         avgVehicleAge: ctx.avg_vehicle_age_years || 0,
+        // Phase B additions
+        fleetAgeDist: ctx.fleet_age_distribution ?? {},
+        warrantyExpiring90d: ctx.warranty_expiring_90d ?? 0,
       },
       maintenanceDetail: {
         estimatedCost: `LKR ${(ctx.total_estimated_cost || 0).toLocaleString()}`,
@@ -446,6 +508,20 @@ function ReportStep({
         actualCost3m: `LKR ${(ctx.actual_cost_3m || 0).toLocaleString()}`,
         maintenanceEvents3m: ctx.total_maintenance_events_3m || 0,
         avgDowntimeHours: ctx.avg_downtime_hours || 0,
+        // Phase A fixes — previously unmapped
+        preventiveCount: ctx.maintenance_type_breakdown?.['Preventive'] ?? ctx.maintenance_type_breakdown?.['preventive'] ?? 0,
+        correctiveCount: ctx.maintenance_type_breakdown?.['Corrective'] ?? ctx.maintenance_type_breakdown?.['corrective'] ?? 0,
+        monthlyTrend: ctx.monthly_maintenance_trend ?? [],
+        // Phase A fix — cost range was in Ctx but never sent to PDF
+        minCostEstimate: ctx.min_cost_estimate ?? 0,
+        maxCostEstimate: ctx.max_cost_estimate ?? 0,
+        // Phase B addition
+        vendorBreakdown: ctx.vendor_breakdown ?? [],
+        // Trend honesty: deterministic directions + seed-data concentration flag
+        eventTrendDirection: ctx.maintenance_trend_direction,
+        costTrendDirection: ctx.cost_trend_direction,
+        dataConcentrated: ctx.maintenance_data_concentrated ?? false,
+        reportingPeriod: ctx.period,
       },
       ticketDetail: {
         totalTickets: ctx.total_tickets || 0,
@@ -454,8 +530,15 @@ function ReportStep({
         resolvedTickets: ctx.resolved_tickets || 0,
         closedTickets: ctx.closed_tickets || 0,
         highPriorityTickets: ctx.high_priority_active_tickets || 0,
-        mediumPriorityTickets: ctx.ticket_priority_breakdown?.["Medium"] || 0,
-        lowPriorityTickets: ctx.ticket_priority_breakdown?.["Low"] || 0,
+        mediumPriorityTickets: ctx.ticket_priority_breakdown?.['Medium'] || 0,
+        lowPriorityTickets: ctx.ticket_priority_breakdown?.['Low'] || 0,
+        // Phase A fix — previously unmapped
+        monthlyTrend: ctx.ticket_trend_last_3m ?? [],
+        // Phase B additions
+        avgResolutionDays: ctx.avg_resolution_days ?? 0,
+        mttrByPriority: ctx.mttr_by_priority ?? [],
+        // AI reclassified priority
+        finalPriorityBreakdown: ctx.ticket_final_priority_breakdown ?? {},
       },
       userDetail: {
         totalUsers: ctx.total_users || 0,
@@ -463,21 +546,32 @@ function ReportStep({
         standardUsers: ctx.standard_users || 0,
         inactiveUsers: ctx.inactive_users || 0,
       },
+      // Phase B — Component & Operational data
+      operationsDetail: {
+        componentHealth: ctx.component_health ?? {},
+        totalFaultCodes: ctx.total_fault_codes ?? 0,
+        avgFaultCodesPerAsset: ctx.avg_fault_codes_per_asset ?? 0,
+        monitoredAssets: ctx.monitored_assets ?? 0,
+      },
+      // Predictive Maintenance Schedule (from /maintenance-schedule endpoint — warehouse only)
+      maintenanceSchedule: maintenanceSchedule.slice(0, 20),
+      // Chart Sections
       sections: {
         assetStatus: Object.entries(ctx.asset_status_breakdown || {}).map(([name, value]) => ({ name, value })),
-        ticketsByPriority: toChart(ctx.ticket_priority_breakdown || {}),
+        ticketPriority: toChart(ctx.ticket_priority_breakdown || {}),
         ticketsByCategory: toChart(ctx.ticket_category_breakdown || {}),
         assetsByType: toChart(ctx.asset_type_breakdown || {}),
         healthScoreDistribution: Object.entries(ctx.health_score_distribution || {}).map(([bucket, count]) => ({ bucket, count })),
-        maintenanceByType: Object.entries(ctx.maintenance_type_breakdown || {}).map(([name, value]) => ({ name, value })),
-        riskDistribution: Object.entries(ctx.risk_breakdown || {}).map(([name, value]) => ({ name, value })),
-        criticaAssets: (ctx.critical_assets || []).map(asset => ({
+        maintenanceTypes: Object.entries(ctx.maintenance_type_breakdown || {}).map(([name, value]) => ({ name, value })),
+        riskBreakdown: Object.entries(ctx.risk_breakdown || {}).map(([name, value]) => ({ name, value })),
+        criticalAssets: (ctx.critical_assets || []).map(asset => ({
           id: asset.code || "N/A",
           vehicle: asset.name || "Unknown",
           component: asset.type || "General",
           health: asset.health || "N/A",
           priority: Math.round(parseFloat(asset.failure_prob || "0")) > 50 ? "High" : "Medium",
           status: asset.status || "Unknown",
+          summary: summaryMap[asset.code] || undefined,
         })),
       },
       trends: {
@@ -489,13 +583,100 @@ function ReportStep({
         importance: importance,
       })),
     };
-
-    downloadProfessionalPDF(pdfData as unknown as Parameters<typeof downloadProfessionalPDF>[0], filename);
+    // const pdfData = {
+    //   title: "Warehouse Report",
+    //   warehouseName: warehouseName,
+    //   warehouseCity: ctx.warehouse_city,
+    //   generatedDate: date,
+    //   summary: {
+    //     totalAssets: ctx.total_assets || 0,
+    //     fleetHealth: Math.round(ctx.avg_health_pct || 0),
+    //     failureProb: Math.round(ctx.avg_failure_prob_pct || 0),
+    //     critical: ctx.critical_count || 0,
+    //     urgent: ctx.urgent_count || 0,
+    //     activeTickets: ctx.active_tickets || 0,
+    //     activeUsers: ctx.active_users || 0,
+    //     maintenanceCost: `LKR ${(ctx.monthly_maintenance_cost || 0).toLocaleString()}`,
+    //   },
+    //   kbAnnotations: kb,
+    //   // AI Content Sections - from data parameter
+    //   aiContent: {
+    //     insight_summary: ai.insight_summary || "",
+    //     risk_analysis: ai.risk_analysis || "",
+    //     maintenance_intelligence: ai.maintenance_intelligence || "",
+    //     pattern_and_trend: ai.pattern_and_trend || "",
+    //     conclusion: ai.conclusion || "",
+    //   },
+    //   // Asset Details
+    //   assetDetail: {
+    //     activeAssets: ctx.active_assets || 0,
+    //     inactiveAssets: ctx.inactive_assets || 0,
+    //     underMaintenanceAssets: ctx.under_maintenance_assets || 0,
+    //     retiredAssets: ctx.retired_assets || 0,
+    //     avgVehicleAge: ctx.avg_vehicle_age_years || 0,
+    //   },
+    //   // Maintenance Details
+    //   maintenanceDetail: {
+    //     estimatedCost: `LKR ${(ctx.total_estimated_cost || 0).toLocaleString()}`,
+    //     avgCostPerAsset: `LKR ${(ctx.avg_cost_per_asset || 0).toLocaleString()}`,
+    //     actualCost3m: `LKR ${(ctx.actual_cost_3m || 0).toLocaleString()}`,
+    //     maintenanceEvents3m: ctx.total_maintenance_events_3m || 0,
+    //     avgDowntimeHours: ctx.avg_downtime_hours || 0,
+    //   },
+    //   // Ticket Details
+    //   ticketDetail: {
+    //     totalTickets: ctx.total_tickets || 0,
+    //     openTickets: ctx.open_tickets || 0,
+    //     inProgressTickets: ctx.in_progress_tickets || 0,
+    //     resolvedTickets: ctx.resolved_tickets || 0,
+    //     closedTickets: ctx.closed_tickets || 0,
+    //     highPriorityTickets: ctx.high_priority_active_tickets || 0,
+    //     mediumPriorityTickets: ctx.ticket_priority_breakdown?.['Medium'] || ctx.ticket_final_priority_breakdown?.['Medium'] || 0,
+    //     lowPriorityTickets: ctx.ticket_priority_breakdown?.['Low'] || ctx.ticket_final_priority_breakdown?.['Low'] || 0,
+    //   },
+    //   // User Details
+    //   userDetail: {
+    //     totalUsers: ctx.total_users || 0,
+    //     adminUsers: ctx.admin_users || 0,
+    //     standardUsers: ctx.standard_users || 0,
+    //     inactiveUsers: ctx.inactive_users || 0,
+    //   },
+    //   // Chart Sections
+    //   sections: {
+    //     assetStatus: Object.entries(ctx.asset_status_breakdown || {}).map(([name, value]) => ({ name, value })),
+    //     ticketPriority: toChart(ctx.ticket_priority_breakdown || {}),
+    //     ticketsByCategory: toChart(ctx.ticket_category_breakdown || {}),
+    //     assetsByType: toChart(ctx.asset_type_breakdown || {}),
+    //     healthScoreDistribution: Object.entries(ctx.health_score_distribution || {}).map(([bucket, count]) => ({ bucket, count })),
+    //     maintenanceTypes: Object.entries(ctx.maintenance_type_breakdown || {}).map(([name, value]) => ({ name, value })),
+    //     riskBreakdown: Object.entries(ctx.risk_breakdown || {}).map(([name, value]) => ({ name, value })),
+    //     criticaAssets: (ctx.critical_assets || []).map(asset => ({
+    //       id: asset.code || "N/A",
+    //       vehicle: asset.name || "Unknown",
+    //       component: asset.type || "General",
+    //       health: asset.health || "N/A",
+    //       priority: Math.round(parseFloat(asset.failure_prob || "0")) > 50 ? "High" : "Medium",
+    //       status: asset.status || "Unknown",
+    //     })),
+    //   },
+    //   // Trends Data
+    //   trends: {
+    //     ticketTrend: ctx.ticket_trend_last_3m || [],
+    //     maintenanceTrend: ctx.monthly_maintenance_trend || [],
+    //   },
+    //   // SHAP Features (Top Failure Drivers)
+    //   shapFeatures: (ctx.top_shap_features || []).slice(0, 8).map(([feature, importance]) => ({
+    //     feature: feature.replace(/_/g, " "),
+    //     importance: importance,
+    //   })),
+    // };
+    
+    downloadProfessionalPDF(pdfData as any, filename);
+    setPdfLoading(false);
 
     // Trigger Server Notification
-    const token = typeof window !== 'undefined' ? localStorage.getItem('predictix.access_token') : null;
     if (token) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/warehouse-dashboard/notify-print`, {
+      fetch(`${API_BASE}/warehouse-dashboard/notify-print`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -523,8 +704,9 @@ function ReportStep({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handlePDFExport} className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-            <Download className="h-3.5 w-3.5" /> PDF
+          <button onClick={handlePDFExport} disabled={pdfLoading} className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+            {pdfLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            {pdfLoading ? "Generating…" : "PDF"}
           </button>
           <button onClick={onRegenerate} className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors">
             <RefreshCw className="h-3.5 w-3.5" /> Regenerate
@@ -575,7 +757,7 @@ function ReportStep({
         {/* ── S1: Executive Summary ── */}
         <Section icon={Brain} accent={P.violet} title="1. Executive Insight Summary" subtitle="Top-level AI intelligence & benchmark context">
           <AIBlock text={ai.insight_summary} />
-          {kb.benchmark_alerts?.map((a, i) => (
+          {kb.benchmark_alerts?.map((a: any, i: number) => (
             <div key={i} className="my-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
               <span className="font-bold flex items-center gap-1.5"><AlertTriangle className="h-4 w-4" /> Benchmark Alert</span>
               <p className="mt-1">{a.message}</p>
@@ -694,11 +876,42 @@ function ReportStep({
                   <span className="text-[10px] font-bold uppercase tracking-widest text-sky-800 dark:text-sky-300">Service Interval Standard</span>
                 </div>
                 <p className="text-xs text-sky-700 dark:text-sky-400 italic leading-relaxed">
-                  &ldquo;{kb.service_interval_text}&rdquo;
+                  "{kb.service_interval_text}"
                 </p>
               </div>
             )}
           </div>
+
+          {/* Fleet Age Distribution */}
+          {Object.keys(ctx.fleet_age_distribution ?? {}).length > 0 && (
+            <>
+              <Divider label="Fleet Age Distribution" />
+              <div className="grid grid-cols-4 gap-3">
+                {Object.entries(ctx.fleet_age_distribution ?? {}).map(([band, cnt]) => {
+                  const total = Object.values(ctx.fleet_age_distribution ?? {}).reduce((a, b) => a + (b as number), 0);
+                  const pct = total > 0 ? Math.round((cnt as number) / total * 100) : 0;
+                  const isOld = band.startsWith('10');
+                  return (
+                    <div key={band} className="rounded-xl border p-3 text-center" style={{ borderColor: isOld && pct > 20 ? '#fca5a5' : '#e2e8f0', background: isOld && pct > 20 ? '#fff5f5' : undefined }}>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{band}</div>
+                      <div className="text-xl font-bold" style={{ color: isOld && pct > 20 ? '#dc2626' : isOld && pct > 10 ? '#ea580c' : P.teal }}>{cnt as number}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">{pct}% of fleet</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Warranty Expiry Alert */}
+          {(ctx.warranty_expiring_90d ?? 0) > 0 && (
+            <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 flex items-start gap-3 mt-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                <strong>{ctx.warranty_expiring_90d} {(ctx.warranty_expiring_90d ?? 0) === 1 ? 'asset has' : 'assets have'}</strong> warranty expiring within the next 90 days. Schedule pre-expiry inspections.
+              </p>
+            </div>
+          )}
         </Section>
 
         {/* ── S3: Health & Risk Analysis ── */}
@@ -742,7 +955,7 @@ function ReportStep({
               <div className="lg:col-span-2">
                 <CLabel text="Enriched SHAP Failure Drivers" />
                 <div className="mt-2 space-y-2">
-                  {kb.shap_enriched.slice(0, 4).map((f, i) => (
+                  {kb.shap_enriched.slice(0, 4).map((f: any, i: number) => (
                     <div key={i} className="flex flex-col gap-1 rounded-lg border border-slate-100 bg-slate-50/50 p-2 dark:border-slate-800 dark:bg-slate-800/20 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-slate-700 dark:text-slate-200">{f.feature}</span>
@@ -773,48 +986,134 @@ function ReportStep({
 
           <Divider label="Critical Assets (Lowest Health)" />
           {(ctx.critical_assets?.length ?? 0) > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800">
-                    {["Code", "Name / Type", "Health", "Fail Prob", "Risk", "Days to Svc", "Status"].map((h) => (
-                      <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ctx.critical_assets!.map((a) => (
-                    <tr key={a.code} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                      <td className="py-2 pr-3 font-mono font-bold text-rose-600">{a.code}</td>
-                      <td className="py-2 pr-3"><div className="font-medium">{a.name}</div><div className="text-muted-foreground">{a.type}</div></td>
-                      <td className="py-2 pr-3">
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-1.5 w-14 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                            <div className="h-full rounded-full" style={{
-                              width: `${a.health_score}%`,
-                              backgroundColor: a.health_score < 50 ? P.rose : a.health_score < 70 ? P.amber : P.emerald,
-                            }} />
-                          </div>
-                          <span className="font-semibold">{a.health}</span>
-                        </div>
-                      </td>
-                      <td className="py-2 pr-3 font-semibold" style={{ color: P.rose }}>{a.failure_prob}</td>
-                      <td className="py-2 pr-3">
-                        <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${P.rose}20`, color: P.rose }}>{a.risk}</span>
-                      </td>
-                      <td className="py-2 pr-3 font-semibold" style={{
-                        color: a.days_to_service != null && a.days_to_service <= 7 ? P.rose
-                          : a.days_to_service != null && a.days_to_service <= 30 ? P.amber : P.slate,
-                      }}>
-                        {a.days_to_service != null ? `${a.days_to_service}d` : "N/A"}
-                      </td>
-                      <td className="py-2 capitalize text-muted-foreground">{a.status}</td>
+            <>
+              {/* Tick assets → generate summaries only for the ticked ones */}
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <p className="text-[11px] text-muted-foreground">
+                  Tick the assets you want AI summaries for — summaries appear below and are included in the PDF.
+                  {selectedCodes.size > 0 && <span className="ml-1 font-semibold text-violet-600">{selectedCodes.size} selected</span>}
+                </p>
+                <button
+                  type="button"
+                  onClick={generateSummaries}
+                  disabled={selectedCodes.size === 0 || summarizing}
+                  className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {summarizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
+                  {summarizing ? "Summarising…" : "Summarise ticked assets"}
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="pb-2 pr-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={toggleAll}
+                          className="h-3.5 w-3.5 cursor-pointer accent-violet-600"
+                          title="Select all"
+                        />
+                      </th>
+                      {["Code", "Name / Type", "Health", "Fail Prob", "Risk", "Days to Svc", "Status"].map((h) => (
+                        <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {ctx.critical_assets!.map((a) => (
+                      <React.Fragment key={a.code}>
+                        <tr className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                          <td className="py-2 pr-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedCodes.has(a.code)}
+                              onChange={() => toggleAsset(a.code)}
+                              className="h-3.5 w-3.5 cursor-pointer accent-violet-600"
+                            />
+                          </td>
+                          <td className="py-2 pr-3 font-mono font-bold text-rose-600">{a.code}</td>
+                          <td className="py-2 pr-3"><div className="font-medium">{a.name}</div><div className="text-muted-foreground">{a.type}</div></td>
+                          <td className="py-2 pr-3">
+                            <div className="flex items-center gap-1.5">
+                              <div className="h-1.5 w-14 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                                <div className="h-full rounded-full" style={{
+                                  width: `${a.health_score}%`,
+                                  backgroundColor: a.health_score < 50 ? P.rose : a.health_score < 70 ? P.amber : P.emerald,
+                                }} />
+                              </div>
+                              <span className="font-semibold">{a.health}</span>
+                            </div>
+                          </td>
+                          <td className="py-2 pr-3 font-semibold" style={{ color: P.rose }}>{a.failure_prob}</td>
+                          <td className="py-2 pr-3">
+                            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${P.rose}20`, color: P.rose }}>{a.risk}</span>
+                          </td>
+                          <td className="py-2 pr-3 font-semibold" style={{
+                            color: a.days_to_service != null && a.days_to_service <= 7 ? P.rose
+                              : a.days_to_service != null && a.days_to_service <= 30 ? P.amber : P.slate,
+                          }}>
+                            {a.days_to_service != null ? `${a.days_to_service}d` : "N/A"}
+                          </td>
+                          <td className="py-2 capitalize text-muted-foreground">{a.status}</td>
+                        </tr>
+                        {summaries[a.code] && (
+                          <tr className="border-b border-slate-50 dark:border-slate-800/50 bg-violet-50/40 dark:bg-violet-950/10">
+                            <td />
+                            <td colSpan={7} className="py-2 pr-3">
+                              <div className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
+                                <Brain className="h-3.5 w-3.5 shrink-0 mt-0.5 text-violet-500" />
+                                <span><span className="font-semibold text-violet-600">AI Summary:</span> {summaries[a.code]}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : <p className="text-sm text-muted-foreground italic text-center py-3">No critical assets found.</p>}
+
+          {/* Component Health Matrix */}
+          {ctx.component_health && Object.values(ctx.component_health).some(v => (v ?? 0) > 0) && (
+            <>
+              <Divider label="Component Health Matrix" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {[
+                  { label: "Tire",      val: ctx.component_health.avg_tire      ?? 0 },
+                  { label: "Brake",     val: ctx.component_health.avg_brake     ?? 0 },
+                  { label: "Battery",   val: ctx.component_health.avg_battery   ?? 0 },
+                  { label: "Oil",       val: ctx.component_health.avg_oil       ?? 0 },
+                  { label: "Hydraulic", val: ctx.component_health.avg_hydraulic ?? 0 },
+                ].map(({ label, val }) => {
+                  const color = val >= 80 ? P.emerald : val >= 60 ? P.amber : P.rose;
+                  return (
+                    <div key={label} className="rounded-xl border border-slate-100 dark:border-slate-800 p-3 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
+                        <span className="text-sm font-bold" style={{ color }}>{val.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(val, 100)}%`, backgroundColor: color }} />
+                      </div>
+                      <span className="text-[9px] text-muted-foreground">{val >= 80 ? 'Good' : val >= 60 ? 'Monitor' : 'Action Required'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {((ctx.total_fault_codes ?? 0) > 0 || (ctx.avg_fault_codes_per_asset ?? 0) > 0) && (
+                <div className="mt-2 rounded-xl border border-rose-100 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-950/10 px-4 py-2.5 flex items-center gap-4 text-xs">
+                  <span className="font-semibold text-rose-700 dark:text-rose-400">Fleet Fault Codes:</span>
+                  <span className="font-bold text-rose-800 dark:text-rose-300">{ctx.total_fault_codes ?? 0} total</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-muted-foreground">{(ctx.avg_fault_codes_per_asset ?? 0).toFixed(2)} avg per monitored asset{(ctx.monitored_assets ?? 0) > 0 ? ` (of ${ctx.monitored_assets})` : ""}</span>
+                </div>
+              )}
+            </>
+          )}
         </Section>
 
         {/* ── S4: Maintenance ── */}
@@ -830,6 +1129,8 @@ function ReportStep({
                 { l: "Events (3 months)",          v: ctx.total_maintenance_events_3m,    c: P.teal },
                 { l: "Avg Downtime/Event",         v: `${ctx.avg_downtime_hours}h`,       c: P.slate },
                 { l: `Est. Cost (${cur})`,         v: (ctx.total_estimated_cost ?? 0).toLocaleString(),   c: P.violet },
+                { l: `Min Estimate (${cur})`,      v: (ctx.min_cost_estimate ?? 0).toLocaleString(),      c: P.sky },
+                { l: `Max Estimate (${cur})`,      v: (ctx.max_cost_estimate ?? 0).toLocaleString(),      c: P.rose },
                 { l: `Actual Spend 3M (${cur})`,   v: (ctx.actual_cost_3m ?? 0).toLocaleString(),         c: P.emerald },
                 { l: `Avg per Asset (${cur})`,     v: (ctx.avg_cost_per_asset ?? 0).toLocaleString(),     c: P.indigo },
               ].map(({ l, v, c }) => <KpiRow key={l} label={l} val={v} color={c} />)}
@@ -852,15 +1153,87 @@ function ReportStep({
           {maintenTrend.length > 0 && (
             <>
               <Divider label="Monthly Events (3 Months)" />
-              <ResponsiveContainer width="100%" height={140}>
-                <BarChart data={maintenTrend} margin={{ left: -10 }}>
+              <ResponsiveContainer width="100%" height={150}>
+                <LineChart data={maintenTrend} margin={{ left: -10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="month" tick={{ fontSize: 9 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip content={<CTip />} />
-                  <Bar dataKey="events" name="Events" fill={P.amber} radius={[4, 4, 0, 0]} />
-                </BarChart>
+                  <Line type="monotone" dataKey="events" name="Events" stroke={P.amber} strokeWidth={2.5} dot={{ r: 4, fill: P.amber }} />
+                </LineChart>
               </ResponsiveContainer>
+            </>
+          )}
+
+          {/* Vendor Analysis */}
+          {(ctx.vendor_breakdown?.length ?? 0) > 0 && (
+            <>
+              <Divider label="Vendor & Service Provider Analysis" />
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      {["Vendor", "Events", `Total Cost (${cur})`].map(h => (
+                        <th key={h} className="pb-2 pr-4 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ctx.vendor_breakdown!.map((v, i) => (
+                      <tr key={i} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                        <td className="py-2 pr-4 font-medium">{v.vendor}</td>
+                        <td className="py-2 pr-4 font-semibold" style={{ color: P.amber }}>{v.events}</td>
+                        <td className="py-2 font-semibold" style={{ color: P.emerald }}>{v.cost.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {/* Predictive Maintenance Schedule */}
+          {maintenanceSchedule.length > 0 && (
+            <>
+              <Divider label="Predictive Maintenance Schedule (Predicted vs Scheduled)" />
+              <p className="text-[11px] text-muted-foreground mb-3">
+                Predicted weeks from ML model vs scheduled weeks from fleet average interval. Negative gap = overdue relative to schedule.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      {["Asset", "Predicted (wks)", "Scheduled (wks)", "Gap (wks)", "Status"].map(h => (
+                        <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {maintenanceSchedule.slice(0, 15).map((r, i) => {
+                      const gap = r.predicted - r.scheduled;
+                      const isOverdue = gap < -2;
+                      const isDue = gap < 0 && !isOverdue;
+                      const gapColor = isOverdue ? P.rose : isDue ? P.amber : P.emerald;
+                      const statusLabel = isOverdue ? '⚠ Overdue' : isDue ? 'Due Soon' : 'On Track';
+                      return (
+                        <tr key={i} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                          <td className="py-2 pr-3 font-medium text-xs">{r.asset}</td>
+                          <td className="py-2 pr-3 font-semibold tabular-nums" style={{ color: P.sky }}>{r.predicted.toFixed(1)}</td>
+                          <td className="py-2 pr-3 font-semibold tabular-nums" style={{ color: P.teal }}>{r.scheduled.toFixed(1)}</td>
+                          <td className="py-2 pr-3 font-bold tabular-nums" style={{ color: gapColor }}>
+                            {gap >= 0 ? '+' : ''}{gap.toFixed(1)}
+                          </td>
+                          <td className="py-2">
+                            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{
+                              backgroundColor: `${gapColor}20`, color: gapColor,
+                            }}>{statusLabel}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
         </Section>
@@ -941,33 +1314,107 @@ function ReportStep({
               </div>
             </>
           )}
+
+          {/* MTTR / Resolution Performance */}
+          {(ctx.avg_resolution_days ?? 0) > 0 && (
+            <>
+              <Divider label="Resolution Performance (MTTR)" />
+              <div className="grid gap-3 sm:grid-cols-2 mb-3">
+                <div className="rounded-xl border border-slate-100 dark:border-slate-800 p-4 flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Avg Resolution Time</span>
+                  <span className="text-2xl font-bold" style={{ color: P.sky }}>{ctx.avg_resolution_days?.toFixed(1)} days</span>
+                  <span className="text-[10px] text-muted-foreground">{ctx.avg_resolution_hours?.toFixed(1)} hours</span>
+                </div>
+                {(ctx.mttr_by_priority?.length ?? 0) > 0 && (
+                  <div className="rounded-xl border border-slate-100 dark:border-slate-800 p-4 flex flex-col gap-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Fastest Priority</span>
+                    {ctx.mttr_by_priority!.slice(-1).map(p => (
+                      <div key={p.priority}>
+                        <span className="text-lg font-bold" style={{ color: P.emerald }}>{p.priority}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{p.avg_hours.toFixed(1)}h avg</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {(ctx.mttr_by_priority?.length ?? 0) > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100 dark:border-slate-800">
+                        {["Priority", "Avg Resolution (hrs)"].map(h => (
+                          <th key={h} className="pb-2 pr-4 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ctx.mttr_by_priority!.map((p, i) => (
+                        <tr key={i} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                          <td className="py-2 pr-4">
+                            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{
+                              backgroundColor: p.priority === 'High' ? `${P.rose}20` : p.priority === 'Medium' ? `${P.amber}20` : `${P.slate}20`,
+                              color: p.priority === 'High' ? P.rose : p.priority === 'Medium' ? P.amber : P.slate,
+                            }}>{p.priority}</span>
+                          </td>
+                          <td className="py-2 font-semibold" style={{ color: P.sky }}>{p.avg_hours.toFixed(1)}h</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* AI Priority Reclassification */}
+          {Object.keys(ctx.ticket_final_priority_breakdown ?? {}).length > 0 && (
+            <>
+              <Divider label="AI Priority Reclassification" />
+              <p className="text-[11px] text-muted-foreground mb-3">
+                PredictiX AI re-scores each ticket using sensor telemetry and SHAP models. Compare against original filed priority to identify under-triaged issues.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {Object.entries(ctx.ticket_final_priority_breakdown ?? {}).map(([pri, cnt]) => {
+                  const color = pri.toLowerCase() === 'high' || pri.toLowerCase() === 'critical'
+                    ? P.rose : pri.toLowerCase() === 'medium' ? P.amber : P.emerald;
+                  return (
+                    <div key={pri} className="rounded-xl border p-3 text-center" style={{ borderColor: `${color}40`, background: `${color}10` }}>
+                      <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color }}>{pri}</div>
+                      <div className="text-2xl font-bold" style={{ color }}>{cnt as number}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">AI-classified</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </Section>
 
         {/* ── S6: Recommendations ── */}
         <Section icon={ShieldAlert} accent={P.emerald} title="6. Recommendations" subtitle="Data-driven prescriptive actions">
           {kb.recommendations ? (
             <div className="grid gap-4">
-              {(kb.recommendations.critical?.length ?? 0) > 0 && (
+              {kb.recommendations.critical?.length > 0 && (
                 <div className="rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/20 overflow-hidden text-xs">
                   <div className="bg-rose-600 px-3 py-1.5 font-bold text-white tracking-widest uppercase text-[10px]">Critical (0-7 Days)</div>
                   <ul className="px-5 py-3 list-disc space-y-1.5 text-rose-900 dark:text-rose-200">
-                    {(kb.recommendations.critical ?? []).map((r, i) => <li key={i}>{r}</li>)}
+                    {kb.recommendations.critical.map((r: string, i: number) => <li key={i}>{r}</li>)}
                   </ul>
                 </div>
               )}
-              {(kb.recommendations.high?.length ?? 0) > 0 && (
+              {kb.recommendations.high?.length > 0 && (
                 <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 overflow-hidden text-xs">
                   <div className="bg-amber-500 px-3 py-1.5 font-bold text-white tracking-widest uppercase text-[10px]">High (7-30 Days)</div>
                   <ul className="px-5 py-3 list-disc space-y-1.5 text-amber-900 dark:text-amber-200">
-                    {(kb.recommendations.high ?? []).map((r, i) => <li key={i}>{r}</li>)}
+                    {kb.recommendations.high.map((r: string, i: number) => <li key={i}>{r}</li>)}
                   </ul>
                 </div>
               )}
-              {(kb.recommendations.medium?.length ?? 0) > 0 && (
+              {kb.recommendations.medium?.length > 0 && (
                 <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20 overflow-hidden text-xs">
                   <div className="bg-emerald-600 px-3 py-1.5 font-bold text-white tracking-widest uppercase text-[10px]">Medium (30-90 Days)</div>
                   <ul className="px-5 py-3 list-disc space-y-1.5 text-emerald-900 dark:text-emerald-200">
-                    {(kb.recommendations.medium ?? []).map((r, i) => <li key={i}>{r}</li>)}
+                    {kb.recommendations.medium.map((r: string, i: number) => <li key={i}>{r}</li>)}
                   </ul>
                 </div>
               )}
@@ -1202,6 +1649,7 @@ function ReportStep({
 
 export default function WarehouseReportModal({
   open, generating, reportData, reportError,
+  maintenanceSchedule = [],
   onGenerate, onClose, onRegenerate,
 }: Props) {
   React.useEffect(() => {
@@ -1229,7 +1677,7 @@ export default function WarehouseReportModal({
         {showConfirm && <ConfirmStep onGenerate={onGenerate} onClose={onClose} />}
         {showLoading && <LoadingStep />}
         {showError   && <ErrorStep error={reportError!} onRetry={onRegenerate} onClose={onClose} />}
-        {showReport  && <ReportStep data={reportData!} onRegenerate={onRegenerate} onClose={onClose} />}
+        {showReport  && <ReportStep data={reportData!} onRegenerate={onRegenerate} onClose={onClose} maintenanceSchedule={maintenanceSchedule} />}
       </div>
     </div>
   );

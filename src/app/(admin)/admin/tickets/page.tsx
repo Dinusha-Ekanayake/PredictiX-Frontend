@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Search, Filter, AlertTriangle, CheckCircle, AlertCircle, RefreshCw, XCircle } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Search, Filter, AlertTriangle, CheckCircle, AlertCircle, RefreshCw, XCircle, Loader2, Ticket as TicketIcon, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
 import TicketDetailsDialog from "@/components/admin/dialogs/TicketDetailsDialog";
@@ -16,205 +17,119 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-
-type Ticket = {
-  id: string;
-  asset: string;
-  title: string;
-  description: string;
-  priority: "High" | "Medium" | "Low";
-  status: "open" | "in-progress" | "resolved" | "closed";
-  category: string;
-  assignedTo?: string;
-  createdAt: string;
-};
+import {
+  fetchTickets,
+  fetchTicketStatusCounts,
+  deleteTicket,
+  type Ticket,
+} from "@/lib/ticketService";
 
 export default function AdminTicketsPage() {
+  const [isAdmin, setIsAdmin] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [tickets, setTickets] = React.useState<Ticket[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [page, setPage] = React.useState(0);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+
+  const [statusCounts, setStatusCounts] = React.useState<Record<string, number>>({ open: 0, "in-progress": 0, resolved: 0, closed: 0 });
+
   const [open, setOpen] = React.useState(false);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [selectedTicket, setSelectedTicket] = React.useState<Ticket | null>(null);
 
-  React.useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const MOCK_TICKETS: Ticket[] = [
-    { id: "T-1001", asset: "Compressor A-14", title: "Vibration spike detected", description: "RMS exceeded threshold during last cycle.", priority: "High", status: "open", category: "Mechanical", assignedTo: "Tech-01", createdAt: "2026-02-14" },
-    { id: "T-1002", asset: "Pump P-09", title: "Temperature rising trend", description: "Gradual temp increase over 3 hours.", priority: "Medium", status: "open", category: "Electrical", assignedTo: "Tech-02", createdAt: "2026-02-13" },
-    { id: "T-1003", asset: "Motor M-02", title: "Minor sensor drift", description: "Sensor offset observed intermittently.", priority: "Low", status: "open", category: "Software", assignedTo: "Tech-03", createdAt: "2026-02-12" },
-
-    { id: "T-2001", asset: "Conveyor B-12", title: "Strange noise during run", description: "Grinding noise coming from bearing area.", priority: "High", status: "in-progress", category: "Mechanical", assignedTo: "Tech-01", createdAt: "2026-02-11" },
-    { id: "T-2002", asset: "Heater H-07", title: "Intermittent trip", description: "Circuit trips under load occasionally.", priority: "Medium", status: "in-progress", category: "Electrical", assignedTo: "Tech-02", createdAt: "2026-02-10" },
-    { id: "T-2003", asset: "Sensor S-21", title: "Calibration needed", description: "Periodic re-calibration recommended.", priority: "Low", status: "in-progress", category: "Software", assignedTo: "Tech-03", createdAt: "2026-02-09" },
-
-    { id: "T-3001", asset: "Crane LD-03", title: "Load imbalance resolved", description: "Root cause fixed and verified.", priority: "High", status: "resolved", category: "Mechanical", assignedTo: "Tech-04", createdAt: "2026-02-08" },
-    { id: "T-3002", asset: "Pump P-11", title: "Seal replaced", description: "Leak fixed, monitoring for recurrence.", priority: "Medium", status: "resolved", category: "Mechanical", assignedTo: "Tech-05", createdAt: "2026-02-07" },
-    { id: "T-3003", asset: "Fan F-02", title: "Imbalance corrected", description: "Fan balanced and vibration reduced.", priority: "Low", status: "resolved", category: "Mechanical", assignedTo: "Tech-06", createdAt: "2026-02-06" },
-
-    { id: "T-4001", asset: "Generator G-01", title: "Closed - awaiting parts", description: "Ticket closed but unresolved (awaiting long-lead parts).", priority: "High", status: "closed", category: "Electrical", assignedTo: "Tech-07", createdAt: "2026-02-05" },
-    { id: "T-4002", asset: "Valve V-08", title: "Closed - monitoring", description: "Issue closed, continue to monitor.", priority: "Medium", status: "closed", category: "Mechanical", assignedTo: "Tech-08", createdAt: "2026-02-04" },
-    { id: "T-4003", asset: "Gauge G-12", title: "Closed - informational", description: "Routine notice, no action required.", priority: "Low", status: "closed", category: "Software", assignedTo: "Tech-09", createdAt: "2026-02-03" },
-  ];
-  // default order: inverse of initial array (newest first by createdAt)
-  const [tickets, setTickets] = React.useState<Ticket[]>(() => {
-    return MOCK_TICKETS.slice().sort((a, b) => {
-      // ISO date strings compare correctly
-      if (a.createdAt < b.createdAt) return 1;
-      if (a.createdAt > b.createdAt) return -1;
-      return 0;
-    });
-  });
-  const dragItemId = React.useRef<string | null>(null);
-  const dragGhostRef = React.useRef<HTMLElement | null>(null);
-  const draggedElRef = React.useRef<HTMLElement | null>(null);
   const [query, setQuery] = React.useState("");
-  const [selectedStatus, setSelectedStatus] = React.useState<string>("all");
-  const [selectedPriority, setSelectedPriority] = React.useState<string>("all");
+  const [debouncedQuery, setDebouncedQuery] = React.useState("");
+  const [selectedStatus, setSelectedStatus] = React.useState("all");
+  const [selectedPriority, setSelectedPriority] = React.useState("all");
 
-  const categoryClass = React.useCallback((cat?: string) => {
-    switch ((cat || "").toLowerCase()) {
-      case "mechanical":
-        return "bg-emerald-100 text-emerald-800";
-      case "electrical":
-        return "bg-pink-100 text-pink-800";
-      case "software":
-        return "bg-sky-100 text-sky-800";
-      default:
-        return "bg-emerald-100 text-emerald-800";
-    }
+  React.useEffect(() => {
+    const role = window.localStorage.getItem("predictix.user.role");
+    setIsAdmin(role === "admin" || role === "ADMIN");
   }, []);
 
-  function handleDragStart(e: React.DragEvent, id: string) {
-    dragItemId.current = id;
-    e.dataTransfer.effectAllowed = "move";
-    try {
-      e.dataTransfer.setData("text/plain", id);
-    } catch {}
+  // Load global status counts (not affected by filters)
+  React.useEffect(() => {
+    fetchTicketStatusCounts().then(setStatusCounts).catch(() => {});
+  }, []);
 
-    // Create a visual clone (ghost) that follows the mouse and scale/darken it
-    const target = e.currentTarget as HTMLElement;
-    draggedElRef.current = target;
-    try {
-      const rect = target.getBoundingClientRect();
-      const clone = target.cloneNode(true) as HTMLElement;
-      clone.style.position = "fixed";
-      clone.style.left = `${e.clientX}px`;
-      clone.style.top = `${e.clientY}px`;
-      clone.style.width = `${rect.width}px`;
-      clone.style.pointerEvents = "none";
-      clone.style.zIndex = "9999";
-      clone.style.margin = "0";
-      clone.style.transition = "transform 120ms ease, left 0ms, top 0ms";
-      clone.style.transform = "translate(-50%,-50%) scale(1.15)";
-      clone.style.filter = "brightness(0.85)";
-      document.body.appendChild(clone);
-      dragGhostRef.current = clone;
-      // Use our clone as the native drag image so browsers don't create a semi-transparent default
-      try {
-        e.dataTransfer.setDragImage(clone, e.clientX - rect.left, e.clientY - rect.top);
-      } catch {}
-    } catch {}
+  // Debounce search input
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 400);
+    return () => clearTimeout(t);
+  }, [query]);
 
-    // darken the original element slightly (do NOT make it transparent)
-    try {
-      target.style.filter = "brightness(0.92)";
-      // ensure it's not made transparent by the UA during drag
-      target.style.opacity = "1";
-      target.style.visibility = "visible";
-    } catch {}
-  }
+  // Reset and reload when filters change
+  React.useEffect(() => {
+    setPage(0);
+    setTickets([]);
+    loadPage(0, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery, selectedStatus, selectedPriority]);
 
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    // Move ghost to follow cursor
-    const ghost = dragGhostRef.current;
-    if (ghost) {
-      try {
-        ghost.style.left = `${e.clientX}px`;
-        ghost.style.top = `${e.clientY}px`;
-      } catch {}
+  async function loadPage(pageNum: number, reset: boolean) {
+    if (pageNum === 0) setIsLoading(true);
+    else setLoadingMore(true);
+
+    try {
+      const { tickets: rows, total: t } = await fetchTickets(
+        pageNum,
+        debouncedQuery,
+        selectedStatus,
+        selectedPriority
+      );
+      setTotal(t);
+      setTickets((prev) => (reset ? rows : [...prev, ...rows]));
+      setPage(pageNum);
+    } catch (err) {
+      toast.error("Failed to load tickets", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setIsLoading(false);
+      setLoadingMore(false);
     }
   }
 
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    const id = e.dataTransfer.getData("text/plain") || dragItemId.current;
-    const target = e.currentTarget as HTMLElement;
-    const indexAttr = target.dataset.index;
-    if (!id || indexAttr === undefined) return;
-    const toIndex = Number(indexAttr);
-    setTickets((prev) => {
-      const fromIndex = prev.findIndex((p) => p.id === id);
-      if (fromIndex === -1) return prev;
-      const next = prev.slice();
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
-    dragItemId.current = null;
-
-    // cleanup ghost and restore original appearance (remove brightness filter)
-    try {
-      if (dragGhostRef.current && dragGhostRef.current.parentElement) {
-        dragGhostRef.current.parentElement.removeChild(dragGhostRef.current);
-      }
-    } catch {}
-    dragGhostRef.current = null;
-    try {
-      if (draggedElRef.current) draggedElRef.current.style.filter = "";
-    } catch {}
-    draggedElRef.current = null;
+  function handleLoadMore() {
+    loadPage(page + 1, false);
   }
 
-  function handleDragEnd() {
-    // cleanup if drag ends without drop
-    try {
-      if (dragGhostRef.current && dragGhostRef.current.parentElement) {
-        dragGhostRef.current.parentElement.removeChild(dragGhostRef.current);
-      }
-    } catch {}
-    dragGhostRef.current = null;
-    try {
-      if (draggedElRef.current) draggedElRef.current.style.filter = "";
-    } catch {}
-    draggedElRef.current = null;
-    dragItemId.current = null;
+  function handleTicketCreated(ticket: Ticket) {
+    setTickets((prev) => [ticket, ...prev]);
+    setTotal((t) => t + 1);
   }
 
-  const filteredTickets = React.useMemo(() => {
-    return tickets.filter((t) => {
-      // status filter
-      if (selectedStatus && selectedStatus !== "all" && t.status !== selectedStatus) return false;
-      // priority filter (select values are lowercase)
-      if (selectedPriority && selectedPriority !== "all" && t.priority.toLowerCase() !== selectedPriority) return false;
-      // search
-      if (!query) return true;
-      const q = query.toLowerCase();
-      return (
-        t.id.toLowerCase().includes(q) ||
-        t.title.toLowerCase().includes(q) ||
-        t.asset.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q)
-      );
-    });
-  }, [tickets, query, selectedStatus, selectedPriority]);
-
-  const stats = React.useMemo(() => {
-    const s = { open: 0, "in-progress": 0, resolved: 0, closed: 0 } as Record<string, number>;
-    tickets.forEach((t) => {
-      s[t.status] = (s[t.status] || 0) + 1;
-    });
-    return s;
-  }, [tickets]);
-
-  function handleDeleteTicket(id: string) {
-    setTickets((prev) => prev.filter((t) => t.id !== id));
-    setSelectedTicket(null);
-    setDetailOpen(false);
+  function handleTicketUpdated(updated: Ticket) {
+    setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    if (selectedTicket?.id === updated.id) setSelectedTicket(updated);
   }
+
+  async function handleDeleteTicket(id: string) {
+    try {
+      await deleteTicket(id);
+      setTickets((prev) => prev.filter((t) => t.id !== id));
+      setTotal((c) => c - 1);
+      setSelectedTicket(null);
+      setDetailOpen(false);
+      toast.success("Ticket deleted");
+    } catch (err) {
+      toast.error("Failed to delete ticket", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
+  }
+
+  const categoryClass = (cat?: string | null) => {
+    switch ((cat || "").toLowerCase()) {
+      case "mechanical": return "bg-emerald-100 text-emerald-800";
+      case "electrical": return "bg-pink-100 text-pink-800";
+      case "software": return "bg-sky-100 text-sky-800";
+      default: return "bg-emerald-100 text-emerald-800";
+    }
+  };
+
+  const hasMore = tickets.length < total;
 
   if (isLoading) {
     return (
@@ -224,206 +139,286 @@ export default function AdminTicketsPage() {
     );
   }
 
-  return (
-    <div className="w-full space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Tickets</h1>
-        <p className="text-sm text-muted-foreground">Manage support tickets and alerts.</p>
-      </div>
+  const totalAll = (statusCounts.open || 0) + (statusCounts["in-progress"] || 0) + (statusCounts.resolved || 0) + (statusCounts.closed || 0);
 
-      {/* Search + filters bar */}
-      <div className="w-full">
-        <div className="flex w-full items-center gap-3 rounded-2xl border border-input bg-transparent p-4">
-          <div className="flex items-center gap-3 flex-1">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tickets..." className="pl-12 h-12 rounded-lg" />
+  return (
+    <div className="w-full space-y-5 pb-10">
+      {/* ══ Hero header (dashboard style) ════════════════════════════════════ */}
+      <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-white/10 dark:bg-white/2">
+        <div className="absolute inset-0 bg-linear-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent pointer-events-none" />
+        <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-linear-to-br from-violet-400/20 to-sky-400/20 dark:from-violet-500/10 dark:to-sky-500/5 blur-3xl pointer-events-none" />
+
+        <div className="relative px-7 py-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-violet-500 dark:text-violet-400">PredictiX</span>
+              <span className="text-muted-foreground/30 text-xs font-light">/</span>
+              <span className="text-[10px] tracking-widest uppercase text-muted-foreground/60">Admin</span>
+              <span className="text-muted-foreground/30 text-xs font-light">/</span>
+              <span className="text-[10px] tracking-widest uppercase text-muted-foreground/80">Tickets</span>
             </div>
 
-            <div className="hidden items-center gap-2 sm:flex">
-              <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v)}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="open">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-destructive" />
-                      <span>Open</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="in-progress">
-                    <div className="flex items-center gap-2">
-                      <RefreshCw className="h-4 w-4 text-amber-400" />
-                      <span>In Progress</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="resolved">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-emerald-400" />
-                      <span>Resolved</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="closed">
-                    <div className="flex items-center gap-2">
-                      <XCircle className="h-4 w-4 text-muted-foreground" />
-                      <span>Closed</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+            <h1 className="flex items-center gap-2.5 text-[26px] font-semibold tracking-[-0.025em] leading-none text-foreground">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-sky-500 text-white shadow-md">
+                <TicketIcon className="size-5" />
+              </span>
+              Support Tickets
+            </h1>
 
-              <Select value={selectedPriority} onValueChange={(v) => setSelectedPriority(v)}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="All Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priority</SelectItem>
-                  <SelectItem value="high">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-destructive" />
-                      <span>High</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="medium">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-amber-400" />
-                      <span>Medium</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="low">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-emerald-400" />
-                      <span>Low</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-2.5 mt-2.5">
+              <p className="text-[12px] text-muted-foreground leading-tight max-w-sm">
+                Track, assign and resolve customer-reported issues and AI-flagged alerts.
+              </p>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 shrink-0">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live
+              </span>
             </div>
           </div>
 
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
-                  <Filter className="h-4 w-4" />
-                </Button>
-                <Button onClick={() => setOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white">+ New Ticket</Button>
-              </div>
+          <div className="flex flex-col items-end gap-2.5 shrink-0">
+            <Button
+              onClick={() => setOpen(true)}
+              className="bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md"
+            >
+              + New Ticket
+            </Button>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100/80 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/25 px-2.5 py-1 text-[10px] font-semibold text-rose-700 dark:text-rose-300">
+                <AlertCircle className="h-3 w-3" /> {statusCounts.open || 0} open
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100/80 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/25 px-2.5 py-1 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
+                <Sparkles className="h-3 w-3" /> {totalAll} total
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Mini dashboard */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card className="card-dynamic cursor-default hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors">
-          <CardContent className="flex items-center gap-3">
-            <AlertCircle className="h-6 w-6 text-red-500" />
-            <div>
-              <div className="text-sm text-muted-foreground">Open</div>
-              <div className="text-xl font-semibold">{stats.open}</div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* ══ Search + filters ═════════════════════════════════════════════════ */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm p-4">
+        <div className="flex w-full items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-60">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search tickets by title, description…"
+              className="pl-9 h-10 bg-background/60 dark:bg-slate-900/60"
+            />
+          </div>
 
-        <Card className="card-dynamic cursor-default hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors">
-          <CardContent className="flex items-center gap-3">
-            <RefreshCw className="h-6 w-6 text-amber-500" />
-            <div>
-              <div className="text-sm text-muted-foreground">In Progress</div>
-              <div className="text-xl font-semibold">{stats["in-progress"]}</div>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="hidden items-center gap-2 sm:flex">
+            <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v)}>
+              <SelectTrigger className="w-40 h-10">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="open">
+                  <div className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-rose-500" /><span>Open</span></div>
+                </SelectItem>
+                <SelectItem value="in-progress">
+                  <div className="flex items-center gap-2"><RefreshCw className="h-4 w-4 text-amber-500" /><span>In Progress</span></div>
+                </SelectItem>
+                <SelectItem value="resolved">
+                  <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-emerald-500" /><span>Resolved</span></div>
+                </SelectItem>
+                <SelectItem value="closed">
+                  <div className="flex items-center gap-2"><XCircle className="h-4 w-4 text-muted-foreground" /><span>Closed</span></div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
 
-        <Card className="card-dynamic cursor-default hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors">
-          <CardContent className="flex items-center gap-3">
-            <CheckCircle className="h-6 w-6 text-emerald-500" />
-            <div>
-              <div className="text-sm text-muted-foreground">Resolved</div>
-              <div className="text-xl font-semibold">{stats.resolved}</div>
-            </div>
-          </CardContent>
-        </Card>
+            <Select value={selectedPriority} onValueChange={(v) => setSelectedPriority(v)}>
+              <SelectTrigger className="w-40 h-10">
+                <SelectValue placeholder="All Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priority</SelectItem>
+                <SelectItem value="high">
+                  <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-500" /><span>High</span></div>
+                </SelectItem>
+                <SelectItem value="medium">
+                  <div className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-amber-500" /><span>Medium</span></div>
+                </SelectItem>
+                <SelectItem value="low">
+                  <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-emerald-500" /><span>Low</span></div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
 
-        <Card className="card-dynamic cursor-default hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-          <CardContent className="flex items-center gap-3">
-            <XCircle className="h-6 w-6 text-slate-500" />
-            <div>
-              <div className="text-sm text-muted-foreground">Closed</div>
-              <div className="text-xl font-semibold">{stats.closed}</div>
-            </div>
-          </CardContent>
-        </Card>
+            <Button variant="ghost" size="sm" className="h-10">
+              <Filter className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
-      {/* Tickets list */}
-      <div className="flex flex-col gap-4">
-        {tickets.map((t, idx) => (
-          <div
-            key={t.id}
-            data-id={t.id}
-            data-index={idx}
-            draggable
-            onDragStart={(e) => handleDragStart(e, t.id)}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            onDragEnd={handleDragEnd}
-            className="ticket-dynamic rounded-xl border p-4 cursor-move transform-gpu will-change-transform hover:scale-[1.01] hover:bg-muted/10 dark:hover:bg-muted/20 hover:shadow-lg transition-transform duration-150 ease-out hover:z-10"
-            onClick={() => {
-              setSelectedTicket(t);
-              setDetailOpen(true);
-            }}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <span className="rounded-md bg-muted/30 px-3 py-1 text-sm font-medium">{t.id}</span>
 
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full ${t.priority === "High" ? "bg-red-100" : t.priority === "Medium" ? "bg-amber-100" : "bg-emerald-100"}`}>
-                      {t.priority === "High" ? (
-                        <AlertTriangle className="h-3 w-3 text-red-600" />
-                      ) : t.priority === "Medium" ? (
-                        <AlertCircle className="h-3 w-3 text-amber-500" />
-                      ) : (
-                        <CheckCircle className="h-3 w-3 text-emerald-500" />
-                      )}
-                    </span>
-                    <span className="text-sm font-medium">{t.priority}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full ${t.status === "open" ? "bg-red-100" : t.status === "in-progress" ? "bg-amber-100" : t.status === "resolved" ? "bg-emerald-100" : "bg-slate-100"}`}>
-                      {t.status === "open" ? (
-                        <AlertCircle className="h-3 w-3 text-red-700" />
-                      ) : t.status === "in-progress" ? (
-                        <RefreshCw className="h-3 w-3 text-amber-600" />
-                      ) : t.status === "resolved" ? (
-                        <CheckCircle className="h-3 w-3 text-emerald-600" />
-                      ) : (
-                        <XCircle className="h-3 w-3 text-slate-600" />
-                      )}
-                    </span>
-                    <span className="text-sm font-medium">{t.status.replace("-", " ")}</span>
-                  </div>
+      {/* ══ Status stat tiles ════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { key: "open", label: "Open", value: statusCounts.open || 0, icon: AlertCircle, iconBg: "bg-rose-100 dark:bg-rose-500/15", iconColor: "text-rose-600 dark:text-rose-400", ring: "ring-rose-400", accent: "text-rose-600 dark:text-rose-400" },
+          { key: "in-progress", label: "In Progress", value: statusCounts["in-progress"] || 0, icon: RefreshCw, iconBg: "bg-amber-100 dark:bg-amber-500/15", iconColor: "text-amber-600 dark:text-amber-400", ring: "ring-amber-400", accent: "text-amber-600 dark:text-amber-400" },
+          { key: "resolved", label: "Resolved", value: statusCounts.resolved || 0, icon: CheckCircle, iconBg: "bg-emerald-100 dark:bg-emerald-500/15", iconColor: "text-emerald-600 dark:text-emerald-400", ring: "ring-emerald-400", accent: "text-emerald-600 dark:text-emerald-400" },
+          { key: "closed", label: "Closed", value: statusCounts.closed || 0, icon: XCircle, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", ring: "ring-slate-400", accent: "text-slate-600 dark:text-slate-400" },
+        ].map((s) => {
+          const Icon = s.icon;
+          const active = selectedStatus === s.key;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setSelectedStatus(active ? "all" : s.key)}
+              className={cn(
+                "group rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm p-4 text-left transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
+                active && `ring-2 ${s.ring} border-transparent`
+              )}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", s.iconBg)}>
+                  <Icon className={cn("h-4 w-4", s.iconColor)} />
                 </div>
+                {active && (
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-400">
+                    Filtered
+                  </span>
+                )}
+              </div>
+              <p className={cn("text-[22px] font-semibold tracking-tight leading-none", s.accent)}>{s.value}</p>
+              <p className="mt-1.5 text-[12px] font-medium text-foreground">{s.label}</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                {totalAll > 0 ? `${Math.round((s.value / totalAll) * 100)}% of total` : "—"}
+              </p>
+            </button>
+          );
+        })}
+      </div>
 
-                <h3 className="mt-3 text-lg font-semibold">{t.title}</h3>
-                <p className="text-sm text-muted-foreground mt-1">{t.asset}</p>
-                <p className="text-sm mt-2 text-muted-foreground">{t.description}</p>
+      {/* Total count */}
+      <p className="text-sm text-muted-foreground">
+        Showing {tickets.length} of {total} ticket{total !== 1 ? "s" : ""}
+      </p>
 
-                <div className="mt-3 flex items-center gap-3">
-                  <Badge className="bg-emerald-100 text-emerald-800">{t.category}</Badge>
-                  <span className="text-sm text-muted-foreground">Created: {t.createdAt}</span>
+      {/* ══ Ticket list ══════════════════════════════════════════════════════ */}
+      <div className="flex flex-col gap-3">
+        {tickets.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card p-10 text-center">
+            <div className="rounded-full bg-violet-100 dark:bg-violet-500/15 p-3">
+              <TicketIcon className="size-5 text-violet-500" />
+            </div>
+            <p className="text-sm font-medium text-foreground">No tickets found</p>
+            <p className="text-xs text-muted-foreground max-w-xs">
+              Try adjusting filters or create a new ticket to get started.
+            </p>
+          </div>
+        ) : (
+          tickets.map((t) => {
+            const priorityAccent =
+              t.priority === "High"
+                ? "from-rose-500 to-rose-600"
+                : t.priority === "Medium"
+                ? "from-amber-500 to-amber-600"
+                : "from-emerald-500 to-emerald-600";
+            return (
+              <div
+                key={t.id}
+                className="group relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-card p-4 pl-5 cursor-pointer transition-all duration-200 hover:border-violet-300/70 dark:hover:border-violet-500/40 hover:shadow-md hover:-translate-y-0.5"
+                onClick={() => { setSelectedTicket(t); setDetailOpen(true); }}
+              >
+                {/* Left accent bar (priority colour) */}
+                <span className={cn("absolute left-0 top-0 bottom-0 w-1 bg-linear-to-b", priorityAccent)} />
+
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="rounded-md bg-muted/50 dark:bg-muted/30 px-2.5 py-0.5 text-xs font-mono font-semibold text-foreground">
+                        {t.ticket_number ?? t.id.slice(0, 8)}
+                      </span>
+
+                      <span className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset",
+                        t.priority === "High"
+                          ? "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20"
+                          : t.priority === "Medium"
+                          ? "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20"
+                          : "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20"
+                      )}>
+                        {t.priority === "High" ? <AlertTriangle className="h-3 w-3" /> : t.priority === "Medium" ? <AlertCircle className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
+                        {t.priority}
+                      </span>
+
+                      <span className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset capitalize",
+                        t.status === "open"
+                          ? "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20"
+                          : t.status === "in-progress"
+                          ? "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20"
+                          : t.status === "resolved"
+                          ? "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20"
+                          : "bg-slate-50 text-slate-600 ring-slate-200 dark:bg-slate-500/10 dark:text-slate-400 dark:ring-slate-500/20"
+                      )}>
+                        {t.status === "open" ? <AlertCircle className="h-3 w-3" /> : t.status === "in-progress" ? <RefreshCw className="h-3 w-3" /> : t.status === "resolved" ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        {t.status.replace("-", " ")}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-3 text-base font-semibold text-foreground group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">{t.title}</h3>
+                    {t.asset_name && <p className="text-xs text-muted-foreground mt-0.5">{t.asset_name}</p>}
+                    {t.description && <p className="text-sm mt-2 text-muted-foreground line-clamp-2">{t.description}</p>}
+
+                    <div className="mt-3 flex items-center gap-3 flex-wrap">
+                      <Badge className={cn(categoryClass(t.predicted_category ?? t.final_category), "font-medium")}>
+                        {t.predicted_category ?? t.final_category ?? "General"}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        Created {t.opened_at ? new Date(t.opened_at).toLocaleDateString() : new Date(t.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="ml-2 shrink-0 flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                    <span className="text-[10px] uppercase tracking-wide">Assigned</span>
+                    {t.assigned_to ? (
+                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300 font-mono">{t.assigned_to.slice(0, 8)}</Badge>
+                    ) : (
+                      <span className="italic">Unassigned</span>
+                    )}
+                  </div>
                 </div>
               </div>
-
-              <div className="ml-4 text-sm text-muted-foreground whitespace-nowrap flex items-center gap-2">Assigned to: {t.assignedTo ? <span><Badge className="bg-purple-100 text-purple-800">{t.assignedTo}</Badge></span> : <span className="text-sm">Unassigned</span>}</div>
-            </div>
-          </div>
-        ))}
+            );
+          })
+        )}
       </div>
-      <NewTicketDialog open={open} onOpenChange={setOpen} />
-      <TicketDetailsDialog ticket={selectedTicket} open={detailOpen} onOpenChange={(v) => setDetailOpen(v)} onDelete={handleDeleteTicket} />
+
+      {/* Load more */}
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="outline"
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="min-w-40"
+          >
+            {loadingMore ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading…</>
+            ) : (
+              `Load More (${total - tickets.length} remaining)`
+            )}
+          </Button>
+        </div>
+      )}
+
+      <NewTicketDialog open={open} onOpenChange={setOpen} onCreated={handleTicketCreated} />
+      <TicketDetailsDialog
+        ticket={selectedTicket}
+        open={detailOpen}
+        onOpenChange={(v) => setDetailOpen(v)}
+        onDelete={isAdmin ? handleDeleteTicket : undefined}
+        onUpdated={isAdmin ? handleTicketUpdated : undefined}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }
-

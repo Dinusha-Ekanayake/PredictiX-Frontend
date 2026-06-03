@@ -1,0 +1,420 @@
+"use client";
+
+/**
+ * Detail / edit / comments dialog for the user role.
+ *
+ * Loads the full ticket from GET /user/tickets/{id}, lets the owner edit
+ * title / description / priority (PUT /user/tickets/{id}), and lists +
+ * posts comments. No delete button, no status transition controls — those
+ * are admin-only.
+ */
+
+import * as React from "react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle,
+  Loader2,
+  MessageSquare,
+  Pencil,
+  RefreshCw,
+  Send,
+  Sparkles,
+  XCircle,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  addMyTicketComment,
+  getMyTicket,
+  updateMyTicket,
+  type UserTicketDetail,
+} from "@/lib/api/userTickets";
+
+type Props = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  ticketId: string | null;
+  currentUserId: string | null;
+  onUpdated?: (ticket: UserTicketDetail) => void;
+};
+
+function StatusIcon({ status }: { status: string }) {
+  if (status === "open") return <AlertCircle className="h-4 w-4 text-destructive" />;
+  if (status === "in-progress" || status === "in_progress")
+    return <RefreshCw className="h-4 w-4 text-amber-400" />;
+  if (status === "resolved") return <CheckCircle className="h-4 w-4 text-emerald-400" />;
+  return <XCircle className="h-4 w-4 text-muted-foreground" />;
+}
+
+function PriorityIcon({ priority }: { priority: string | null | undefined }) {
+  const p = (priority || "").toLowerCase();
+  if (p === "high" || p === "critical")
+    return <AlertTriangle className="h-4 w-4 text-red-500" />;
+  if (p === "medium") return <AlertCircle className="h-4 w-4 text-amber-400" />;
+  return <CheckCircle className="h-4 w-4 text-emerald-400" />;
+}
+
+function formatTimestamp(iso: string) {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+export default function UserTicketDetailsDialog({
+  open,
+  onOpenChange,
+  ticketId,
+  currentUserId,
+  onUpdated,
+}: Props) {
+  const [ticket, setTicket] = React.useState<UserTicketDetail | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
+  const [savingEdit, setSavingEdit] = React.useState(false);
+  const [commentText, setCommentText] = React.useState("");
+  const [postingComment, setPostingComment] = React.useState(false);
+
+  // Edit form state — local until saved.
+  const [editTitle, setEditTitle] = React.useState("");
+  const [editDescription, setEditDescription] = React.useState("");
+  const [editPriority, setEditPriority] = React.useState<string>("");
+
+  React.useEffect(() => {
+    if (!open || !ticketId) return;
+    let cancelled = false;
+
+    setLoading(true);
+    setEditing(false);
+    setCommentText("");
+    getMyTicket(ticketId)
+      .then((t) => {
+        if (cancelled) return;
+        setTicket(t);
+        setEditTitle(t.title);
+        setEditDescription(t.description);
+        setEditPriority(t.priority || "");
+      })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        toast.error(err.message || "Could not load ticket");
+        onOpenChange(false);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, ticketId, onOpenChange]);
+
+  const isOwner = !!ticket && !!currentUserId && ticket.created_by === currentUserId;
+
+  async function handleSaveEdit() {
+    if (!ticket) return;
+
+    const payload: Record<string, string> = {};
+    if (editTitle.trim() && editTitle !== ticket.title) payload.title = editTitle.trim();
+    if (editDescription.trim() && editDescription !== ticket.description)
+      payload.description = editDescription.trim();
+    if (editPriority && editPriority !== (ticket.priority ?? ""))
+      payload.priority = editPriority;
+
+    if (Object.keys(payload).length === 0) {
+      setEditing(false);
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const updated = await updateMyTicket(ticket.id, payload);
+      setTicket(updated);
+      setEditing(false);
+      toast.success("Ticket updated");
+      onUpdated?.(updated);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Update failed";
+      toast.error(msg);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function handleAddComment() {
+    if (!ticket || !commentText.trim()) return;
+    setPostingComment(true);
+    try {
+      const newComment = await addMyTicketComment(ticket.id, commentText.trim());
+      setTicket({ ...ticket, comments: [...ticket.comments, newComment] });
+      setCommentText("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not post comment";
+      toast.error(msg);
+    } finally {
+      setPostingComment(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[760px] max-h-[90vh] overflow-y-auto">
+        {loading || !ticket ? (
+          <>
+            {/* Radix requires a DialogTitle for screen readers. The loading
+                state has no meaningful title, so we hide it visually. */}
+            <VisuallyHidden>
+              <DialogTitle>Loading ticket</DialogTitle>
+            </VisuallyHidden>
+            <div className="flex h-48 items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <div className="flex items-start justify-between gap-4 w-full">
+                <div className="flex-1 min-w-0">
+                  <DialogTitle className="text-lg font-semibold truncate">
+                    {ticket.title}
+                  </DialogTitle>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <span className="rounded-md bg-muted/30 px-3 py-1 text-sm font-medium">
+                      {ticket.ticket_number}
+                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <PriorityIcon priority={ticket.final_priority || ticket.priority} />
+                      <span className="text-sm font-medium capitalize">
+                        {ticket.final_priority || ticket.priority || "unset"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <StatusIcon status={ticket.status} />
+                      <span className="text-sm font-medium capitalize">
+                        {ticket.status.replace(/[-_]/g, " ")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {isOwner && !editing && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditing(true)}
+                    className="shrink-0"
+                  >
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+
+              <DialogDescription className="mt-3 text-sm text-muted-foreground">
+                Opened {formatTimestamp(ticket.created_at)}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 pt-4">
+              {/* Description / Edit form */}
+              {editing ? (
+                <div className="rounded-md border p-3 bg-muted/30 space-y-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Title</p>
+                    <Input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      disabled={savingEdit}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Description</p>
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      disabled={savingEdit}
+                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[110px] resize-vertical"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Priority</p>
+                      <Select
+                        value={editPriority}
+                        onValueChange={(v) => setEditPriority(v)}
+                        disabled={savingEdit}
+                      >
+                        <SelectTrigger className="w-full bg-background">
+                          <SelectValue placeholder="Unset" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setEditing(false)}
+                      disabled={savingEdit}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveEdit} disabled={savingEdit}>
+                      {savingEdit ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving…
+                        </>
+                      ) : (
+                        "Save"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-md border p-3 bg-muted/30">
+                  <h4 className="text-sm font-medium text-muted-foreground">
+                    Description
+                  </h4>
+                  <p className="mt-2 text-sm whitespace-pre-wrap">
+                    {ticket.description}
+                  </p>
+                </div>
+              )}
+
+              {/* AI fields */}
+              {(ticket.ticket_summary ||
+                ticket.predicted_priority ||
+                ticket.predicted_category) && (
+                <div className="rounded-md border p-3 bg-violet-50/40 dark:bg-violet-950/20">
+                  <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-violet-500" />
+                    AI insights
+                  </h4>
+                  <div className="mt-2 space-y-2 text-sm">
+                    {ticket.ticket_summary && (
+                      <p className="text-sm">{ticket.ticket_summary}</p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {ticket.predicted_category && (
+                        <Badge className="bg-sky-100 text-sky-800">
+                          Category: {ticket.predicted_category}
+                        </Badge>
+                      )}
+                      {ticket.predicted_priority && (
+                        <Badge className="bg-amber-100 text-amber-800">
+                          Predicted: {ticket.predicted_priority}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* History (read-only) */}
+              {ticket.history.length > 0 && (
+                <div className="rounded-md border p-3 bg-muted/30">
+                  <h4 className="text-sm font-medium text-muted-foreground">
+                    Status history
+                  </h4>
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {ticket.history.map((h) => (
+                      <li key={h.id} className="flex items-center gap-2">
+                        <span className="text-muted-foreground">
+                          {formatTimestamp(h.created_at)}
+                        </span>
+                        <span>
+                          {h.old_status ? `${h.old_status} → ` : ""}
+                          <span className="font-medium capitalize">
+                            {h.new_status.replace(/[-_]/g, " ")}
+                          </span>
+                        </span>
+                        {h.note && (
+                          <span className="text-muted-foreground italic">— {h.note}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Comments */}
+              <div className="rounded-md border p-3 bg-muted/30">
+                <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Comments ({ticket.comments.length})
+                </h4>
+
+                <ul className="mt-3 space-y-3">
+                  {ticket.comments.length === 0 && (
+                    <li className="text-sm text-muted-foreground italic">
+                      No comments yet.
+                    </li>
+                  )}
+                  {ticket.comments.map((c) => (
+                    <li key={c.id} className="rounded-md border bg-background p-2">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{c.user_id === currentUserId ? "You" : c.user_id}</span>
+                        <span>{formatTimestamp(c.created_at)}</span>
+                      </div>
+                      <p className="mt-1 text-sm whitespace-pre-wrap">{c.comment}</p>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-3 flex items-end gap-2">
+                  <textarea
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder="Add a comment…"
+                    disabled={postingComment}
+                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-vertical"
+                  />
+                  <Button
+                    onClick={handleAddComment}
+                    disabled={postingComment || !commentText.trim()}
+                  >
+                    {postingComment ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-1" />
+                        Send
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

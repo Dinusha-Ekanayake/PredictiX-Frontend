@@ -31,7 +31,7 @@ export default function PredictiXLoader({
 
   return (
     <div className={cn("flex flex-col items-center justify-center", className)}>
-      <div className="relative h-[340px] w-[340px]">
+      <div className="relative h-[340px] w-85">
         {/* ORBIT RING */}
         <div className="absolute inset-0" style={{ animation: "orbit-ring 12s linear infinite" }}>
           {ICONS.map(({ Icon, color }, i) => (

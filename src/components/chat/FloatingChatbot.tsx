@@ -20,7 +20,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Position = {
   x: number;
@@ -46,7 +45,7 @@ type LocalMessage = ChatMessage;
 
 const STORAGE_KEY = "predictix.chatbot.launcher.position";
 const LAUNCHER_SIZE = 56;
-const LAUNCHER_MARGIN = 20;
+const LAUNCHER_MARGIN = 24;
 const PANEL_GAP = 12;
 const CHATBOT_API_BASE =
   process.env.NEXT_PUBLIC_CHATBOT_API_URL ||
@@ -150,6 +149,8 @@ export default function FloatingChatbot() {
 
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const messageEndRef = React.useRef<HTMLDivElement | null>(null);
+  const scrollRef = React.useRef<HTMLDivElement | null>(null);
+  const [showScrollButton, setShowScrollButton] = React.useState(false);
   const dragRef = React.useRef({
     active: false,
     moved: false,
@@ -181,25 +182,9 @@ export default function FloatingChatbot() {
   React.useEffect(() => {
     const width = window.innerWidth;
     const height = window.innerHeight;
-
     setViewport({ width, height });
-
-    const fallbackPosition = getDefaultPosition(width, height);
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-
-    if (!saved) {
-      setPosition(fallbackPosition);
-      setIsMounted(true);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(saved) as Position;
-      setPosition(sanitizePosition(parsed, width, height));
-    } catch {
-      setPosition(fallbackPosition);
-    }
-
+    // Launcher is pinned to the bottom-right corner (not draggable).
+    setPosition(getDefaultPosition(width, height));
     setIsMounted(true);
   }, []);
 
@@ -255,6 +240,17 @@ export default function FloatingChatbot() {
 
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [isSending, isOpen, messages]);
+
+  const scrollToBottom = React.useCallback(() => {
+    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  const handleMessagesScroll = React.useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollButton(distanceFromBottom > 80);
+  }, []);
 
   const panelDimensions = React.useMemo(() => {
     const width = Math.min(380, Math.max(320, viewport.width - 24));
@@ -428,23 +424,8 @@ export default function FloatingChatbot() {
     setIsDragging(true);
   };
 
-  const onLauncherPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
-    if (!dragRef.current.active || dragRef.current.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const nextX = event.clientX - dragRef.current.offsetX;
-    const nextY = event.clientY - dragRef.current.offsetY;
-
-    if (!dragRef.current.moved) {
-      const distanceX = Math.abs(nextX - position.x);
-      const distanceY = Math.abs(nextY - position.y);
-      if (distanceX > 2 || distanceY > 2) {
-        dragRef.current.moved = true;
-      }
-    }
-
-    setPosition(sanitizePosition({ x: nextX, y: nextY }, viewport.width, viewport.height));
+  const onLauncherPointerMove = () => {
+    // Launcher is pinned in place — dragging is disabled.
   };
 
   const onLauncherPointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -544,7 +525,12 @@ export default function FloatingChatbot() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1 px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20">
+            <div className="relative flex-1 min-h-0">
+              <div
+                ref={scrollRef}
+                onScroll={handleMessagesScroll}
+                className="h-full overflow-y-auto scrollbar-styled px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20"
+              >
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
                   <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3">
@@ -669,7 +655,19 @@ export default function FloatingChatbot() {
                   <div ref={messageEndRef} />
                 </div>
               )}
-            </ScrollArea>
+              </div>
+
+              {showScrollButton && (
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  aria-label="Scroll to latest message"
+                  className="absolute bottom-3 right-3 z-10 flex size-9 items-center justify-center rounded-full border border-border/60 bg-card/95 text-foreground shadow-lg backdrop-blur-sm transition hover:bg-card hover:scale-105"
+                >
+                  <ChevronDown className="size-4" />
+                </button>
+              )}
+            </div>
 
             <form
               className="border-t border-border/60 p-3"
@@ -702,6 +700,7 @@ export default function FloatingChatbot() {
         </div>
       ) : null}
 
+      {isMounted && (
       <button
         type="button"
         className={cn(
@@ -709,10 +708,8 @@ export default function FloatingChatbot() {
           "bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500",
           "motion-reduce:transition-none",
           isDragging
-            ? "scale-105 cursor-grabbing transition-transform duration-100"
-            : isHelpDeskRoute
-            ? "cursor-pointer hover:scale-105 transition-all duration-300 ease-out"
-            : "cursor-grab hover:scale-105 transition-all duration-300 ease-out"
+            ? "scale-105 cursor-pointer transition-transform duration-100"
+            : "cursor-pointer hover:scale-105 transition-all duration-300 ease-out"
         )}
         style={{
           left: `${position.x}px`,
@@ -732,6 +729,7 @@ export default function FloatingChatbot() {
         <MessageCircle className="relative size-6 drop-shadow-sm" />
         <Sparkles className="absolute -top-1 -right-1 size-3 text-white/90 drop-shadow" />
       </button>
+      )}
     </div>
   );
 }

@@ -321,7 +321,7 @@ export default function WarehouseAIReportPanel({
 
       {/* Loading */}
       {loading && (
-        <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div className="flex min-h-70 flex-col items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <div className="relative">
             <Loader2 className="h-10 w-10 animate-spin text-violet-600" />
             <div className="absolute inset-0 h-10 w-10 rounded-full bg-violet-100 dark:bg-violet-950 blur-lg" />

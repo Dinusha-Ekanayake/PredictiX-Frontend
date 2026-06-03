@@ -154,20 +154,20 @@ export default function HelpDeskPage() {
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
 
           {/* ══ Hero header (dashboard style) ════════════════════════════════ */}
-          <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-violet-500/20">
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-950/70 dark:via-slate-950/60 dark:to-sky-950/50 pointer-events-none" />
-            <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-gradient-to-br from-violet-400/20 to-sky-400/20 blur-3xl pointer-events-none" />
+          <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-white/10 dark:bg-white/2">
+            <div className="absolute inset-0 bg-linear-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent pointer-events-none" />
+            <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-linear-to-br from-violet-400/20 to-sky-400/20 dark:from-violet-500/10 dark:to-sky-500/5 blur-3xl pointer-events-none" />
 
             <div className="relative px-7 py-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-violet-500 dark:text-violet-400">PredictiX</span>
                   <span className="text-muted-foreground/30 text-xs font-light">/</span>
-                  <span className="text-[10px] tracking-[0.1em] uppercase text-muted-foreground/80">Help Desk</span>
+                  <span className="text-[10px] tracking-widest uppercase text-muted-foreground/80">Help Desk</span>
                 </div>
 
                 <h1 className="flex items-center gap-2.5 text-[26px] font-semibold tracking-[-0.025em] leading-none text-foreground">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-sky-500 text-white shadow-md">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-sky-500 text-white shadow-md">
                     <CircleHelp className="size-5" />
                   </span>
                   Help Desk
@@ -191,7 +191,7 @@ export default function HelpDeskPage() {
                   <Button
                     type="button"
                     onClick={() => adminFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                    className="h-9 shrink-0 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md"
+                    className="h-9 shrink-0 bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md"
                   >
                     <PlusCircle className="size-4" />
                     Add New Q&amp;A
@@ -288,7 +288,7 @@ export default function HelpDeskPage() {
                               size="sm"
                               onClick={() => saveEdit(item.id)}
                               disabled={isSavingEdit || !editQuestion.trim() || !editAnswer.trim()}
-                              className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white"
+                              className="bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white"
                             >
                               <Check className="size-3.5 mr-1" />
                               {isSavingEdit ? "Saving…" : "Save"}
@@ -305,7 +305,7 @@ export default function HelpDeskPage() {
                           <summary className="cursor-pointer list-none text-sm font-semibold md:text-base">
                             <div className="flex items-center justify-between gap-3">
                               <span className="inline-flex items-center gap-2.5 flex-1 min-w-0">
-                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/15 to-sky-500/15 text-violet-600 dark:text-violet-400 group-hover:from-violet-500/25 group-hover:to-sky-500/25 transition-colors">
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-violet-500/15 to-sky-500/15 text-violet-600 dark:text-violet-400 group-hover:from-violet-500/25 group-hover:to-sky-500/25 transition-colors">
                                   <MessageSquareText className="size-3.5" />
                                 </span>
                                 <span className="text-foreground truncate">{item.question}</span>
@@ -371,7 +371,7 @@ export default function HelpDeskPage() {
               ref={adminFormRef}
               className="relative rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm overflow-hidden"
             >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-sky-500" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-violet-500 via-fuchsia-500 to-sky-500" />
               <div className="px-5 pt-5 pb-3 border-b border-slate-200 dark:border-slate-700">
                 <p className="text-[13px] font-semibold text-foreground flex items-center gap-2">
                   <PlusCircle className="size-4 text-violet-500" />
@@ -401,7 +401,7 @@ export default function HelpDeskPage() {
                     type="button"
                     onClick={handleAddFaq}
                     disabled={!adminQuestion.trim() || !adminAnswer.trim() || isAdding}
-                    className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md"
+                    className="bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md"
                   >
                     {isAdding ? "Saving…" : "Add Question & Answer"}
                   </Button>

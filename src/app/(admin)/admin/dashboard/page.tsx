@@ -22,103 +22,6 @@ import {
   type TicketStatus,
 } from "@/lib/dashboardService";
 
-// ─── Full-page floating particle background ───────────────────────────────────
-
-function PageParticles() {
-  const canvasRef = React.useRef<HTMLCanvasElement>(null);
-
-  React.useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let raf: number;
-    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-    const particles: {
-      x: number; y: number; r: number;
-      vx: number; vy: number; alpha: number; va: number;
-    }[] = [];
-
-    function resize() {
-      if (!canvas) return;
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
-    resize();
-    window.addEventListener("resize", resize);
-
-    const COUNT = 80;
-    for (let i = 0; i < COUNT; i++) {
-      particles.push({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        r: Math.random() * 1.6 + 0.3,
-        vx: (Math.random() - 0.5) * 0.18,
-        vy: (Math.random() - 0.5) * 0.18,
-        alpha: Math.random() * 0.45 + 0.08,
-        va: (Math.random() - 0.5) * 0.002,
-      });
-    }
-
-    function draw() {
-      if (!ctx || !canvas) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (const p of particles) {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.alpha = Math.max(0.05, Math.min(0.5, p.alpha + p.va));
-        if (p.alpha <= 0.05 || p.alpha >= 0.5) p.va *= -1;
-        if (p.x < 0) p.x = canvas.width;
-        if (p.x > canvas.width) p.x = 0;
-        if (p.y < 0) p.y = canvas.height;
-        if (p.y > canvas.height) p.y = 0;
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = isDark
-          ? `rgba(167,139,250,${p.alpha})`
-          : `rgba(109,40,217,${p.alpha * 0.35})`;
-        ctx.fill();
-      }
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
-          const d = Math.sqrt(dx * dx + dy * dy);
-          if (d < 90) {
-            const a = isDark ? (1 - d / 90) * 0.1 : (1 - d / 90) * 0.04;
-            ctx.beginPath();
-            ctx.moveTo(particles[i].x, particles[i].y);
-            ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = isDark
-              ? `rgba(167,139,250,${a})`
-              : `rgba(109,40,217,${a})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
-        }
-      }
-      raf = requestAnimationFrame(draw);
-    }
-    draw();
-
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
-    };
-  }, []);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none fixed inset-0 w-full h-full z-0"
-      aria-hidden="true"
-    />
-  );
-}
-
 // ─── Style maps & helpers ─────────────────────────────────────────────────────
 
 const SEV_DOT: Record<AlertSeverity, string> = { critical: "bg-rose-500 animate-pulse", warning: "bg-amber-400", info: "bg-sky-400" };
@@ -168,7 +71,7 @@ function PieTip({ active, payload }: { active?: boolean; payload?: Array<{ paylo
 function CTip({ active, payload, label, fmt }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string; fmt?: (v: number) => string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-md space-y-1 min-w-[110px]">
+    <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-md space-y-1 min-w-27.5">
       <p className="font-semibold text-foreground">{label}</p>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2 text-muted-foreground">
@@ -269,20 +172,19 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="relative space-y-5 pb-20">
-      <PageParticles />
       <div className="relative z-10 space-y-5">
 
         {/* ══ Hero header ════════════════════════════════════════════════════ */}
-        <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-violet-500/20">
-          <div className="absolute inset-0 bg-linear-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-950/70 dark:via-slate-950/60 dark:to-sky-950/50 pointer-events-none" />
+        <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-white/10 dark:bg-white/2">
+          <div className="absolute inset-0 bg-linear-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent pointer-events-none" />
           <div className="relative px-7 py-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-violet-500 dark:text-violet-400">PredictiX</span>
                 <span className="text-muted-foreground/30 text-xs font-light">/</span>
-                <span className="text-[10px] tracking-[0.1em] uppercase text-muted-foreground/60">Admin</span>
+                <span className="text-[10px] tracking-widest uppercase text-muted-foreground/60">Admin</span>
                 <span className="text-muted-foreground/30 text-xs font-light">/</span>
-                <span className="text-[10px] tracking-[0.1em] uppercase text-muted-foreground/80">Dashboard</span>
+                <span className="text-[10px] tracking-widest uppercase text-muted-foreground/80">Dashboard</span>
               </div>
               <h1 className="text-[26px] font-semibold tracking-[-0.025em] leading-none text-foreground">
                 Operations Dashboard
@@ -624,7 +526,7 @@ export default function AdminDashboardPage() {
 
         {/* ══ AI summary banner ═════════════════════════════════════════════ */}
         {data?.aiSummary && (
-          <div className="rounded-xl border border-violet-200 dark:border-violet-500/20 bg-linear-to-br from-violet-50 to-indigo-50/60 dark:from-violet-950/40 dark:to-indigo-950/30 p-5">
+          <div className="rounded-xl border border-violet-200 dark:border-violet-500/20 bg-linear-to-br from-violet-50 to-indigo-50/60 dark:from-violet-500/10 dark:to-transparent dark:bg-white/2 p-5">
             <div className="flex items-start gap-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-200 dark:border-violet-500/30 bg-violet-100 dark:bg-violet-500/15">
                 <Bot className="h-5 w-5 text-violet-600 dark:text-violet-400" />

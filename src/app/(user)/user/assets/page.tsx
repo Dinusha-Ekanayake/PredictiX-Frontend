@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
+import PageHero from "@/components/common/PageHero";
 import { fetchMyAssets, type UserAssetData } from "@/lib/api/userProfileApi";
 import { listAssets } from "@/components/admin/assets/assetService";
 import type { Asset } from "@/components/admin/assets/types";
@@ -141,10 +142,11 @@ export default function UserAssetsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Assets</h1>
-        <p className="text-sm text-muted-foreground">Your assigned assets are shown below. Search to find any asset and raise a ticket on it.</p>
-      </div>
+      <PageHero
+        crumbs={["PredictiX", "User", "Assets"]}
+        title="Assets"
+        subtitle="Your assigned assets are shown below. Search to find any asset and raise a ticket on it."
+      />
 
       {/* Search */}
       <div className="relative">

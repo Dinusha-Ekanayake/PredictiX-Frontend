@@ -238,16 +238,18 @@ export async function fetchTicketEnrichment(ticket: {
 
   let nameById = new Map<string, { name: string | null; email: string | null }>();
   if (profileIds.size > 0) {
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
       .select("id,full_name,email")
       .in("id", Array.from(profileIds));
+
+    if (profilesError) throw profilesError;
+
     nameById = new Map(
       ((profiles ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>).map(
         (p) => [p.id, { name: p.full_name, email: p.email }],
       ),
     );
-  }
 
   if (ticket.created_by) {
     const p = nameById.get(ticket.created_by);

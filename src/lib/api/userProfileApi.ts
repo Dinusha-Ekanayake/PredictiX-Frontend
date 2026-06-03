@@ -37,10 +37,19 @@ export type UserAssetData = {
   name: string;
   asset_type: string;
   category: string | null;
+  make: string;
+  model: string;
   location: string;
   status: string;
   healthPercent: number;
   nextServiceDate: string | null;
+  sensorHealth: {
+    tire: number | null;
+    brake: number | null;
+    battery: number | null;
+    oil: number | null;
+    hydraulic: number | null;
+  } | null;
 };
 
 export type UserStatsData = {
@@ -230,4 +239,61 @@ export async function getTeamMembers(): Promise<TeamMemberData[]> {
     throw new Error(err.detail || "Failed to fetch team members");
   }
   return res.json();
+}
+
+export async function generateAssetSummary(asset: UserAssetData): Promise<string> {
+  const s = asset.sensorHealth;
+  const components = s
+    ? [
+        s.oil != null ? `oil ${s.oil}%` : null,
+        s.brake != null ? `brakes ${s.brake}%` : null,
+        s.tire != null ? `tires ${s.tire}%` : null,
+        s.battery != null ? `battery ${s.battery}%` : null,
+        s.hydraulic != null ? `hydraulics ${s.hydraulic}%` : null,
+      ]
+        .filter(Boolean)
+        .join(", ")
+    : "";
+
+  const parts = [
+    `Vehicle: ${asset.asset_code}`,
+    `Type: ${asset.asset_type || asset.name}`,
+    asset.make ? `Make: ${asset.make}` : null,
+    asset.model ? `Model: ${asset.model}` : null,
+    `Status: ${asset.status}`,
+    `Health score: ${asset.healthPercent}%`,
+    components ? `Component health: ${components}` : null,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+
+  console.log(`[AssetSummary] Generating summary for ${asset.asset_code}:`, parts.slice(0, 100));
+
+  const res = await fetch(`${API_URL}/asset-summaries/generate`, {
+    method: "POST",
+    headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ input_text: parts }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const errorMsg = errorData.detail || errorData.error || `HTTP ${res.status}`;
+    
+    console.error(`[AssetSummary] ✗ Failed for ${asset.asset_code}:`, errorMsg);
+    
+    if (res.status === 503) {
+      throw new Error("Model is loading, please try again in a few seconds");
+    } else if (res.status === 429) {
+      throw new Error("Rate limit exceeded, please try again later");
+    } else if (res.status === 401 || res.status === 403) {
+      throw new Error("Authentication failed");
+    } else if (res.status === 404) {
+      throw new Error("Summary model not found");
+    }
+    throw new Error(`Summary generation failed: ${errorMsg}`);
+  }
+  
+  const data = await res.json();
+  console.log(`[AssetSummary] ✓ Generated for ${asset.asset_code}`);
+  return data.summary as string;
 }

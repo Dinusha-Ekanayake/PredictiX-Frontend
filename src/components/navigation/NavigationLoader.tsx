@@ -60,7 +60,7 @@ export default function PredictiXLoader({
                   "radial-gradient(closest-side, rgba(0,0,0,0.45), rgba(0,0,0,0))",
               }}
             />
-            <div className="relative flex h-[128px] w-[128px] items-center justify-center rounded-[28px] border bg-white shadow-md ring-1 ring-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:ring-slate-800">
+            <div className="relative flex h-[128px] w-[128px] items-center justify-center rounded-[28px] border bg-white shadow-md ring-1 ring-slate-200 dark:border-white/10 dark:bg-white/5 dark:ring-white/10">
               <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-gradient-to-br from-white/60 via-transparent to-transparent dark:from-white/10" />
               <Image
                 src="/logo/predictix-icon.svg"
@@ -80,7 +80,7 @@ export default function PredictiXLoader({
           {label}
         </p>
 
-        <div className="pointer-events-none absolute left-1/2 top-full mt-2 h-[2px] w-52 -translate-x-1/2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800/70">
+        <div className="pointer-events-none absolute left-1/2 top-full mt-2 h-[2px] w-52 -translate-x-1/2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-white/10">
           <div
             className="h-full w-1/3 rounded-full bg-slate-400/40 dark:bg-slate-500/30"
             style={{ animation: "title-shimmer 1.6s ease-in-out infinite" }}
@@ -134,7 +134,7 @@ function Orbiter({
         <div
           className={cn(
             "relative flex h-14 w-14 items-center justify-center rounded-full ring-1 shadow-md",
-            "bg-white dark:bg-slate-900",
+            "bg-white dark:bg-white/5",
             " [--bubble-hi:rgba(255,255,255,0.98)]",
             " [--bubble-mid:rgba(255,255,255,0.72)]",
             " [--bubble-lo:rgba(248,250,252,0.95)]",

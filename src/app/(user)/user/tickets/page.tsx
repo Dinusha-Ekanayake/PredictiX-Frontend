@@ -1,88 +1,207 @@
 "use client";
 
-import * as React from "react";
-import { toast } from "sonner";
-import {
-  Search, AlertCircle, RefreshCw, CheckCircle, XCircle, AlertTriangle,
-  Plus, Pencil, Trash2, Ticket as TicketIcon,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
-} from "@/components/ui/select";
-import PredictiXLoader from "@/components/loading/PredictiXLoader";
-import PageHero from "@/components/common/PageHero";
-import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
-import EditTicketDialog from "@/components/user/tickets/EditTicketDialog";
-import type { Ticket } from "@/lib/ticketService";
-import { fetchMyTickets, createMyTicket, deleteMyTicket } from "@/lib/userTicketService";
-import { getUser } from "@/lib/authService";
+/**
+ * User-role ticket page.
+ *
+ * Visually inspired by the admin tickets page (kept untouched) but scoped to
+ * the logged-in user's own tickets. Backed by the new `/user/tickets` API.
+ *
+ * Features:
+ *  - Search (title / description / ticket_number)
+ *  - Status + priority filters
+ *  - Mini-dashboard with open / in-progress / resolved / closed counts
+ *  - "+ New Ticket" — opens UserNewTicketDialog (POST /user/tickets)
+ *  - Click a card — opens UserTicketDetailsDialog (GET/PUT + comments)
+ */
 
-const PRI_CLS: Record<string, string> = {
-  High: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
-  Medium: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-  Low: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-};
-const STATUS_ICON: Record<string, React.ElementType> = {
-  open: AlertCircle, "in-progress": RefreshCw, resolved: CheckCircle, closed: XCircle,
-};
+import * as React from "react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle,
+  Filter,
+  Loader2,
+  RefreshCw,
+  Search,
+  Sparkles,
+  XCircle,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import PredictiXLoader from "@/components/loading/PredictiXLoader";
+import UserNewTicketDialog from "@/components/user/dialogs/UserNewTicketDialog";
+import UserTicketDetailsDialog from "@/components/user/dialogs/UserTicketDetailsDialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  listMyTickets,
+  getMyTicketStats,
+  type UserTicketSummary,
+  type UserTicketStats,
+} from "@/lib/api/userTickets";
+
+// Values must match the Postgres ENUM labels (`ticket_status`,
+// `ticket_priority`). Display label is human-friendly; value is what the
+// backend stores.
+const STATUS_OPTIONS = [
+  { value: "all", label: "All Status" },
+  { value: "open", label: "Open" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "pending", label: "Pending" },
+  { value: "resolved", label: "Resolved" },
+  { value: "closed", label: "Closed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: "all", label: "All Priority" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+];
+
+function priorityRingClass(priority?: string | null) {
+  const p = (priority || "").toLowerCase();
+  if (p === "high" || p === "critical") return "bg-red-100";
+  if (p === "medium") return "bg-amber-100";
+  if (p === "low") return "bg-emerald-100";
+  return "bg-slate-100";
+}
+
+function priorityIcon(priority?: string | null) {
+  const p = (priority || "").toLowerCase();
+  if (p === "high" || p === "critical")
+    return <AlertTriangle className="h-3 w-3 text-red-600" />;
+  if (p === "medium") return <AlertCircle className="h-3 w-3 text-amber-500" />;
+  return <CheckCircle className="h-3 w-3 text-emerald-500" />;
+}
+
+function statusRingClass(status: string) {
+  if (status === "open") return "bg-red-100";
+  if (status === "in-progress" || status === "in_progress") return "bg-amber-100";
+  if (status === "resolved") return "bg-emerald-100";
+  return "bg-slate-100";
+}
+
+function statusIcon(status: string) {
+  if (status === "open") return <AlertCircle className="h-3 w-3 text-red-700" />;
+  if (status === "in-progress" || status === "in_progress")
+    return <RefreshCw className="h-3 w-3 text-amber-600" />;
+  if (status === "resolved")
+    return <CheckCircle className="h-3 w-3 text-emerald-600" />;
+  return <XCircle className="h-3 w-3 text-slate-600" />;
+}
+
+function categoryBadgeClass(cat?: string | null) {
+  switch ((cat || "").toLowerCase()) {
+    case "mechanical":
+      return "bg-emerald-100 text-emerald-800";
+    case "electrical":
+      return "bg-pink-100 text-pink-800";
+    case "software":
+      return "bg-sky-100 text-sky-800";
+    default:
+      return "bg-slate-100 text-slate-800";
+  }
+}
+
+function formatDate(iso: string) {
+  try {
+    return new Date(iso).toLocaleDateString();
+  } catch {
+    return iso;
+  }
+}
 
 export default function UserTicketsPage() {
-  const loggedIn = React.useMemo(() => !!getUser(), []);
-
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [tickets, setTickets] = React.useState<Ticket[]>([]);
+  const [tickets, setTickets] = React.useState<UserTicketSummary[]>([]);
+  const [stats, setStats] = React.useState<UserTicketStats | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   const [query, setQuery] = React.useState("");
-  const [debouncedQuery, setDebouncedQuery] = React.useState("");
-  const [status, setStatus] = React.useState("all");
-  const [priority, setPriority] = React.useState("all");
+  const [selectedStatus, setSelectedStatus] = React.useState("all");
+  const [selectedPriority, setSelectedPriority] = React.useState("all");
 
   const [newOpen, setNewOpen] = React.useState(false);
-  const [editTicket, setEditTicket] = React.useState<Ticket | null>(null);
+  const [detailOpen, setDetailOpen] = React.useState(false);
+  const [activeTicketId, setActiveTicketId] = React.useState<string | null>(null);
 
+  // Read the current user id once on mount — needed by the detail dialog to
+  // decide if the "Edit" button shows up.
+  const currentUserId = React.useMemo(() => {
+    if (typeof window === "undefined") return null;
+    return (
+      localStorage.getItem("predictix.user.id") ||
+      localStorage.getItem("user_id") ||
+      null
+    );
+  }, []);
+
+  const loadTickets = React.useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      if (mode === "initial") setLoading(true);
+      else setRefreshing(true);
+      setErrorMsg(null);
+      try {
+        // The list respects the active filters; the KPI stats are fetched
+        // separately so they always show the user's TRUE totals from the DB,
+        // independent of the current filter/search/pagination.
+        const [res, statsRes] = await Promise.all([
+          listMyTickets({
+            status: selectedStatus !== "all" ? selectedStatus : undefined,
+            priority: selectedPriority !== "all" ? selectedPriority : undefined,
+            search: query.trim() || undefined,
+            sort_by: "created_at",
+            sort_dir: "desc",
+            page_size: 100,
+          }),
+          getMyTicketStats(),
+        ]);
+        setTickets(res.items);
+        setStats(statsRes);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to load tickets";
+        setErrorMsg(msg);
+        toast.error(msg);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [selectedStatus, selectedPriority, query]
+  );
+
+  // Initial load — runs once.
   React.useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 400);
+    loadTickets("initial");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Refetch when filters change (debounced for search).
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      loadTickets("refresh");
+    }, 300);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [selectedStatus, selectedPriority, query, loadTickets]);
 
-  const load = React.useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const rows = await fetchMyTickets(debouncedQuery, status, priority);
-      setTickets(rows);
-    } catch (err) {
-      toast.error("Failed to load your tickets", { description: err instanceof Error ? err.message : undefined });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [debouncedQuery, status, priority]);
-
-  React.useEffect(() => { load(); }, [load]);
-
-  function handleCreated(ticket: Ticket) {
-    setTickets((prev) => [ticket, ...prev]);
-  }
-  function handleUpdated(updated: Ticket) {
-    setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-  }
-  async function handleDelete(t: Ticket) {
-    if (!confirm(`Delete ticket "${t.title}"? This cannot be undone.`)) return;
-    try {
-      await deleteMyTicket(t.id);
-      setTickets((prev) => prev.filter((x) => x.id !== t.id));
-      toast.success("Ticket deleted");
-    } catch (err) {
-      toast.error("Failed to delete ticket", { description: err instanceof Error ? err.message : undefined });
-    }
+  function openDetail(id: string) {
+    setActiveTicketId(id);
+    setDetailOpen(true);
   }
 
-  if (!loggedIn) {
-    return <div className="rounded-2xl border p-8 text-center text-muted-foreground">Please log in to view your tickets.</div>;
-  }
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
         <PredictiXLoader label="Loading your tickets…" />
@@ -92,94 +211,221 @@ export default function UserTicketsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <PageHero
-        crumbs={["PredictiX", "User", "Tickets"]}
-        title="My Tickets"
-        subtitle="Tickets you have created. You can edit or delete your own tickets."
-      />
-
-      {/* Filters */}
-      <div className="flex w-full flex-col gap-3 rounded-2xl border border-input p-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your tickets…" className="h-11 rounded-lg pl-12" />
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">My Tickets</h1>
+          <p className="text-sm text-muted-foreground">
+            Track issues you&apos;ve reported and the work assigned to you.
+          </p>
         </div>
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="All Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="open">Open</SelectItem>
-            <SelectItem value="in-progress">In Progress</SelectItem>
-            <SelectItem value="resolved">Resolved</SelectItem>
-            <SelectItem value="closed">Closed</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={priority} onValueChange={setPriority}>
-          <SelectTrigger className="w-37.5"><SelectValue placeholder="All Priority" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Priority</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button onClick={() => setNewOpen(true)} className="gap-1.5 bg-purple-600 text-white hover:bg-purple-500">
-          <Plus className="h-4 w-4" /> New Ticket
-        </Button>
-      </div>
-
-      <p className="text-sm text-muted-foreground">{tickets.length} ticket{tickets.length !== 1 ? "s" : ""}</p>
-
-      {/* List */}
-      <div className="flex flex-col gap-4">
-        {tickets.length === 0 ? (
-          <div className="rounded-xl border p-10 text-center text-muted-foreground">
-            <TicketIcon className="mx-auto mb-3 h-8 w-8 opacity-40" />
-            You haven&apos;t created any tickets yet.
-          </div>
-        ) : (
-          tickets.map((t) => {
-            const SIcon = STATUS_ICON[t.status] ?? AlertCircle;
-            return (
-              <div key={t.id} className="rounded-xl border p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-muted/40 px-2.5 py-0.5 text-sm font-medium">{t.ticket_number ?? t.id.slice(0, 8)}</span>
-                      <Badge className={PRI_CLS[t.priority] ?? PRI_CLS.Medium}>
-                        {t.priority === "High" ? <AlertTriangle className="mr-1 h-3 w-3" /> : null}{t.priority}
-                      </Badge>
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                        <SIcon className="h-3.5 w-3.5" />{t.status.replace("-", " ")}
-                      </span>
-                    </div>
-                    <h3 className="mt-2 text-lg font-semibold">{t.title}</h3>
-                    {t.asset_name && <p className="mt-0.5 text-sm text-muted-foreground">{t.asset_name}</p>}
-                    {t.description && <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{t.description}</p>}
-                    <div className="mt-2 flex flex-wrap items-center gap-3">
-                      <Badge variant="outline" className="capitalize">{t.predicted_category ?? t.final_category ?? "General"}</Badge>
-                      <span className="text-xs text-muted-foreground">
-                        Created {new Date(t.opened_at ?? t.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-col gap-2">
-                    <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditTicket(t)}>
-                      <Pencil className="h-3.5 w-3.5" /> Edit
-                    </Button>
-                    <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => handleDelete(t)}>
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })
+        {refreshing && (
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-2" />
         )}
       </div>
 
-      <NewTicketDialog open={newOpen} onOpenChange={setNewOpen} onCreated={handleCreated} createFn={createMyTicket} />
-      <EditTicketDialog open={editTicket !== null} onOpenChange={(o) => { if (!o) setEditTicket(null); }} ticket={editTicket} onUpdated={handleUpdated} />
+      {/* Search + filters bar */}
+      <div className="w-full">
+        <div className="flex w-full items-center gap-3 rounded-2xl border border-input bg-transparent p-4">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by title, description or ticket number…"
+                className="pl-12 h-12 rounded-lg"
+              />
+            </div>
+
+            <div className="hidden items-center gap-2 sm:flex">
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedPriority} onValueChange={setSelectedPriority}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="All Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITY_OPTIONS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden sm:inline-flex"
+              onClick={() => loadTickets("refresh")}
+            >
+              <Filter className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={() => setNewOpen(true)}
+              className="bg-purple-600 hover:bg-purple-500 text-white"
+            >
+              + New Ticket
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mini dashboard */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="card-dynamic cursor-default hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <AlertCircle className="h-6 w-6 text-red-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">Open</div>
+              <div className="text-xl font-semibold">{stats?.open ?? 0}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-dynamic cursor-default hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <RefreshCw className="h-6 w-6 text-amber-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">In Progress</div>
+              <div className="text-xl font-semibold">{stats?.in_progress ?? 0}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-dynamic cursor-default hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <CheckCircle className="h-6 w-6 text-emerald-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">Resolved</div>
+              <div className="text-xl font-semibold">{stats?.resolved ?? 0}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-dynamic cursor-default hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+          <CardContent className="flex items-center gap-3">
+            <XCircle className="h-6 w-6 text-slate-500" />
+            <div>
+              <div className="text-sm text-muted-foreground">Closed</div>
+              <div className="text-xl font-semibold">{stats?.closed ?? 0}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Error banner */}
+      {errorMsg && (
+        <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/30 p-3 text-sm text-red-700 dark:text-red-300">
+          {errorMsg}
+        </div>
+      )}
+
+      {/* Tickets list */}
+      <div className="flex flex-col gap-4">
+        {tickets.length === 0 && !errorMsg && (
+          <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+            No tickets match your filters. Click <strong>+ New Ticket</strong> to
+            create one.
+          </div>
+        )}
+
+        {tickets.map((t) => {
+          const displayPriority = t.final_priority || t.priority || t.predicted_priority;
+          const displayCategory = t.final_category || t.predicted_category;
+          return (
+            <div
+              key={t.id}
+              className="ticket-dynamic rounded-xl border p-4 cursor-pointer transform-gpu will-change-transform hover:scale-[1.01] hover:bg-muted/10 dark:hover:bg-muted/20 hover:shadow-lg transition-transform duration-150 ease-out"
+              onClick={() => openDetail(t.id)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="rounded-md bg-muted/30 px-3 py-1 text-sm font-medium">
+                      {t.ticket_number}
+                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center justify-center h-5 w-5 rounded-full ${priorityRingClass(displayPriority)}`}
+                      >
+                        {priorityIcon(displayPriority)}
+                      </span>
+                      <span className="text-sm font-medium capitalize">
+                        {displayPriority || "unset"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center justify-center h-5 w-5 rounded-full ${statusRingClass(t.status)}`}
+                      >
+                        {statusIcon(t.status)}
+                      </span>
+                      <span className="text-sm font-medium capitalize">
+                        {t.status.replace(/[-_]/g, " ")}
+                      </span>
+                    </div>
+
+                    {t.predicted_priority &&
+                      !t.final_priority &&
+                      t.predicted_priority !== t.priority && (
+                        <span className="inline-flex items-center gap-1 text-xs text-violet-600">
+                          <Sparkles className="h-3 w-3" />
+                          AI suggested
+                        </span>
+                      )}
+                  </div>
+
+                  <h3 className="mt-3 text-lg font-semibold truncate">{t.title}</h3>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    {displayCategory && (
+                      <Badge className={categoryBadgeClass(displayCategory)}>
+                        {displayCategory}
+                      </Badge>
+                    )}
+                    <span className="text-sm text-muted-foreground">
+                      Created: {formatDate(t.created_at)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <UserNewTicketDialog
+        open={newOpen}
+        onOpenChange={setNewOpen}
+        onCreated={() => loadTickets("refresh")}
+      />
+      <UserTicketDetailsDialog
+        open={detailOpen}
+        onOpenChange={(v) => {
+          setDetailOpen(v);
+          if (!v) setActiveTicketId(null);
+        }}
+        ticketId={activeTicketId}
+        currentUserId={currentUserId}
+        onUpdated={() => loadTickets("refresh")}
+      />
     </div>
   );
 }

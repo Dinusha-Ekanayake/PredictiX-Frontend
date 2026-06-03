@@ -104,7 +104,7 @@ export default function UserDashboardPage() {
   return (
     <div className="w-full space-y-6">
       {/* ── Welcome header ── */}
-      <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-violet-500/20 bg-linear-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-950/40 dark:via-slate-950/40 dark:to-sky-950/30 px-6 py-6">
+      <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-white/10 bg-linear-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent px-6 py-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Welcome back, {firstName} 👋</h1>

@@ -216,13 +216,15 @@ export async function fetchTicketEnrichment(ticket: {
   if (ticket.created_by) profileIds.add(ticket.created_by);
   if (ticket.assigned_to) profileIds.add(ticket.assigned_to);
 
-  const historyResp = await supabase
+  const { data: historyData, error: historyError } = await supabase
     .from("ticket_status_history")
     .select("id,old_status,new_status,changed_by,note,created_at")
     .eq("ticket_id", ticket.id)
     .order("created_at", { ascending: true });
 
-  const historyRows = (historyResp.data ?? []) as Array<{
+  if (historyError) throw historyError;
+
+  const historyRows = (historyData ?? []) as Array<{
     id: string;
     old_status: string | null;
     new_status: string;

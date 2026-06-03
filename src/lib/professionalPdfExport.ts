@@ -1445,12 +1445,6 @@ export function generateProfessionalHTML(data: ReportData): string {
       const aiUnsetPct = aiTotal > 0 ? Math.round(aiUnset / aiTotal * 1000) / 10 : 0;
       return `
       ${subHeader('5.6 AI-Reclassified Priority (vs Filed)', C.navy)}
-      <p style="font-size:9px;color:${C.textMuted};margin:0 0 8px;">
-        PredictiX re-scores each ticket from sensor telemetry and SHAP models. The table compares the priority
-        <strong>as filed</strong> (the §5.2 distribution) against the <strong>AI re-classification</strong> to surface
-        under- or over-triaged tickets. Both columns cover the same ${fmtN(aiTotal)} tickets — they differ by
-        <em>re-grading</em>, not by counting different sets.
-      </p>
       ${darkTable(['Priority', 'Filed', 'AI-Reclassified', 'Change'], rows)}
       ${aiUnset > 0 ? alertBox(
         `<strong>${fmtN(aiUnset)} tickets (${aiUnsetPct}%) remain Unset by the AI classifier</strong> — a model-coverage limitation (low confidence or not yet scored), <em>not</em> a low-priority grade. These need manual triage; widening classifier coverage is a model-improvement action, and the share should be tracked down over time.`,

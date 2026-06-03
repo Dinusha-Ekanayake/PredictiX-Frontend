@@ -554,7 +554,7 @@ export default function FloatingChatbot() {
                         className={cn(
                           "max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm",
                           message.role === "user"
-                            ? "rounded-br-md bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white"
+                            ? "rounded-br-md bg-linear-to-br from-violet-600 to-fuchsia-600 text-white"
                             : "rounded-bl-md border border-border/70 bg-card text-foreground dark:bg-slate-800/80"
                         )}
                       >

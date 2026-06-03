@@ -705,7 +705,7 @@ export default function FloatingChatbot() {
         type="button"
         className={cn(
           "pointer-events-auto group absolute flex items-center justify-center rounded-full border border-white/20 text-white shadow-[0_10px_30px_-10px_rgba(124,58,237,0.6)]",
-          "bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500",
+          "bg-linear-to-br from-violet-500 via-fuchsia-500 to-sky-500",
           "motion-reduce:transition-none",
           isDragging
             ? "scale-105 cursor-pointer transition-transform duration-100"

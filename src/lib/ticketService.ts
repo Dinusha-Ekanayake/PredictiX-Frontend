@@ -267,11 +267,14 @@ export async function fetchTicketEnrichment(ticket: {
   }));
 
   if (ticket.asset_id) {
-    const { data: asset } = await supabase
+    const { data: asset, error: assetError } = await supabase
       .from("assets")
       .select("warehouse_id,department_id")
       .eq("id", ticket.asset_id)
       .maybeSingle();
+
+    if (assetError) throw assetError;
+
     const a = asset as { warehouse_id: string | null; department_id: string | null } | null;
     if (a?.warehouse_id) {
       const { data: w } = await supabase

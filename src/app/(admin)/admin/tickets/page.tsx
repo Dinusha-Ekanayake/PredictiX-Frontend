@@ -144,22 +144,22 @@ export default function AdminTicketsPage() {
   return (
     <div className="w-full space-y-5 pb-10">
       {/* ══ Hero header (dashboard style) ════════════════════════════════════ */}
-      <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-violet-500/20">
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-950/70 dark:via-slate-950/60 dark:to-sky-950/50 pointer-events-none" />
-        <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-gradient-to-br from-violet-400/20 to-sky-400/20 blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-white/10 dark:bg-white/2">
+        <div className="absolute inset-0 bg-linear-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent pointer-events-none" />
+        <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-linear-to-br from-violet-400/20 to-sky-400/20 dark:from-violet-500/10 dark:to-sky-500/5 blur-3xl pointer-events-none" />
 
         <div className="relative px-7 py-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-violet-500 dark:text-violet-400">PredictiX</span>
               <span className="text-muted-foreground/30 text-xs font-light">/</span>
-              <span className="text-[10px] tracking-[0.1em] uppercase text-muted-foreground/60">Admin</span>
+              <span className="text-[10px] tracking-widest uppercase text-muted-foreground/60">Admin</span>
               <span className="text-muted-foreground/30 text-xs font-light">/</span>
-              <span className="text-[10px] tracking-[0.1em] uppercase text-muted-foreground/80">Tickets</span>
+              <span className="text-[10px] tracking-widest uppercase text-muted-foreground/80">Tickets</span>
             </div>
 
             <h1 className="flex items-center gap-2.5 text-[26px] font-semibold tracking-[-0.025em] leading-none text-foreground">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-sky-500 text-white shadow-md">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-sky-500 text-white shadow-md">
                 <TicketIcon className="size-5" />
               </span>
               Support Tickets
@@ -179,7 +179,7 @@ export default function AdminTicketsPage() {
           <div className="flex flex-col items-end gap-2.5 shrink-0">
             <Button
               onClick={() => setOpen(true)}
-              className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md"
+              className="bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md"
             >
               + New Ticket
             </Button>
@@ -198,7 +198,7 @@ export default function AdminTicketsPage() {
       {/* ══ Search + filters ═════════════════════════════════════════════════ */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm p-4">
         <div className="flex w-full items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative flex-1 min-w-60">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
@@ -210,7 +210,7 @@ export default function AdminTicketsPage() {
 
           <div className="hidden items-center gap-2 sm:flex">
             <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v)}>
-              <SelectTrigger className="w-[160px] h-10">
+              <SelectTrigger className="w-40 h-10">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
@@ -231,7 +231,7 @@ export default function AdminTicketsPage() {
             </Select>
 
             <Select value={selectedPriority} onValueChange={(v) => setSelectedPriority(v)}>
-              <SelectTrigger className="w-[160px] h-10">
+              <SelectTrigger className="w-40 h-10">
                 <SelectValue placeholder="All Priority" />
               </SelectTrigger>
               <SelectContent>
@@ -327,7 +327,7 @@ export default function AdminTicketsPage() {
                 onClick={() => { setSelectedTicket(t); setDetailOpen(true); }}
               >
                 {/* Left accent bar (priority colour) */}
-                <span className={cn("absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b", priorityAccent)} />
+                <span className={cn("absolute left-0 top-0 bottom-0 w-1 bg-linear-to-b", priorityAccent)} />
 
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
@@ -399,7 +399,7 @@ export default function AdminTicketsPage() {
             variant="outline"
             onClick={handleLoadMore}
             disabled={loadingMore}
-            className="min-w-[160px]"
+            className="min-w-40"
           >
             {loadingMore ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading…</>

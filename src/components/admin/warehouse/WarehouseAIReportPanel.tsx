@@ -162,7 +162,7 @@ function AIBlock({ text }: { text?: string }) {
 
 function KpiTile({ label, value, color, note }: { label: string; value: string | number; color?: string; note?: string }) {
   return (
-    <div className="flex flex-col rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-4 py-3 min-w-[95px]">
+    <div className="flex flex-col rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-4 py-3 min-w-23.75">
       <span className="text-xl font-bold" style={{ color: color || P.violet }}>{value}</span>
       <span className="text-[11px] text-muted-foreground leading-tight mt-0.5">{label}</span>
       {note && <span className="text-[10px] text-muted-foreground/70 mt-0.5">{note}</span>}
@@ -235,9 +235,9 @@ export default function WarehouseAIReportPanel({
     <div className="mt-6 space-y-4">
 
       {/* ── Report Header Bar ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-violet-200 dark:border-violet-900 bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30 px-5 py-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-violet-200 dark:border-violet-500/20 bg-linear-to-r from-violet-50 to-indigo-50 dark:from-violet-500/10 dark:to-transparent dark:bg-white/2 px-5 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-violet-600 to-indigo-600 text-white shadow-sm">
             <Brain className="h-5 w-5" />
           </div>
           <div>
@@ -308,7 +308,7 @@ export default function WarehouseAIReportPanel({
 
       {/* Loading */}
       {loading && (
-        <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div className="flex min-h-70 flex-col items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
           <div className="relative">
             <Loader2 className="h-10 w-10 animate-spin text-violet-600" />
             <div className="absolute inset-0 h-10 w-10 rounded-full bg-violet-100 dark:bg-violet-950 blur-lg" />
@@ -747,7 +747,7 @@ export default function WarehouseAIReportPanel({
                           <div key={d.name} className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2">
                               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                              <span className="text-muted-foreground truncate max-w-[140px]">{d.name}</span>
+                              <span className="text-muted-foreground truncate max-w-35">{d.name}</span>
                             </div>
                             <span className="font-semibold">{d.value}</span>
                           </div>

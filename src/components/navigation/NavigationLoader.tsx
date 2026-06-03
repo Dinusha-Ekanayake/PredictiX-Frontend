@@ -148,7 +148,7 @@ function Orbiter({
               "radial-gradient(circle at 30% 25%, var(--bubble-hi), var(--bubble-mid) 45%, var(--bubble-lo))",
           }}
         >
-          <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-br from-white/70 via-transparent to-transparent opacity-60 dark:from-white/10" />
+          <div className="pointer-events-none absolute inset-0 rounded-full bg-linear-to-br from-white/70 via-transparent to-transparent opacity-60 dark:from-white/10" />
           <div className="relative">{children}</div>
         </div>
       </div>

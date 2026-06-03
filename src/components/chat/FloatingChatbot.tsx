@@ -486,7 +486,7 @@ export default function FloatingChatbot() {
           }}
         >
           <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-md motion-reduce:transition-none">
-            <div className="relative flex items-center justify-between border-b border-border/60 px-4 py-3 bg-gradient-to-r from-violet-500/10 via-fuchsia-500/5 to-sky-500/10 dark:from-violet-500/15 dark:via-fuchsia-500/10 dark:to-sky-500/15">
+            <div className="relative flex items-center justify-between border-b border-border/60 px-4 py-3 bg-linear-to-r from-violet-500/10 via-fuchsia-500/5 to-sky-500/10 dark:from-violet-500/15 dark:via-fuchsia-500/10 dark:to-sky-500/15">
               <div className="flex items-center gap-2">
                 <div className="rounded-full bg-gradient-to-br from-violet-500 to-sky-500 p-1.5 text-white shadow-sm">
                   <MessageCircle className="size-4" />

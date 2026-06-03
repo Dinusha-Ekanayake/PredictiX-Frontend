@@ -109,19 +109,19 @@ export default function AdminNavbar({
           <div
             className={cn(
               "relative overflow-hidden",
-              "bg-white/80 backdrop-blur-xl dark:bg-slate-950/60",
+              "bg-white/80 backdrop-blur-xl dark:bg-white/5",
               "transition-all duration-300 ease-out",
               !scrolled
                 ? [
                     "h-16",
-                    "border-b border-slate-200/70 dark:border-slate-800/70",
+                    "border-b border-slate-200/70 dark:border-white/10",
                     "shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)]",
                     "rounded-none",
                   ].join(" ")
                 : [
                     "h-16",
                     "rounded-3xl",
-                    "border border-slate-200/60 dark:border-slate-800/60",
+                    "border border-slate-200/60 dark:border-white/10",
                     "shadow-[0_18px_45px_-18px_rgba(15,23,42,0.35)] dark:shadow-[0_18px_45px_-18px_rgba(0,0,0,0.60)]",
                     "ring-1 ring-white/35 dark:ring-white/10",
                   ].join(" ")
@@ -175,7 +175,7 @@ export default function AdminNavbar({
               <nav
                 className={cn(
                   "justify-self-center hidden md:flex items-center",
-                  !scrolled ? "gap-9" : "gap-1 rounded-2xl bg-slate-100/80 p-1.5 dark:bg-slate-900/60"
+                  !scrolled ? "gap-9" : "gap-1 rounded-2xl bg-slate-100/80 p-1.5 dark:bg-white/5"
                 )}
               >
                 {NAV.map((item) => {
@@ -194,7 +194,7 @@ export default function AdminNavbar({
                           : "px-3.5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50 hover:bg-white/70 dark:hover:bg-slate-950/60",
                         active &&
                           (scrolled
-                            ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-950 dark:text-slate-50 dark:ring-slate-800/70"
+                            ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70 dark:bg-white/10 dark:text-white dark:ring-white/15"
                             : "text-slate-900 dark:text-white")
                       )}
                     >
@@ -214,7 +214,7 @@ export default function AdminNavbar({
                 <button
                   type="button"
                   onClick={handleProfileClick}
-                  className="hidden sm:flex items-center gap-3 rounded-xl px-1 py-1 -mr-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                  className="hidden sm:flex items-center gap-3 rounded-xl px-1 py-1 -mr-1 hover:bg-slate-100/70 dark:hover:bg-white/5 transition-colors cursor-pointer"
                 >
                   <div className="text-right leading-[1.05]">
                     <div className="text-sm font-semibold tracking-tight">
@@ -277,7 +277,7 @@ export default function AdminNavbar({
                           setOpen(false);
                           setProfileOpen(true);
                         }}
-                        className="mt-5 w-full rounded-2xl border border-slate-200 p-3 dark:border-slate-800 text-left hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                        className="mt-5 w-full rounded-2xl border border-slate-200 p-3 dark:border-white/10text-left hover:bg-slate-100/70 dark:hover:bg-white/5 transition-colors cursor-pointer"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="leading-tight">
@@ -312,7 +312,7 @@ export default function AdminNavbar({
                                 "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition",
                                 "hover:bg-slate-100 dark:hover:bg-slate-900/60",
                                 active &&
-                                  "bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-900/60 dark:ring-slate-800"
+                                  "bg-slate-100 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/15"
                               )}
                             >
                               <Icon className="h-5 w-5" />

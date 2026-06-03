@@ -13,6 +13,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
+import PageHero from "@/components/common/PageHero";
 import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
 import EditTicketDialog from "@/components/user/tickets/EditTicketDialog";
 import type { Ticket } from "@/lib/ticketService";
@@ -91,10 +92,11 @@ export default function UserTicketsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">My Tickets</h1>
-        <p className="text-sm text-muted-foreground">Tickets you have created. You can edit or delete your own tickets.</p>
-      </div>
+      <PageHero
+        crumbs={["PredictiX", "User", "Tickets"]}
+        title="My Tickets"
+        subtitle="Tickets you have created. You can edit or delete your own tickets."
+      />
 
       {/* Filters */}
       <div className="flex w-full flex-col gap-3 rounded-2xl border border-input p-4 sm:flex-row sm:items-center">

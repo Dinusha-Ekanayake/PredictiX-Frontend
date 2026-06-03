@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
+import PageHero from "@/components/common/PageHero";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -76,12 +77,11 @@ export default function UserTeamPage() {
 
   return (
     <div className="w-full space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
-        <p className="text-sm text-muted-foreground">
-          Team members in {profile?.department ? `the ${profile.department} department` : "your department"}.
-        </p>
-      </div>
+      <PageHero
+        crumbs={["PredictiX", "User", "Users"]}
+        title="Users"
+        subtitle={`Team members in ${profile?.department ? `the ${profile.department} department` : "your department"}.`}
+      />
 
       <Card className="rounded-2xl">
         <CardHeader className="flex flex-row items-center justify-between">

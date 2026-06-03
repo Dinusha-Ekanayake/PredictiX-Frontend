@@ -168,7 +168,7 @@ export default function AdminAssetsPage() {
   return (
     <div className="space-y-6">
       {/* ── Hero header ── */}
-      <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-linear-to-br from-slate-50 via-white to-slate-50 dark:from-[rgba(74,29,111,0.18)] dark:via-[rgba(29,58,95,0.12)] dark:to-[rgba(29,94,63,0.14)] p-6">
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-linear-to-br from-slate-50 via-white to-slate-50 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent dark:bg-white/2 p-6">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60 mb-3">
           <span>Admin</span>
           <ChevronRight className="h-3 w-3" />

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
+import PageHero from "@/components/common/PageHero";
 import {
   Select,
   SelectContent,
@@ -286,6 +287,12 @@ export default function AdminUsersPage() {
 
   return (
     <div className="w-full space-y-6">
+      <PageHero
+        crumbs={["PredictiX", "Admin", "Users"]}
+        title="User Management"
+        subtitle="Manage user accounts, roles, departments and assigned assets."
+      />
+
       {/* KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((k) => (

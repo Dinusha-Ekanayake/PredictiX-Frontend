@@ -67,7 +67,6 @@ function getInitials(name: string): string {
 // ---------------------------------------------------------------------------
 
 export default function UserProfilePage() {
-  const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   

@@ -105,7 +105,7 @@ export default function UserTicketsPage() {
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your tickets…" className="h-11 rounded-lg pl-12" />
         </div>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Status" /></SelectTrigger>
+          <SelectTrigger className="w-40"><SelectValue placeholder="All Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="open">Open</SelectItem>
@@ -115,7 +115,7 @@ export default function UserTicketsPage() {
           </SelectContent>
         </Select>
         <Select value={priority} onValueChange={setPriority}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="All Priority" /></SelectTrigger>
+          <SelectTrigger className="w-37.5"><SelectValue placeholder="All Priority" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Priority</SelectItem>
             <SelectItem value="high">High</SelectItem>

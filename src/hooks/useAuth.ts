@@ -6,8 +6,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { isAuthenticated, getUserRole, isAdmin, isUserRole } from "@/lib/authService";
+import { useRouter } from "next/navigation";
+import {
+  isAuthenticated,
+  isAdmin,
+  isUserRole,
+  getUser,
+  logout as clearSession,
+  type StoredUser,
+} from "@/lib/authService";
 
 interface UseAuthOptions {
   requireAuth?: boolean;
@@ -26,7 +33,6 @@ export function useAuth({
   redirectPath = "/login",
 }: UseAuthOptions = {}) {
   const router = useRouter();
-  const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
 
@@ -49,6 +55,8 @@ export function useAuth({
       return;
     }
 
+    // localStorage is only readable on the client, so this gate runs after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsAuthorized(true);
     setIsLoading(false);
   }, [
@@ -66,20 +74,14 @@ export function useAuth({
  * Hook to get current user info
  */
 export function useUser() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<StoredUser | null>(null);
 
   useEffect(() => {
-    const userStr = localStorage.getItem("predictix.user");
-    if (userStr) {
-      try {
-        setUser(JSON.parse(userStr));
-      } catch {
-        setUser(null);
-      }
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUser(getUser());
   }, []);
 
-  return { user, role: user?.role || null };
+  return { user, role: user?.role ?? null };
 }
 
 /**
@@ -88,17 +90,8 @@ export function useUser() {
 export function useLogout() {
   const router = useRouter();
 
-  const logout = () => {
-    // Clear all auth data
-    localStorage.removeItem("predictix.access_token");
-    localStorage.removeItem("predictix.refresh_token");
-    localStorage.removeItem("predictix.user");
-    localStorage.removeItem("predictix.user.role");
-    localStorage.removeItem("predictix.user.email");
-
-    // Redirect to login
+  return () => {
+    clearSession();
     router.push("/login");
   };
-
-  return logout;
 }

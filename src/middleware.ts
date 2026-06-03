@@ -9,12 +9,6 @@ import { NextRequest, NextResponse } from "next/server";
 // Routes that don't require authentication
 const publicRoutes = ["/login", "/register", "/forgot-password"];
 
-// Routes that require admin role
-const adminRoutes = ["/admin/users"];
-
-// Routes that require user role (or admin)
-const userRoutes = ["/user"];
-
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 

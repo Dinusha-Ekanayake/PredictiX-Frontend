@@ -21,7 +21,7 @@ import {
 
 import { getWarehouseSummary, WarehouseSummaryData } from "@/lib/warehouseService";
 
-export default function WarehouseInsightsSection({ data: initialData }: { data?: any }) {
+export default function WarehouseInsightsSection({ data: initialData }: { data?: WarehouseSummaryData }) {
   const [data, setData] = useState<WarehouseSummaryData | null>(initialData || null);
   const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);

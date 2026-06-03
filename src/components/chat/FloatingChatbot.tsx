@@ -725,7 +725,7 @@ export default function FloatingChatbot() {
       >
         <span className="sr-only">Chatbot launcher</span>
         <span className="pointer-events-none absolute inset-0 rounded-full bg-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-violet-400/40 to-sky-400/40 blur-md opacity-60" />
+        <span className="pointer-events-none absolute -inset-1 rounded-full bg-linear-to-br from-violet-400/40 to-sky-400/40 blur-md opacity-60" />
         <MessageCircle className="relative size-6 drop-shadow-sm" />
         <Sparkles className="absolute -top-1 -right-1 size-3 text-white/90 drop-shadow" />
       </button>

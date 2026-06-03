@@ -24,8 +24,10 @@ export interface WarehouseSummaryData {
 export async function getMaintenanceSchedule() {
   try {
     const url = `${API_BASE_URL}/warehouse-dashboard/maintenance-schedule`;
-    console.log('[DEBUG] Fetching maintenance schedule from:', url);
-    
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[warehouseService] Fetching maintenance schedule from:", url);
+    }
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {

@@ -71,7 +71,7 @@ function PieTip({ active, payload }: { active?: boolean; payload?: Array<{ paylo
 function CTip({ active, payload, label, fmt }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string; fmt?: (v: number) => string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-md space-y-1 min-w-[110px]">
+    <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-md space-y-1 min-w-27.5">
       <p className="font-semibold text-foreground">{label}</p>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2 text-muted-foreground">
@@ -182,9 +182,9 @@ export default function AdminDashboardPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-violet-500 dark:text-violet-400">PredictiX</span>
                 <span className="text-muted-foreground/30 text-xs font-light">/</span>
-                <span className="text-[10px] tracking-[0.1em] uppercase text-muted-foreground/60">Admin</span>
+                <span className="text-[10px] tracking-widest uppercase text-muted-foreground/60">Admin</span>
                 <span className="text-muted-foreground/30 text-xs font-light">/</span>
-                <span className="text-[10px] tracking-[0.1em] uppercase text-muted-foreground/80">Dashboard</span>
+                <span className="text-[10px] tracking-widest uppercase text-muted-foreground/80">Dashboard</span>
               </div>
               <h1 className="text-[26px] font-semibold tracking-[-0.025em] leading-none text-foreground">
                 Operations Dashboard

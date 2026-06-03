@@ -80,7 +80,7 @@ export default function PredictiXLoader({
           {label}
         </p>
 
-        <div className="pointer-events-none absolute left-1/2 top-full mt-2 h-[2px] w-52 -translate-x-1/2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-white/10">
+        <div className="pointer-events-none absolute left-1/2 top-full mt-2 h-0.5 w-52 -translate-x-1/2 overflow-hidden rounded-full bg-slate-200/70 dark:bg-white/10">
           <div
             className="h-full w-1/3 rounded-full bg-slate-400/40 dark:bg-slate-500/30"
             style={{ animation: "title-shimmer 1.6s ease-in-out infinite" }}

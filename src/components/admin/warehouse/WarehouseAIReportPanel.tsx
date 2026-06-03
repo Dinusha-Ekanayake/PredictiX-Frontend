@@ -760,7 +760,7 @@ export default function WarehouseAIReportPanel({
                           <div key={d.name} className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2">
                               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                              <span className="text-muted-foreground truncate max-w-[140px]">{d.name}</span>
+                              <span className="text-muted-foreground truncate max-w-35">{d.name}</span>
                             </div>
                             <span className="font-semibold">{d.value}</span>
                           </div>

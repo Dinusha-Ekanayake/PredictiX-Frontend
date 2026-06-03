@@ -250,7 +250,7 @@ export default function WarehouseAIReportPanel({
       {/* ── Report Header Bar ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-violet-200 dark:border-violet-500/20 bg-linear-to-r from-violet-50 to-indigo-50 dark:from-violet-500/10 dark:to-transparent dark:bg-white/2 px-5 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-violet-600 to-indigo-600 text-white shadow-sm">
             <Brain className="h-5 w-5" />
           </div>
           <div>

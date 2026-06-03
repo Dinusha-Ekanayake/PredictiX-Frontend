@@ -6,7 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, AlertCircle, CheckCircle, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { updateTicketStatus, updateTicketPriority, type Ticket, type TicketStatus, type TicketPriority } from "@/lib/ticketService";
+import {
+  updateTicketStatus,
+  updateTicketPriority,
+  fetchTicketEnrichment,
+  type Ticket,
+  type TicketStatus,
+  type TicketPriority,
+  type TicketEnrichment,
+} from "@/lib/ticketService";
 
 type Props = {
   open: boolean;
@@ -32,6 +40,8 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
   const [priorityUpdating, setPriorityUpdating] = React.useState(false);
   const [localStatus, setLocalStatus] = React.useState<TicketStatus>("open");
   const [localPriority, setLocalPriority] = React.useState<TicketPriority>("Medium");
+  const [enrichment, setEnrichment] = React.useState<TicketEnrichment | null>(null);
+  const [enrichmentLoading, setEnrichmentLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (ticket) {
@@ -40,6 +50,33 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     }
     if (!open) setConfirmOpen(false);
   }, [ticket, open]);
+
+  React.useEffect(() => {
+    if (!open || !ticket) {
+      setEnrichment(null);
+      return;
+    }
+    let cancelled = false;
+    setEnrichmentLoading(true);
+    fetchTicketEnrichment({
+      id: ticket.id,
+      created_by: ticket.created_by,
+      assigned_to: ticket.assigned_to,
+      asset_id: ticket.asset_id,
+    })
+      .then((data) => {
+        if (!cancelled) setEnrichment(data);
+      })
+      .catch(() => {
+        if (!cancelled) setEnrichment(null);
+      })
+      .finally(() => {
+        if (!cancelled) setEnrichmentLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, ticket]);
 
   async function handleStatusChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const newStatus = e.target.value as TicketStatus;
@@ -197,16 +234,79 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
             </div>
           </div>
 
-          <div className="rounded-md border p-3 bg-muted/30">
-            <h4 className="text-sm font-medium text-muted-foreground">Assigned To</h4>
-            <div className="mt-2 text-sm">
-              {ticket?.assigned_to ? (
-                <Badge className="bg-purple-100 text-purple-800">{ticket.assigned_to.slice(0, 8)}</Badge>
-              ) : (
-                "Unassigned"
-              )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-md border p-3 bg-muted/30">
+              <h4 className="text-sm font-medium text-muted-foreground">Assigned To</h4>
+              <div className="mt-2 text-sm">
+                {enrichment?.assignee_name ? (
+                  <Badge className="bg-purple-100 text-purple-800">{enrichment.assignee_name}</Badge>
+                ) : ticket?.assigned_to ? (
+                  <Badge className="bg-purple-100 text-purple-800">{ticket.assigned_to.slice(0, 8)}</Badge>
+                ) : (
+                  "Unassigned"
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-md border p-3 bg-muted/30">
+              <h4 className="text-sm font-medium text-muted-foreground">Created By</h4>
+              <div className="mt-2 text-sm">
+                {enrichmentLoading && !enrichment ? (
+                  <span className="text-muted-foreground">Loading…</span>
+                ) : enrichment?.creator_name ? (
+                  <div>
+                    <Badge className="bg-blue-100 text-blue-800">{enrichment.creator_name}</Badge>
+                    {enrichment.creator_email && (
+                      <div className="mt-1 text-xs text-muted-foreground">{enrichment.creator_email}</div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Unknown</span>
+                )}
+              </div>
             </div>
           </div>
+
+          {(enrichment?.warehouse_name || enrichment?.department_name) && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-md border p-3 bg-muted/30">
+                <h4 className="text-sm font-medium text-muted-foreground">Warehouse</h4>
+                <div className="mt-2 text-sm">
+                  {enrichment?.warehouse_name ?? <span className="text-muted-foreground">—</span>}
+                </div>
+              </div>
+              <div className="rounded-md border p-3 bg-muted/30">
+                <h4 className="text-sm font-medium text-muted-foreground">Department</h4>
+                <div className="mt-2 text-sm">
+                  {enrichment?.department_name ?? <span className="text-muted-foreground">—</span>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {enrichment && enrichment.history.length > 0 && (
+            <div className="rounded-md border p-3 bg-muted/30">
+              <h4 className="text-sm font-medium text-muted-foreground">History</h4>
+              <ul className="mt-2 space-y-2">
+                {enrichment.history.map((h) => (
+                  <li key={h.id} className="text-xs">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">
+                        {h.old_status ? `${h.old_status} → ${h.new_status}` : `Set to ${h.new_status}`}
+                      </span>
+                      {h.changed_by_name && (
+                        <span className="text-muted-foreground">by {h.changed_by_name}</span>
+                      )}
+                      <span className="text-muted-foreground">
+                        {new Date(h.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    {h.note && <div className="mt-0.5 text-muted-foreground">{h.note}</div>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {confirmOpen && (

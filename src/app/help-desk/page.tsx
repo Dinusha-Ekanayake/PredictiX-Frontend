@@ -401,7 +401,7 @@ export default function HelpDeskPage() {
                     type="button"
                     onClick={handleAddFaq}
                     disabled={!adminQuestion.trim() || !adminAnswer.trim() || isAdding}
-                    className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md"
+                    className="bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md"
                   >
                     {isAdding ? "Saving…" : "Add Question & Answer"}
                   </Button>

@@ -29,7 +29,7 @@ export default function WarehousePage() {
     try {
       // Fetch summary and maintenance schedule in parallel
       const [summaryRes, scheduleData] = await Promise.allSettled([
-        fetch("http://127.0.0.1:8000/warehouse-dashboard/summary", {
+        fetch(`${API_BASE_URL}/warehouse-dashboard/summary`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         }),

@@ -5,31 +5,37 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
+/** Generic chart data point — keys vary per chart (name/value/count/etc.). */
+export type ChartDatum = Record<string, string | number | null | undefined>;
+
+/** A single predictive-maintenance schedule row. */
+export interface MaintenanceScheduleItem {
+  asset?: string;
+  predicted?: number;
+  scheduled?: number;
+  [key: string]: string | number | null | undefined;
+}
+
 export interface WarehouseSummaryData {
-  kpis?: any[];
-  kpiGrid?: any[];
-  assetStatus?: any[];
-  ticketPriority?: any[];
-  ticketsByCategory?: any[];
-  healthMaintenanceTrends?: any[];
-  healthScoreDist?: any[];
-  assetsByType?: any[];
-  monthlyTicketVolume?: any[];
-  criticalAssets?: any[];
-  maintenanceSchedule?: any[];
+  kpis?: ChartDatum[];
+  kpiGrid?: ChartDatum[];
+  assetStatus?: ChartDatum[];
+  ticketPriority?: ChartDatum[];
+  ticketsByCategory?: ChartDatum[];
+  healthMaintenanceTrends?: ChartDatum[];
+  healthScoreDist?: ChartDatum[];
+  assetsByType?: ChartDatum[];
+  monthlyTicketVolume?: ChartDatum[];
+  criticalAssets?: ChartDatum[];
+  maintenanceSchedule?: MaintenanceScheduleItem[];
 }
 
 /**
  * Fetch predictive maintenance schedule from PostgreSQL backend
  */
-export async function getMaintenanceSchedule() {
+export async function getMaintenanceSchedule(): Promise<MaintenanceScheduleItem[]> {
   try {
-    const url = `${API_BASE_URL}/warehouse-dashboard/maintenance-schedule`;
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[warehouseService] Fetching maintenance schedule from:", url);
-    }
-
-    const response = await fetch(url, {
+    const response = await fetch(`${API_BASE_URL}/warehouse-dashboard/maintenance-schedule`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -38,16 +44,13 @@ export async function getMaintenanceSchedule() {
     });
 
     if (!response.ok) {
-      console.warn(`[DEBUG] Maintenance schedule API error: ${response.status} ${response.statusText}`);
+      console.warn(`Maintenance schedule API error: ${response.status} ${response.statusText}`);
       return [];
     }
 
-    const data = await response.json();
-    console.log('[DEBUG] Maintenance schedule data received:', data);
-    return data;
+    return await response.json();
   } catch (error) {
-    // Backend unreachable — expected when server is not running
-    console.warn('[warehouseService] Maintenance schedule unavailable:', (error as Error).message);
+    console.error('Failed to fetch maintenance schedule:', error);
     return [];
   }
 }
@@ -56,58 +59,41 @@ export async function getMaintenanceSchedule() {
  * Fetch warehouse dashboard summary from PostgreSQL backend
  */
 export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
-  try {
-    const url = `${API_BASE_URL}/warehouse-dashboard/summary`;
-    console.log('[DEBUG] Fetching warehouse summary from:', url);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store', // Disable caching for fresh data
-    });
+  const response = await fetch(`${API_BASE_URL}/warehouse-dashboard/summary`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store', // Disable caching for fresh data
+  });
 
-    if (!response.ok) {
-      console.error(`[ERROR] Warehouse API error: ${response.status}`);
-      throw new Error(`Failed to fetch warehouse summary: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log('[DEBUG] Warehouse summary data received:', data);
-    
-    // Fetch maintenance schedule separately and include it
-    const maintenanceSchedule = await getMaintenanceSchedule();
-    console.log('[DEBUG] Merging maintenance schedule with summary data');
-    
-    const result = {
-      ...data,
-      maintenanceSchedule,
-    };
-    
-    console.log('[DEBUG] Final warehouse summary with maintenance schedule:', result);
-    return result;
-  } catch (error) {
-    console.error('[ERROR] Failed to fetch warehouse summary:', error);
-    throw error;
+  if (!response.ok) {
+    throw new Error(`Failed to fetch warehouse summary: ${response.statusText}`);
   }
+
+  const data = await response.json();
+
+  // Fetch maintenance schedule separately and include it
+  const maintenanceSchedule = await getMaintenanceSchedule();
+
+  return {
+    ...data,
+    maintenanceSchedule,
+  };
 }
 
 /**
  * Fetch critical assets for warehouse table
  */
-export async function getCriticalAssets() {
+export async function getCriticalAssets(): Promise<ChartDatum[]> {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/assets/?status=at_risk`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
-      }
-    );
+    const response = await fetch(`${API_BASE_URL}/assets/?status=at_risk`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch critical assets: ${response.statusText}`);

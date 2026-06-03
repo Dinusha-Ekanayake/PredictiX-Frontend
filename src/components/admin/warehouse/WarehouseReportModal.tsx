@@ -148,11 +148,14 @@ function CTip({ active, payload, label }: any) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 py-2 text-xs shadow-lg">
       {label && <div className="font-semibold mb-1">{label}</div>}
-      {payload.map((p: any, i: number) => (
-        <div key={i} style={{ color: p.color || p.fill }}>
-          {p.name ?? "Value"}: <strong>{(p.value as number)?.toLocaleString()}</strong>
-        </div>
-      ))}
+      {payload.map((p: any, i: number) => {
+        const value = typeof p.value === "number" ? p.value.toLocaleString() : (p.value ?? "–");
+        return (
+          <div key={i} style={{ color: p.color || p.fill }}>
+            {p.name ?? "Value"}: <strong>{value}</strong>
+          </div>
+        );
+      })}
     </div>
   );
 }

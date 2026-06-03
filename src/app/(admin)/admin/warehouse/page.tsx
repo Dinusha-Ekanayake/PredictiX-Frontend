@@ -4,6 +4,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, FileText } from "lucide-react";
 
+import PageHero from "@/components/common/PageHero";
 import WarehouseOverviewCards from "@/components/admin/warehouse/WarehouseOverviewCards";
 import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsightsSection";
 import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
@@ -92,31 +93,27 @@ export default function WarehousePage() {
   return (
     <div className="w-full space-y-6">
       {/* ── Page header ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Warehouse</h1>
-          <p className="text-sm text-muted-foreground">
-            Overview of asset health, tickets, and predictive maintenance signals.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={fetchData} disabled={refreshing}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-
-          {/* Generate Report → Skip confirmation, go directly to generating */}
-          <Button
-            variant="secondary"
-            id="btn-generate-warehouse-report"
-            onClick={openModalAndGenerate}
-          >
-            <FileText className="mr-2 h-4 w-4" />
-            Generate Report
-          </Button>
-        </div>
-      </div>
+      <PageHero
+        crumbs={["PredictiX", "Admin", "Warehouse"]}
+        title="Warehouse"
+        subtitle="Overview of asset health, tickets, and predictive maintenance signals."
+        right={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={fetchData} disabled={refreshing}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Button
+              variant="secondary"
+              id="btn-generate-warehouse-report"
+              onClick={openModalAndGenerate}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Generate Report
+            </Button>
+          </div>
+        }
+      />
 
       {/* ── Existing dashboard (completely untouched) ── */}
       <WarehouseOverviewCards data={data} isLoading={refreshing && !data} />

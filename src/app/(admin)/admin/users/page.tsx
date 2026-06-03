@@ -339,7 +339,7 @@ export default function AdminUsersPage() {
               value={departmentFilter}
               onValueChange={setDepartmentFilter}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-45">
                 <SelectValue placeholder="All Departments" />
               </SelectTrigger>
               <SelectContent>
@@ -353,7 +353,7 @@ export default function AdminUsersPage() {
             </Select>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-35">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>

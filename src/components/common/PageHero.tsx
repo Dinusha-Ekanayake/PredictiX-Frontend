@@ -32,7 +32,7 @@ export default function PageHero({ crumbs, title, subtitle, live, right }: PageH
                     className={
                       i === 0
                         ? "text-[10px] font-bold tracking-[0.14em] uppercase text-violet-500 dark:text-violet-400"
-                        : "text-[10px] tracking-[0.1em] uppercase text-muted-foreground/70"
+                        : "text-[10px] tracking-widest uppercase text-muted-foreground/70"
                     }
                   >
                     {c}

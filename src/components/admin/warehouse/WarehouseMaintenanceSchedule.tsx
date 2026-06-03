@@ -16,34 +16,30 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarClock, Lightbulb, ArrowUpDown } from "lucide-react";
 import { useTheme } from "next-themes";
-import { getMaintenanceSchedule } from "@/lib/warehouseService";
+import { getMaintenanceSchedule, type MaintenanceScheduleItem } from "@/lib/warehouseService";
 import { Button } from "@/components/ui/button";
 
 type SortBy = "urgent" | "alphabetical";
 
-export default function WarehouseMaintenanceSchedule({ data: propsData }: { data?: any[] } = {}) {
+export default function WarehouseMaintenanceSchedule({ data: propsData }: { data?: MaintenanceScheduleItem[] } = {}) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
-  
-  // If an array is passed (even empty), it means the parent manages the data — never self-fetch.
-  const managedExternally = Array.isArray(propsData);
 
-  const [allData, setAllData] = useState<any[]>(propsData ?? []);
-  const [displayData, setDisplayData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(!managedExternally);
+  const [allData, setAllData] = useState<MaintenanceScheduleItem[]>(propsData || []);
+  const [displayData, setDisplayData] = useState<MaintenanceScheduleItem[]>([]);
+  const [loading, setLoading] = useState(!propsData || propsData.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("urgent");
   const [itemsToShow, setItemsToShow] = useState(15);
 
-  // Sync externally-managed data into local state
+  // Fetch maintenance schedule data if not provided via props
   useEffect(() => {
-    if (managedExternally) {
-      setAllData(propsData!);
+    if (propsData && propsData.length > 0) {
+      setAllData(propsData);
       setLoading(false);
       return;
     }
 
-    // No prop passed — self-fetch as fallback
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -52,7 +48,7 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
         setAllData(fetchedData);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load maintenance schedule';
-        console.warn('[WarehouseMaintenanceSchedule] fetch failed:', errorMessage);
+        console.error('Maintenance schedule fetch failed:', err);
         setError(errorMessage);
         setAllData([]);
       } finally {
@@ -61,11 +57,11 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
     };
 
     fetchData();
-  }, [propsData, managedExternally]);
+  }, [propsData]);
 
   // Update display data based on sort and filter
   useEffect(() => {
-    let sorted = [...allData];
+    const sorted = [...allData];
 
     if (sortBy === "urgent") {
       // Sort by urgency: where predicted < scheduled (needs maintenance sooner)
@@ -232,7 +228,7 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
               <span className="font-medium text-foreground">Quick Tips:</span>
               <ul className="mt-1 space-y-1 list-disc list-inside">
                 <li>Red bars shorter than green = needs maintenance sooner than scheduled</li>
-                <li>Click "Most Urgent First" to prioritize high-risk assets</li>
+                <li>Click &ldquo;Most Urgent First&rdquo; to prioritize high-risk assets</li>
                 <li>Use the number buttons to show more assets at once</li>
               </ul>
             </div>

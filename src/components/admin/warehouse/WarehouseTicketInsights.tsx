@@ -20,6 +20,14 @@ import { useTheme } from "next-themes";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart as PieIcon, BarChart3, LineChart as LineIcon } from "lucide-react";
+import type { ChartDatum } from "@/lib/warehouseService";
+
+const ticketPriority = [
+  { name: "Critical", value: 1 },
+  { name: "High", value: 1 },
+  { name: "Medium", value: 1 },
+  { name: "Low", value: 1 },
+];
 
 const PRIORITY_COLORS = {
   Critical: "#ef4444",
@@ -27,6 +35,21 @@ const PRIORITY_COLORS = {
   Medium: "#3b82f6",
   Low: "#94a3b8",
 } as const;
+
+const ticketsByCategory = [
+  { category: "Electrical", count: 1 },
+  { category: "Mechanical", count: 2 },
+  { category: "Software", count: 1 },
+];
+
+const monthlyTicketVolume = [
+  { month: "Jul", total: 8 },
+  { month: "Aug", total: 12 },
+  { month: "Sep", total: 10 },
+  { month: "Oct", total: 15 },
+  { month: "Nov", total: 18 },
+  { month: "Dec", total: 4 },
+];
 
 // Reusable hook-based styles
 function useChartStyles() {
@@ -43,8 +66,8 @@ function useChartStyles() {
   };
 }
 
-export function TicketPriorityBreakdownCard({ data: externalData }: { data?: any[] }) {
-  const data = externalData || [];
+export function TicketPriorityBreakdownCard({ data: externalData }: { data?: ChartDatum[] }) {
+  const data = externalData || ticketPriority;
   const { axisColor, tooltipStyle } = useChartStyles();
 
   return (
@@ -55,7 +78,7 @@ export function TicketPriorityBreakdownCard({ data: externalData }: { data?: any
           Ticket Priority Breakdown
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Current ticket distribution by priority from Supabase.
+          Current ticket distribution by priority (sample).
         </p>
       </CardHeader>
 
@@ -91,8 +114,8 @@ export function TicketPriorityBreakdownCard({ data: externalData }: { data?: any
   );
 }
 
-export function TicketsByCategoryCard({ data: externalData }: { data?: any[] }) {
-  const data = externalData || [];
+export function TicketsByCategoryCard({ data: externalData }: { data?: ChartDatum[] }) {
+  const data = externalData || ticketsByCategory;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 
   return (
@@ -103,7 +126,7 @@ export function TicketsByCategoryCard({ data: externalData }: { data?: any[] }) 
           Tickets by Category
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Number of tickets by category from Supabase.
+          Number of tickets by category (sample).
         </p>
       </CardHeader>
 
@@ -125,8 +148,8 @@ export function TicketsByCategoryCard({ data: externalData }: { data?: any[] }) 
   );
 }
 
-export function MonthlyTicketVolumeCard({ data: externalData }: { data?: any[] }) {
-  const data = externalData || [];
+export function MonthlyTicketVolumeCard({ data: externalData }: { data?: ChartDatum[] }) {
+  const data = externalData || monthlyTicketVolume;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 
   return (
@@ -137,7 +160,7 @@ export function MonthlyTicketVolumeCard({ data: externalData }: { data?: any[] }
           Monthly Ticket Volume
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Ticket volume trend from Supabase.
+          Ticket volume trend (sample).
         </p>
       </CardHeader>
 

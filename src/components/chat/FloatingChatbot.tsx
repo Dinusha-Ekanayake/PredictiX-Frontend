@@ -529,7 +529,7 @@ export default function FloatingChatbot() {
               <div
                 ref={scrollRef}
                 onScroll={handleMessagesScroll}
-                className="h-full overflow-y-auto scrollbar-styled px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20"
+                className="h-full overflow-y-auto scrollbar-styled px-3 py-4 bg-linear-to-b from-transparent to-violet-50/30 dark:to-violet-950/20"
               >
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">

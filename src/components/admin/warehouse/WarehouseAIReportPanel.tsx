@@ -161,7 +161,7 @@ function AIBlock({ text }: { text?: string }) {
 
 function KpiTile({ label, value, color, note }: { label: string; value: string | number; color?: string; note?: string }) {
   return (
-    <div className="flex flex-col rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-4 py-3 min-w-[95px]">
+    <div className="flex flex-col rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-4 py-3 min-w-23.75">
       <span className="text-xl font-bold" style={{ color: color || P.violet }}>{value}</span>
       <span className="text-[11px] text-muted-foreground leading-tight mt-0.5">{label}</span>
       {note && <span className="text-[10px] text-muted-foreground/70 mt-0.5">{note}</span>}

@@ -1,15 +1,15 @@
 /**
  * Authenticated API Client
- * Automatically attaches Bearer token to all requests
- * Handles token refresh on 401 errors
+ * Automatically attaches Bearer token to all requests.
+ * On 401 → logs out and redirects to /login (no refresh token in current auth scheme).
  */
 
-import { getAccessToken, getRefreshToken, storeAuthSession, logout } from "./authService";
+import { getAccessToken, logout } from "./authService";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 /**
- * Fetch wrapper with automatic JWT token attachment and refresh
+ * Core fetch wrapper — attaches JWT and handles 401.
  */
 export async function apiFetch(
   endpoint: string,
@@ -17,7 +17,6 @@ export async function apiFetch(
 ): Promise<Response> {
   const token = getAccessToken();
 
-  // Build headers with auth token
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
@@ -27,61 +26,17 @@ export async function apiFetch(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // First attempt
-  let response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
   });
 
-  // If 401 (Unauthorized), try to refresh token
   if (response.status === 401) {
-    const refreshToken = getRefreshToken();
-
-    if (refreshToken) {
-      try {
-        // Try to refresh the access token
-        const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: refreshToken }),
-        });
-
-        if (refreshResponse.ok) {
-          const data = await refreshResponse.json();
-          const newAccessToken = data.access_token;
-
-          // Store new token
-          const user = JSON.parse(localStorage.getItem("predictix.user") || "{}");
-          storeAuthSession({
-            access_token: newAccessToken,
-            refresh_token: refreshToken,
-            token_type: "bearer",
-            user,
-          });
-
-          // Retry original request with new token
-          headers["Authorization"] = `Bearer ${newAccessToken}`;
-          response = await fetch(`${API_BASE_URL}${endpoint}`, {
-            ...options,
-            headers,
-          });
-        } else {
-          // Refresh failed - logout user
-          logout();
-          window.location.href = "/login";
-          throw new Error("Session expired. Please login again.");
-        }
-      } catch (error) {
-        logout();
-        window.location.href = "/login";
-        throw error;
-      }
-    } else {
-      // No refresh token - logout
-      logout();
+    logout();
+    if (typeof window !== "undefined") {
       window.location.href = "/login";
-      throw new Error("Not authenticated. Please login.");
     }
+    throw new Error("Session expired. Please login again.");
   }
 
   return response;
@@ -104,7 +59,7 @@ export async function apiGet<T>(endpoint: string): Promise<T> {
 /**
  * POST request helper
  */
-export async function apiPost<T>(endpoint: string, body: any): Promise<T> {
+export async function apiPost<T>(endpoint: string, body: unknown): Promise<T> {
   const response = await apiFetch(endpoint, {
     method: "POST",
     body: JSON.stringify(body),
@@ -121,7 +76,7 @@ export async function apiPost<T>(endpoint: string, body: any): Promise<T> {
 /**
  * PUT request helper
  */
-export async function apiPut<T>(endpoint: string, body: any): Promise<T> {
+export async function apiPut<T>(endpoint: string, body: unknown): Promise<T> {
   const response = await apiFetch(endpoint, {
     method: "PUT",
     body: JSON.stringify(body),
@@ -149,6 +104,8 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
   return response.json();
 }
 
+// ─── Chatbot (unauthenticated, separate service) ──────────────────────────────
+
 export type ChatbotSource = {
   title: string;
   category: string;
@@ -160,10 +117,9 @@ export type ChatbotAskResponse = {
 };
 
 export async function askChatbot(question: string): Promise<ChatbotAskResponse> {
-  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || "http://localhost:8002";
-  const url = `${chatbotUrl}/chatbot/ask`;
+  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  const response = await fetch(url, {
+  const response = await fetch(`${chatbotUrl}/chatbot/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question }),
@@ -171,7 +127,9 @@ export async function askChatbot(question: string): Promise<ChatbotAskResponse> 
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Chatbot request failed: ${response.status} ${response.statusText} — ${errorText}`);
+    throw new Error(
+      `Chatbot request failed: ${response.status} ${response.statusText} — ${errorText}`
+    );
   }
 
   return response.json();

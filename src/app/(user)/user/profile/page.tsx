@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { UserProfileForm } from "@/components/user/UserProfileForm";
 import { fetchMyProfile, UserProfileData } from "@/lib/api/userProfileApi";
 import { Card, CardContent } from "@/components/ui/card";
+import PageHero from "@/components/common/PageHero";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfileData | null>(null);
@@ -66,11 +67,12 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="w-full p-4 md:p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">My Profile</h1>
-        <p className="text-muted-foreground mt-1">Manage your personal information</p>
-      </div>
+    <div className="w-full space-y-6 p-4 md:p-6">
+      <PageHero
+        crumbs={["PredictiX", "User", "Profile"]}
+        title="My Profile"
+        subtitle="Manage your personal information."
+      />
 
       <UserProfileForm
         initialProfile={profile}

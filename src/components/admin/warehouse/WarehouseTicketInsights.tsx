@@ -20,6 +20,7 @@ import { useTheme } from "next-themes";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart as PieIcon, BarChart3, LineChart as LineIcon } from "lucide-react";
+import type { ChartDatum } from "@/lib/warehouseService";
 
 const ticketPriority = [
   { name: "Critical", value: 1 },
@@ -65,7 +66,7 @@ function useChartStyles() {
   };
 }
 
-export function TicketPriorityBreakdownCard({ data: externalData }: { data?: any[] }) {
+export function TicketPriorityBreakdownCard({ data: externalData }: { data?: ChartDatum[] }) {
   const data = externalData || ticketPriority;
   const { axisColor, tooltipStyle } = useChartStyles();
 
@@ -113,7 +114,7 @@ export function TicketPriorityBreakdownCard({ data: externalData }: { data?: any
   );
 }
 
-export function TicketsByCategoryCard({ data: externalData }: { data?: any[] }) {
+export function TicketsByCategoryCard({ data: externalData }: { data?: ChartDatum[] }) {
   const data = externalData || ticketsByCategory;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 
@@ -147,7 +148,7 @@ export function TicketsByCategoryCard({ data: externalData }: { data?: any[] }) 
   );
 }
 
-export function MonthlyTicketVolumeCard({ data: externalData }: { data?: any[] }) {
+export function MonthlyTicketVolumeCard({ data: externalData }: { data?: ChartDatum[] }) {
   const data = externalData || monthlyTicketVolume;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 

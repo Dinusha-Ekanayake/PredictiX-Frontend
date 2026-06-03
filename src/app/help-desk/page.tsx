@@ -156,7 +156,7 @@ export default function HelpDeskPage() {
           {/* ══ Hero header (dashboard style) ════════════════════════════════ */}
           <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-white/10 dark:bg-white/2">
             <div className="absolute inset-0 bg-linear-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent pointer-events-none" />
-            <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-gradient-to-br from-violet-400/20 to-sky-400/20 dark:from-violet-500/10 dark:to-sky-500/5 blur-3xl pointer-events-none" />
+            <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-linear-to-br from-violet-400/20 to-sky-400/20 dark:from-violet-500/10 dark:to-sky-500/5 blur-3xl pointer-events-none" />
 
             <div className="relative px-7 py-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div>

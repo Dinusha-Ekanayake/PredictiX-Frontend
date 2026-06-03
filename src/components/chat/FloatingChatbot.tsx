@@ -533,7 +533,7 @@ export default function FloatingChatbot() {
               >
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
-                  <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3">
+                  <div className="rounded-full bg-linear-to-br from-violet-500/15 to-sky-500/15 p-3">
                     <Sparkles className="size-6 text-violet-500" />
                   </div>
                   <div>

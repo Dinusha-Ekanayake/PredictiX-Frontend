@@ -116,7 +116,7 @@ export default function UserTeamPage() {
                     <TableRow key={m.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-xs font-semibold text-white">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-purple-600 text-xs font-semibold text-white">
                             {getInitials(m.name)}
                           </div>
                           <div className="flex flex-col">

@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarClock, Lightbulb, Loader2, ArrowUpDown } from "lucide-react";
+import { CalendarClock, Lightbulb, ArrowUpDown } from "lucide-react";
 import { useTheme } from "next-themes";
 import { getMaintenanceSchedule } from "@/lib/warehouseService";
 import { Button } from "@/components/ui/button";

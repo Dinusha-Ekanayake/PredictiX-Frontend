@@ -20,12 +20,44 @@ import { useTheme } from "next-themes";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, PieChart as PieIcon, BarChart3 } from "lucide-react";
+import type { ChartDatum } from "@/lib/warehouseService";
+
+const healthMaintenanceTrends = [
+  { month: "Jul", avgHealth: 86, maintenance: 1 },
+  { month: "Aug", avgHealth: 82, maintenance: 1 },
+  { month: "Sep", avgHealth: 80, maintenance: 1 },
+  { month: "Oct", avgHealth: 78, maintenance: 2 },
+  { month: "Nov", avgHealth: 77, maintenance: 2 },
+  { month: "Dec", avgHealth: 76, maintenance: 1 },
+];
+
+const assetStatus = [
+  { name: "Operational", value: 67 },
+  { name: "Maintenance", value: 17 },
+  { name: "Critical", value: 17 },
+  { name: "Offline", value: 0 },
+];
 
 const STATUS_COLORS = {
   Active: "#10b981",
   Critical: "#ef4444",
   Under_Maintenance: "#f59e0b",
 } as const;
+
+const healthScoreDist = [
+  { bucket: "90–100%", count: 2 },
+  { bucket: "80–89%", count: 1 },
+  { bucket: "70–79%", count: 1 },
+  { bucket: "60–69%", count: 1 },
+  { bucket: "< 60%", count: 1 },
+];
+
+const assetsByType = [
+  { type: "Material Handling", count: 2 },
+  { type: "Automation", count: 2 },
+  { type: "Heavy Equipment", count: 1 },
+  { type: "Climate Control", count: 1 },
+];
 
 // Reusable hook-based styles
 function useChartStyles() {
@@ -42,8 +74,8 @@ function useChartStyles() {
   };
 }
 
-export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: any[] }) {
-  const data = externalData || [];
+export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: ChartDatum[] }) {
+  const data = externalData || healthMaintenanceTrends;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 
   return (
@@ -54,7 +86,7 @@ export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: any
           Health &amp; Maintenance Trends
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Avg health score and maintenance count from Supabase.
+          Avg health score and maintenance count (sample).
         </p>
       </CardHeader>
 
@@ -94,8 +126,8 @@ export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: any
   );
 }
 
-export function AssetStatusDistributionCard({ data: externalData }: { data?: any[] }) {
-  const data = externalData || [];
+export function AssetStatusDistributionCard({ data: externalData }: { data?: ChartDatum[] }) {
+  const data = externalData || assetStatus;
   const { axisColor, tooltipStyle } = useChartStyles();
 
   return (
@@ -106,7 +138,7 @@ export function AssetStatusDistributionCard({ data: externalData }: { data?: any
           Asset Status Distribution
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Operational vs maintenance vs critical from Supabase.
+          Operational vs maintenance vs critical (sample).
         </p>
       </CardHeader>
 
@@ -142,8 +174,8 @@ export function AssetStatusDistributionCard({ data: externalData }: { data?: any
   );
 }
 
-export function HealthScoreDistributionCard({ data: externalData }: { data?: any[] }) {
-  const data = externalData || [];
+export function HealthScoreDistributionCard({ data: externalData }: { data?: ChartDatum[] }) {
+  const data = externalData || healthScoreDist;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 
   return (
@@ -154,7 +186,7 @@ export function HealthScoreDistributionCard({ data: externalData }: { data?: any
           Health Score Distribution
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Number of assets by health bucket from Supabase.
+          Number of assets by health bucket (sample).
         </p>
       </CardHeader>
 
@@ -176,8 +208,8 @@ export function HealthScoreDistributionCard({ data: externalData }: { data?: any
   );
 }
 
-export function AssetsByTypeCard({ data: externalData }: { data?: any[] }) {
-  const data = externalData || [];
+export function AssetsByTypeCard({ data: externalData }: { data?: ChartDatum[] }) {
+  const data = externalData || assetsByType;
   const { axisColor, gridColor, tooltipStyle } = useChartStyles();
 
   return (
@@ -188,7 +220,7 @@ export function AssetsByTypeCard({ data: externalData }: { data?: any[] }) {
           Assets by Type
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Asset counts by vehicle type from Supabase.
+          Asset counts by category (sample).
         </p>
       </CardHeader>
 

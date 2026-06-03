@@ -14,10 +14,13 @@ import {
   X,
 } from "lucide-react";
 
+import { type ChatbotSource } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Position = {
   x: number;
@@ -35,12 +38,15 @@ type ChatMessage = {
   role: "user" | "assistant";
   text: string;
   createdAt: number;
+  sources?: ChatbotSource[];
   toolTrace?: ToolTraceItem[];
 };
 
+type LocalMessage = ChatMessage;
+
 const STORAGE_KEY = "predictix.chatbot.launcher.position";
 const LAUNCHER_SIZE = 56;
-const LAUNCHER_MARGIN = 24;
+const LAUNCHER_MARGIN = 20;
 const PANEL_GAP = 12;
 const CHATBOT_API_BASE =
   process.env.NEXT_PUBLIC_CHATBOT_API_URL ||
@@ -48,45 +54,6 @@ const CHATBOT_API_BASE =
   "http://127.0.0.1:8000";
 const CHATBOT_AGENT_ENDPOINT = "/chatbot/agent";
 const CHATBOT_FALLBACK_ENDPOINTS = ["/chatbot/ask", "/chatbot", "/chatbot/message"];
-// Backend agent loops can take 30-60s when several tool calls chain together.
-// Default browser fetches don't time out but Next dev proxy + some networks
-// drop earlier — give the agent a generous 180s window before we abort.
-const REQUEST_TIMEOUT_MS = 180_000;
-
-// In-memory cache (per chat panel mount) — identical user questions return
-// instantly instead of re-running the agent.
-type CachedReply = {
-  text: string;
-  toolTrace?: ToolTraceItem[];
-  ts: number;
-};
-const REPLY_CACHE_TTL_MS = 5 * 60 * 1000;
-const replyCache = new Map<string, CachedReply>();
-
-function cacheKey(question: string): string {
-  return question.trim().toLowerCase();
-}
-
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-// Suggested starter questions shown only on the empty state.
-const SUGGESTED_PROMPTS: string[] = [
-  "How many tickets do I have?",
-  "Show me ticket counts by category",
-  "Give me a dashboard overview",
-];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -183,8 +150,6 @@ export default function FloatingChatbot() {
 
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const messageEndRef = React.useRef<HTMLDivElement | null>(null);
-  const scrollRef = React.useRef<HTMLDivElement | null>(null);
-  const [showScrollButton, setShowScrollButton] = React.useState(false);
   const dragRef = React.useRef({
     active: false,
     moved: false,
@@ -216,9 +181,25 @@ export default function FloatingChatbot() {
   React.useEffect(() => {
     const width = window.innerWidth;
     const height = window.innerHeight;
+
     setViewport({ width, height });
-    // Launcher is pinned to the bottom-right corner (not draggable).
-    setPosition(getDefaultPosition(width, height));
+
+    const fallbackPosition = getDefaultPosition(width, height);
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+
+    if (!saved) {
+      setPosition(fallbackPosition);
+      setIsMounted(true);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(saved) as Position;
+      setPosition(sanitizePosition(parsed, width, height));
+    } catch {
+      setPosition(fallbackPosition);
+    }
+
     setIsMounted(true);
   }, []);
 
@@ -275,17 +256,6 @@ export default function FloatingChatbot() {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [isSending, isOpen, messages]);
 
-  const scrollToBottom = React.useCallback(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
-  const handleMessagesScroll = React.useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setShowScrollButton(distanceFromBottom > 80);
-  }, []);
-
   const panelDimensions = React.useMemo(() => {
     const width = Math.min(380, Math.max(320, viewport.width - 24));
     const height = Math.min(520, Math.max(360, viewport.height - 100));
@@ -319,8 +289,8 @@ export default function FloatingChatbot() {
     viewport.width,
   ]);
 
-  const sendMessage = async (overrideText?: string) => {
-    const text = (overrideText ?? draft).trim();
+  const sendMessage = async () => {
+    const text = draft.trim();
     if (!text || isSending) {
       return;
     }
@@ -343,24 +313,6 @@ export default function FloatingChatbot() {
     setMessages((current) => [...current, userMessage]);
     setDraft("");
 
-    // Cache short-circuit for identical questions in the same session.
-    const ckey = cacheKey(text);
-    const cached = replyCache.get(ckey);
-    if (cached && Date.now() - cached.ts < REPLY_CACHE_TTL_MS) {
-      setMessages((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          text: cached.text,
-          createdAt: Date.now(),
-          toolTrace: cached.toolTrace,
-        },
-      ]);
-      setIsSending(false);
-      return;
-    }
-
     try {
       const token =
         window.localStorage.getItem("token") ||
@@ -370,19 +322,16 @@ export default function FloatingChatbot() {
 
       let replyText = "";
       let toolTrace: ToolTraceItem[] | undefined;
+      let sources: ChatbotSource[] | undefined;
       let lastError = "";
 
       // 1) Try the agentic endpoint first
       try {
-        const response = await fetchWithTimeout(
-          `${CHATBOT_API_BASE}${CHATBOT_AGENT_ENDPOINT}`,
-          {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ question: text, history: historyForAgent }),
-          },
-          REQUEST_TIMEOUT_MS,
-        );
+        const response = await fetch(`${CHATBOT_API_BASE}${CHATBOT_AGENT_ENDPOINT}`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ question: text, history: historyForAgent }),
+        });
         if (response.ok) {
           const payload = await response.json();
           replyText = typeof payload?.answer === "string" ? payload.answer : "";
@@ -400,25 +349,20 @@ export default function FloatingChatbot() {
       if (!replyText) {
         for (const path of CHATBOT_FALLBACK_ENDPOINTS) {
           try {
-            const response = await fetchWithTimeout(
-              `${CHATBOT_API_BASE}${path}`,
-              {
-                method: "POST",
-                headers,
-                body: JSON.stringify({ question: text }),
-              },
-              REQUEST_TIMEOUT_MS,
-            );
+            const response = await fetch(`${CHATBOT_API_BASE}${path}`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ question: text }),
+            });
             if (!response.ok) {
               lastError = `${response.status} ${response.statusText}`;
               continue;
             }
             const payload = await response.json();
             replyText = extractAssistantReply(payload);
-            // Note: we intentionally drop the `sources` array from the legacy
-            // endpoint — they were rendering as noise at the end of every
-            // assistant message. Suggested prompts now live only on the
-            // empty state.
+            if (Array.isArray((payload as { sources?: unknown })?.sources)) {
+              sources = (payload as { sources: ChatbotSource[] }).sources;
+            }
             if (replyText) break;
             lastError = "Chat endpoint returned no reply text";
           } catch (error) {
@@ -431,8 +375,6 @@ export default function FloatingChatbot() {
         throw new Error(lastError || "Unable to get chatbot response");
       }
 
-      replyCache.set(ckey, { text: replyText, toolTrace, ts: Date.now() });
-
       setMessages((current) => [
         ...current,
         {
@@ -441,30 +383,28 @@ export default function FloatingChatbot() {
           text: replyText,
           createdAt: Date.now(),
           toolTrace,
+          sources,
         },
       ]);
     } catch (error) {
-      const msg = error instanceof Error ? error.message.toLowerCase() : "";
-      let friendly: string;
-      if (msg.includes("abort") || msg.includes("timeout") || msg.includes("timed out")) {
-        friendly = "The assistant took a bit longer than usual. Please try again in a moment.";
-      } else if (msg.includes("failed to fetch") || msg.includes("network")) {
-        friendly = "I couldn't reach the server. Please check your connection and try again.";
-      } else {
-        friendly = "Something went wrong on my side. Please try again shortly.";
-      }
+      const msg = error instanceof Error ? error.message : "Unable to connect to chatbot backend";
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: friendly,
+          text: `Connection error: ${msg}`,
           createdAt: Date.now(),
         },
       ]);
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleSourceClick = (source: ChatbotSource) => {
+    setDraft((current) => (current ? `${current} ${source.title}` : source.title));
+    inputRef.current?.focus();
   };
 
   const onLauncherPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -488,8 +428,23 @@ export default function FloatingChatbot() {
     setIsDragging(true);
   };
 
-  const onLauncherPointerMove = () => {
-    // Launcher is pinned in place — dragging is disabled.
+  const onLauncherPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current.active || dragRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const nextX = event.clientX - dragRef.current.offsetX;
+    const nextY = event.clientY - dragRef.current.offsetY;
+
+    if (!dragRef.current.moved) {
+      const distanceX = Math.abs(nextX - position.x);
+      const distanceY = Math.abs(nextY - position.y);
+      if (distanceX > 2 || distanceY > 2) {
+        dragRef.current.moved = true;
+      }
+    }
+
+    setPosition(sanitizePosition({ x: nextX, y: nextY }, viewport.width, viewport.height));
   };
 
   const onLauncherPointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -550,9 +505,9 @@ export default function FloatingChatbot() {
           }}
         >
           <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-md motion-reduce:transition-none">
-            <div className="relative flex items-center justify-between border-b border-border/60 px-4 py-3 bg-linear-to-r from-violet-500/10 via-fuchsia-500/5 to-sky-500/10 dark:from-violet-500/15 dark:via-fuchsia-500/10 dark:to-sky-500/15">
+            <div className="relative flex items-center justify-between border-b border-border/60 px-4 py-3 bg-gradient-to-r from-violet-500/10 via-fuchsia-500/5 to-sky-500/10 dark:from-violet-500/15 dark:via-fuchsia-500/10 dark:to-sky-500/15">
               <div className="flex items-center gap-2">
-                <div className="rounded-full bg-linear-to-br from-violet-500 to-sky-500 p-1.5 text-white shadow-sm">
+                <div className="rounded-full bg-gradient-to-br from-violet-500 to-sky-500 p-1.5 text-white shadow-sm">
                   <MessageCircle className="size-4" />
                 </div>
                 <div>
@@ -589,34 +544,17 @@ export default function FloatingChatbot() {
               </div>
             </div>
 
-            <div className="relative flex-1 min-h-0">
-              <div
-                ref={scrollRef}
-                onScroll={handleMessagesScroll}
-                className="h-full overflow-y-auto scrollbar-styled px-3 py-4 bg-linear-to-b from-transparent to-violet-50/30 dark:to-violet-950/20"
-              >
+            <ScrollArea className="flex-1 px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20">
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
-                  <div className="rounded-full bg-linear-to-br from-violet-500/15 to-sky-500/15 p-3">
+                  <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3">
                     <Sparkles className="size-6 text-violet-500" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">How can I help?</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Ask about assets, tickets, users, or warehouses.
+                      Ask about assets, tickets, or maintenance.
                     </p>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
-                    {SUGGESTED_PROMPTS.map((prompt) => (
-                      <button
-                        key={prompt}
-                        type="button"
-                        onClick={() => void sendMessage(prompt)}
-                        className="rounded-full border border-violet-300/60 bg-violet-50/70 px-3 py-1 text-[11px] text-violet-700 transition-colors hover:bg-violet-100 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-200 dark:hover:bg-violet-500/20"
-                      >
-                        {prompt}
-                      </button>
-                    ))}
                   </div>
                 </div>
               ) : (
@@ -630,7 +568,7 @@ export default function FloatingChatbot() {
                         className={cn(
                           "max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm",
                           message.role === "user"
-                            ? "rounded-br-md bg-linear-to-br from-violet-600 to-fuchsia-600 text-white"
+                            ? "rounded-br-md bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white"
                             : "rounded-bl-md border border-border/70 bg-card text-foreground dark:bg-slate-800/80"
                         )}
                       >
@@ -646,6 +584,24 @@ export default function FloatingChatbot() {
                             minute: "2-digit",
                           })}
                         </p>
+
+                        {message.role === "assistant" && message.sources && message.sources.length > 0 ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {message.sources.map((source, index) => (
+                              <button
+                                key={`${message.id}-${source.title}-${index}`}
+                                type="button"
+                                className="rounded-md"
+                                onClick={() => handleSourceClick(source)}
+                                aria-label={`Use source ${source.title}`}
+                              >
+                                <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
+                                  {source.title} - {source.category}
+                                </Badge>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
 
                         {message.role === "assistant" && message.toolTrace && message.toolTrace.length > 0 ? (
                           <div className="mt-2 border-t border-border/40 pt-2">
@@ -713,19 +669,7 @@ export default function FloatingChatbot() {
                   <div ref={messageEndRef} />
                 </div>
               )}
-              </div>
-
-              {showScrollButton && (
-                <button
-                  type="button"
-                  onClick={scrollToBottom}
-                  aria-label="Scroll to latest message"
-                  className="absolute bottom-3 right-3 z-10 flex size-9 items-center justify-center rounded-full border border-border/60 bg-card/95 text-foreground shadow-lg backdrop-blur-sm transition hover:bg-card hover:scale-105"
-                >
-                  <ChevronDown className="size-4" />
-                </button>
-              )}
-            </div>
+            </ScrollArea>
 
             <form
               className="border-t border-border/60 p-3"
@@ -758,16 +702,17 @@ export default function FloatingChatbot() {
         </div>
       ) : null}
 
-      {isMounted && (
       <button
         type="button"
         className={cn(
           "pointer-events-auto group absolute flex items-center justify-center rounded-full border border-white/20 text-white shadow-[0_10px_30px_-10px_rgba(124,58,237,0.6)]",
-          "bg-linear-to-br from-violet-500 via-fuchsia-500 to-sky-500",
+          "bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500",
           "motion-reduce:transition-none",
           isDragging
-            ? "scale-105 cursor-pointer transition-transform duration-100"
-            : "cursor-pointer hover:scale-105 transition-all duration-300 ease-out"
+            ? "scale-105 cursor-grabbing transition-transform duration-100"
+            : isHelpDeskRoute
+            ? "cursor-pointer hover:scale-105 transition-all duration-300 ease-out"
+            : "cursor-grab hover:scale-105 transition-all duration-300 ease-out"
         )}
         style={{
           left: `${position.x}px`,
@@ -783,11 +728,10 @@ export default function FloatingChatbot() {
       >
         <span className="sr-only">Chatbot launcher</span>
         <span className="pointer-events-none absolute inset-0 rounded-full bg-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        <span className="pointer-events-none absolute -inset-1 rounded-full bg-linear-to-br from-violet-400/40 to-sky-400/40 blur-md opacity-60" />
+        <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-violet-400/40 to-sky-400/40 blur-md opacity-60" />
         <MessageCircle className="relative size-6 drop-shadow-sm" />
         <Sparkles className="absolute -top-1 -right-1 size-3 text-white/90 drop-shadow" />
       </button>
-      )}
     </div>
   );
 }

@@ -250,6 +250,7 @@ export default function AdminAssetsPage() {
         resultsCount={assets.length}
         warehouseOptions={warehouseOptions}
         loading={listLoading}
+        onAddAsset={openCreate}
       />
 
       {/* ── Table + Details ── */}

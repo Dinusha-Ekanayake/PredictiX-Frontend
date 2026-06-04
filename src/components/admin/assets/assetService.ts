@@ -15,6 +15,7 @@ import type {
   Ticket,
   AssetAssignment,
   VehiclePredictionResult,
+  AssetSurvivalResponse,
 } from "./types";
 
 // ─── Create / update payloads ────────────────────────────────────────────────
@@ -107,6 +108,16 @@ export async function getCostPrediction(assetId: string): Promise<CostPrediction
   }
 }
 
+// ─── Survival prediction for an asset ──────────────────────────────────────────
+
+export async function getSurvivalPrediction(assetId: string): Promise<AssetSurvivalResponse | null> {
+  try {
+    return await apiGet<AssetSurvivalResponse>(`/survival/${assetId}`);
+  } catch {
+    return null;
+  }
+}
+
 // ─── Run new prediction for an asset (POST to vehicle-predictions) ─────────────
 
 export async function runVehiclePrediction(
@@ -128,17 +139,18 @@ export async function runVehiclePrediction(
 
 export async function getAssetDetail(assetId: string): Promise<AssetDetail> {
   // Run all fetches in parallel for speed
-  const [asset, prediction, costPrediction, maintenanceEvents, tickets, assignments] =
+  const [asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments] =
     await Promise.all([
       getAsset(assetId),
       getFailurePrediction(assetId),
       getCostPrediction(assetId),
+      getSurvivalPrediction(assetId),
       getMaintenanceEvents(assetId).catch(() => [] as MaintenanceEvent[]),
       getAssetTickets(assetId).catch(() => [] as Ticket[]),
       getAssetAssignments(assetId).catch(() => [] as AssetAssignment[]),
     ]);
 
-  return { asset, prediction, costPrediction, maintenanceEvents, tickets, assignments };
+  return { asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments };
 }
 
 // ─── Create asset ────────────────────────────────────────────────────────────

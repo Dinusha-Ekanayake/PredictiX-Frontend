@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import AssetsSummary from "@/components/admin/assets/AssetsSummary";
+import AssetsAnalytics from "@/components/admin/assets/AssetsAnalytics";
 import AssetsToolbar, { DEFAULT_FILTERS } from "@/components/admin/assets/AssetsToolbar";
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel, { AssetDetailsSkeleton } from "@/components/admin/assets/AssetDetailsPanel";
@@ -238,6 +239,9 @@ export default function AdminAssetsPage() {
 
       {/* ── Summary KPIs ── */}
       <AssetsSummary assets={assets} />
+
+      {/* ── Descriptive Analytics ── */}
+      {!listLoading && assets.length > 0 && <AssetsAnalytics assets={assets} />}
 
       {/* ── Toolbar ── */}
       <AssetsToolbar

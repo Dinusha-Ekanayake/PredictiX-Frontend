@@ -251,24 +251,25 @@ export async function fetchTicketEnrichment(ticket: {
       ),
     );
 
-  if (ticket.created_by) {
-    const p = nameById.get(ticket.created_by);
-    result.creator_name = p?.name ?? null;
-    result.creator_email = p?.email ?? null;
-  }
-  if (ticket.assigned_to) {
-    result.assignee_name = nameById.get(ticket.assigned_to)?.name ?? null;
-  }
+    if (ticket.created_by) {
+      const p = nameById.get(ticket.created_by);
+      result.creator_name = p?.name ?? null;
+      result.creator_email = p?.email ?? null;
+    }
+    if (ticket.assigned_to) {
+      result.assignee_name = nameById.get(ticket.assigned_to)?.name ?? null;
+    }
 
-  result.history = historyRows.map((h) => ({
-    id: h.id,
-    old_status: h.old_status,
-    new_status: h.new_status,
-    changed_by: h.changed_by,
-    changed_by_name: h.changed_by ? nameById.get(h.changed_by)?.name ?? null : null,
-    note: h.note,
-    created_at: h.created_at,
-  }));
+    result.history = historyRows.map((h) => ({
+      id: h.id,
+      old_status: h.old_status,
+      new_status: h.new_status,
+      changed_by: h.changed_by,
+      changed_by_name: h.changed_by ? nameById.get(h.changed_by)?.name ?? null : null,
+      note: h.note,
+      created_at: h.created_at,
+    }));
+  }
 
   if (ticket.asset_id) {
     const { data: asset, error: assetError } = await supabase
@@ -300,3 +301,4 @@ export async function fetchTicketEnrichment(ticket: {
 
   return result;
 }
+

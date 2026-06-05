@@ -28,6 +28,7 @@ export type UserProfileData = {
   role: string;
   status: string;
   assignedAssetsCount: number;
+  avatar_url?: string | null;
 };
 
 export type UserAssetData = {

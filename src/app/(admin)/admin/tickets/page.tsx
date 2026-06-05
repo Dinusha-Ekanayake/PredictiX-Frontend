@@ -208,7 +208,7 @@ export default function AdminTicketsPage() {
             />
           </div>
 
-          <div className="hidden items-center gap-2 sm:flex">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v)}>
               <SelectTrigger className="w-40 h-10">
                 <SelectValue placeholder="All Status" />

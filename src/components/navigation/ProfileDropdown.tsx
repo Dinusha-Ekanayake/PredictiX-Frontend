@@ -13,6 +13,7 @@ import {
   Warehouse,
   ExternalLink,
   Settings,
+  CircleHelp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -286,6 +287,27 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
               <div className="leading-tight">Settings</div>
               <div className="text-[11px] text-muted-foreground font-normal">
                 Preferences & notifications
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/help-desk"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className={cn(
+              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium",
+              "text-slate-700 dark:text-slate-200",
+              "hover:bg-slate-100 dark:hover:bg-white/8 transition-colors"
+            )}
+          >
+            <div className="grid place-items-center h-8 w-8 rounded-lg bg-violet-50 dark:bg-violet-500/10 flex-shrink-0">
+              <CircleHelp className="h-4 w-4 text-violet-500 dark:text-violet-400" />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <div className="leading-tight">Help Desk</div>
+              <div className="text-[11px] text-muted-foreground font-normal">
+                FAQs & support articles
               </div>
             </div>
           </Link>

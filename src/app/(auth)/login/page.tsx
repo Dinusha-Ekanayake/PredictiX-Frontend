@@ -510,7 +510,7 @@ export default function LoginPage() {
                     {isSubmitting ? "Logging in…" : "Log in"}
                   </Button>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 break-all">
                     <div className="font-medium text-slate-800 dark:text-slate-200">Demo accounts</div>
                     <div>Super Admin: super.admin1@lankalogix.lk / super</div>
                     <div>Admin: anjali.warnakulasuriya.adm1@lankalogix.lk / admin</div>

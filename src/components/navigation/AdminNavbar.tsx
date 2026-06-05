@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import Link from "next/link";
@@ -193,7 +193,8 @@ export default function AdminNavbar() {
               {/* Profile dropdown (replaces old profile button + dialog) */}
               <ProfileDropdown
                 user={profileUser}
-                profileHref="/admin/dashboard"
+                profileHref="/admin/profile"
+                settingsHref="/admin/settings"
               />
 
               {/* Mobile menu */}

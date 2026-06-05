@@ -331,7 +331,8 @@ export default function LoginPage() {
       // Single source of truth for session storage (writes both token keys).
       storeAuthSession(data);
 
-      if (data.role.toLowerCase() === "admin") {
+      const roleStr = data.role.toLowerCase();
+      if (roleStr === "admin" || roleStr === "super_admin") {
         router.push("/admin/dashboard");
       } else {
         router.push("/user/dashboard");

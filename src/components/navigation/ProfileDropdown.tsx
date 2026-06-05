@@ -29,6 +29,7 @@ export type ProfileDropdownUser = {
   department?: string | null;
   warehouse?: string | null;
   initials?: string;
+  avatar_url?: string | null;
 };
 
 type Props = {
@@ -127,14 +128,18 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
         {/* Avatar circle */}
         <div
           className={cn(
-            "grid place-items-center rounded-full font-semibold text-white text-sm",
+            "grid place-items-center rounded-full font-semibold text-white text-sm overflow-hidden",
             "bg-gradient-to-br from-violet-600 to-indigo-600",
             "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
             "ring-2 ring-white/40 dark:ring-white/10",
             "h-9 w-9 transition-transform group-hover:scale-105 flex-shrink-0"
           )}
         >
-          {avatarText}
+          {user.avatar_url ? (
+            <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+          ) : (
+            avatarText
+          )}
         </div>
 
         {/* Chevron indicator */}
@@ -151,7 +156,7 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "sm:hidden grid place-items-center rounded-full font-semibold text-white",
+          "sm:hidden grid place-items-center rounded-full font-semibold text-white overflow-hidden",
           "bg-gradient-to-br from-violet-600 to-indigo-600",
           "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
           "ring-2 ring-white/40 dark:ring-white/10",
@@ -161,7 +166,11 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
         aria-haspopup="true"
         aria-expanded={open}
       >
-        {avatarText}
+        {user.avatar_url ? (
+          <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+        ) : (
+          avatarText
+        )}
       </button>
 
       {/* Dropdown Panel */}
@@ -184,14 +193,18 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
           <div className="flex items-center gap-3">
             <div
               className={cn(
-                "grid place-items-center rounded-full font-bold text-white text-base",
+                "grid place-items-center rounded-full font-bold text-white text-base overflow-hidden",
                 "bg-gradient-to-br from-violet-600 to-indigo-600",
                 "ring-2 ring-white dark:ring-slate-900",
                 "shadow-[0_8px_20px_-8px_rgba(99,102,241,0.8)]",
                 "h-12 w-12 flex-shrink-0"
               )}
             >
-              {avatarText}
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                avatarText
+              )}
             </div>
             <div className="min-w-0">
               <p className="font-semibold text-sm truncate leading-tight">{user.name}</p>

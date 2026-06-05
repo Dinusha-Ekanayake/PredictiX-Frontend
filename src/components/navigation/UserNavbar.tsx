@@ -84,6 +84,7 @@ export default function UserNavbar() {
           role: (data.role?.toUpperCase() as "ADMIN" | "USER") || "USER",
           department: data.department ?? null,
           warehouse: data.warehouse ?? null,
+          avatar_url: data.avatar_url ?? null,
         });
       })
       .catch(() => {
@@ -215,13 +216,17 @@ export default function UserNavbar() {
                       <div className="flex items-center gap-3">
                         <div
                           className={cn(
-                            "grid place-items-center rounded-full font-semibold text-white",
+                            "grid place-items-center rounded-full font-semibold text-white overflow-hidden",
                             "bg-gradient-to-br from-violet-600 to-indigo-600",
                             "ring-1 ring-white/40 dark:ring-white/10",
                             "h-11 w-11 text-sm flex-shrink-0"
                           )}
                         >
-                          {avatarText}
+                          {profileUser.avatar_url ? (
+                            <img src={profileUser.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                          ) : (
+                            avatarText
+                          )}
                         </div>
                         <div className="min-w-0">
                           <div className="text-sm font-semibold truncate">{profileUser.name}</div>

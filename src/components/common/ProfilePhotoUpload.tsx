@@ -60,7 +60,7 @@ export default function ProfilePhotoUpload() {
     formData.append("file", file);
 
     try {
-      const token = localStorage.getItem("predictix_token");
+      const token = localStorage.getItem("token") || localStorage.getItem("predictix.access_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/profiles/me/avatar`, {
         method: "POST",
         headers: {

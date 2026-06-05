@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { UserProfileForm } from "@/components/user/UserProfileForm";
 import { fetchMyProfile, UserProfileData } from "@/lib/api/userProfileApi";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import PageHero from "@/components/common/PageHero";
-import ProfilePhotoUpload from "@/components/common/ProfilePhotoUpload";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfileData | null>(null);
@@ -75,24 +74,12 @@ export default function ProfilePage() {
         subtitle="Manage your personal information."
       />
 
-      <div className="w-full max-w-2xl mx-auto space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile Photo</CardTitle>
-            <CardDescription>Update your profile picture.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ProfilePhotoUpload />
-          </CardContent>
-        </Card>
-
-        <UserProfileForm
-          initialProfile={profile}
-          onProfileUpdated={(updatedProfile) => {
-            setProfile(updatedProfile);
-          }}
-        />
-      </div>
+      <UserProfileForm
+        initialProfile={profile}
+        onProfileUpdated={(updatedProfile) => {
+          setProfile(updatedProfile);
+        }}
+      />
     </div>
   );
 }

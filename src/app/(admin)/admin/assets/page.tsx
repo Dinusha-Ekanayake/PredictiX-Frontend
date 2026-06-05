@@ -256,13 +256,15 @@ export default function AdminAssetsPage() {
       {/* ── Table + Details ── */}
       <div className="grid grid-cols-12 gap-5">
         {/* List */}
-        <div className="col-span-12 lg:col-span-5">
-          <AssetsTable
-            assets={assets}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            loading={listLoading}
-          />
+        <div className="col-span-12 lg:col-span-5 relative h-[520px] lg:h-auto">
+          <div className="h-full w-full lg:absolute lg:inset-0">
+            <AssetsTable
+              assets={assets}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              loading={listLoading}
+            />
+          </div>
         </div>
 
         {/* Detail panel */}

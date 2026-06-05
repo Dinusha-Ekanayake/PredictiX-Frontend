@@ -17,7 +17,7 @@ import PredictiXLoader from "@/components/loading/PredictiXLoader";
 
 type Props = {
   children: React.ReactNode;
-  requiredRole?: "ADMIN" | "USER";
+  requiredRole?: "ADMIN" | "USER" | "SUPER_ADMIN";
 };
 
 export default function AuthGuard({ children, requiredRole }: Props) {
@@ -30,11 +30,15 @@ export default function AuthGuard({ children, requiredRole }: Props) {
       return;
     }
 
-    const role = getUserRole();
-    if (requiredRole && role !== requiredRole) {
-      // Logged in but in the wrong area — send to their own home.
-      router.replace(role === "ADMIN" ? "/admin/dashboard" : "/user/dashboard");
-      return;
+    const role = getUserRole(); // returns e.g. "ADMIN", "SUPER_ADMIN", or "USER"
+    if (requiredRole) {
+      if (requiredRole === "ADMIN" && (role !== "ADMIN" && role !== "SUPER_ADMIN")) {
+        router.replace("/user/dashboard");
+        return;
+      } else if (requiredRole === "USER" && role !== "USER") {
+        router.replace("/admin/dashboard");
+        return;
+      }
     }
 
     setAuthorized(true);

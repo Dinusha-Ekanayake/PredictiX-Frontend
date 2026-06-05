@@ -6,6 +6,7 @@ import PageHero from "@/components/common/PageHero";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import ProfilePhotoUpload from "@/components/common/ProfilePhotoUpload";
 
 export default function AdminSettingsPage() {
   return (
@@ -17,6 +18,16 @@ export default function AdminSettingsPage() {
       />
 
       <div className="max-w-3xl space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile Details</CardTitle>
+            <CardDescription>Update your photo and personal information.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ProfilePhotoUpload />
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Notifications</CardTitle>

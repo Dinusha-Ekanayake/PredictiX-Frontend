@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import Link from "next/link";
@@ -187,10 +187,10 @@ export default function UserNavbar() {
             <div className="flex items-center gap-3 justify-self-end">
               <ThemeToggle className="-translate-y-px" size={20} />
 
-              {/* Profile dropdown */}
               <ProfileDropdown
                 user={profileUser}
                 profileHref="/user/profile"
+                settingsHref="/user/settings"
               />
 
               {/* Mobile menu */}

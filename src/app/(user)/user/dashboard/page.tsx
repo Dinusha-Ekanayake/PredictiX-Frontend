@@ -131,7 +131,7 @@ export default function UserDashboardPage() {
       </div>
 
       {/* ── KPI cards ── */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {kpis.map((k) => (
           <Card key={k.label} className="rounded-2xl">
             <CardContent className="flex items-center gap-3 p-5">
@@ -147,9 +147,9 @@ export default function UserDashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-3">
         {/* ── My assigned assets ── */}
-        <Card className="rounded-2xl lg:col-span-2">
+        <Card className="rounded-2xl md:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
               <Boxes className="h-4 w-4 text-muted-foreground" /> My Assigned Assets

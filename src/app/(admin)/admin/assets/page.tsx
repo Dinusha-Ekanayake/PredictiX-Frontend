@@ -256,7 +256,7 @@ export default function AdminAssetsPage() {
       {/* ── Table + Details ── */}
       <div className="grid grid-cols-12 gap-5">
         {/* List */}
-        <div className="col-span-12 xl:col-span-5">
+        <div className="col-span-12 lg:col-span-5">
           <AssetsTable
             assets={assets}
             selectedId={selectedId}
@@ -266,7 +266,7 @@ export default function AdminAssetsPage() {
         </div>
 
         {/* Detail panel */}
-        <div className="col-span-12 xl:col-span-7">
+        <div className="col-span-12 lg:col-span-7">
           {detailLoading ? (
             <AssetDetailsSkeleton />
           ) : detailError ? (

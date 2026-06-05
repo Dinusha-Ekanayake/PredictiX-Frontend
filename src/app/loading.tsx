@@ -2,7 +2,7 @@ import PredictiXLoader from "@/components/loading/PredictiXLoader";
 
 export default function Loading() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
+    <main className="fixed inset-0 z-50 overflow-hidden bg-slate-50 dark:bg-slate-950">
       {/* Background (same style as login) */}
       <div className="pointer-events-none absolute inset-0">
         {/* Light blobs */}

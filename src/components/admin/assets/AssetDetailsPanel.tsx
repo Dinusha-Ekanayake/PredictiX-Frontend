@@ -110,7 +110,7 @@ function InfoField({ icon, label, value, mono, valueClass }: {
   icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
+    <div className="h-full rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
       {icon && <div className="mt-0.5 text-muted-foreground/60 shrink-0">{icon}</div>}
       <div className="min-w-0">
         <div className="text-[11px] text-muted-foreground/80 font-medium">{label}</div>
@@ -123,10 +123,13 @@ function InfoField({ icon, label, value, mono, valueClass }: {
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────────────── */
-function EmptyState({ message }: { message: string }) {
+function EmptyState({ message, icon: Icon = Info }: { message: string, icon?: React.ElementType }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-200 dark:border-white/8 p-8 text-center text-sm text-muted-foreground/60">
-      {message}
+    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 dark:border-white/8 bg-slate-50/30 dark:bg-white/2 p-8 text-center">
+      <div className="rounded-full bg-slate-100 dark:bg-white/5 p-3">
+        <Icon className="h-5 w-5 text-muted-foreground/40" />
+      </div>
+      <p className="text-sm font-medium text-muted-foreground/70">{message}</p>
     </div>
   );
 }
@@ -426,7 +429,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
             value={fmt(prediction?.predicted_maintenance_date)}
           />
           {/* Cost prediction */}
-          <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
+          <div className="h-full rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
             <div className={cn("mt-0.5 shrink-0", costDeltaColor)}>
               <CostDeltaIcon className="h-3.5 w-3.5" />
             </div>
@@ -801,7 +804,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
           {/* ═══ Tickets ═══ */}
           <TabsContent value="tickets" className="mt-4 space-y-3">
             {tickets.length === 0 ? (
-              <EmptyState message="No tickets raised for this asset." />
+              <EmptyState message="No tickets raised for this asset." icon={Ticket} />
             ) : (
               tickets.map((t) => (
                 <button
@@ -842,7 +845,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
           {/* ═══ Maintenance Logs ═══ */}
           <TabsContent value="maintenance" className="mt-4 space-y-3">
             {maintenanceEvents.length === 0 ? (
-              <EmptyState message="No maintenance events recorded for this asset." />
+              <EmptyState message="No maintenance events recorded for this asset." icon={ClipboardList} />
             ) : (
               maintenanceEvents.map((e) => (
                 <div
@@ -883,7 +886,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
           {/* ═══ Assignments ═══ */}
           <TabsContent value="assignments" className="mt-4 space-y-3">
             {assignments.length === 0 ? (
-              <EmptyState message="No assignment history for this asset." />
+              <EmptyState message="No assignment history for this asset." icon={Users} />
             ) : (
               assignments.map((a) => (
                 <div

@@ -79,7 +79,11 @@ export default function AdminTicketsPage() {
         selectedPriority
       );
       setTotal(t);
-      setTickets((prev) => (reset ? rows : [...prev, ...rows]));
+      setTickets((prev) => {
+        const next = reset ? rows : [...prev, ...rows];
+        const unique = new Map(next.map(t => [t.id, t]));
+        return Array.from(unique.values());
+      });
       setPage(pageNum);
     } catch (err) {
       toast.error("Failed to load tickets", {

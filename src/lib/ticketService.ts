@@ -76,7 +76,8 @@ export async function fetchTickets(
   let query = supabase
     .from("tickets")
     .select("*, assets(asset_name)", { count: "exact" })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: true });
 
   if (search.trim()) {
     query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);

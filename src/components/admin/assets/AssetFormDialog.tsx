@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { Loader2, Boxes } from "lucide-react";
+import { Loader2, Boxes, Upload, X, Image as ImageIcon } from "lucide-react";
 
 import {
   Dialog,
@@ -25,6 +25,7 @@ import {
 import {
   createAsset,
   updateAsset,
+  uploadAssetImage,
   getWarehouseOptions,
   getDepartmentOptions,
   type AssetWritePayload,
@@ -94,14 +95,51 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
   const [warehouses, setWarehouses] = React.useState<IdNameOption[]>([]);
   const [departments, setDepartments] = React.useState<IdNameOption[]>([]);
   const [submitting, setSubmitting] = React.useState(false);
+  
+  const [imageFiles, setImageFiles] = React.useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = React.useState<string[]>([]);
+  const [existingImages, setExistingImages] = React.useState<string[]>([]);
 
   // Load options + reset form when the dialog opens
   React.useEffect(() => {
     if (!open) return;
     setForm(asset ? fromAsset(asset) : EMPTY);
+    
+    // Check if asset has existing image(s)
+    const existing = asset?.meta?.images || [];
+    const legacy = asset?.meta?.image_url;
+    let allExisting = [...existing];
+    if (legacy && !allExisting.includes(legacy)) {
+      allExisting.unshift(legacy);
+    }
+    
+    setExistingImages(allExisting);
+    setImagePreviews([]);
+    setImageFiles([]);
+    
     getWarehouseOptions().then(setWarehouses).catch(() => setWarehouses([]));
     getDepartmentOptions().then(setDepartments).catch(() => setDepartments([]));
   }, [open, asset]);
+
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    
+    const validFiles = files.filter(f => f.size <= 5 * 1024 * 1024);
+    if (validFiles.length < files.length) {
+      toast.error("Some files too large", { description: "Each image must be under 5MB" });
+    }
+    
+    if (validFiles.length > 0) {
+      setImageFiles(prev => [...prev, ...validFiles]);
+      setImagePreviews(prev => [...prev, ...validFiles.map(f => URL.createObjectURL(f))]);
+    }
+  }
+
+  function removeNewImage(index: number) {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((p) => ({ ...p, [key]: value }));
@@ -136,9 +174,17 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
 
     setSubmitting(true);
     try {
-      const saved = isEdit
+      let saved = isEdit
         ? await updateAsset(asset!.id, payload)
         : await createAsset(payload);
+        
+      if (imageFiles.length > 0) {
+        toast.info(`Uploading ${imageFiles.length} image(s)...`, { duration: 2000 });
+        for (const file of imageFiles) {
+          saved = await uploadAssetImage(saved.id, file);
+        }
+      }
+        
       toast.success(isEdit ? "Asset updated" : "Asset created", {
         description: saved.asset_name,
       });
@@ -167,6 +213,55 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid gap-4 pt-1">
+          {/* Image Upload Section */}
+          <div className="flex flex-col p-4 border-2 border-dashed border-muted-foreground/25 rounded-xl bg-slate-50/50 dark:bg-slate-900/50 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900 group">
+            <div className="flex flex-col items-center justify-center text-center mb-4">
+              <div className="mx-auto w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mb-2">
+                <ImageIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <p className="text-sm font-medium">Asset Images</p>
+              <p className="text-xs text-muted-foreground mb-3">Add multiple PNG/JPG up to 5MB</p>
+              <div className="relative">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <Button type="button" variant="outline" size="sm" className="pointer-events-none">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Browse Files
+                </Button>
+              </div>
+            </div>
+
+            {(existingImages.length > 0 || imagePreviews.length > 0) && (
+              <div className="flex flex-wrap gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                {/* Existing Images (Read-only) */}
+                {existingImages.map((url, idx) => (
+                  <div key={`existing-${idx}`} className="relative w-16 h-16 rounded-md overflow-hidden ring-1 ring-slate-200 dark:ring-slate-700 opacity-80">
+                    <img src={url} alt={`Existing ${idx}`} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+                
+                {/* New Images */}
+                {imagePreviews.map((preview, idx) => (
+                  <div key={`new-${idx}`} className="relative w-16 h-16 rounded-md overflow-hidden ring-2 ring-indigo-500/50">
+                    <img src={preview} alt={`New ${idx}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeNewImage(idx)}
+                      className="absolute top-0.5 right-0.5 bg-black/60 text-white p-0.5 rounded-full hover:bg-black/80 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Asset Code *">
               <Input value={form.asset_code} onChange={(e) => set("asset_code", e.target.value)}

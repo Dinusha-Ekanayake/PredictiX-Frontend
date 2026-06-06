@@ -212,10 +212,6 @@ export default function AdminAssetsPage() {
               <Radio className="h-3 w-3 animate-pulse" />
               Live
             </Badge>
-            <Button size="sm" className="h-7 gap-1.5 rounded-full" onClick={openCreate}>
-              <Plus className="h-3.5 w-3.5" />
-              Add Asset
-            </Button>
           </div>
         </div>
       </div>

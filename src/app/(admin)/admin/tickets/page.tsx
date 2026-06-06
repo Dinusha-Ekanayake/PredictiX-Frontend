@@ -23,6 +23,7 @@ import {
   deleteTicket,
   type Ticket,
 } from "@/lib/ticketService";
+import { listUsers, type UserItem } from "@/lib/userService";
 
 export default function AdminTicketsPage() {
   const [isAdmin, setIsAdmin] = React.useState(false);
@@ -42,11 +43,23 @@ export default function AdminTicketsPage() {
   const [debouncedQuery, setDebouncedQuery] = React.useState("");
   const [selectedStatus, setSelectedStatus] = React.useState("all");
   const [selectedPriority, setSelectedPriority] = React.useState("all");
+  const [users, setUsers] = React.useState<UserItem[]>([]);
 
   React.useEffect(() => {
     const role = window.localStorage.getItem("predictix.user.role");
     setIsAdmin(role === "admin" || role === "ADMIN");
+    listUsers()
+      .then(setUsers)
+      .catch((err) => console.error("Failed to load users:", err));
   }, []);
+
+  const userMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    users.forEach((u) => {
+      map.set(u.id, u.name);
+    });
+    return map;
+  }, [users]);
 
   // Load global status counts (not affected by filters)
   React.useEffect(() => {
@@ -380,7 +393,7 @@ export default function AdminTicketsPage() {
                   <div className="ml-2 shrink-0 flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap">
                     <span className="text-[10px] uppercase tracking-wide">Assigned</span>
                     {t.assigned_to ? (
-                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300 font-mono">{t.assigned_to.slice(0, 8)}</Badge>
+                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300 font-medium">{userMap.get(t.assigned_to) ?? t.assigned_to.slice(0, 8)}</Badge>
                     ) : (
                       <span className="italic">Unassigned</span>
                     )}

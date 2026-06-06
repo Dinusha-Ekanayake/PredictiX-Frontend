@@ -50,7 +50,7 @@ const CHATBOT_AGENT_ENDPOINT = "/chatbot/agent";
 const CHATBOT_FALLBACK_ENDPOINTS = ["/chatbot/ask", "/chatbot", "/chatbot/message"];
 // Backend agent loops can take 30-60s when several tool calls chain together.
 // Default browser fetches don't time out but Next dev proxy + some networks
-// drop earlier — give the agent a generous 90s window before we abort.
+// drop earlier — give the agent a generous 180s window before we abort.
 const REQUEST_TIMEOUT_MS = 180_000;
 
 // In-memory cache (per chat panel mount) — identical user questions return

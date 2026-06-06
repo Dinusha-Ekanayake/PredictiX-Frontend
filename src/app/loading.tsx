@@ -2,13 +2,13 @@ import PredictiXLoader from "@/components/loading/PredictiXLoader";
 
 export default function Loading() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
+    <main className="fixed inset-0 z-50 overflow-hidden bg-slate-50 dark:bg-slate-950">
       {/* Background (same style as login) */}
       <div className="pointer-events-none absolute inset-0">
         {/* Light blobs */}
         <div className="absolute -top-56 -left-56 h-225 w-225 rounded-full bg-sky-200/60 blur-[140px] float-slow-1 dark:hidden" />
         <div className="absolute top-1/3 left-1/2 h-225 w-225 -translate-x-1/2 rounded-full bg-violet-200/50 blur-[160px] float-slow-2 dark:hidden" />
-        <div className="absolute -bottom-56 -right-56 h-22525 rounded-full bg-white/70 blur-[160px] float-slow-3 dark:hidden" />
+        <div className="absolute -bottom-56 -right-56 h-225 w-225 rounded-full bg-white/70 blur-[160px] float-slow-3 dark:hidden" />
 
         {/* Dark blobs */}
         <div className="hidden dark:block absolute -top-56 -left-56 h-225 w-225 rounded-full bg-sky-500/10 blur-[160px] float-slow-1" />

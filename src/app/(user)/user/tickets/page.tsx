@@ -237,7 +237,7 @@ export default function UserTicketsPage() {
               />
             </div>
 
-            <div className="hidden items-center gap-2 sm:flex">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                 <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="All Status" />
@@ -270,7 +270,6 @@ export default function UserTicketsPage() {
             <Button
               variant="ghost"
               size="sm"
-              className="hidden sm:inline-flex"
               onClick={() => loadTickets("refresh")}
             >
               <Filter className="h-4 w-4" />

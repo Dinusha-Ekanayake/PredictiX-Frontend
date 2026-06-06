@@ -6,6 +6,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 export interface WarehouseSummaryData {
+  kpis?: any[];
   kpiGrid?: any[];
   assetStatus?: any[];
   ticketPriority?: any[];
@@ -24,8 +25,10 @@ export interface WarehouseSummaryData {
 export async function getMaintenanceSchedule() {
   try {
     const url = `${API_BASE_URL}/warehouse-dashboard/maintenance-schedule`;
-    console.log('[DEBUG] Fetching maintenance schedule from:', url);
-    
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[warehouseService] Fetching maintenance schedule from:", url);
+    }
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {

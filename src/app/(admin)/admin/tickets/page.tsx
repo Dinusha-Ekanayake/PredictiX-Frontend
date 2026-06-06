@@ -61,10 +61,14 @@ export default function AdminTicketsPage() {
     return map;
   }, [users]);
 
-  // Load global status counts (not affected by filters)
-  React.useEffect(() => {
+  const refreshStatusCounts = React.useCallback(() => {
     fetchTicketStatusCounts().then(setStatusCounts).catch(() => {});
   }, []);
+
+  // Load global status counts (not affected by filters)
+  React.useEffect(() => {
+    refreshStatusCounts();
+  }, [refreshStatusCounts]);
 
   // Debounce search input
   React.useEffect(() => {
@@ -111,11 +115,13 @@ export default function AdminTicketsPage() {
   function handleTicketCreated(ticket: Ticket) {
     setTickets((prev) => [ticket, ...prev]);
     setTotal((t) => t + 1);
+    refreshStatusCounts();
   }
 
   function handleTicketUpdated(updated: Ticket) {
     setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
     if (selectedTicket?.id === updated.id) setSelectedTicket(updated);
+    refreshStatusCounts();
   }
 
   async function handleDeleteTicket(id: string) {
@@ -126,6 +132,7 @@ export default function AdminTicketsPage() {
       setSelectedTicket(null);
       setDetailOpen(false);
       toast.success("Ticket deleted");
+      refreshStatusCounts();
     } catch (err) {
       toast.error("Failed to delete ticket", {
         description: err instanceof Error ? err.message : undefined,

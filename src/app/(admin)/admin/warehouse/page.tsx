@@ -15,7 +15,8 @@ import { getMaintenanceSchedule } from "@/lib/warehouseService";
 // ── Warehouse Report (my section — warehouse components only) ──
 import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
 
-const REPORT_API = "http://127.0.0.1:8000/warehouse-dashboard/generate-report";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const REPORT_API = `${API_BASE_URL}/warehouse-dashboard/generate-report`;
 
 export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
@@ -28,7 +29,7 @@ export default function WarehousePage() {
     try {
       // Fetch summary and maintenance schedule in parallel
       const [summaryRes, scheduleData] = await Promise.allSettled([
-        fetch("http://127.0.0.1:8000/warehouse-dashboard/summary", {
+        fetch(`${API_BASE_URL}/warehouse-dashboard/summary`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         }),

@@ -9,6 +9,7 @@ import {
   Boxes,
   Users,
   Menu,
+  CircleHelp,
 } from "lucide-react";
 
 import PredictiXLogo from "@/components/brand/PredictiXLogo";
@@ -33,6 +34,7 @@ const NAV = [
   { href: "/user/tickets",   label: "Tickets",   icon: Ticket },
   { href: "/user/assets",    label: "Assets",    icon: Boxes },
   { href: "/user/users",     label: "Users",     icon: Users },
+  { href: "/help-desk",      label: "Help Desk", icon: CircleHelp },
 ] as const;
 
 function isActive(pathname: string, href: string) {

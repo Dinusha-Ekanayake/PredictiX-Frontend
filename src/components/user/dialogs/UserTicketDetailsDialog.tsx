@@ -48,6 +48,7 @@ import {
   updateMyTicket,
   type UserTicketDetail,
 } from "@/lib/api/userTickets";
+import { listUsers, type UserItem } from "@/lib/userService";
 
 type Props = {
   open: boolean;
@@ -94,6 +95,7 @@ export default function UserTicketDetailsDialog({
   const [savingEdit, setSavingEdit] = React.useState(false);
   const [commentText, setCommentText] = React.useState("");
   const [postingComment, setPostingComment] = React.useState(false);
+  const [users, setUsers] = React.useState<UserItem[]>([]);
 
   // Edit form state — local until saved.
   const [editTitle, setEditTitle] = React.useState("");
@@ -124,10 +126,24 @@ export default function UserTicketDetailsDialog({
         if (!cancelled) setLoading(false);
       });
 
+    listUsers()
+      .then((data) => {
+        if (!cancelled) setUsers(data ?? []);
+      })
+      .catch((err) => console.error("Failed to load users:", err));
+
     return () => {
       cancelled = true;
     };
   }, [open, ticketId, onOpenChange]);
+
+  const userMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    users.forEach((u) => {
+      map.set(u.id, u.name);
+    });
+    return map;
+  }, [users]);
 
   const isOwner = !!ticket && !!currentUserId && ticket.created_by === currentUserId;
 
@@ -298,14 +314,40 @@ export default function UserTicketDetailsDialog({
                   </div>
                 </div>
               ) : (
-                <div className="rounded-md border p-3 bg-muted/30">
-                  <h4 className="text-sm font-medium text-muted-foreground">
-                    Description
-                  </h4>
-                  <p className="mt-2 text-sm whitespace-pre-wrap">
-                    {ticket.description}
-                  </p>
-                </div>
+                <>
+                  <div className="rounded-md border p-3 bg-muted/30">
+                    <h4 className="text-sm font-medium text-muted-foreground">
+                      Description
+                    </h4>
+                    <p className="mt-2 text-sm whitespace-pre-wrap">
+                      {ticket.description}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-md border p-3 bg-muted/30">
+                      <h4 className="text-sm font-medium text-muted-foreground">Category</h4>
+                      <div className="mt-2">
+                        <Badge className="bg-sky-100 text-sky-800">
+                          {ticket.final_category || ticket.predicted_category || "General"}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="rounded-md border p-3 bg-muted/30">
+                      <h4 className="text-sm font-medium text-muted-foreground">Assigned To</h4>
+                      <div className="mt-2 text-sm">
+                        {ticket.assigned_to ? (
+                          <Badge className="bg-purple-100 text-purple-800">
+                            {userMap.get(ticket.assigned_to) ?? ticket.assigned_to.slice(0, 8)}
+                          </Badge>
+                        ) : (
+                          <span className="italic text-muted-foreground">Unassigned</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
 
               {/* AI fields */}

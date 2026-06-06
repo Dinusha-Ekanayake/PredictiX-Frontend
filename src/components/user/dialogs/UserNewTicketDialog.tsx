@@ -55,6 +55,7 @@ import {
   type TicketPreviewResponse,
   type UserTicketDetail,
 } from "@/lib/api/userTickets";
+import { listUsers, type UserItem } from "@/lib/userService";
 
 type Props = {
   open: boolean;
@@ -71,6 +72,9 @@ export default function UserNewTicketDialog({
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [priority, setPriority] = React.useState<string>("");
+  const [assignedTo, setAssignedTo] = React.useState("");
+  const [users, setUsers] = React.useState<UserItem[]>([]);
+  const [usersLoading, setUsersLoading] = React.useState(false);
 
   // -------- AI preview state --------
   const [preview, setPreview] = React.useState<TicketPreviewResponse | null>(null);
@@ -84,16 +88,25 @@ export default function UserNewTicketDialog({
   // Reset everything shortly after the dialog closes so the closing animation
   // doesn't show empty/stale values mid-fade.
   React.useEffect(() => {
-    if (open) return;
+    if (open) {
+      setUsersLoading(true);
+      listUsers()
+        .then((data) => setUsers(data ?? []))
+        .catch((err) => console.error("Failed to load users:", err))
+        .finally(() => setUsersLoading(false));
+      return;
+    }
     const t = setTimeout(() => {
       setTitle("");
       setDescription("");
       setPriority("");
+      setAssignedTo("");
       setPreview(null);
       setPreviewLoading(false);
       setPreviewAccepted(false);
       setIsSubmitting(false);
       setResult(null);
+      setUsers([]);
     }, 200);
     return () => clearTimeout(t);
   }, [open]);
@@ -164,6 +177,7 @@ export default function UserNewTicketDialog({
           previewAccepted && preview?.ticket_summary
             ? preview.ticket_summary
             : undefined,
+        assigned_to: assignedTo || undefined,
       });
       toast.success("Ticket created", {
         description: `${created.ticket_number} — ${created.title}`,
@@ -345,6 +359,36 @@ export default function UserNewTicketDialog({
                     )}
                   </Button>
                 </div>
+              </div>
+
+              {/* Assigned User */}
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Assigned User (optional)
+                </p>
+                {usersLoading ? (
+                  <div className="flex items-center gap-2 h-10 px-3 rounded-md border border-input text-sm text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading users…
+                  </div>
+                ) : (
+                  <Select
+                    value={assignedTo}
+                    onValueChange={(v) => setAssignedTo(v)}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger className="w-full bg-background h-10">
+                      <SelectValue placeholder="Select a user to assign" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name} ({u.role})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               {/* ---------------- AI preview panel ---------------- */}

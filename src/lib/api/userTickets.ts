@@ -30,6 +30,7 @@ export interface UserTicketSummary {
   final_category: string | null;
   asset_id: string | null;
   warehouse_id: string | null;
+  assigned_to: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -112,6 +113,7 @@ export interface CreateTicketPayload {
   predicted_priority?: string;
   predicted_category?: string;
   ticket_summary?: string;
+  assigned_to?: string | null;
 }
 
 export interface PreviewTicketPayload {

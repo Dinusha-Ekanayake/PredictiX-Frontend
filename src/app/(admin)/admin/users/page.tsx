@@ -28,12 +28,14 @@ import AddUserDialog from "@/components/admin/users/AddUserDialog";
 import type { NewUser } from "@/components/admin/users/AddUserDialog";
 import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
+import EditUserDialog from "@/components/admin/users/EditUserDialog";
 import type { AssetItem } from "@/components/admin/users/ViewAssignedAssetsDialog";
 import { toast } from "sonner";
 
 import {
   listUsers,
   createUser,
+  updateUser,
   getUserAssets,
   deleteUser,
   type UserItem,
@@ -139,6 +141,7 @@ export default function AdminUsersPage() {
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
+  const [editUser, setEditUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
   const [assignedAssets, setAssignedAssets] = React.useState<AssetItem[]>([]);
   const [assetsLoading, setAssetsLoading] = React.useState(false);
@@ -237,6 +240,12 @@ export default function AdminUsersPage() {
 
   function handleViewDetails(user: UserItem) {
     setDetailsUser(user);
+  }
+
+  async function handleUserUpdated(userId: string, updatedFields: Partial<UserItem>) {
+    const updatedUser = await updateUser(userId, updatedFields);
+    setUsers((prev) => prev.map((u) => (u.id === userId ? updatedUser : u)));
+    toast.success("User updated", { description: `${updatedUser.name} has been updated.` });
   }
 
   async function handleDeleteUser(user: UserItem) {
@@ -441,6 +450,12 @@ export default function AdminUsersPage() {
                           >
                             View Details
                           </button>
+                          <button
+                            onClick={() => setEditUser(user)}
+                            className="rounded-full bg-blue-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-500"
+                          >
+                            Edit
+                          </button>
                           {user.assignedAssets > 0 && (
                             <button
                               onClick={() => handleViewAssets(user)}
@@ -487,6 +502,15 @@ export default function AdminUsersPage() {
           setDetailsUser(null);
           handleViewAssets(user);
         }}
+      />
+
+      <EditUserDialog
+        user={editUser}
+        open={editUser !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditUser(null);
+        }}
+        onUserUpdated={handleUserUpdated}
       />
 
       {/* View Assigned Assets Dialog */}

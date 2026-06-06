@@ -294,13 +294,23 @@ export default function LoginPage() {
   const [role, setRole] = React.useState<Role | "">("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [warehouseId, setWarehouseId] = React.useState("");
+  const [warehouses, setWarehouses] = React.useState<{id: string, name: string}[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
+
+  React.useEffect(() => {
+    fetch("http://127.0.0.1:8000/warehouses/")
+      .then((r) => r.json())
+      .then((data) => setWarehouses(data))
+      .catch(console.error);
+  }, []);
 
   const canSubmit =
     role !== "" &&
     email.trim().length > 0 &&
     password.trim().length > 0 &&
+    warehouseId !== "" &&
     !isSubmitting;
 
   async function onSubmit(e: React.FormEvent) {
@@ -315,12 +325,14 @@ export default function LoginPage() {
         email: email.trim().toLowerCase(),
         password: password.trim(),
         role: String(role).toUpperCase(), // backend validates declared role
+        warehouse_id: warehouseId,
       });
 
       // Single source of truth for session storage (writes both token keys).
       storeAuthSession(data);
 
-      if (data.role.toLowerCase() === "admin") {
+      const roleStr = data.role.toLowerCase();
+      if (roleStr === "admin" || roleStr === "super_admin") {
         router.push("/admin/dashboard");
       } else {
         router.push("/user/dashboard");
@@ -443,6 +455,26 @@ export default function LoginPage() {
                     />
                   </div>
 
+                  {/* Warehouse */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      Warehouse
+                    </Label>
+                    <select
+                      className="flex h-11 w-full rounded-md border border-slate-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:focus-visible:ring-slate-300"
+                      value={warehouseId}
+                      onChange={(e) => setWarehouseId(e.target.value)}
+                      disabled={isSubmitting}
+                    >
+                      <option value="" disabled className="dark:bg-slate-900">Select a warehouse...</option>
+                      {warehouses.map((w) => (
+                        <option key={w.id} value={w.id} className="dark:bg-slate-900">
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Password */}
                   <div className="space-y-2">
                     <Label
@@ -479,8 +511,9 @@ export default function LoginPage() {
                     {isSubmitting ? "Logging in…" : "Log in"}
                   </Button>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 break-all">
                     <div className="font-medium text-slate-800 dark:text-slate-200">Demo accounts</div>
+                    <div>Super Admin: super.admin1@lankalogix.lk / super</div>
                     <div>Admin: anjali.warnakulasuriya.adm1@lankalogix.lk / admin</div>
                     <div>User: nuwan.gunasekara.tra1@lankalogix.lk / user</div>
                     <div className="mt-1 text-slate-500">Other seeded users: password <span className="font-mono">Predictix@123</span></div>

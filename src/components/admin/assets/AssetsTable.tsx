@@ -115,7 +115,7 @@ type Props = {
 
 export default function AssetsTable({ assets, selectedId, onSelect, loading }: Props) {
   return (
-    <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden flex flex-col transition-all">
+    <div className="h-full card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden flex flex-col transition-all">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200/80 dark:border-white/6">
         <h2 className="text-sm font-semibold">Asset List</h2>
@@ -133,7 +133,7 @@ export default function AssetsTable({ assets, selectedId, onSelect, loading }: P
       </div>
 
       {/* Rows */}
-      <ScrollArea style={{ height: 520 }}>
+      <ScrollArea className="flex-1 min-h-0">
         {loading ? (
           <TableSkeleton />
         ) : assets.length === 0 ? (

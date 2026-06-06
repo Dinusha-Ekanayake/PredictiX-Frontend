@@ -28,7 +28,8 @@ export interface StoredUser {
 interface LoginPayload {
   email: string;
   password: string;
-  role: string;       // "ADMIN" | "USER" — required by backend
+  role: string;       // "ADMIN" | "USER" | "SUPER_ADMIN" — required by backend
+  warehouse_id?: string;
 }
 
 interface RegisterPayload {
@@ -45,11 +46,11 @@ interface RegisterPayload {
  * Login — sends email, password AND role to /auth/login.
  * The backend validates that the declared role matches the stored account role.
  */
-export async function login({ email, password, role }: LoginPayload): Promise<LoginResponse> {
+export async function login({ email, password, role, warehouse_id }: LoginPayload): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, role }),
+    body: JSON.stringify({ email, password, role, warehouse_id }),
   });
 
   if (!response.ok) {
@@ -101,6 +102,9 @@ export function storeAuthSession(data: LoginResponse): void {
   localStorage.setItem("predictix.user.email", user.email);
   localStorage.setItem("predictix.user.id", user.id);
   localStorage.setItem("predictix.user.name", user.full_name);
+  if ((data as any).active_warehouse_id) {
+    localStorage.setItem("predictix.user.warehouse_id", (data as any).active_warehouse_id);
+  }
 }
 
 /** Return the stored JWT access token, or null. */
@@ -153,4 +157,10 @@ export function isAdmin(): boolean {
 /** True if the stored role is USER. */
 export function isUserRole(): boolean {
   return getUserRole() === "USER";
+}
+
+/** Return the stored active warehouse ID. */
+export function getActiveWarehouseId(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("predictix.user.warehouse_id");
 }

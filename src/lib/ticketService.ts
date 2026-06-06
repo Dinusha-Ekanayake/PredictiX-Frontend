@@ -216,13 +216,15 @@ export async function fetchTicketEnrichment(ticket: {
   if (ticket.created_by) profileIds.add(ticket.created_by);
   if (ticket.assigned_to) profileIds.add(ticket.assigned_to);
 
-  const historyResp = await supabase
+  const { data: historyData, error: historyError } = await supabase
     .from("ticket_status_history")
     .select("id,old_status,new_status,changed_by,note,created_at")
     .eq("ticket_id", ticket.id)
     .order("created_at", { ascending: true });
 
-  const historyRows = (historyResp.data ?? []) as Array<{
+  if (historyError) throw historyError;
+
+  const historyRows = (historyData ?? []) as Array<{
     id: string;
     old_status: string | null;
     new_status: string;
@@ -236,42 +238,48 @@ export async function fetchTicketEnrichment(ticket: {
 
   let nameById = new Map<string, { name: string | null; email: string | null }>();
   if (profileIds.size > 0) {
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
       .select("id,full_name,email")
       .in("id", Array.from(profileIds));
+
+    if (profilesError) throw profilesError;
+
     nameById = new Map(
       ((profiles ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>).map(
         (p) => [p.id, { name: p.full_name, email: p.email }],
       ),
     );
-  }
 
-  if (ticket.created_by) {
-    const p = nameById.get(ticket.created_by);
-    result.creator_name = p?.name ?? null;
-    result.creator_email = p?.email ?? null;
-  }
-  if (ticket.assigned_to) {
-    result.assignee_name = nameById.get(ticket.assigned_to)?.name ?? null;
-  }
+    if (ticket.created_by) {
+      const p = nameById.get(ticket.created_by);
+      result.creator_name = p?.name ?? null;
+      result.creator_email = p?.email ?? null;
+    }
+    if (ticket.assigned_to) {
+      result.assignee_name = nameById.get(ticket.assigned_to)?.name ?? null;
+    }
 
-  result.history = historyRows.map((h) => ({
-    id: h.id,
-    old_status: h.old_status,
-    new_status: h.new_status,
-    changed_by: h.changed_by,
-    changed_by_name: h.changed_by ? nameById.get(h.changed_by)?.name ?? null : null,
-    note: h.note,
-    created_at: h.created_at,
-  }));
+    result.history = historyRows.map((h) => ({
+      id: h.id,
+      old_status: h.old_status,
+      new_status: h.new_status,
+      changed_by: h.changed_by,
+      changed_by_name: h.changed_by ? nameById.get(h.changed_by)?.name ?? null : null,
+      note: h.note,
+      created_at: h.created_at,
+    }));
+  }
 
   if (ticket.asset_id) {
-    const { data: asset } = await supabase
+    const { data: asset, error: assetError } = await supabase
       .from("assets")
       .select("warehouse_id,department_id")
       .eq("id", ticket.asset_id)
       .maybeSingle();
+
+    if (assetError) throw assetError;
+
     const a = asset as { warehouse_id: string | null; department_id: string | null } | null;
     if (a?.warehouse_id) {
       const { data: w } = await supabase
@@ -293,3 +301,4 @@ export async function fetchTicketEnrichment(ticket: {
 
   return result;
 }
+

@@ -377,6 +377,31 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
         )}
       </div>
 
+      {/* ── Image Gallery ── */}
+      {(() => {
+        const existing = asset?.meta?.images || [];
+        const legacy = asset?.meta?.image_url;
+        let allImages = [...existing];
+        if (legacy && !allImages.includes(legacy)) {
+          allImages.unshift(legacy);
+        }
+        
+        if (allImages.length === 0) return null;
+        
+        return (
+          <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/20 dark:bg-slate-900/10">
+            <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Asset Images</h3>
+            <div className="flex flex-wrap gap-3">
+              {allImages.map((url, idx) => (
+                <div key={idx} className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-black group">
+                  <img src={url} alt={`Asset image ${idx}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Fields grid ── */}
       <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">

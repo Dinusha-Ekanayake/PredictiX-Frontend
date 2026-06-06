@@ -27,7 +27,12 @@ export type Asset = {
   payload_capacity_kg: number | null;
   vehicle_age_years: number | null;
   lifetime_service_count: number | null;
-  lifetime_breakdown_count: number | null;
+  // Custom metadata
+  meta?: {
+    image_url?: string; // Legacy
+    images?: string[];
+    [key: string]: any;
+  };
   created_at: string;
   updated_at: string;
 };

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Plus } from "lucide-react";
 import { apiGet } from "@/lib/apiClient";
 import { createTicket, type Ticket, type TicketPriority, type TicketCategory } from "@/lib/ticketService";
+import { listUsers, type UserItem } from "@/lib/userService";
 
 type Asset = {
   id: string;
@@ -41,6 +42,7 @@ type Props = {
     description: string;
     priority: TicketPriority;
     category: TicketCategory;
+    assigned_to?: string | null;
   }) => Promise<Ticket>;
 };
 
@@ -55,6 +57,9 @@ export default function NewTicketDialog({
   const [description, setDescription] = React.useState("");
   const [priority, setPriority] = React.useState<TicketPriority | "">("");
   const [category, setCategory] = React.useState<TicketCategory | "">("");
+  const [assignedTo, setAssignedTo] = React.useState("");
+  const [users, setUsers] = React.useState<UserItem[]>([]);
+  const [usersLoading, setUsersLoading] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [assets, setAssets] = React.useState<Asset[]>([]);
   const [assetsLoading, setAssetsLoading] = React.useState(false);
@@ -70,6 +75,14 @@ export default function NewTicketDialog({
           toast.error("Failed to load assets", { description: err?.message });
         })
         .finally(() => setAssetsLoading(false));
+
+      setUsersLoading(true);
+      listUsers()
+        .then((data) => setUsers(data ?? []))
+        .catch((err) => {
+          console.error("Failed to load users:", err);
+        })
+        .finally(() => setUsersLoading(false));
     } else {
       const t = setTimeout(() => {
         setAssetId("");
@@ -77,8 +90,10 @@ export default function NewTicketDialog({
         setDescription("");
         setPriority("");
         setCategory("");
+        setAssignedTo("");
         setIsSubmitting(false);
         setAssets([]);
+        setUsers([]);
       }, 200);
       return () => clearTimeout(t);
     }
@@ -99,6 +114,7 @@ export default function NewTicketDialog({
         description: description.trim(),
         priority: (priority as TicketPriority) || "Medium",
         category: (category as TicketCategory) || "Mechanical",
+        assigned_to: assignedTo || null,
       };
       const ticket = createFn
         ? await createFn(createArgs)
@@ -208,6 +224,30 @@ export default function NewTicketDialog({
                 <option value="Software">Software</option>
               </select>
             </div>
+          </div>
+
+          {/* Assigned User */}
+          <div>
+            <p className="text-sm text-muted-foreground mb-2">Assigned User</p>
+            {usersLoading ? (
+              <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input text-sm text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading users…
+              </div>
+            ) : (
+              <select
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">Select a user (optional)</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.role})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Actions */}

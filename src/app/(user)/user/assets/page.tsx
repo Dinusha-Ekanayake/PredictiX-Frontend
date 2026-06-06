@@ -101,6 +101,7 @@ export default function UserAssetsPage() {
   function AssetCard({ r }: { r: Row }) {
     const h = r.healthPercent != null ? Math.round(r.healthPercent) : null;
     const d = daysUntil(r.nextServiceDate);
+    return (
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
         <div className="flex items-start sm:items-center gap-4 min-w-0 flex-1">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15">
@@ -140,6 +141,7 @@ export default function UserAssetsPage() {
           </Button>
         </div>
       </div>
+    );
   }
 
   return (

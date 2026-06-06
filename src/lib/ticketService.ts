@@ -103,6 +103,7 @@ export async function createTicket(payload: {
   description: string;
   priority: TicketPriority;
   category: TicketCategory;
+  assigned_to?: string | null;
 }): Promise<Ticket> {
   if (!supabase) throw new Error("Supabase not configured");
 
@@ -115,6 +116,7 @@ export async function createTicket(payload: {
       status: "open",
       priority: dbPriority(payload.priority),
       predicted_category: payload.category === "General" ? "mechanical" : payload.category.toLowerCase(),
+      assigned_to: payload.assigned_to || null,
       opened_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

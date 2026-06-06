@@ -48,6 +48,7 @@ import {
   type UserTicketSummary,
   type UserTicketStats,
 } from "@/lib/api/userTickets";
+import { listUsers, type UserItem } from "@/lib/userService";
 
 // Values must match the Postgres ENUM labels (`ticket_status`,
 // `ticket_priority`). Display label is human-friendly; value is what the
@@ -136,6 +137,7 @@ export default function UserTicketsPage() {
   const [newOpen, setNewOpen] = React.useState(false);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [activeTicketId, setActiveTicketId] = React.useState<string | null>(null);
+  const [users, setUsers] = React.useState<UserItem[]>([]);
 
   // Read the current user id once on mount — needed by the detail dialog to
   // decide if the "Edit" button shows up.
@@ -147,6 +149,14 @@ export default function UserTicketsPage() {
       null
     );
   }, []);
+
+  const userMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    users.forEach((u) => {
+      map.set(u.id, u.name);
+    });
+    return map;
+  }, [users]);
 
   const loadTickets = React.useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
@@ -185,6 +195,9 @@ export default function UserTicketsPage() {
   // Initial load — runs once.
   React.useEffect(() => {
     loadTickets("initial");
+    listUsers()
+      .then(setUsers)
+      .catch((err) => console.error("Failed to load users:", err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -403,6 +416,15 @@ export default function UserTicketsPage() {
                       Created: {formatDate(t.created_at)}
                     </span>
                   </div>
+                </div>
+
+                <div className="ml-2 shrink-0 flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                  <span className="text-[10px] uppercase tracking-wide">Assigned</span>
+                  {t.assigned_to ? (
+                    <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300 font-medium">{userMap.get(t.assigned_to) ?? t.assigned_to.slice(0, 8)}</Badge>
+                  ) : (
+                    <span className="italic">Unassigned</span>
+                  )}
                 </div>
               </div>
             </div>

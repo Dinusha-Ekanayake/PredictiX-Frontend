@@ -81,6 +81,7 @@ export async function createMyTicket(payload: {
   description: string;
   priority: TicketPriority;
   category: TicketCategory;
+  assigned_to?: string | null;
 }): Promise<Ticket> {
   const body = {
     asset_id: payload.asset_id,
@@ -88,6 +89,7 @@ export async function createMyTicket(payload: {
     description: payload.description,
     priority: payload.priority.toLowerCase(),
     category: dbCategory(payload.category),
+    assigned_to: payload.assigned_to || null,
   };
   return mapTicket(await apiPost<BackendTicket>("/tickets/mine", body));
 }

@@ -12,15 +12,23 @@ import {
   X,
   Sparkles,
   BookOpen,
-  HelpCircle,
+  ChevronDown,
+  LifeBuoy,
+  Mail,
+  FileQuestion,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import AdminNavbar from "@/components/navigation/AdminNavbar";
+import UserNavbar from "@/components/navigation/UserNavbar";
+import AmbientBackground from "@/components/background/AmbientBackground";
+import Footer from "@/components/navigation/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type FaqItem = {
   id: string;
@@ -33,6 +41,205 @@ type FaqItem = {
   updated_at: string | null;
 };
 
+// ─── FAQ Accordion Card ───────────────────────────────────────────────────────
+// NOTE: The outer row is a <div> (not <button>) so that admin action
+// <button> elements inside it are NOT nested inside another <button>.
+
+function FaqCard({
+  item,
+  isAdmin,
+  isEditing,
+  editQuestion,
+  editAnswer,
+  isSavingEdit,
+  deletingId,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onEditQuestion,
+  onEditAnswer,
+  onConfirmDelete,
+  onRequestDelete,
+  onCancelDelete,
+}: {
+  item: FaqItem;
+  isAdmin: boolean;
+  isEditing: boolean;
+  editQuestion: string;
+  editAnswer: string;
+  isSavingEdit: boolean;
+  deletingId: string | null;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onEditQuestion: (v: string) => void;
+  onEditAnswer: (v: string) => void;
+  onConfirmDelete: () => void;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+
+  // ── Edit mode ───────────────────────────────────────────────────────────────
+  if (isEditing) {
+    return (
+      <div className="rounded-2xl border border-violet-300 dark:border-violet-500/50 bg-card shadow-sm p-5 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/15">
+            <Pencil className="size-3.5 text-violet-600 dark:text-violet-400" />
+          </span>
+          <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
+            Editing FAQ
+          </span>
+        </div>
+        <Input
+          value={editQuestion}
+          onChange={(e) => onEditQuestion(e.target.value)}
+          placeholder="Question"
+          className="bg-background/60 dark:bg-slate-900/60"
+        />
+        <textarea
+          value={editAnswer}
+          onChange={(e) => onEditAnswer(e.target.value)}
+          placeholder="Answer"
+          className="min-h-24 w-full resize-y rounded-xl border border-input bg-background/60 dark:bg-slate-900/60 px-3 py-2.5 text-sm outline-none focus-visible:border-violet-400 focus-visible:ring-2 focus-visible:ring-violet-400/30 transition-all"
+        />
+        <div className="flex items-center gap-2 justify-end">
+          <Button
+            type="button"
+            size="sm"
+            onClick={onSaveEdit}
+            disabled={isSavingEdit || !editQuestion.trim() || !editAnswer.trim()}
+            className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-sm"
+          >
+            <Check className="size-3.5 mr-1.5" />
+            {isSavingEdit ? "Saving…" : "Save Changes"}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={onCancelEdit}>
+            <X className="size-3.5 mr-1.5" />
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── View mode ───────────────────────────────────────────────────────────────
+  return (
+    <div
+      className={cn(
+        "group rounded-2xl border bg-card transition-all duration-200 overflow-hidden",
+        "border-slate-200 dark:border-slate-800",
+        open
+          ? "border-violet-200 dark:border-violet-500/40 shadow-md shadow-violet-500/5"
+          : "hover:border-violet-200/70 dark:hover:border-violet-500/30 hover:shadow-sm"
+      )}
+    >
+      {/* ── Header row: outer is a plain div, click zone is a div[role=button] */}
+      <div className="flex items-center gap-2 pr-3">
+        {/* Clickable question area — uses div+role so buttons can sit beside it */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setOpen((v) => !v)}
+          className="flex-1 min-w-0 flex items-center gap-3 px-5 py-4 cursor-pointer select-none"
+        >
+          <span
+            className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-colors",
+              open
+                ? "bg-gradient-to-br from-violet-500 to-sky-500 text-white"
+                : "bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 group-hover:bg-violet-100 dark:group-hover:bg-violet-500/15"
+            )}
+          >
+            <MessageSquareText className="size-4" />
+          </span>
+          <span className="text-sm font-semibold text-foreground leading-snug">
+            {item.question}
+          </span>
+        </div>
+
+        {/* Right side: admin actions + chevron — siblings of the click zone, NOT inside it */}
+        <div className="flex items-center gap-1 shrink-0">
+          {isAdmin && (
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                type="button"
+                onClick={onStartEdit}
+                className="rounded-lg p-1.5 text-muted-foreground hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10 transition-colors"
+                title="Edit"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+
+              {deletingId === item.id ? (
+                <span className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={onConfirmDelete}
+                    className="rounded-lg px-2.5 py-1 bg-rose-600 text-white text-xs font-medium hover:bg-rose-700 transition-colors"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onCancelDelete}
+                    className="rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onRequestDelete}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Chevron — also a plain div click so it doesn't nest inside role=button */}
+          <div
+            onClick={() => setOpen((v) => !v)}
+            className="p-2 cursor-pointer rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+          >
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                open && "rotate-180 text-violet-500"
+              )}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Answer panel — CSS height transition */}
+      <div
+        className={cn(
+          "overflow-hidden transition-all duration-300",
+          open ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+        )}
+      >
+        <div className="px-5 pb-5">
+          <div className="ml-11 pl-4 border-l-2 border-violet-200/80 dark:border-violet-500/30">
+            <p className="text-sm leading-7 text-muted-foreground">
+              {item.answer}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function HelpDeskPage() {
   const adminFormRef = React.useRef<HTMLDivElement | null>(null);
   const [isAdmin, setIsAdmin] = React.useState(false);
@@ -41,23 +248,19 @@ export default function HelpDeskPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState("");
 
-  // Add form state
   const [adminQuestion, setAdminQuestion] = React.useState("");
   const [adminAnswer, setAdminAnswer] = React.useState("");
   const [isAdding, setIsAdding] = React.useState(false);
 
-  // Inline edit state
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editQuestion, setEditQuestion] = React.useState("");
   const [editAnswer, setEditAnswer] = React.useState("");
   const [isSavingEdit, setIsSavingEdit] = React.useState(false);
-
-  // Delete confirm state
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const role = window.localStorage.getItem("predictix.user.role");
-    setIsAdmin(role === "admin" || role === "ADMIN");
+    const r = window.localStorage.getItem("predictix.user.role") ?? "";
+    setIsAdmin(r === "admin" || r === "ADMIN");
   }, []);
 
   const fetchFaqs = React.useCallback(async () => {
@@ -73,9 +276,7 @@ export default function HelpDeskPage() {
     }
   }, []);
 
-  React.useEffect(() => {
-    fetchFaqs();
-  }, [fetchFaqs]);
+  React.useEffect(() => { fetchFaqs(); }, [fetchFaqs]);
 
   const filteredFaqs = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -91,14 +292,13 @@ export default function HelpDeskPage() {
     const question = adminQuestion.trim();
     const answer = adminAnswer.trim();
     if (!question || !answer) return;
-
     setIsAdding(true);
     try {
       const created = await apiPost<FaqItem>("/faqs/", { question, answer });
       setFaqItems((prev) => [created, ...prev]);
       setAdminQuestion("");
       setAdminAnswer("");
-      toast.success("FAQ added");
+      toast.success("FAQ published successfully");
     } catch (err: any) {
       toast.error("Failed to add FAQ", { description: err?.message });
     } finally {
@@ -122,7 +322,6 @@ export default function HelpDeskPage() {
     const question = editQuestion.trim();
     const answer = editAnswer.trim();
     if (!question || !answer) return;
-
     setIsSavingEdit(true);
     try {
       const updated = await apiPut<FaqItem>(`/faqs/${id}`, { question, answer });
@@ -147,271 +346,257 @@ export default function HelpDeskPage() {
     }
   }
 
+  const Navbar = isAdmin ? AdminNavbar : UserNavbar;
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <AdminNavbar />
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
+    <div className="relative min-h-screen flex flex-col">
+      <AmbientBackground />
+      <Navbar />
 
-          {/* ══ Hero header (dashboard style) ════════════════════════════════ */}
-          <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-white/10 dark:bg-white/2">
-            <div className="absolute inset-0 bg-linear-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent pointer-events-none" />
-            <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-linear-to-br from-violet-400/20 to-sky-400/20 dark:from-violet-500/10 dark:to-sky-500/5 blur-3xl pointer-events-none" />
+      <main className="relative z-10 flex-1 mx-auto w-full max-w-5xl px-4 py-8 space-y-6">
 
-            <div className="relative px-7 py-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        {/* ── Hero header ── */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-linear-to-br from-slate-50 via-white to-slate-50 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent dark:bg-white/2 p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-primary/10 dark:bg-white/6 p-2.5">
+                <CircleHelp className="h-5 w-5 text-primary dark:text-white/70" />
+              </div>
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-violet-500 dark:text-violet-400">PredictiX</span>
-                  <span className="text-muted-foreground/30 text-xs font-light">/</span>
-                  <span className="text-[10px] tracking-widest uppercase text-muted-foreground/80">Help Desk</span>
-                </div>
-
-                <h1 className="flex items-center gap-2.5 text-[26px] font-semibold tracking-[-0.025em] leading-none text-foreground">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-sky-500 text-white shadow-md">
-                    <CircleHelp className="size-5" />
-                  </span>
-                  Help Desk
-                </h1>
-
-                <p className="mt-2.5 text-[12px] text-muted-foreground leading-tight max-w-md">
-                  Browse curated answers to common questions. Can't find what you need? Reach out to your admin.
-                </p>
-              </div>
-
-              <div className="flex flex-col items-end gap-2.5 shrink-0">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100/80 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/25 px-2.5 py-1 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
-                    <BookOpen className="h-3 w-3" /> {faqItems.length} article{faqItems.length === 1 ? "" : "s"}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100/80 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
-                    <Sparkles className="h-3 w-3" /> Knowledge Base
-                  </span>
-                </div>
-                {isAdmin && (
-                  <Button
-                    type="button"
-                    onClick={() => adminFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                    className="h-9 shrink-0 bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md"
-                  >
-                    <PlusCircle className="size-4" />
-                    Add New Q&amp;A
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ══ Search bar ═══════════════════════════════════════════════════ */}
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm p-4">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="pl-9 h-11 bg-background/60 dark:bg-slate-900/60"
-                placeholder="Search question or answer…"
-                aria-label="Search FAQ"
-              />
-            </div>
-          </div>
-
-          {/* ══ FAQ list ═════════════════════════════════════════════════════ */}
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm">
-            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-200 dark:border-slate-700">
-              <div>
-                <p className="text-[13px] font-semibold text-foreground flex items-center gap-2">
-                  <HelpCircle className="size-4 text-violet-500" />
-                  Frequently Asked Questions
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  {filteredFaqs.length} result{filteredFaqs.length === 1 ? "" : "s"}
+                <h1 className="text-2xl font-bold tracking-tight">Help Desk</h1>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Browse curated answers to common questions.
                 </p>
               </div>
             </div>
 
-            <div className="p-4">
-              {isLoading ? (
-                <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                  Loading FAQs…
-                </p>
-              ) : loadError ? (
-                <div className="space-y-3 rounded-xl border border-dashed border-destructive/40 p-4 text-sm">
-                  <p className="text-destructive">Failed to load FAQs: {loadError}</p>
-                  <Button type="button" variant="outline" onClick={fetchFaqs}>Retry</Button>
-                </div>
-              ) : filteredFaqs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border p-10 text-center">
-                  <div className="rounded-full bg-violet-100 dark:bg-violet-500/15 p-3">
-                    <Search className="size-5 text-violet-500" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground">No matching FAQ found</p>
-                  <p className="text-xs text-muted-foreground max-w-xs">
-                    Try a different search term or ask your admin to add a new question.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {filteredFaqs.map((item) => (
-                    <div
-                      key={item.id}
-                      className={cn(
-                        "group rounded-xl border bg-card transition-all duration-200",
-                        "border-slate-200 dark:border-slate-700",
-                        "hover:border-violet-300/70 dark:hover:border-violet-500/40 hover:shadow-md",
-                        editingId === item.id && "border-violet-400 dark:border-violet-500/60 shadow-md"
-                      )}
-                    >
-                      {editingId === item.id ? (
-                        /* ── Inline edit mode ── */
-                        <div className="p-4 space-y-3">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Pencil className="size-3.5 text-violet-500" />
-                            <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wide">
-                              Editing
-                            </span>
-                          </div>
-                          <Input
-                            value={editQuestion}
-                            onChange={(e) => setEditQuestion(e.target.value)}
-                            placeholder="Question"
-                            className="bg-background/60 dark:bg-slate-900/60"
-                          />
-                          <textarea
-                            value={editAnswer}
-                            onChange={(e) => setEditAnswer(e.target.value)}
-                            placeholder="Answer"
-                            className="min-h-20 w-full resize-y rounded-md border border-input bg-background/60 dark:bg-slate-900/60 px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                          />
-                          <div className="flex items-center gap-2 justify-end">
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() => saveEdit(item.id)}
-                              disabled={isSavingEdit || !editQuestion.trim() || !editAnswer.trim()}
-                              className="bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white"
-                            >
-                              <Check className="size-3.5 mr-1" />
-                              {isSavingEdit ? "Saving…" : "Save"}
-                            </Button>
-                            <Button type="button" size="sm" variant="ghost" onClick={cancelEdit}>
-                              <X className="size-3.5 mr-1" />
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        /* ── Normal view mode ── */
-                        <details className="group/details px-4 py-3 [&[open]>summary>div>span>svg.chevron]:rotate-90">
-                          <summary className="cursor-pointer list-none text-sm font-semibold md:text-base">
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="inline-flex items-center gap-2.5 flex-1 min-w-0">
-                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-violet-500/15 to-sky-500/15 text-violet-600 dark:text-violet-400 group-hover:from-violet-500/25 group-hover:to-sky-500/25 transition-colors">
-                                  <MessageSquareText className="size-3.5" />
-                                </span>
-                                <span className="text-foreground truncate">{item.question}</span>
-                              </span>
-                              {isAdmin && (
-                                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.preventDefault()}>
-                                  <button
-                                    type="button"
-                                    onClick={() => startEdit(item)}
-                                    className="rounded-lg p-1.5 text-muted-foreground hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10 transition-colors"
-                                    title="Edit"
-                                  >
-                                    <Pencil className="size-3.5" />
-                                  </button>
-                                  {deletingId === item.id ? (
-                                    <span className="flex items-center gap-1 text-xs">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDelete(item.id)}
-                                        className="rounded-md px-2 py-1 bg-rose-600 text-white text-xs font-medium hover:bg-rose-700 transition-colors"
-                                      >
-                                        Confirm
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setDeletingId(null)}
-                                        className="rounded-md px-2 py-1 text-muted-foreground hover:bg-muted transition-colors"
-                                      >
-                                        Cancel
-                                      </button>
-                                    </span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => setDeletingId(item.id)}
-                                      className="rounded-lg p-1.5 text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
-                                      title="Delete"
-                                    >
-                                      <Trash2 className="size-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </summary>
-                          <div className="mt-3 ml-9 pl-3 border-l-2 border-violet-200/60 dark:border-violet-500/30">
-                            <p className="text-sm leading-6 text-muted-foreground md:text-[15px]">
-                              {item.answer}
-                            </p>
-                          </div>
-                        </details>
-                      )}
-                    </div>
-                  ))}
-                </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/25 px-3 py-1 text-xs font-medium text-violet-700 dark:text-violet-300">
+                <BookOpen className="h-3.5 w-3.5" />
+                {faqItems.length} articles
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                <Sparkles className="h-3.5 w-3.5" />
+                Knowledge Base
+              </span>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-8 gap-1.5 rounded-full"
+                  onClick={() =>
+                    adminFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                >
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  Add Q&amp;A
+                </Button>
               )}
             </div>
           </div>
+        </div>
 
-          {/* ══ Admin: Add FAQ ═══════════════════════════════════════════════ */}
-          {isAdmin && (
-            <div
-              ref={adminFormRef}
-              className="relative rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm overflow-hidden"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-violet-500 via-fuchsia-500 to-sky-500" />
-              <div className="px-5 pt-5 pb-3 border-b border-slate-200 dark:border-slate-700">
-                <p className="text-[13px] font-semibold text-foreground flex items-center gap-2">
-                  <PlusCircle className="size-4 text-violet-500" />
-                  Add New FAQ
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Publish a new question and answer to the knowledge base.
+        {/* ── Search ─────────────────────────────────────────────────────── */}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card shadow-sm p-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-10 h-11 bg-background/60 dark:bg-slate-900/60 rounded-xl border-slate-200 dark:border-slate-700"
+              placeholder="Search questions and answers…"
+              aria-label="Search FAQ"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── FAQ List ────────────────────────────────────────────────────── */}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card shadow-sm overflow-hidden">
+          {/* Section header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-white/[0.02]">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/15">
+                <FileQuestion className="size-4 text-violet-600 dark:text-violet-400" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Frequently Asked Questions</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {query
+                    ? `${filteredFaqs.length} result${filteredFaqs.length !== 1 ? "s" : ""} for "${query}"`
+                    : `${filteredFaqs.length} article${filteredFaqs.length !== 1 ? "s" : ""} available`}
                 </p>
               </div>
-              <div className="p-5 space-y-3">
-                <Input
-                  value={adminQuestion}
-                  onChange={(e) => setAdminQuestion(e.target.value)}
-                  placeholder="Question"
-                  aria-label="FAQ question"
-                  className="bg-background/60 dark:bg-slate-900/60"
-                />
-                <textarea
-                  value={adminAnswer}
-                  onChange={(e) => setAdminAnswer(e.target.value)}
-                  placeholder="Answer"
-                  className="min-h-24 w-full resize-y rounded-md border border-input bg-background/60 dark:bg-slate-900/60 px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  aria-label="FAQ answer"
-                />
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    onClick={handleAddFaq}
-                    disabled={!adminQuestion.trim() || !adminAnswer.trim() || isAdding}
-                    className="bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md"
-                  >
-                    {isAdding ? "Saving…" : "Add Question & Answer"}
+            </div>
+          </div>
+
+          <div className="p-5">
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={n} className="rounded-2xl border border-slate-200 dark:border-slate-800 p-5 animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-xl bg-slate-200 dark:bg-slate-700 shrink-0" />
+                      <div className="h-4 rounded-lg bg-slate-200 dark:bg-slate-700 flex-1" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : loadError ? (
+              <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-destructive/40 p-10 text-center">
+                <div className="rounded-full bg-red-100 dark:bg-red-500/10 p-3">
+                  <X className="size-5 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-destructive">Failed to load FAQs</p>
+                  <p className="text-xs text-muted-foreground mt-1">{loadError}</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={fetchFaqs}>Retry</Button>
+              </div>
+            ) : filteredFaqs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-12 text-center">
+                <div className="rounded-2xl bg-violet-100/80 dark:bg-violet-500/10 p-4">
+                  <Search className="size-6 text-violet-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">No matching FAQ found</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                    {query
+                      ? `No results for "${query}". Try a different term.`
+                      : "No FAQs have been added yet. Ask your admin to add some."}
+                  </p>
+                </div>
+                {query && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setQuery("")}>
+                    Clear search
                   </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {filteredFaqs.map((item) => (
+                  <FaqCard
+                    key={item.id}
+                    item={item}
+                    isAdmin={isAdmin}
+                    isEditing={editingId === item.id}
+                    editQuestion={editQuestion}
+                    editAnswer={editAnswer}
+                    isSavingEdit={isSavingEdit}
+                    deletingId={deletingId}
+                    onStartEdit={() => startEdit(item)}
+                    onCancelEdit={cancelEdit}
+                    onSaveEdit={() => saveEdit(item.id)}
+                    onEditQuestion={setEditQuestion}
+                    onEditAnswer={setEditAnswer}
+                    onConfirmDelete={() => handleDelete(item.id)}
+                    onRequestDelete={() => setDeletingId(item.id)}
+                    onCancelDelete={() => setDeletingId(null)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Contact Support (non-admin users) ──────────────────────────── */}
+        {!isAdmin && (
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card shadow-sm overflow-hidden">
+            <div className="relative p-6">
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-50 to-sky-50 dark:from-violet-950/30 dark:to-sky-950/20 pointer-events-none" />
+              <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-sky-500 text-white shadow-md shadow-violet-500/25">
+                  <LifeBuoy className="size-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Still need help?</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Contact your administrator directly if you can't find an answer here.
+                  </p>
+                </div>
+                <a
+                  href="mailto:support@lankalogix.lk"
+                  className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-violet-200 dark:border-violet-500/30 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-500/10 transition-colors shadow-sm"
+                >
+                  <Mail className="size-4" />
+                  Contact Admin
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Admin: Add FAQ ──────────────────────────────────────────────── */}
+        {isAdmin && (
+          <div
+            ref={adminFormRef}
+            className="relative rounded-2xl border border-slate-200 dark:border-slate-800 bg-card shadow-sm overflow-hidden"
+          >
+            {/* Accent top bar */}
+            <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-sky-500" />
+
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-white/[0.02]">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/15">
+                  <PlusCircle className="size-4 text-violet-600 dark:text-violet-400" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Add New FAQ</p>
+                  <p className="text-[11px] text-muted-foreground">Publish a new question and answer to the knowledge base.</p>
                 </div>
               </div>
             </div>
-          )}
 
-        </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Question</label>
+                <Input
+                  value={adminQuestion}
+                  onChange={(e) => setAdminQuestion(e.target.value)}
+                  placeholder="e.g. How do I reset my password?"
+                  aria-label="FAQ question"
+                  className="bg-background/60 dark:bg-slate-900/60 rounded-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Answer</label>
+                <textarea
+                  value={adminAnswer}
+                  onChange={(e) => setAdminAnswer(e.target.value)}
+                  placeholder="Provide a clear and concise answer…"
+                  className="min-h-28 w-full resize-y rounded-xl border border-input bg-background/60 dark:bg-slate-900/60 px-3.5 py-2.5 text-sm outline-none transition-all focus-visible:border-violet-400 focus-visible:ring-2 focus-visible:ring-violet-400/30"
+                  aria-label="FAQ answer"
+                />
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <p className="text-xs text-muted-foreground">
+                  This FAQ will be visible to all users immediately.
+                </p>
+                <Button
+                  type="button"
+                  onClick={handleAddFaq}
+                  disabled={!adminQuestion.trim() || !adminAnswer.trim() || isAdding}
+                  className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md shadow-violet-500/25"
+                >
+                  <PlusCircle className="size-4 mr-1.5" />
+                  {isAdding ? "Publishing…" : "Publish FAQ"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
+      
+      <Footer />
     </div>
   );
 }

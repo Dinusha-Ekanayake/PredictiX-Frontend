@@ -159,6 +159,27 @@ export async function createAsset(payload: AssetWritePayload): Promise<Asset> {
   return apiPost<Asset>("/assets/", payload);
 }
 
+// ─── Upload Asset Image ────────────────────────────────────────────────────────
+
+export async function uploadAssetImage(assetId: string, file: File): Promise<Asset> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await apiFetch(`/assets/${assetId}/image`, {
+    method: "POST",
+    body: formData,
+    // Note: Do NOT set Content-Type header manually for FormData, 
+    // the browser will automatically set it with the boundary.
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Upload failed" }));
+    throw new Error(err.detail || "Image upload failed");
+  }
+
+  return response.json();
+}
+
 // ─── Update asset (full edit) ──────────────────────────────────────────────────
 
 export async function updateAsset(

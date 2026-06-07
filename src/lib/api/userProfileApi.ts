@@ -28,6 +28,13 @@ export type UserProfileData = {
   role: string;
   status: string;
   assignedAssetsCount: number;
+  avatar_url?: string | null;
+  settings?: {
+    emailNotifications?: boolean;
+    criticalAlerts?: boolean;
+    maintenanceAlerts?: boolean;
+    compactView?: boolean;
+  };
 };
 
 export type UserAssetData = {
@@ -79,6 +86,12 @@ export async function updateMyProfile(data: {
   lastName?: string;
   contactNumber?: string;
   address?: string;
+  settings?: {
+    emailNotifications?: boolean;
+    criticalAlerts?: boolean;
+    maintenanceAlerts?: boolean;
+    compactView?: boolean;
+  };
 }): Promise<UserProfileData> {
   const res = await fetch(`${API_URL}/profiles/me`, {
     method: "PUT",

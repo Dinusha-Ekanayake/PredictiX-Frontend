@@ -255,11 +255,12 @@ html {
 
 /* subtle shimmer line */
 @keyframes title-shimmer {
-  0% { transform: translateX(-120%); opacity: 0; }
-  25% { opacity: .28; }
-  60% { opacity: .18; }
+  0%   { transform: translateX(-120%); opacity: 0; }
+  25%  { opacity: .28; }
+  60%  { opacity: .18; }
   100% { transform: translateX(120%); opacity: 0; }
 }
+
 
 /* ===== Custom Scrollbar Styling ===== */
 .scrollbar-styled::-webkit-scrollbar {

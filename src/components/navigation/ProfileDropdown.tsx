@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import Link from "next/link";
@@ -13,6 +13,7 @@ import {
   Warehouse,
   ExternalLink,
   Settings,
+  CircleHelp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -29,12 +30,15 @@ export type ProfileDropdownUser = {
   department?: string | null;
   warehouse?: string | null;
   initials?: string;
+  avatar_url?: string | null;
 };
 
 type Props = {
   user: ProfileDropdownUser;
   /** Link to navigate to the full profile page */
   profileHref: string;
+  /** Link to navigate to the settings page */
+  settingsHref: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -67,7 +71,7 @@ function RoleBadge({ role }: { role: "ADMIN" | "USER" }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function ProfileDropdown({ user, profileHref }: Props) {
+export default function ProfileDropdown({ user, profileHref, settingsHref }: Props) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -125,14 +129,18 @@ export default function ProfileDropdown({ user, profileHref }: Props) {
         {/* Avatar circle */}
         <div
           className={cn(
-            "grid place-items-center rounded-full font-semibold text-white text-sm",
+            "grid place-items-center rounded-full font-semibold text-white text-sm overflow-hidden",
             "bg-gradient-to-br from-violet-600 to-indigo-600",
             "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
             "ring-2 ring-white/40 dark:ring-white/10",
             "h-9 w-9 transition-transform group-hover:scale-105 flex-shrink-0"
           )}
         >
-          {avatarText}
+          {user.avatar_url ? (
+            <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+          ) : (
+            avatarText
+          )}
         </div>
 
         {/* Chevron indicator */}
@@ -149,7 +157,7 @@ export default function ProfileDropdown({ user, profileHref }: Props) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "sm:hidden grid place-items-center rounded-full font-semibold text-white",
+          "sm:hidden grid place-items-center rounded-full font-semibold text-white overflow-hidden",
           "bg-gradient-to-br from-violet-600 to-indigo-600",
           "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
           "ring-2 ring-white/40 dark:ring-white/10",
@@ -159,7 +167,11 @@ export default function ProfileDropdown({ user, profileHref }: Props) {
         aria-haspopup="true"
         aria-expanded={open}
       >
-        {avatarText}
+        {user.avatar_url ? (
+          <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+        ) : (
+          avatarText
+        )}
       </button>
 
       {/* Dropdown Panel */}
@@ -182,14 +194,18 @@ export default function ProfileDropdown({ user, profileHref }: Props) {
           <div className="flex items-center gap-3">
             <div
               className={cn(
-                "grid place-items-center rounded-full font-bold text-white text-base",
+                "grid place-items-center rounded-full font-bold text-white text-base overflow-hidden",
                 "bg-gradient-to-br from-violet-600 to-indigo-600",
                 "ring-2 ring-white dark:ring-slate-900",
                 "shadow-[0_8px_20px_-8px_rgba(99,102,241,0.8)]",
                 "h-12 w-12 flex-shrink-0"
               )}
             >
-              {avatarText}
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                avatarText
+              )}
             </div>
             <div className="min-w-0">
               <p className="font-semibold text-sm truncate leading-tight">{user.name}</p>
@@ -254,19 +270,18 @@ export default function ProfileDropdown({ user, profileHref }: Props) {
             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
           </Link>
 
-          <button
-            type="button"
+          <Link
+            href={settingsHref}
             role="menuitem"
-            disabled
-            title="Coming soon"
+            onClick={() => setOpen(false)}
             className={cn(
-              "w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium",
-              "text-slate-400 dark:text-slate-500",
-              "cursor-not-allowed"
+              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium",
+              "text-slate-700 dark:text-slate-200",
+              "hover:bg-slate-100 dark:hover:bg-white/8 transition-colors"
             )}
           >
             <div className="grid place-items-center h-8 w-8 rounded-lg bg-slate-100 dark:bg-white/5 flex-shrink-0">
-              <Settings className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+              <Settings className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             </div>
             <div className="flex-1 min-w-0 text-left">
               <div className="leading-tight">Settings</div>
@@ -274,10 +289,28 @@ export default function ProfileDropdown({ user, profileHref }: Props) {
                 Preferences & notifications
               </div>
             </div>
-            <span className="text-[10px] bg-slate-100 dark:bg-white/10 text-muted-foreground px-1.5 py-0.5 rounded-md font-medium flex-shrink-0">
-              Soon
-            </span>
-          </button>
+          </Link>
+
+          <Link
+            href="/help-desk"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className={cn(
+              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium",
+              "text-slate-700 dark:text-slate-200",
+              "hover:bg-slate-100 dark:hover:bg-white/8 transition-colors"
+            )}
+          >
+            <div className="grid place-items-center h-8 w-8 rounded-lg bg-violet-50 dark:bg-violet-500/10 flex-shrink-0">
+              <CircleHelp className="h-4 w-4 text-violet-500 dark:text-violet-400" />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <div className="leading-tight">Help Desk</div>
+              <div className="text-[11px] text-muted-foreground font-normal">
+                FAQs & support articles
+              </div>
+            </div>
+          </Link>
         </div>
 
         <div className="h-px bg-slate-100 dark:bg-white/10 mx-3" />

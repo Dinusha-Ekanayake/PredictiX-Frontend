@@ -94,20 +94,20 @@ export default function AdminSettingsPage() {
             <CardDescription>Configure how you receive alerts and reports.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-0.5 pr-2">
                 <Label className="text-base">Email Notifications</Label>
-                <p className="text-sm text-muted-foreground">Receive daily summary reports via email.</p>
+                <p className="text-sm text-muted-foreground leading-snug">Receive daily summary reports via email.</p>
               </div>
               <Switch
                 checked={emailNotifications}
                 onCheckedChange={setEmailNotifications}
               />
             </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-0.5 pr-2">
                 <Label className="text-base">Critical Alerts</Label>
-                <p className="text-sm text-muted-foreground">Get immediate notifications for critical asset failures.</p>
+                <p className="text-sm text-muted-foreground leading-snug">Get immediate notifications for critical asset failures.</p>
               </div>
               <Switch
                 checked={criticalAlerts}
@@ -123,10 +123,10 @@ export default function AdminSettingsPage() {
             <CardDescription>Manage your dashboard and viewing preferences.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-0.5 pr-2">
                 <Label className="text-base">Compact View</Label>
-                <p className="text-sm text-muted-foreground">Display tables and lists in a compact format.</p>
+                <p className="text-sm text-muted-foreground leading-snug">Display tables and lists in a compact format.</p>
               </div>
               <Switch
                 checked={compactView}

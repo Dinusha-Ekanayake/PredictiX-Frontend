@@ -136,6 +136,7 @@ const HELPDESK_ROUTE_PREFIXES = ["/help-desk", "/admin/help-desk", "/user/help-d
 
 export default function FloatingChatbot() {
   const pathname = usePathname();
+  const isHelpDeskRoute = HELPDESK_ROUTE_PREFIXES.some((p) => pathname?.startsWith(p) ?? false);
 
   const [isMounted, setIsMounted] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);

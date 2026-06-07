@@ -9,12 +9,14 @@ import {
   TrendingUp, TrendingDown, Minus, Pencil, Trash2, Bot,
   ClipboardList, Users, ShieldCheck, Zap, AlertTriangle,
   RefreshCw, Ticket, ChevronRight, Loader2,
-  Info, Gauge, Hash,
+  Info, Gauge, Hash, Wrench,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
 import type { AssetDetail, ComponentSurvivalResponse } from "./types";
 import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
+import LogMaintenanceDialog from "./LogMaintenanceDialog";
 
 /* ══════════════════════════════════════════════════════════════════════════════
    Helpers
@@ -114,7 +116,7 @@ function InfoField({ icon, label, value, mono, valueClass }: {
       {icon && <div className="mt-0.5 text-muted-foreground/60 shrink-0">{icon}</div>}
       <div className="min-w-0">
         <div className="text-[11px] text-muted-foreground/80 font-medium">{label}</div>
-        <div className={cn("text-sm font-medium mt-0.5 truncate", mono && "font-mono text-xs", valueClass)}>
+        <div className={cn("text-sm font-medium mt-0.5 leading-snug break-words", mono && "font-mono text-xs", valueClass)}>
           {value}
         </div>
       </div>
@@ -223,12 +225,17 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
   const router = useNavRouter();
 
   const [runningPrediction, setRunningPrediction] = React.useState(false);
+  const [showLogMaintenance, setShowLogMaintenance] = React.useState(false);
 
   const healthScore = deriveHealthScore(asset, prediction);
   const failureProb = deriveFailureProbability(prediction);
 
   const daysUntilMaint = asset.next_service_date
     ? Math.ceil((new Date(asset.next_service_date).getTime() - Date.now()) / 86_400_000)
+    : null;
+
+  const aiDaysUntilMaint = prediction?.predicted_maintenance_date
+    ? Math.ceil((new Date(prediction.predicted_maintenance_date).getTime() - Date.now()) / 86_400_000)
     : null;
 
   const predDiff =
@@ -254,9 +261,11 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
     setRunningPrediction(true);
     try {
       await runVehiclePrediction(asset.id);
+      toast.success("Prediction generated successfully!");
       onRefresh();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Prediction failed:", e);
+      toast.error(e.message || "Failed to generate prediction");
     } finally {
       setRunningPrediction(false);
     }
@@ -291,6 +300,15 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-xl gap-1.5 text-xs border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+            onClick={() => setShowLogMaintenance(true)}
+          >
+            <Wrench className="h-3 w-3" />
+            Log Maint.
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -442,11 +460,13 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
             icon={<CalendarClock className="h-3.5 w-3.5" />}
             label="Next Scheduled Service"
             value={
-              asset.next_service_date
-                ? `${fmt(asset.next_service_date)}${daysUntilMaint !== null ? ` (${daysUntilMaint > 0 ? `in ${daysUntilMaint}d` : `${Math.abs(daysUntilMaint)}d overdue`})` : ""}`
-                : "—"
+              asset.status === "maintenance"
+                ? "Currently in Maintenance"
+                : asset.next_service_date
+                  ? `${fmt(asset.next_service_date)}${daysUntilMaint !== null ? ` (${daysUntilMaint > 0 ? `in ${daysUntilMaint}d` : `${Math.abs(daysUntilMaint)}d overdue`})` : ""}`
+                  : "—"
             }
-            valueClass={daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
+            valueClass={asset.status !== "maintenance" && daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
           />
           <InfoField
             icon={<Bot className="h-3.5 w-3.5" />}
@@ -624,11 +644,11 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
                         </div>
                       </div>
                       {/* Maintenance countdown */}
-                      {prediction.days_until_maintenance != null && (
+                      {aiDaysUntilMaint != null && (
                         <div className="flex items-center justify-between text-xs border-t border-slate-200/60 dark:border-white/6 pt-2">
                           <span className="text-muted-foreground">Days until maintenance</span>
-                          <span className={`font-bold tabular-nums ${Number(prediction.days_until_maintenance) <= 14 ? "text-red-500" : Number(prediction.days_until_maintenance) <= 30 ? "text-amber-500" : "text-foreground"}`}>
-                            {prediction.days_until_maintenance}d
+                          <span className={`font-bold tabular-nums ${aiDaysUntilMaint < 0 ? "text-red-600 dark:text-red-400" : aiDaysUntilMaint <= 14 ? "text-red-500" : aiDaysUntilMaint <= 30 ? "text-amber-500" : "text-foreground"}`}>
+                            {aiDaysUntilMaint < 0 ? `${Math.abs(aiDaysUntilMaint)}d overdue` : `${aiDaysUntilMaint}d`}
                           </span>
                         </div>
                       )}
@@ -722,7 +742,10 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
                       )}
                       <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
                         <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                        <span>Predicted maintenance date: <strong>{prediction.predicted_maintenance_date ? new Date(prediction.predicted_maintenance_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</strong></span>
+                        <span>
+                          {aiDaysUntilMaint !== null && aiDaysUntilMaint < 0 ? "Maintenance was due on:" : "Predicted maintenance date:"} 
+                          <strong> {prediction.predicted_maintenance_date ? new Date(prediction.predicted_maintenance_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</strong>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -946,6 +969,13 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
           </TabsContent>
         </Tabs>
       </div>
+
+      <LogMaintenanceDialog
+        open={showLogMaintenance}
+        onOpenChange={setShowLogMaintenance}
+        asset={asset}
+        onSaved={onRefresh}
+      />
     </div>
   );
 }

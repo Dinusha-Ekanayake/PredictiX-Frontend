@@ -10,7 +10,7 @@ import ProfilePhotoUpload from "@/components/common/ProfilePhotoUpload";
 
 export default function UserSettingsPage() {
   return (
-    <div className="w-full space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
       <PageHero
         crumbs={["PredictiX", "User", "Settings"]}
         title="Settings"

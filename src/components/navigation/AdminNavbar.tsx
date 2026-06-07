@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import Link from "next/link";
@@ -10,6 +10,7 @@ import {
   Warehouse,
   Users,
   Menu,
+  CircleHelp,
 } from "lucide-react";
 
 import PredictiXLogo from "@/components/brand/PredictiXLogo";
@@ -26,6 +27,7 @@ import {
 import ProfileDropdown, {
   type ProfileDropdownUser,
 } from "@/components/navigation/ProfileDropdown";
+import NotificationBell from "@/components/navigation/NotificationBell";
 import { useUser } from "@/hooks/useAuth";
 import { fetchMyProfile } from "@/lib/api/userProfileApi";
 
@@ -87,6 +89,7 @@ export default function AdminNavbar() {
           role: (data.role?.toUpperCase() as "ADMIN" | "USER") || "ADMIN",
           department: data.department ?? null,
           warehouse: data.warehouse ?? null,
+          avatar_url: data.avatar_url ?? null,
         });
       })
       .catch(() => {
@@ -186,14 +189,17 @@ export default function AdminNavbar() {
               })}
             </nav>
 
-            {/* RIGHT - Theme + Profile dropdown */}
+            {/* RIGHT - Theme + Notifications + Profile */}
             <div className="flex items-center gap-3 justify-self-end">
               <ThemeToggle className="-translate-y-px" size={20} />
+              
+              <NotificationBell />
 
               {/* Profile dropdown (replaces old profile button + dialog) */}
               <ProfileDropdown
                 user={profileUser}
-                profileHref="/admin/dashboard"
+                profileHref="/admin/profile"
+                settingsHref="/admin/settings"
               />
 
               {/* Mobile menu */}
@@ -218,13 +224,17 @@ export default function AdminNavbar() {
                       <div className="flex items-center gap-3">
                         <div
                           className={cn(
-                            "grid place-items-center rounded-full font-semibold text-white",
+                            "grid place-items-center rounded-full font-semibold text-white overflow-hidden",
                             "bg-gradient-to-br from-violet-600 to-indigo-600",
                             "ring-1 ring-white/40 dark:ring-white/10",
                             "h-11 w-11 text-sm flex-shrink-0"
                           )}
                         >
-                          {avatarText}
+                          {profileUser.avatar_url ? (
+                            <img src={profileUser.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                          ) : (
+                            avatarText
+                          )}
                         </div>
                         <div className="min-w-0">
                           <div className="text-sm font-semibold truncate">{profileUser.name}</div>

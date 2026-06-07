@@ -23,6 +23,7 @@ import {
   deleteTicket,
   type Ticket,
 } from "@/lib/ticketService";
+import { listUsers, type UserItem } from "@/lib/userService";
 
 export default function AdminTicketsPage() {
   const [isAdmin, setIsAdmin] = React.useState(false);
@@ -42,16 +43,32 @@ export default function AdminTicketsPage() {
   const [debouncedQuery, setDebouncedQuery] = React.useState("");
   const [selectedStatus, setSelectedStatus] = React.useState("all");
   const [selectedPriority, setSelectedPriority] = React.useState("all");
+  const [users, setUsers] = React.useState<UserItem[]>([]);
 
   React.useEffect(() => {
     const role = window.localStorage.getItem("predictix.user.role");
     setIsAdmin(role === "admin" || role === "ADMIN");
+    listUsers()
+      .then(setUsers)
+      .catch((err) => console.error("Failed to load users:", err));
+  }, []);
+
+  const userMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    users.forEach((u) => {
+      map.set(u.id, u.name);
+    });
+    return map;
+  }, [users]);
+
+  const refreshStatusCounts = React.useCallback(() => {
+    fetchTicketStatusCounts().then(setStatusCounts).catch(() => {});
   }, []);
 
   // Load global status counts (not affected by filters)
   React.useEffect(() => {
-    fetchTicketStatusCounts().then(setStatusCounts).catch(() => {});
-  }, []);
+    refreshStatusCounts();
+  }, [refreshStatusCounts]);
 
   // Debounce search input
   React.useEffect(() => {
@@ -79,7 +96,11 @@ export default function AdminTicketsPage() {
         selectedPriority
       );
       setTotal(t);
-      setTickets((prev) => (reset ? rows : [...prev, ...rows]));
+      setTickets((prev) => {
+        const next = reset ? rows : [...prev, ...rows];
+        const unique = new Map(next.map(t => [t.id, t]));
+        return Array.from(unique.values());
+      });
       setPage(pageNum);
     } catch (err) {
       toast.error("Failed to load tickets", {
@@ -98,11 +119,13 @@ export default function AdminTicketsPage() {
   function handleTicketCreated(ticket: Ticket) {
     setTickets((prev) => [ticket, ...prev]);
     setTotal((t) => t + 1);
+    refreshStatusCounts();
   }
 
   function handleTicketUpdated(updated: Ticket) {
     setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
     if (selectedTicket?.id === updated.id) setSelectedTicket(updated);
+    refreshStatusCounts();
   }
 
   async function handleDeleteTicket(id: string) {
@@ -113,6 +136,7 @@ export default function AdminTicketsPage() {
       setSelectedTicket(null);
       setDetailOpen(false);
       toast.success("Ticket deleted");
+      refreshStatusCounts();
     } catch (err) {
       toast.error("Failed to delete ticket", {
         description: err instanceof Error ? err.message : undefined,
@@ -208,7 +232,7 @@ export default function AdminTicketsPage() {
             />
           </div>
 
-          <div className="hidden items-center gap-2 sm:flex">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v)}>
               <SelectTrigger className="w-40 h-10">
                 <SelectValue placeholder="All Status" />
@@ -380,7 +404,7 @@ export default function AdminTicketsPage() {
                   <div className="ml-2 shrink-0 flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap">
                     <span className="text-[10px] uppercase tracking-wide">Assigned</span>
                     {t.assigned_to ? (
-                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300 font-mono">{t.assigned_to.slice(0, 8)}</Badge>
+                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300 font-medium">{userMap.get(t.assigned_to) ?? t.assigned_to.slice(0, 8)}</Badge>
                     ) : (
                       <span className="italic">Unassigned</span>
                     )}

@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { useUser } from "@/hooks/useAuth";
 
 function timeAgo(dateString: string) {
   const date = new Date(dateString);
@@ -52,10 +53,41 @@ export default function NotificationBell() {
   // Fetch on mount
   React.useEffect(() => {
     loadNotifications();
-    // Optional: set up a polling interval here if desired
-    // const interval = setInterval(loadNotifications, 60000);
-    // return () => clearInterval(interval);
   }, [loadNotifications]);
+
+  const { user } = useUser();
+  const userId = user?.id;
+
+  // WebSocket Connection
+  React.useEffect(() => {
+    if (!userId) return;
+
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
+    const ws = new WebSocket(`${wsUrl}/ws/notifications/${userId}`);
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload && payload.id) {
+          // It's a new notification!
+          setNotifications((prev) => [payload, ...prev]);
+          toast.info(payload.title, {
+            description: payload.message,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to parse websocket message", err);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket disconnected.");
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [userId]);
 
   // Close on outside click
   React.useEffect(() => {

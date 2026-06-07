@@ -17,7 +17,7 @@ export default function AdminSettingsPage() {
         subtitle="Manage your administrative preferences and notifications."
       />
 
-      <div className="max-w-3xl space-y-6">
+      <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Profile Details</CardTitle>

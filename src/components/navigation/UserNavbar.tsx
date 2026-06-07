@@ -26,6 +26,7 @@ import {
 import ProfileDropdown, {
   type ProfileDropdownUser,
 } from "@/components/navigation/ProfileDropdown";
+import NotificationBell from "@/components/navigation/NotificationBell";
 import { useUser } from "@/hooks/useAuth";
 import { fetchMyProfile } from "@/lib/api/userProfileApi";
 
@@ -185,9 +186,11 @@ export default function UserNavbar() {
               })}
             </nav>
 
-            {/* RIGHT - Theme + Profile dropdown */}
+            {/* RIGHT - Theme + Notifications + Profile */}
             <div className="flex items-center gap-3 justify-self-end">
               <ThemeToggle className="-translate-y-px" size={20} />
+              
+              <NotificationBell />
 
               <ProfileDropdown
                 user={profileUser}

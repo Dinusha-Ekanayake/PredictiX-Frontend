@@ -119,9 +119,9 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
         )}
       >
         {/* Name + role text */}
-        <div className="text-right leading-[1.1]">
-          <div className="text-sm font-semibold tracking-tight">{user.name}</div>
-          <div className="text-[11px] text-muted-foreground font-medium">
+        <div className="text-right flex flex-col justify-center gap-0.5">
+          <div className="text-sm font-semibold tracking-tight leading-none">{user.name}</div>
+          <div className="text-[11px] text-muted-foreground font-medium leading-none pb-0.5">
             {user.role === "ADMIN" ? "Administrator" : "User"}
           </div>
         </div>

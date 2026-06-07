@@ -214,11 +214,11 @@ export default function NotificationBell() {
                   onClick={() => handleMarkAsRead(notification.id, notification.status)}
                   className={cn(
                     "flex gap-3 p-4 border-b border-slate-100 dark:border-white/5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors relative group",
-                    getPriorityBg(notification.priority, notification.status)
+                    getPriorityBg(notification.meta?.priority || "low", notification.status)
                   )}
                 >
                   <div className="flex-shrink-0 mt-0.5">
-                    {getPriorityIcon(notification.priority)}
+                    {getPriorityIcon(notification.meta?.priority || "low")}
                   </div>
                   <div className="flex-1 min-w-0 pr-6">
                     <p className={cn(

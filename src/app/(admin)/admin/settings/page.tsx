@@ -10,7 +10,7 @@ import ProfilePhotoUpload from "@/components/common/ProfilePhotoUpload";
 
 export default function AdminSettingsPage() {
   return (
-    <div className="w-full space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
       <PageHero
         crumbs={["PredictiX", "Admin", "Settings"]}
         title="Admin Settings"

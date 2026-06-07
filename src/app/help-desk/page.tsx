@@ -21,6 +21,8 @@ import { toast } from "sonner";
 
 import AdminNavbar from "@/components/navigation/AdminNavbar";
 import UserNavbar from "@/components/navigation/UserNavbar";
+import AmbientBackground from "@/components/background/AmbientBackground";
+import Footer from "@/components/navigation/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/apiClient";
@@ -347,57 +349,47 @@ export default function HelpDeskPage() {
   const Navbar = isAdmin ? AdminNavbar : UserNavbar;
 
   return (
-    /* Match the shared page background used across all admin/user pages */
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="relative min-h-screen flex flex-col">
+      <AmbientBackground />
       <Navbar />
 
-      <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
+      <main className="relative z-10 flex-1 mx-auto w-full max-w-5xl px-4 py-8 space-y-6">
 
-        {/* ── Hero Banner ────────────────────────────────────────────────── */}
-        <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-white/8">
-          <div className="absolute inset-0 bg-gradient-to-br from-violet-50 via-white to-sky-50 dark:from-violet-950/40 dark:via-slate-900 dark:to-indigo-950/40 pointer-events-none" />
-          <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-gradient-to-br from-violet-400/20 to-sky-400/20 dark:from-violet-500/10 dark:to-sky-500/8 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-12 -left-12 h-48 w-48 rounded-full bg-gradient-to-br from-fuchsia-400/10 to-violet-400/10 dark:from-fuchsia-500/8 dark:to-violet-500/8 blur-3xl pointer-events-none" />
-
-          <div className="relative px-7 py-7 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-violet-500 dark:text-violet-400">PredictiX</span>
-                <span className="text-muted-foreground/30 text-xs">/</span>
-                <span className="text-[10px] tracking-widest uppercase text-muted-foreground/70">Help Desk</span>
+        {/* ── Hero header ── */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-linear-to-br from-slate-50 via-white to-slate-50 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent dark:bg-white/2 p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-primary/10 dark:bg-white/6 p-2.5">
+                <CircleHelp className="h-5 w-5 text-primary dark:text-white/70" />
               </div>
-              <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight text-foreground">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-sky-500 text-white shadow-lg shadow-violet-500/30">
-                  <CircleHelp className="size-5" />
-                </span>
-                Help Desk
-              </h1>
-              <p className="mt-2.5 text-sm text-muted-foreground max-w-md leading-relaxed">
-                Browse curated answers to common questions. Can't find what you need? Reach out to your administrator.
-              </p>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">Help Desk</h1>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Browse curated answers to common questions.
+                </p>
+              </div>
             </div>
 
-            <div className="flex flex-col items-start sm:items-end gap-3 shrink-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/25 px-3 py-1 text-[11px] font-semibold text-violet-700 dark:text-violet-300">
-                  <BookOpen className="h-3 w-3" />
-                  {faqItems.length} article{faqItems.length !== 1 && "s"}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 px-3 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-                  <Sparkles className="h-3 w-3" />
-                  Knowledge Base
-                </span>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/25 px-3 py-1 text-xs font-medium text-violet-700 dark:text-violet-300">
+                <BookOpen className="h-3.5 w-3.5" />
+                {faqItems.length} articles
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                <Sparkles className="h-3.5 w-3.5" />
+                Knowledge Base
+              </span>
               {isAdmin && (
                 <Button
-                  type="button"
+                  size="sm"
+                  variant="default"
+                  className="h-8 gap-1.5 rounded-full"
                   onClick={() =>
                     adminFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
                   }
-                  className="h-9 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md shadow-violet-500/25"
                 >
-                  <PlusCircle className="size-4 mr-1.5" />
-                  Add New Q&amp;A
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  Add Q&amp;A
                 </Button>
               )}
             </div>
@@ -603,6 +595,8 @@ export default function HelpDeskPage() {
         )}
 
       </main>
+      
+      <Footer />
     </div>
   );
 }

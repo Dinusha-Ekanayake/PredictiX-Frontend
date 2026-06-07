@@ -228,6 +228,13 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import RoleSelectCards, { type Role } from "@/components/auth/RoleSelectCards";
 import PredictiXLogo from "@/components/brand/PredictiXLogo";
@@ -294,13 +301,25 @@ export default function LoginPage() {
   const [role, setRole] = React.useState<Role | "">("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [warehouseId, setWarehouseId] = React.useState("");
+  const [warehouses, setWarehouses] = React.useState<Array<{id: string, name: string}>>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
+
+  React.useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/warehouses`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setWarehouses(data);
+      })
+      .catch(err => console.error("Failed to load warehouses:", err));
+  }, []);
 
   const canSubmit =
     role !== "" &&
     email.trim().length > 0 &&
     password.trim().length > 0 &&
+    (String(role).toUpperCase() === "SUPER_ADMIN" ? warehouseId !== "" : true) &&
     !isSubmitting;
 
   async function onSubmit(e: React.FormEvent) {
@@ -315,6 +334,7 @@ export default function LoginPage() {
         email: email.trim().toLowerCase(),
         password: password.trim(),
         role: String(role).toUpperCase(), // backend validates declared role
+        warehouse_id: warehouseId,
       });
 
       // Single source of truth for session storage (writes both token keys).
@@ -443,6 +463,27 @@ export default function LoginPage() {
                       disabled={isSubmitting}
                     />
                   </div>
+
+                  {/* Warehouse selector (Super Admin Only) */}
+                  {String(role).toUpperCase() === "SUPER_ADMIN" && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                        Warehouse
+                      </Label>
+                      <Select value={warehouseId} onValueChange={setWarehouseId} disabled={isSubmitting}>
+                        <SelectTrigger className="h-11 w-full text-left font-normal bg-white dark:bg-slate-950">
+                          <SelectValue placeholder="Select a warehouse" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {warehouses.map((w) => (
+                            <SelectItem key={w.id} value={w.id}>
+                              {w.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
 
                   {/* Password */}

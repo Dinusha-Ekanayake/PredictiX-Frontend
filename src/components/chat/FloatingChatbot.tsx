@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
@@ -164,19 +164,7 @@ export default function FloatingChatbot() {
     });
   }, [pathname]);
 
-  const isHelpDeskRoute = React.useMemo(() => {
-    return HELPDESK_ROUTE_PREFIXES.some((prefix) => {
-      return pathname === prefix || pathname.startsWith(`${prefix}/`);
-    });
-  }, [pathname]);
 
-  // On help-desk routes, force chatbot to top-left so it can never overlap
-  // the floating Help Desk action button (which lives in the bottom-right).
-  React.useEffect(() => {
-    if (!isMounted || !isHelpDeskRoute) return;
-    setIsOpen(false);
-    setPosition({ x: LAUNCHER_MARGIN, y: LAUNCHER_MARGIN });
-  }, [isHelpDeskRoute, isMounted]);
 
   React.useEffect(() => {
     const width = window.innerWidth;
@@ -409,10 +397,6 @@ export default function FloatingChatbot() {
 
   const onLauncherPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) {
-      return;
-    }
-    if (isHelpDeskRoute) {
-      // Dragging is disabled on help desk routes — click only.
       return;
     }
 

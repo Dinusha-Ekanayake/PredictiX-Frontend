@@ -102,40 +102,44 @@ export default function UserAssetsPage() {
     const h = r.healthPercent != null ? Math.round(r.healthPercent) : null;
     const d = daysUntil(r.nextServiceDate);
     return (
-      <div className="flex items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15">
-          <Boxes className="h-5 w-5 text-indigo-500" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-semibold">{r.name}</p>
-            <span className="rounded-full bg-slate-100 dark:bg-white/10 px-2 py-0.5 text-[10px] font-mono text-muted-foreground">{r.code}</span>
-            {r.assigned && <Badge variant="outline" className="text-[10px]">Assigned to you</Badge>}
-            <Badge variant="outline" className="text-[10px] capitalize">{r.status?.replace("_", " ")}</Badge>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+        <div className="flex items-start sm:items-center gap-4 min-w-0 flex-1">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15">
+            <Boxes className="h-5 w-5 text-indigo-500" />
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-            {r.category && <span className="capitalize">{r.category.replace("_", " ")}</span>}
-            {r.location && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{r.location}</span>}
-            {r.nextServiceDate && (
-              <span className={`inline-flex items-center gap-1 ${d != null && d <= 30 ? "text-amber-600 dark:text-amber-400 font-medium" : ""}`}>
-                <CalendarClock className="h-3 w-3" />
-                {d != null && d < 0 ? `overdue ${Math.abs(d)}d` : `service in ${d}d`}
-              </span>
-            )}
-          </div>
-        </div>
-        {h != null && (
-          <div className="flex shrink-0 items-center gap-2">
-            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full" style={{ width: `${h}%`, background: healthColor(h) }} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <span className="rounded-full bg-slate-100 dark:bg-white/10 px-2 py-0.5 text-[10px] font-mono text-muted-foreground">{r.code}</span>
+              {r.assigned && <Badge variant="outline" className="text-[10px]">Assigned to you</Badge>}
+              <Badge variant="outline" className="text-[10px] capitalize">{r.status?.replace("_", " ")}</Badge>
             </div>
-            <span className="w-9 text-right text-xs font-semibold tabular-nums" style={{ color: healthColor(h) }}>{h}%</span>
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+              {r.category && <span className="capitalize">{r.category.replace("_", " ")}</span>}
+              {r.location && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{r.location}</span>}
+              {r.nextServiceDate && (
+                <span className={`inline-flex items-center gap-1 ${d != null && d <= 30 ? "text-amber-600 dark:text-amber-400 font-medium" : ""}`}>
+                  <CalendarClock className="h-3 w-3" />
+                  {d != null && d < 0 ? `overdue ${Math.abs(d)}d` : `service in ${d}d`}
+                </span>
+              )}
+            </div>
           </div>
-        )}
-        <Button size="sm" variant="outline" className="shrink-0 gap-1.5"
-          onClick={() => setTicketAsset({ id: r.id, name: r.name })}>
-          <TicketIcon className="h-3.5 w-3.5" /> Create Ticket
-        </Button>
+        </div>
+        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 mt-1 sm:mt-0">
+          {h != null && (
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full" style={{ width: `${h}%`, background: healthColor(h) }} />
+              </div>
+              <span className="w-9 text-right text-xs font-semibold tabular-nums" style={{ color: healthColor(h) }}>{h}%</span>
+            </div>
+          )}
+          <Button size="sm" variant="outline" className="shrink-0 gap-1.5"
+            onClick={() => setTicketAsset({ id: r.id, name: r.name })}>
+            <TicketIcon className="h-3.5 w-3.5" /> Create Ticket
+          </Button>
+        </div>
       </div>
     );
   }

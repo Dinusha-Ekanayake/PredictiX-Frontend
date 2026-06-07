@@ -36,7 +36,6 @@ const NAV = [
   { href: "/admin/assets", label: "Assets", icon: Boxes },
   { href: "/admin/warehouse", label: "Warehouse", icon: Warehouse },
   { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/help-desk", label: "Help Desk", icon: CircleHelp },
 ] as const;
 
 function isActive(pathname: string, href: string) {

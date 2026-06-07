@@ -32,6 +32,13 @@ export type UserProfileData = {
   role: string;
   status: string;
   assignedAssetsCount: number;
+  avatar_url?: string | null;
+  settings?: {
+    emailNotifications?: boolean;
+    criticalAlerts?: boolean;
+    maintenanceAlerts?: boolean;
+    compactView?: boolean;
+  };
 };
 
 export type UserAssetData = {
@@ -64,6 +71,7 @@ export type TeamMemberData = {
   role: string;
   status: string;
 };
+
 
 export type UserItemOut = {
   id: string;

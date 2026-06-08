@@ -28,12 +28,15 @@ export type Asset = {
   vehicle_age_years: number | null;
   lifetime_service_count: number | null;
   lifetime_breakdown_count: number | null;
+<<<<<<< HEAD
+=======
   // Custom metadata
   meta?: {
     image_url?: string; // Legacy
     images?: string[];
     [key: string]: any;
   };
+>>>>>>> 0974038 (feat: complete in-app notifications and fix build errors)
   created_at: string;
   updated_at: string;
 };
@@ -134,41 +137,11 @@ export type VehiclePredictionResult = {
   features_used: Record<string, unknown>;
 };
 
-// ─── Survival Prediction (FRSO) ────────────────────────────────────────────────
-export type SurvivalCurvePoint = {
-  day: number;
-  survival_prob: number;
-};
-
-export type ComponentSurvivalResponse = {
-  asset_id: string;
-  component: "brake" | "tire" | "battery" | "oil" | "hydraulic";
-  median_days: number;
-  p10_days: number;
-  p90_days: number;
-  curve: SurvivalCurvePoint[];
-};
-
-export type ComponentSurvivalError = {
-  component: "brake" | "tire" | "battery" | "oil" | "hydraulic";
-  error: string;
-};
-
-export type AssetSurvivalResponse = {
-  asset_id: string;
-  horizon_days: number;
-  step_days: number;
-  soonest_component: "brake" | "tire" | "battery" | "oil" | "hydraulic" | null;
-  soonest_median_days: number | null;
-  components: (ComponentSurvivalResponse | ComponentSurvivalError)[];
-};
-
 // ─── Combined asset detail view (assembled in the service layer) ───────────────
 export type AssetDetail = {
   asset: Asset;
   prediction: FailurePrediction | null;
   costPrediction: CostPrediction | null;
-  survivalPrediction: AssetSurvivalResponse | null;
   maintenanceEvents: MaintenanceEvent[];
   tickets: Ticket[];
   assignments: AssetAssignment[];

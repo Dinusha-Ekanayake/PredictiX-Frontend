@@ -177,7 +177,7 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
       {/* Dropdown Panel */}
       <div
         className={cn(
-          "absolute right-0 top-[calc(100%+10px)] z-[200] w-[90vw] sm:w-[300px]",
+          "absolute right-0 top-[calc(100%+10px)] z-[200] w-[300px]",
           "rounded-2xl border border-slate-200/80 dark:border-white/10",
           "bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl",
           "shadow-[0_20px_60px_-15px_rgba(0,0,0,0.18)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]",

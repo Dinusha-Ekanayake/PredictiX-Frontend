@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import Link from "next/link";
@@ -23,9 +23,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import AdminProfileDialog, {
-  type AdminProfile,
-} from "@/components/navigation/AdminProfileDialog";
+import ProfileDropdown, {
+  type ProfileDropdownUser,
+} from "@/components/navigation/ProfileDropdown";
+import { useUser } from "@/hooks/useAuth";
+import { fetchMyProfile } from "@/lib/api/userProfileApi";
 
 const NAV = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -39,51 +41,62 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-type UserRole = "ADMIN" | "USER";
-
-type Props = {
-  name?: string;
-  role?: UserRole;
-  initials?: string;
-  email?: string;
-  assignedWarehouse?: string;
-  department?: string;
-};
-
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "U";
+  if (parts.length === 0) return "A";
   if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export default function AdminNavbar({
-  name = "Dinusha Ekanayake",
-  role = "ADMIN",
-  initials,
-  email = "admin@mail.com",
-  assignedWarehouse = "Main Warehouse",
-  department = "Operations",
-}: Props) {
+export default function AdminNavbar() {
   const pathname = usePathname() ?? "";
   const [scrolled, setScrolled] = React.useState(false);
   const [open, setOpen] = React.useState(false);
-  const [profileOpen, setProfileOpen] = React.useState(false);
 
-  const badgeText = role === "ADMIN" ? "Admin" : "User";
-  const avatarText = initials ?? getInitials(name);
+  // ── User data ──────────────────────────────────────────────────────────────
+  // Start with data from localStorage (instant) then hydrate from backend
+  const { user: storedUser } = useUser();
 
-  const adminProfile: AdminProfile = {
-    name,
-    email,
-    role,
-    department,
-    assignedWarehouse,
-  };
+  const [profileUser, setProfileUser] = React.useState<ProfileDropdownUser>({
+    name: "Admin",
+    email: "",
+    role: "ADMIN",
+    department: null,
+    warehouse: null,
+  });
 
-  function handleProfileClick() {
-    setProfileOpen(true);
-  }
+  // Populate from localStorage immediately
+  React.useEffect(() => {
+    if (storedUser) {
+      setProfileUser((prev) => ({
+        ...prev,
+        name: storedUser.full_name || "Admin",
+        email: storedUser.email || "",
+        role: (storedUser.role?.toUpperCase() as "ADMIN" | "USER") || "ADMIN",
+      }));
+    }
+  }, [storedUser]);
+
+  // Hydrate richer data from backend (department, warehouse)
+  React.useEffect(() => {
+    fetchMyProfile()
+      .then((data) => {
+        setProfileUser({
+          name: data.name || storedUser?.full_name || "Admin",
+          email: data.email || storedUser?.email || "",
+          role: (data.role?.toUpperCase() as "ADMIN" | "USER") || "ADMIN",
+          department: data.department ?? null,
+          warehouse: data.warehouse ?? null,
+          avatar_url: data.avatar_url ?? null,
+        });
+      })
+      .catch(() => {
+        // Silently fall back to localStorage values already set
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const avatarText = getInitials(profileUser.name);
 
   React.useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 80);
@@ -103,239 +116,165 @@ export default function AdminNavbar({
         <div
           className={cn(
             "transition-all duration-300",
-            !scrolled ? "w-full" : "mx-auto max-w-6xl px-4"
+            !scrolled
+              ? "bg-white/80 dark:bg-slate-950/80 backdrop-blur-lg border-b border-slate-200/60 dark:border-white/10"
+              : "mx-auto max-w-5xl rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl shadow-[0_8px_30px_-4px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.4)] border border-slate-200/60 dark:border-white/10"
           )}
         >
           <div
             className={cn(
-              "relative overflow-hidden",
-              "bg-white/80 backdrop-blur-xl dark:bg-slate-950/60",
-              "transition-all duration-300 ease-out",
-              !scrolled
-                ? [
-                    "h-16",
-                    "border-b border-slate-200/70 dark:border-slate-800/70",
-                    "shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)]",
-                    "rounded-none",
-                  ].join(" ")
-                : [
-                    "h-16",
-                    "rounded-3xl",
-                    "border border-slate-200/60 dark:border-slate-800/60",
-                    "shadow-[0_18px_45px_-18px_rgba(15,23,42,0.35)] dark:shadow-[0_18px_45px_-18px_rgba(0,0,0,0.60)]",
-                    "ring-1 ring-white/35 dark:ring-white/10",
-                  ].join(" ")
+              "grid grid-cols-[auto_1fr_auto] items-center gap-4",
+              !scrolled ? "px-6 h-16" : "px-5 h-14"
             )}
           >
-            {/* Top glow when floating */}
-            {scrolled && (
-              <div className="pointer-events-none absolute inset-0 rounded-3xl bg-linear-to-b from-white/35 via-transparent to-transparent opacity-70 dark:from-white/10" />
-            )}
-
-            {/* Soft border glow in dark mode (floating) */}
-            {scrolled && (
-              <div className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 dark:opacity-100">
-                <div className="absolute -inset-0.5 rounded-[26px] bg-[radial-gradient(60%_60%_at_50%_0%,rgba(99,102,241,0.25),transparent_70%)]" />
-                <div className="absolute -inset-0.5 rounded-[26px] bg-[radial-gradient(50%_50%_at_0%_50%,rgba(56,189,248,0.18),transparent_65%)]" />
+            {/* LEFT - Logo */}
+            <Link
+              href="/admin/dashboard"
+              className="flex items-center gap-2.5 select-none"
+            >
+              <PredictiXLogo
+                size={scrolled ? 28 : 32}
+                showText={false}
+                className="flex-shrink-0"
+              />
+              <div className="leading-[1.05]">
+                <div
+                  className={cn(
+                    "font-semibold tracking-tight",
+                    scrolled ? "text-[16px]" : "text-[20px]"
+                  )}
+                >
+                  PredictiX
+                </div>
+                {!scrolled && (
+                  <div className="hidden sm:block text-sm font-medium text-muted-foreground">
+                    AI-Powered Asset Management
+                  </div>
+                )}
               </div>
-            )}
+            </Link>
 
-            {/* Layout: left / center / right */}
-            <div
+            {/* CENTER - Nav */}
+            <nav
               className={cn(
-                "relative h-full",
-                "grid grid-cols-[1fr_auto_1fr] items-center",
-                !scrolled ? "px-4" : "px-6"
+                "justify-self-center hidden md:flex items-center",
+                !scrolled ? "gap-9" : "gap-1 rounded-2xl bg-slate-100/80 p-1.5 dark:bg-white/5"
               )}
             >
-              {/* LEFT */}
-              <Link
-                href="/admin/dashboard"
-                className="flex items-center gap-3 justify-self-start"
-              >
-                <PredictiXLogo size={scrolled ? 30 : 40} showText={false} />
-                <div className="leading-[1.05]">
-                  <div
+              {NAV.map((item) => {
+                const active = isActive(pathname, item.href);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
                     className={cn(
-                      "font-semibold tracking-tight",
-                      scrolled ? "text-[16px]" : "text-[20px]"
+                      "flex items-center gap-2 rounded-xl select-none",
+                      "transition-all duration-200",
+                      !scrolled
+                        ? "px-2 py-2 text-sm font-semibold text-slate-700/90 hover:text-slate-900 dark:text-slate-200/90 dark:hover:text-white"
+                        : "px-3.5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50 hover:bg-white/70 dark:hover:bg-white/5",
+                      active &&
+                        (scrolled
+                          ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70 dark:bg-white/10 dark:text-white dark:ring-white/15"
+                          : "text-slate-900 dark:text-white")
                     )}
                   >
-                    PredictiX
-                  </div>
-                  {!scrolled && (
-                    <div className="hidden sm:block text-sm font-medium text-muted-foreground">
-                      AI-Powered Asset Management
-                    </div>
-                  )}
-                </div>
-              </Link>
+                    <Icon className="h-4 w-4 -translate-y-px" />
+                    <span className="leading-none">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
 
-              {/* CENTER */}
-              <nav
-                className={cn(
-                  "justify-self-center hidden md:flex items-center",
-                  !scrolled ? "gap-9" : "gap-1 rounded-2xl bg-slate-100/80 p-1.5 dark:bg-slate-900/60"
-                )}
-              >
-                {NAV.map((item) => {
-                  const active = isActive(pathname, item.href);
-                  const Icon = item.icon;
+            {/* RIGHT - Theme + Profile dropdown */}
+            <div className="flex items-center gap-3 justify-self-end">
+              <ThemeToggle className="-translate-y-px" size={20} />
 
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-2 rounded-xl select-none",
-                        "transition-all duration-200",
-                        !scrolled
-                          ? "px-2 py-2 text-sm font-semibold text-slate-700/90 hover:text-slate-900 dark:text-slate-200/90 dark:hover:text-white"
-                          : "px-3.5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50 hover:bg-white/70 dark:hover:bg-slate-950/60",
-                        active &&
-                          (scrolled
-                            ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-950 dark:text-slate-50 dark:ring-slate-800/70"
-                            : "text-slate-900 dark:text-white")
-                      )}
-                    >
-                      <Icon className="h-4 w-4 -translate-y-px" />
-                      <span className="leading-none">{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </nav>
+              {/* Profile dropdown (replaces old profile button + dialog) */}
+              <ProfileDropdown
+                user={profileUser}
+                profileHref="/admin/profile"
+                settingsHref="/admin/settings"
+              />
 
-              {/* RIGHT */}
-              <div className="flex items-center gap-3 justify-self-end">
-                {/* Theme icon: keep perfectly centered with name/avatar */}
-                <ThemeToggle className="-translate-y-px" size={20} />
+              {/* Mobile menu */}
+              <div className="md:hidden">
+                <Sheet open={open} onOpenChange={setOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="icon" className="rounded-2xl">
+                      <Menu className="h-5 w-5" />
+                    </Button>
+                  </SheetTrigger>
 
-                {/* User (sm+) - clickable profile */}
-                <button
-                  type="button"
-                  onClick={handleProfileClick}
-                  className="hidden sm:flex items-center gap-3 rounded-xl px-1 py-1 -mr-1 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
-                >
-                  <div className="text-right leading-[1.05]">
-                    <div className="text-sm font-semibold tracking-tight">
-                      {name}
-                    </div>
-                    <div className="text-xs text-muted-foreground">{badgeText}</div>
-                  </div>
+                  <SheetContent side="right" className="w-[320px] sm:w-90">
+                    <SheetHeader>
+                      <SheetTitle className="flex items-center gap-3">
+                        <PredictiXLogo size={32} showText={false} />
+                        <span className="font-semibold tracking-tight">PredictiX</span>
+                      </SheetTitle>
+                    </SheetHeader>
 
-                  <div
-                    className={cn(
-                      "grid place-items-center rounded-full font-semibold text-white",
-                      "bg-linear-to-br from-violet-600 to-indigo-600",
-                      "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
-                      "ring-1 ring-white/40 dark:ring-white/10",
-                      "h-10 w-10 text-sm transition-transform hover:scale-105"
-                    )}
-                  >
-                    {avatarText}
-                  </div>
-                </button>
-
-                {/* Compact avatar (xs) - clickable profile */}
-                <button
-                  type="button"
-                  onClick={handleProfileClick}
-                  className={cn(
-                    "sm:hidden grid place-items-center rounded-full font-semibold text-white",
-                    "bg-linear-to-br from-violet-600 to-indigo-600",
-                    "shadow-[0_10px_25px_-15px_rgba(99,102,241,0.9)]",
-                    "ring-1 ring-white/40 dark:ring-white/10",
-                    "h-10 w-10 text-sm transition-transform hover:scale-105 cursor-pointer"
-                  )}
-                  title={`${name} • ${badgeText} (click for details)`}
-                >
-                  {avatarText}
-                </button>
-
-                {/* Mobile menu */}
-                <div className="md:hidden">
-                  <Sheet open={open} onOpenChange={setOpen}>
-                    <SheetTrigger asChild>
-                      <Button variant="outline" size="icon" className="rounded-2xl">
-                        <Menu className="h-5 w-5" />
-                      </Button>
-                    </SheetTrigger>
-
-                    <SheetContent side="right" className="w-[320px] sm:w-90">
-                      <SheetHeader>
-                        <SheetTitle className="flex items-center gap-3">
-                          <PredictiXLogo size={32} showText={false} />
-                          <span className="font-semibold tracking-tight">
-                            PredictiX
-                          </span>
-                        </SheetTitle>
-                      </SheetHeader>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOpen(false);
-                          setProfileOpen(true);
-                        }}
-                        className="mt-5 w-full rounded-2xl border border-slate-200 p-3 dark:border-slate-800 text-left hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="leading-tight">
-                            <div className="text-sm font-semibold">{name}</div>
-                            <div className="text-xs text-muted-foreground">{badgeText}</div>
+                    {/* Mobile user card */}
+                    <div className="mt-5 rounded-2xl border border-slate-200 p-4 dark:border-white/10">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={cn(
+                            "grid place-items-center rounded-full font-semibold text-white overflow-hidden",
+                            "bg-gradient-to-br from-violet-600 to-indigo-600",
+                            "ring-1 ring-white/40 dark:ring-white/10",
+                            "h-11 w-11 text-sm flex-shrink-0"
+                          )}
+                        >
+                          {profileUser.avatar_url ? (
+                            <img src={profileUser.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                          ) : (
+                            avatarText
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold truncate">{profileUser.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {profileUser.role === "ADMIN" ? "Administrator" : "User"}
                           </div>
+                          {profileUser.email && (
+                            <div className="text-[11px] text-muted-foreground truncate mt-0.5">
+                              {profileUser.email}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-                          <div
+                    <nav className="mt-6 flex flex-col gap-2">
+                      {NAV.map((item) => {
+                        const active = isActive(pathname, item.href);
+                        const Icon = item.icon;
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setOpen(false)}
                             className={cn(
-                              "grid place-items-center rounded-full font-semibold text-white",
-                              "bg-linear-to-br from-violet-600 to-indigo-600",
-                              "ring-1 ring-white/40 dark:ring-white/10",
-                              "h-10 w-10 text-sm"
+                              "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition",
+                              "hover:bg-slate-100 dark:hover:bg-white/5",
+                              active &&
+                                "bg-slate-100 ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/15"
                             )}
                           >
-                            {avatarText}
-                          </div>
-                        </div>
-                      </button>
-
-                      <nav className="mt-6 flex flex-col gap-2">
-                        {NAV.map((item) => {
-                          const active = isActive(pathname, item.href);
-                          const Icon = item.icon;
-
-                          return (
-                            <Link
-                              key={item.href}
-                              href={item.href}
-                              onClick={() => setOpen(false)}
-                              className={cn(
-                                "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition",
-                                "hover:bg-slate-100 dark:hover:bg-slate-900/60",
-                                active &&
-                                  "bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-900/60 dark:ring-slate-800"
-                              )}
-                            >
-                              <Icon className="h-5 w-5" />
-                              {item.label}
-                            </Link>
-                          );
-                        })}
-                      </nav>
-                    </SheetContent>
-                  </Sheet>
-                </div>
+                            <Icon className="h-5 w-5" />
+                            {item.label}
+                          </Link>
+                        );
+                      })}
+                    </nav>
+                  </SheetContent>
+                </Sheet>
               </div>
             </div>
           </div>
         </div>
       </header>
-
-      {/* Admin profile details pop-up */}
-      <AdminProfileDialog
-        admin={adminProfile}
-        open={profileOpen}
-        onOpenChange={setProfileOpen}
-      />
 
       {/* Spacer for floating bar */}
       <div className={cn(!scrolled ? "h-0" : "h-24")} />

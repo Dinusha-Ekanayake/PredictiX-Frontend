@@ -228,10 +228,18 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import RoleSelectCards, { type Role } from "@/components/auth/RoleSelectCards";
 import PredictiXLogo from "@/components/brand/PredictiXLogo";
 import ThemeToggle from "@/components/theme/ThemeToggle";
+import { login, storeAuthSession } from "@/lib/authService";
 
 // ─── Background decoration ────────────────────────────────────────────────────
 
@@ -293,13 +301,25 @@ export default function LoginPage() {
   const [role, setRole] = React.useState<Role | "">("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [warehouseId, setWarehouseId] = React.useState("");
+  const [warehouses, setWarehouses] = React.useState<Array<{id: string, name: string}>>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
+
+  React.useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/warehouses`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setWarehouses(data);
+      })
+      .catch(err => console.error("Failed to load warehouses:", err));
+  }, []);
 
   const canSubmit =
     role !== "" &&
     email.trim().length > 0 &&
     password.trim().length > 0 &&
+    (String(role).toUpperCase() === "SUPER_ADMIN" ? warehouseId !== "" : true) &&
     !isSubmitting;
 
   async function onSubmit(e: React.FormEvent) {
@@ -310,85 +330,24 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const emailLower = email.trim().toLowerCase();
-      const passwordTrimmed = password.trim();
-      const roleLower = role.toLowerCase();
+      const data = await login({
+        email: email.trim().toLowerCase(),
+        password: password.trim(),
+        role: String(role).toUpperCase(), // backend validates declared role
+        warehouse_id: warehouseId,
+      });
 
-      try {
-        const response = await fetch(`${API_URL}/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: emailLower,
-            password: passwordTrimmed,
-            role: roleLower.toUpperCase(),
-          }),
-        });
+      // Single source of truth for session storage (writes both token keys).
+      storeAuthSession(data);
 
-        if (response.ok) {
-          const data = await response.json();
-
-          window.localStorage.setItem("token", data.access_token);
-          window.localStorage.setItem("predictix.user.role", data.role.toUpperCase());
-          window.localStorage.setItem("predictix.user.email", data.email);
-          window.localStorage.setItem("predictix.user.id", data.user_id);
-          window.localStorage.setItem("predictix.user.name", data.full_name);
-
-          if (data.role.toLowerCase() === "admin") {
-            router.push("/admin/dashboard");
-          } else {
-            router.push("/user/users");
-          }
-          return;
-        }
-      } catch {
-        console.warn("Backend login failed, falling back to mock");
-      }
-
-      // Fallback: Mock login
-      const mockUsers: Record<string, { password: string; role: string; id: string; name: string }> = {
-        "nuwan.gunasekara.tra1@lankalogix.lk": {
-          password: "nuwan",
-          role: "user",
-          id: "aaaaaaaa-aaaa-5000-a000-000000000000",
-          name: "Nuwan Gunasekara"
-        },
-        "anjali.warnakulasuriya.adm1@lankalogix.lk": {
-          password: "admin",
-          role: "admin",
-          id: "bbbbbbbb-bbbb-5000-a000-000000000000",
-          name: "Anjali Warnakulasuriya"
-        }
-      };
-
-      if (!(emailLower in mockUsers)) {
-        setError("Invalid email or password");
-        return;
-      }
-
-      const user = mockUsers[emailLower];
-      if (user.password !== passwordTrimmed || user.role !== roleLower) {
-        setError("Invalid email or password");
-        return;
-      }
-
-      const mockPayload = btoa(JSON.stringify({ sub: user.id, email: emailLower, role: user.role }));
-      const mockToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${mockPayload}.mock`;
-
-      window.localStorage.setItem("token", mockToken);
-      window.localStorage.setItem("predictix.user.role", user.role.toUpperCase());
-      window.localStorage.setItem("predictix.user.email", emailLower);
-      window.localStorage.setItem("predictix.user.id", user.id);
-      window.localStorage.setItem("predictix.user.name", user.name);
-
-      if (user.role === "admin") {
+      const roleStr = data.role.toLowerCase();
+      if (roleStr === "admin" || roleStr === "super_admin") {
         router.push("/admin/dashboard");
       } else {
-        router.push("/user/users");
+        router.push("/user/dashboard");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.");
     } finally {
       setIsSubmitting(false);
     }
@@ -505,6 +464,28 @@ export default function LoginPage() {
                     />
                   </div>
 
+                  {/* Warehouse selector (Super Admin Only) */}
+                  {String(role).toUpperCase() === "SUPER_ADMIN" && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                        Warehouse
+                      </Label>
+                      <Select value={warehouseId} onValueChange={setWarehouseId} disabled={isSubmitting}>
+                        <SelectTrigger className="h-11 w-full text-left font-normal bg-white dark:bg-slate-950">
+                          <SelectValue placeholder="Select a warehouse" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {warehouses.map((w) => (
+                            <SelectItem key={w.id} value={w.id}>
+                              {w.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+
                   {/* Password */}
                   <div className="space-y-2">
                     <Label
@@ -541,10 +522,12 @@ export default function LoginPage() {
                     {isSubmitting ? "Logging in…" : "Log in"}
                   </Button>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-                    <div className="font-medium text-slate-800 dark:text-slate-200">Default Admin</div>
-                    <div>Email: admin@mail.com</div>
-                    <div>Password: admin</div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 break-all">
+                    <div className="font-medium text-slate-800 dark:text-slate-200">Demo accounts</div>
+                    <div>Super Admin: super.admin1@lankalogix.lk / super</div>
+                    <div>Admin: anjali.warnakulasuriya.adm1@lankalogix.lk / admin</div>
+                    <div>User: nuwan.gunasekara.tra1@lankalogix.lk / user</div>
+                    <div className="mt-1 text-slate-500">Other seeded users: password <span className="font-mono">Predictix@123</span></div>
                   </div>
 
 

@@ -408,7 +408,7 @@ export default function FloatingChatbot() {
   }
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[100]" aria-hidden={false}>
+    <div className="pointer-events-none fixed inset-0 z-[45]" aria-hidden={false}>
       {isOpen ? (
         <div
           className="pointer-events-auto absolute"

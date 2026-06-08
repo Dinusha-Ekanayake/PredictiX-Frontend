@@ -206,7 +206,7 @@ export default function AdminTicketsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="card-dynamic cursor-default hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors">
           <CardContent className="flex items-center gap-3">
             <AlertCircle className="h-6 w-6 text-red-500" />

@@ -1,13 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
+import PageHero from "@/components/common/PageHero";
 import {
   Select,
   SelectContent,
@@ -27,10 +27,21 @@ import {
 import AddUserDialog from "@/components/admin/users/AddUserDialog";
 import type { NewUser } from "@/components/admin/users/AddUserDialog";
 import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
-import type { ViewUser } from "@/components/admin/users/ViewUserDetailsDialog";
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
+import EditUserDialog from "@/components/admin/users/EditUserDialog";
+import type { AssetItem } from "@/components/admin/users/ViewAssignedAssetsDialog";
+import { toast } from "sonner";
 
-import { fetchAllUsers } from "@/lib/api/userProfileApi";
+import {
+  listUsers,
+  createUser,
+  updateUser,
+  getUserAssets,
+  deleteUser,
+  type UserItem,
+  type UserRole,
+  type UserStatus,
+} from "@/lib/userService";
 
 import {
   Users,
@@ -40,29 +51,13 @@ import {
   UserPlus,
   Search,
   Building2,
+  Trash2,
 } from "lucide-react";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type UserRole = "admin" | "user";
-type UserStatus = "active" | "inactive";
-
-type UserItem = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  name: string;
-  email: string;
-  address: string;
-  contactNumber: string;
-  warehouse: string;
-  role: UserRole;
-  department: string;
-  status: UserStatus;
-  assignedAssets: number;
-};
+/**
+ * Admin Users Management Page (PredictiX)
+ * Fetches real users from the backend /users API.
+ */
 
 // ---------------------------------------------------------------------------
 // KPI helpers
@@ -73,6 +68,7 @@ function computeKpis(users: UserItem[]) {
   const active = users.filter((u) => u.status === "active").length;
   const admins = users.filter((u) => u.role === "admin").length;
   const regular = users.filter((u) => u.role === "user").length;
+
   return [
     { label: "Total Users", value: total, icon: Users },
     { label: "Active", value: active, icon: UserCheck },
@@ -82,7 +78,7 @@ function computeKpis(users: UserItem[]) {
 }
 
 // ---------------------------------------------------------------------------
-// Badges
+// Sub-components: Badges (solid fills matching Figma)
 // ---------------------------------------------------------------------------
 
 function RoleBadge({ role }: { role: UserRole }) {
@@ -108,21 +104,22 @@ function StatusBadge({ status }: { status: UserStatus }) {
       </Badge>
     );
   }
-  return <Badge variant="secondary">inactive</Badge>;
+  return (
+    <Badge variant="secondary">inactive</Badge>
+  );
 }
 
 // ---------------------------------------------------------------------------
-// Avatar
+// Sub-component: User avatar
 // ---------------------------------------------------------------------------
 
 function UserAvatar({ name }: { name: string }) {
-  const initials = (name || "?")
+  const initials = name
     .split(" ")
-    .filter((n) => n.length > 0)
     .map((n) => n[0])
     .join("")
     .toUpperCase()
-    .slice(0, 2) || "?";
+    .slice(0, 2);
 
   return (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
@@ -144,63 +141,149 @@ export default function AdminUsersPage() {
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
+  const [editUser, setEditUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
+  const [assignedAssets, setAssignedAssets] = React.useState<AssetItem[]>([]);
+  const [assetsLoading, setAssetsLoading] = React.useState(false);
 
-  // Load users from backend on mount
-  React.useEffect(() => {
-    async function loadUsers() {
-      try {
-        const data = await fetchAllUsers();
-        setUsers(data);
-      } catch (err) {
-        console.error("Failed to load users:", err);
-        toast.error("Failed to load users.", {
-          description: "Could not connect to the server.",
-        });
-      } finally {
-        setIsLoading(false);
+  function generateUserId(role: UserRole, department: string): string {
+    const roleLetter = role === "admin" ? "A" : "U";
+    const deptLetter = department.charAt(0).toUpperCase() || "X";
+
+    const relevantUsers = users.filter((u) => u.id.startsWith(roleLetter));
+    let maxNumber = 0;
+
+    for (const u of relevantUsers) {
+      const match = u.id.match(/^[AU](\d{4})[A-Z]?$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!Number.isNaN(num) && num > maxNumber) {
+          maxNumber = num;
+        }
       }
     }
-    loadUsers();
-  }, []);
 
-  // Unique departments from loaded data for filter dropdown
-  const departments = React.useMemo(() => {
-    const set = new Set(users.map((u) => u.department).filter(Boolean));
-    return Array.from(set).sort();
-  }, [users]);
+    const next = String(maxNumber + 1).padStart(4, "0");
+    return `${roleLetter}${next}${deptLetter}`;
+  }
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const data = await listUsers();
+        if (!cancelled) setUsers(data);
+      } catch (err) {
+        if (!cancelled) {
+          toast.error("Failed to load users", {
+            description: err instanceof Error ? err.message : undefined,
+          });
+          setUsers([]);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredUsers = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
+
     return users.filter((user) => {
       const matchesSearch =
         query === "" ||
         user.name.toLowerCase().includes(query) ||
         user.email.toLowerCase().includes(query) ||
         user.id.toLowerCase().includes(query);
+
       const matchesRole = roleFilter === "all" || user.role === roleFilter;
       const matchesDepartment =
         departmentFilter === "all" || user.department === departmentFilter;
       const matchesStatus =
         statusFilter === "all" || user.status === statusFilter;
-      return matchesSearch && matchesRole && matchesDepartment && matchesStatus;
+
+      return (
+        matchesSearch && matchesRole && matchesDepartment && matchesStatus
+      );
     });
   }, [users, searchQuery, roleFilter, departmentFilter, statusFilter]);
 
   const kpis = computeKpis(users);
 
-  function handleUserAdded(newUser: NewUser) {
-    setUsers((prev) => [newUser as UserItem, ...prev]);
+  async function handleUserAdded(newUser: NewUser) {
+    try {
+      const created = await createUser({
+        id: newUser.id,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        name: newUser.name,
+        email: newUser.email,
+        address: newUser.address,
+        contactNumber: newUser.contactNumber,
+        warehouse: newUser.warehouse,
+        role: newUser.role,
+        department: newUser.department,
+        status: newUser.status,
+      });
+      setUsers((prev) => [created, ...prev]);
+      toast.success("User created", { description: `${created.name} added.` });
+    } catch (err) {
+      toast.error("Failed to create user", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
   }
 
-  function handleUserUpdated(updatedUser: ViewUser) {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === updatedUser.id ? { ...u, ...updatedUser } : u))
-    );
+  function handleViewDetails(user: UserItem) {
+    setDetailsUser(user);
   }
 
-  function handleUserDeleted(userId: string) {
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
+  async function handleUserUpdated(userId: string, updatedFields: Partial<UserItem>) {
+    const updatedUser = await updateUser(userId, updatedFields);
+    setUsers((prev) => prev.map((u) => (u.id === userId ? updatedUser : u)));
+    toast.success("User updated", { description: `${updatedUser.name} has been updated.` });
+  }
+
+  async function handleDeleteUser(user: UserItem) {
+    if (!confirm(`Delete ${user.name}? This removes their login and profile. This cannot be undone.`)) return;
+    try {
+      await deleteUser(user.id);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      toast.success("User deleted", { description: user.name });
+    } catch (err) {
+      toast.error("Failed to delete user", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
+  }
+
+  async function handleViewAssets(user: UserItem) {
+    setAssetsUser(user);
+    setAssignedAssets([]);
+    setAssetsLoading(true);
+    try {
+      const rows = await getUserAssets(user.id);
+      setAssignedAssets(
+        rows.map((a) => ({
+          id: a.asset_id,
+          name: a.name,
+          category: a.category ?? a.asset_type ?? "General",
+          location: a.location,
+          healthPercent: Math.round(a.healthPercent),
+        }))
+      );
+    } catch (err) {
+      toast.error("Failed to load assigned assets", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+      setAssignedAssets([]);
+    } finally {
+      setAssetsLoading(false);
+    }
   }
 
   if (isLoading) {
@@ -213,6 +296,12 @@ export default function AdminUsersPage() {
 
   return (
     <div className="w-full space-y-6">
+      <PageHero
+        crumbs={["PredictiX", "Admin", "Users"]}
+        title="User Management"
+        subtitle="Manage user accounts, roles, departments and assigned assets."
+      />
+
       {/* KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((k) => (
@@ -245,7 +334,7 @@ export default function AdminUsersPage() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[130px]">
+              <SelectTrigger className="w-35">
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
               <SelectContent>
@@ -255,22 +344,25 @@ export default function AdminUsersPage() {
               </SelectContent>
             </Select>
 
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-[180px]">
+            <Select
+              value={departmentFilter}
+              onValueChange={setDepartmentFilter}
+            >
+              <SelectTrigger className="w-45">
                 <SelectValue placeholder="All Departments" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((d) => (
-                  <SelectItem key={d} value={d}>
-                    {d}
-                  </SelectItem>
-                ))}
+                <SelectItem value="Administrative">Administrative</SelectItem>
+                <SelectItem value="Mechanical">Mechanical</SelectItem>
+                <SelectItem value="Electrical">Electrical</SelectItem>
+                <SelectItem value="IT">IT</SelectItem>
+                <SelectItem value="Maintenance">Maintenance</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-35">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
@@ -280,10 +372,7 @@ export default function AdminUsersPage() {
               </SelectContent>
             </Select>
 
-            <Button
-              onClick={() => setIsAddDialogOpen(true)}
-              className="ml-auto"
-            >
+            <Button onClick={() => setIsAddDialogOpen(true)} className="ml-auto">
               <UserPlus className="mr-2 h-4 w-4" />
               Add User
             </Button>
@@ -299,11 +388,11 @@ export default function AdminUsersPage() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="min-w-60 pl-6">User</TableHead>
-                  <TableHead className="w-24">Role</TableHead>
+                  <TableHead className="w-25">Role</TableHead>
                   <TableHead className="w-40">Department</TableHead>
-                  <TableHead className="w-24">Status</TableHead>
-                  <TableHead className="w-36">Assigned Assets</TableHead>
-                  <TableHead className="w-48">Actions</TableHead>
+                  <TableHead className="w-25">Status</TableHead>
+                  <TableHead className="w-35">Assigned Assets</TableHead>
+                  <TableHead className="w-45">Actions</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -354,21 +443,35 @@ export default function AdminUsersPage() {
                       </TableCell>
 
                       <TableCell className="pr-6">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           <button
-                            onClick={() => setDetailsUser(user)}
+                            onClick={() => handleViewDetails(user)}
                             className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
                           >
                             View Details
                           </button>
+                          <button
+                            onClick={() => setEditUser(user)}
+                            className="rounded-full bg-blue-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-500"
+                          >
+                            Edit
+                          </button>
                           {user.assignedAssets > 0 && (
                             <button
-                              onClick={() => setAssetsUser(user)}
+                              onClick={() => handleViewAssets(user)}
                               className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
                             >
                               View Assets
                             </button>
                           )}
+                          <button
+                            onClick={() => handleDeleteUser(user)}
+                            title="Delete user"
+                            className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-500"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -385,40 +488,47 @@ export default function AdminUsersPage() {
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
         onUserAdded={handleUserAdded}
+        generateUserId={generateUserId}
       />
 
       {/* View User Details Dialog */}
       <ViewUserDetailsDialog
         user={detailsUser}
         open={detailsUser !== null}
-        onOpenChange={(open) => { if (!open) setDetailsUser(null); }}
+        onOpenChange={(open) => {
+          if (!open) setDetailsUser(null);
+        }}
         onViewAssets={(user) => {
           setDetailsUser(null);
-          setAssetsUser(user as UserItem);
+          handleViewAssets(user);
         }}
-        onUserUpdated={(updated) => {
-          handleUserUpdated(updated);
-          setDetailsUser(null);
+      />
+
+      <EditUserDialog
+        user={editUser}
+        open={editUser !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditUser(null);
         }}
-        onUserDeleted={(id) => {
-          handleUserDeleted(id);
-          setDetailsUser(null);
-        }}
+        onUserUpdated={handleUserUpdated}
       />
 
       {/* View Assigned Assets Dialog */}
       <ViewAssignedAssetsDialog
-        userId={assetsUser?.id ?? ""}
         userName={assetsUser?.name ?? ""}
+        assets={assignedAssets}
+        loading={assetsLoading}
         open={assetsUser !== null}
-        onOpenChange={(open) => { if (!open) setAssetsUser(null); }}
+        onOpenChange={(open) => {
+          if (!open) setAssetsUser(null);
+        }}
         onBackToDetails={
           assetsUser
             ? () => {
-              const user = assetsUser;
-              setAssetsUser(null);
-              setDetailsUser(user);
-            }
+                const user = assetsUser;
+                setAssetsUser(null);
+                setDetailsUser(user);
+              }
             : undefined
         }
       />

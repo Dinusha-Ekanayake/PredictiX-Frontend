@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,9 +27,10 @@ import {
 import AddUserDialog from "@/components/admin/users/AddUserDialog";
 import type { NewUser } from "@/components/admin/users/AddUserDialog";
 import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
-import ViewAssignedAssetsDialog, {
-  getMockAssetsForUser,
-} from "@/components/admin/users/ViewAssignedAssetsDialog";
+import type { ViewUser } from "@/components/admin/users/ViewUserDetailsDialog";
+import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
+
+import { fetchAllUsers } from "@/lib/api/userProfileApi";
 
 import {
   Users,
@@ -39,13 +41,6 @@ import {
   Search,
   Building2,
 } from "lucide-react";
-
-/**
- * Admin Users Management Page (PredictiX)
- * Matches Figma spec exactly.
- * - Uses mock data now
- * - Replace mock data with API calls later (FastAPI)
- */
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,83 +65,6 @@ type UserItem = {
 };
 
 // ---------------------------------------------------------------------------
-// Initial mock data
-// ---------------------------------------------------------------------------
-
-const INITIAL_USERS: UserItem[] = [
-  {
-    id: "U0001O",
-    firstName: "John",
-    lastName: "Smith",
-    name: "John Smith",
-    email: "john.smith@warehouse.com",
-    address: "No. 12, First Lane, Colombo",
-    contactNumber: "0711234567",
-    warehouse: "Main Branch - Colombo",
-    role: "user",
-    department: "Administrative",
-    status: "active",
-    assignedAssets: 3,
-  },
-  {
-    id: "A0001M",
-    firstName: "Sarah",
-    lastName: "Johnson",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@warehouse.com",
-    address: "No. 22, Lake Road, Kandy",
-    contactNumber: "0772345678",
-    warehouse: "Main Branch - Colombo",
-    role: "admin",
-    department: "Mechanical",
-    status: "active",
-    assignedAssets: 0,
-  },
-  {
-    id: "U0002M",
-    firstName: "Mike",
-    lastName: "Davis",
-    name: "Mike Davis",
-    email: "mike.davis@warehouse.com",
-    address: "No. 5, Palm Gardens, Galle",
-    contactNumber: "0753456789",
-    warehouse: "Galle",
-    role: "user",
-    department: "Mechanical",
-    status: "active",
-    assignedAssets: 2,
-  },
-  {
-    id: "U0003E",
-    firstName: "Emily",
-    lastName: "Chen",
-    name: "Emily Chen",
-    email: "emily.chen@warehouse.com",
-    address: "No. 8, Rose Avenue, Colombo",
-    contactNumber: "0724567890",
-    warehouse: "Main Branch - Colombo",
-    role: "user",
-    department: "Electrical",
-    status: "active",
-    assignedAssets: 5,
-  },
-  {
-    id: "U0004M",
-    firstName: "David",
-    lastName: "Wilson",
-    name: "David Wilson",
-    email: "david.wilson@warehouse.com",
-    address: "No. 16, Temple Road, Galle",
-    contactNumber: "0765678901",
-    warehouse: "Galle",
-    role: "user",
-    department: "Maintenance",
-    status: "inactive",
-    assignedAssets: 1,
-  },
-];
-
-// ---------------------------------------------------------------------------
 // KPI helpers
 // ---------------------------------------------------------------------------
 
@@ -155,7 +73,6 @@ function computeKpis(users: UserItem[]) {
   const active = users.filter((u) => u.status === "active").length;
   const admins = users.filter((u) => u.role === "admin").length;
   const regular = users.filter((u) => u.role === "user").length;
-
   return [
     { label: "Total Users", value: total, icon: Users },
     { label: "Active", value: active, icon: UserCheck },
@@ -165,7 +82,7 @@ function computeKpis(users: UserItem[]) {
 }
 
 // ---------------------------------------------------------------------------
-// Sub-components: Badges (solid fills matching Figma)
+// Badges
 // ---------------------------------------------------------------------------
 
 function RoleBadge({ role }: { role: UserRole }) {
@@ -191,22 +108,21 @@ function StatusBadge({ status }: { status: UserStatus }) {
       </Badge>
     );
   }
-  return (
-    <Badge variant="secondary">inactive</Badge>
-  );
+  return <Badge variant="secondary">inactive</Badge>;
 }
 
 // ---------------------------------------------------------------------------
-// Sub-component: User avatar
+// Avatar
 // ---------------------------------------------------------------------------
 
 function UserAvatar({ name }: { name: string }) {
-  const initials = name
+  const initials = (name || "?")
     .split(" ")
+    .filter((n) => n.length > 0)
     .map((n) => n[0])
     .join("")
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || "?";
 
   return (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
@@ -221,7 +137,7 @@ function UserAvatar({ name }: { name: string }) {
 
 export default function AdminUsersPage() {
   const [isLoading, setIsLoading] = React.useState(true);
-  const [users, setUsers] = React.useState<UserItem[]>(INITIAL_USERS);
+  const [users, setUsers] = React.useState<UserItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = React.useState<string>("all");
@@ -230,66 +146,61 @@ export default function AdminUsersPage() {
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
 
-  function generateUserId(role: UserRole, department: string): string {
-    const roleLetter = role === "admin" ? "A" : "U";
-    const deptLetter = department.charAt(0).toUpperCase() || "X";
-
-    const relevantUsers = users.filter((u) => u.id.startsWith(roleLetter));
-    let maxNumber = 0;
-
-    for (const u of relevantUsers) {
-      const match = u.id.match(/^[AU](\d{4})[A-Z]?$/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (!Number.isNaN(num) && num > maxNumber) {
-          maxNumber = num;
-        }
+  // Load users from backend on mount
+  React.useEffect(() => {
+    async function loadUsers() {
+      try {
+        const data = await fetchAllUsers();
+        setUsers(data);
+      } catch (err) {
+        console.error("Failed to load users:", err);
+        toast.error("Failed to load users.", {
+          description: "Could not connect to the server.",
+        });
+      } finally {
+        setIsLoading(false);
       }
     }
-
-    const next = String(maxNumber + 1).padStart(4, "0");
-    return `${roleLetter}${next}${deptLetter}`;
-  }
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
+    loadUsers();
   }, []);
+
+  // Unique departments from loaded data for filter dropdown
+  const departments = React.useMemo(() => {
+    const set = new Set(users.map((u) => u.department).filter(Boolean));
+    return Array.from(set).sort();
+  }, [users]);
 
   const filteredUsers = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-
     return users.filter((user) => {
       const matchesSearch =
         query === "" ||
         user.name.toLowerCase().includes(query) ||
         user.email.toLowerCase().includes(query) ||
         user.id.toLowerCase().includes(query);
-
       const matchesRole = roleFilter === "all" || user.role === roleFilter;
       const matchesDepartment =
         departmentFilter === "all" || user.department === departmentFilter;
       const matchesStatus =
         statusFilter === "all" || user.status === statusFilter;
-
-      return (
-        matchesSearch && matchesRole && matchesDepartment && matchesStatus
-      );
+      return matchesSearch && matchesRole && matchesDepartment && matchesStatus;
     });
   }, [users, searchQuery, roleFilter, departmentFilter, statusFilter]);
 
   const kpis = computeKpis(users);
 
   function handleUserAdded(newUser: NewUser) {
-    setUsers((prev) => [newUser, ...prev]);
+    setUsers((prev) => [newUser as UserItem, ...prev]);
   }
 
-  function handleViewDetails(user: UserItem) {
-    setDetailsUser(user);
+  function handleUserUpdated(updatedUser: ViewUser) {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === updatedUser.id ? { ...u, ...updatedUser } : u))
+    );
   }
 
-  function handleViewAssets(user: UserItem) {
-    setAssetsUser(user);
+  function handleUserDeleted(userId: string) {
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
   }
 
   if (isLoading) {
@@ -334,7 +245,7 @@ export default function AdminUsersPage() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-35">
+              <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
               <SelectContent>
@@ -344,20 +255,17 @@ export default function AdminUsersPage() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={departmentFilter}
-              onValueChange={setDepartmentFilter}
-            >
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Departments" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                <SelectItem value="Administrative">Administrative</SelectItem>
-                <SelectItem value="Mechanical">Mechanical</SelectItem>
-                <SelectItem value="Electrical">Electrical</SelectItem>
-                <SelectItem value="IT">IT</SelectItem>
-                <SelectItem value="Maintenance">Maintenance</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -372,7 +280,10 @@ export default function AdminUsersPage() {
               </SelectContent>
             </Select>
 
-            <Button onClick={() => setIsAddDialogOpen(true)} className="ml-auto">
+            <Button
+              onClick={() => setIsAddDialogOpen(true)}
+              className="ml-auto"
+            >
               <UserPlus className="mr-2 h-4 w-4" />
               Add User
             </Button>
@@ -388,11 +299,11 @@ export default function AdminUsersPage() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="min-w-60 pl-6">User</TableHead>
-                  <TableHead className="w-25">Role</TableHead>
+                  <TableHead className="w-24">Role</TableHead>
                   <TableHead className="w-40">Department</TableHead>
-                  <TableHead className="w-25">Status</TableHead>
-                  <TableHead className="w-35">Assigned Assets</TableHead>
-                  <TableHead className="w-45">Actions</TableHead>
+                  <TableHead className="w-24">Status</TableHead>
+                  <TableHead className="w-36">Assigned Assets</TableHead>
+                  <TableHead className="w-48">Actions</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -443,16 +354,16 @@ export default function AdminUsersPage() {
                       </TableCell>
 
                       <TableCell className="pr-6">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleViewDetails(user)}
+                            onClick={() => setDetailsUser(user)}
                             className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
                           >
                             View Details
                           </button>
                           {user.assignedAssets > 0 && (
                             <button
-                              onClick={() => handleViewAssets(user)}
+                              onClick={() => setAssetsUser(user)}
                               className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
                             >
                               View Assets
@@ -474,37 +385,40 @@ export default function AdminUsersPage() {
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
         onUserAdded={handleUserAdded}
-        generateUserId={generateUserId}
       />
 
       {/* View User Details Dialog */}
       <ViewUserDetailsDialog
         user={detailsUser}
         open={detailsUser !== null}
-        onOpenChange={(open) => {
-          if (!open) setDetailsUser(null);
-        }}
+        onOpenChange={(open) => { if (!open) setDetailsUser(null); }}
         onViewAssets={(user) => {
           setDetailsUser(null);
-          setAssetsUser(user);
+          setAssetsUser(user as UserItem);
+        }}
+        onUserUpdated={(updated) => {
+          handleUserUpdated(updated);
+          setDetailsUser(null);
+        }}
+        onUserDeleted={(id) => {
+          handleUserDeleted(id);
+          setDetailsUser(null);
         }}
       />
 
       {/* View Assigned Assets Dialog */}
       <ViewAssignedAssetsDialog
+        userId={assetsUser?.id ?? ""}
         userName={assetsUser?.name ?? ""}
-        assets={assetsUser ? getMockAssetsForUser(assetsUser.id) : []}
         open={assetsUser !== null}
-        onOpenChange={(open) => {
-          if (!open) setAssetsUser(null);
-        }}
+        onOpenChange={(open) => { if (!open) setAssetsUser(null); }}
         onBackToDetails={
           assetsUser
             ? () => {
-                const user = assetsUser;
-                setAssetsUser(null);
-                setDetailsUser(user);
-              }
+              const user = assetsUser;
+              setAssetsUser(null);
+              setDetailsUser(user);
+            }
             : undefined
         }
       />

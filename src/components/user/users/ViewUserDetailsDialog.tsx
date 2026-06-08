@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { updateUser } from "@/lib/api/userProfileApi";
-import { Loader2 } from "lucide-react";
 
 import {
   Dialog,
@@ -13,8 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Mail, Building2, ShieldCheck, Phone, MapPin, Loader2 } from "lucide-react";
 
-import { Mail, Building2, ShieldCheck, Phone, MapPin } from "lucide-react";
+import { updateUser, deleteUser } from "@/lib/api/userProfileApi";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,17 +41,15 @@ type Props = {
   user: ViewUser | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Called when user clicks "View Assigned Assets" to navigate to the assets dialog. */
   onViewAssets?: (user: ViewUser) => void;
-  /** Called after a successful status change or edit. */
-  onUserUpdated?: () => void;
+  onUserUpdated?: (user: ViewUser) => void;
+  onUserDeleted?: (userId: string) => void;
 };
 
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-/** Single info row — icon + label + value inside a dark rounded card. */
 function InfoCard({
   icon: Icon,
   label,
@@ -73,7 +70,6 @@ function InfoCard({
   );
 }
 
-/** Highlighted card for assigned assets with a teal border. */
 function AssetsCard({
   count,
   onViewAssets,
@@ -123,43 +119,55 @@ export default function ViewUserDetailsDialog({
   onOpenChange,
   onViewAssets,
   onUserUpdated,
+  onUserDeleted,
 }: Props) {
-  const [isUpdating, setIsUpdating] = React.useState(false);
+  const [isToggling, setIsToggling] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   if (!user) return null;
 
   async function handleToggleStatus() {
-    setIsUpdating(true);
-    const newStatus = user!.status === "active" ? "inactive" : "active";
+    if (!user) return;
+    setIsToggling(true);
     try {
-      await updateUser(user!.id, { status: newStatus });
-      toast.success(`User ${newStatus === "active" ? "activated" : "deactivated"}`, {
-        description: `${user!.name}'s account status has been updated.`,
-      });
-      if (onUserUpdated) onUserUpdated();
+      const newStatus = user.status === "active" ? "inactive" : "active";
+      const updated = await updateUser(user.id, { status: newStatus });
+      toast.success(
+        `User ${newStatus === "active" ? "activated" : "deactivated"} successfully.`
+      );
+      onUserUpdated?.({ ...user, ...updated, status: newStatus });
       onOpenChange(false);
-    } catch (err) {
-      toast.error("Failed to update status", {
-        description: err instanceof Error ? err.message : "An error occurred while communicating with PostgreSQL.",
-      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to update status.";
+      toast.error("Status update failed.", { description: message });
     } finally {
-      setIsUpdating(false);
+      setIsToggling(false);
     }
   }
 
-  function handleEditUser() {
-    toast.info(`Edit user: ${user!.name}`, {
-      description: "Direct editing is being enabled via partial updates.",
-    });
+  async function handleDelete() {
+    if (!user) return;
+    if (!confirm(`Are you sure you want to delete ${user.name}? This cannot be undone.`))
+      return;
+    setIsDeleting(true);
+    try {
+      await deleteUser(user.id);
+      toast.success(`${user.name} has been deleted.`);
+      onUserDeleted?.(user.id);
+      onOpenChange(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete user.";
+      toast.error("Delete failed.", { description: message });
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   function handleViewAssets() {
     if (onViewAssets) {
       onViewAssets(user!);
     } else {
-      toast.info(`Viewing assets for ${user!.name}`, {
-        description: `${user!.assignedAssets} asset(s) assigned.`,
-      });
+      toast.info(`Viewing assets for ${user!.name}`);
     }
   }
 
@@ -173,7 +181,6 @@ export default function ViewUserDetailsDialog({
           </div>
         </DialogHeader>
 
-        {/* Info cards */}
         <div className="grid gap-3 pt-1">
           <InfoCard icon={Mail} label="Email" value={user.email} />
           <InfoCard icon={Building2} label="Department" value={user.department} />
@@ -183,24 +190,32 @@ export default function ViewUserDetailsDialog({
           <InfoCard icon={Building2} label="Warehouse" value={user.warehouse} />
         </div>
 
-        {/* Assigned assets highlight card */}
         <AssetsCard count={user.assignedAssets} onViewAssets={handleViewAssets} />
 
-        {/* Action buttons */}
         <div className="grid grid-cols-2 gap-3 pt-1">
-          <Button onClick={handleEditUser} className="w-full">
-            Edit User
-          </Button>
           <Button
             variant="secondary"
             onClick={handleToggleStatus}
-            disabled={isUpdating}
+            disabled={isToggling || isDeleting}
             className="w-full"
           >
-            {isUpdating ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+            {isToggling ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...</>
             ) : (
               user.status === "active" ? "Deactivate" : "Activate"
+            )}
+          </Button>
+
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={isDeleting || isToggling}
+            className="w-full"
+          >
+            {isDeleting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</>
+            ) : (
+              "Delete User"
             )}
           </Button>
         </div>

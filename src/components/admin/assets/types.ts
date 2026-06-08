@@ -135,11 +135,41 @@ export type VehiclePredictionResult = {
   features_used: Record<string, unknown>;
 };
 
+// ─── Survival Prediction ─────────────────────────────────────────────────────────
+export type SurvivalCurvePoint = {
+  days: number;
+  probability: number;
+};
+
+export type ComponentSurvivalResponse = {
+  asset_id: string;
+  component: "brake" | "tire" | "battery" | "oil" | "hydraulic";
+  median_days: number;
+  p10_days: number;
+  p90_days: number;
+  curve: SurvivalCurvePoint[];
+};
+
+export type ComponentSurvivalError = {
+  component: "brake" | "tire" | "battery" | "oil" | "hydraulic";
+  error: string;
+};
+
+export type AssetSurvivalResponse = {
+  asset_id: string;
+  horizon_days: number;
+  step_days: number;
+  soonest_component: "brake" | "tire" | "battery" | "oil" | "hydraulic" | null;
+  soonest_median_days: number | null;
+  components: (ComponentSurvivalResponse | ComponentSurvivalError)[];
+};
+
 // ─── Combined asset detail view (assembled in the service layer) ───────────────
 export type AssetDetail = {
   asset: Asset;
   prediction: FailurePrediction | null;
   costPrediction: CostPrediction | null;
+  survivalPrediction: AssetSurvivalResponse | null;
   maintenanceEvents: MaintenanceEvent[];
   tickets: Ticket[];
   assignments: AssetAssignment[];

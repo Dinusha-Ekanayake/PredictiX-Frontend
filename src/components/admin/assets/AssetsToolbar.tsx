@@ -21,6 +21,7 @@ type Props = {
   resultsCount: number;
   warehouseOptions: WarehouseOption[];
   loading?: boolean;
+  onAddAsset?: () => void;
 };
 
 export const DEFAULT_FILTERS: AssetFilters = {
@@ -36,6 +37,7 @@ export default function AssetsToolbar({
   resultsCount,
   warehouseOptions,
   loading,
+  onAddAsset,
 }: Props) {
   const isDirty =
     filters.query !== "" ||
@@ -141,7 +143,7 @@ export default function AssetsToolbar({
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <Button className="h-9 rounded-xl px-4 text-sm gap-1.5">
+          <Button className="h-9 rounded-xl px-4 text-sm gap-1.5" onClick={onAddAsset}>
             <Plus className="h-3.5 w-3.5" />
             Add Asset
           </Button>

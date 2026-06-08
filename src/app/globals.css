@@ -82,7 +82,8 @@ html {
   --ring: oklch(0.704 0.04 256.788);
 }
 
-/* Dark theme tokens */
+/* Dark theme tokens — True Black (OLED). Deep neutral blacks, white primary,
+   hairline translucent-white borders for a polished, Apple-like dark mode. */
 .dark {
   --background: oklch(0.04 0 0);
   --foreground: oklch(0.985 0 0);
@@ -93,8 +94,8 @@ html {
   --popover: oklch(0.135 0 0);
   --popover-foreground: oklch(0.985 0 0);
 
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.135 0 0);
 
   --secondary: oklch(0.22 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -108,20 +109,14 @@ html {
   --destructive: oklch(0.62 0.21 25);
 
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  /* dynamic accent RGB channels (updated by JS on scroll when in dark mode) */
-  --dynamic-accent-r: 64;
-  --dynamic-accent-g: 0;
-  --dynamic-accent-b: 96;
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.7 0 0);
+
+  /* Neutral white glow channels for the *-dynamic utilities (no rainbow). */
+  --dynamic-accent-r: 255;
+  --dynamic-accent-g: 255;
+  --dynamic-accent-b: 255;
   --dynamic-accent: rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b));
-  /* When JS sets --accent, many components that use --accent will pick it up; fallback to dynamic-accent */
-  --accent: var(--dynamic-accent);
-  
-  /* Gradient color cores: dark purple, green, blue */
-  --gradient-purple: #4a1d6f;
-  --gradient-green: #1d5e3f;
-  --gradient-blue: #1d3a5f;
 }
 
 /* Base */
@@ -134,18 +129,12 @@ html {
     @apply bg-background text-foreground antialiased;
   }
   
-  /* Dark mode gradient background with purple, green, blue color cores */
-  .dark {
-    background: linear-gradient(
-      135deg,
-      var(--gradient-purple) 0%,
-      #2a1045 15%,
-      var(--gradient-blue) 35%,
-      #0f2535 50%,
-      var(--gradient-green) 70%,
-      #1a3f2f 85%,
-      var(--gradient-purple) 100%
-    );
+  /* True Black (OLED) base — solid near-black with a whisper of elevation at
+     the top for depth (keeps it from looking flat). */
+  .dark body {
+    background:
+      radial-gradient(1200px 620px at 50% -12%, oklch(0.16 0 0 / 0.55), transparent 70%),
+      oklch(0.04 0 0);
     background-attachment: fixed;
   }
 }
@@ -198,53 +187,32 @@ html {
   box-shadow: 0 6px 18px -6px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.28), 0 0 0 4px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.06);
 }
 
-/* Card / ticket hover styles that use the dynamic accent in dark mode */
+/* Card / ticket hover styles — True Black (OLED): clean elevated surfaces with
+   hairline translucent-white borders and a soft black drop shadow (no rainbow). */
 .dark .card-dynamic {
   transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, border-color 160ms ease;
-  background: linear-gradient(
-    135deg,
-    rgba(74, 29, 111, 0.15) 0%,
-    rgba(29, 94, 63, 0.08) 50%,
-    rgba(29, 58, 95, 0.12) 100%
-  );
-  border: 1px solid rgba(29, 58, 95, 0.3);
+  background: oklch(0.14 0 0);
+  border: 1px solid oklch(1 0 0 / 8%);
 }
 .dark .card-dynamic:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(74, 29, 111, 0.25) 0%,
-    rgba(29, 94, 63, 0.15) 50%,
-    rgba(29, 58, 95, 0.22) 100%
-  );
-  box-shadow: 0 10px 30px -8px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.32), 
-              0 0 20px -8px rgba(29, 94, 63, 0.2),
-              0 0 15px -8px rgba(29, 58, 95, 0.15);
-  transform: translateY(-2px) scale(1.02);
-  border-color: rgba(29, 94, 63, 0.5);
+  background: oklch(0.17 0 0);
+  box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.85),
+              0 0 0 1px oklch(1 0 0 / 10%);
+  transform: translateY(-2px);
+  border-color: oklch(1 0 0 / 16%);
 }
 
 .dark .ticket-dynamic {
   transition: background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease, border-color 140ms ease;
-  background: linear-gradient(
-    135deg,
-    rgba(74, 29, 111, 0.08) 0%,
-    rgba(29, 94, 63, 0.06) 50%,
-    rgba(29, 58, 95, 0.08) 100%
-  );
-  border: 1px solid rgba(74, 29, 111, 0.2);
+  background: oklch(0.13 0 0);
+  border: 1px solid oklch(1 0 0 / 7%);
 }
 .dark .ticket-dynamic:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(74, 29, 111, 0.15) 0%,
-    rgba(29, 94, 63, 0.12) 50%,
-    rgba(29, 58, 95, 0.15) 100%
-  );
-  box-shadow: 0 8px 22px -6px rgb(var(--dynamic-accent-r) var(--dynamic-accent-g) var(--dynamic-accent-b) / 0.26),
-              0 0 15px -6px rgba(29, 94, 63, 0.15),
-              0 0 12px -6px rgba(29, 58, 95, 0.12);
-  transform: translateY(-2px) scale(1.06);
-  border-color: rgba(29, 94, 63, 0.4);
+  background: oklch(0.16 0 0);
+  box-shadow: 0 12px 28px -10px rgba(0, 0, 0, 0.8),
+              0 0 0 1px oklch(1 0 0 / 9%);
+  transform: translateY(-2px);
+  border-color: oklch(1 0 0 / 14%);
 }
 
 /* ===== PredictiX loader animations ===== */
@@ -292,6 +260,7 @@ html {
   60%  { opacity: .18; }
   100% { transform: translateX(120%); opacity: 0; }
 }
+
 
 /* ===== Custom Scrollbar Styling ===== */
 .scrollbar-styled::-webkit-scrollbar {

@@ -1,15 +1,34 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
-import { CircleHelp, Mail, MessageSquareText, PlusCircle, Search } from "lucide-react";
+import {
+  CircleHelp,
+  MessageSquareText,
+  PlusCircle,
+  Search,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+  Sparkles,
+  BookOpen,
+  ChevronDown,
+  LifeBuoy,
+  Mail,
+  FileQuestion,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import AdminNavbar from "@/components/navigation/AdminNavbar";
+import UserNavbar from "@/components/navigation/UserNavbar";
+import AmbientBackground from "@/components/background/AmbientBackground";
+import Footer from "@/components/navigation/Footer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { hasSupabaseConfig, supabase } from "@/lib/supabaseBrowserClient";
+import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/apiClient";
+import { cn } from "@/lib/utils";
 
-const ADMIN_SUPPORT_EMAIL = "support@predictix.com";
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type FaqItem = {
   id: string;
@@ -22,269 +41,562 @@ type FaqItem = {
   updated_at: string | null;
 };
 
+// ─── FAQ Accordion Card ───────────────────────────────────────────────────────
+// NOTE: The outer row is a <div> (not <button>) so that admin action
+// <button> elements inside it are NOT nested inside another <button>.
+
+function FaqCard({
+  item,
+  isAdmin,
+  isEditing,
+  editQuestion,
+  editAnswer,
+  isSavingEdit,
+  deletingId,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onEditQuestion,
+  onEditAnswer,
+  onConfirmDelete,
+  onRequestDelete,
+  onCancelDelete,
+}: {
+  item: FaqItem;
+  isAdmin: boolean;
+  isEditing: boolean;
+  editQuestion: string;
+  editAnswer: string;
+  isSavingEdit: boolean;
+  deletingId: string | null;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onEditQuestion: (v: string) => void;
+  onEditAnswer: (v: string) => void;
+  onConfirmDelete: () => void;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+
+  // ── Edit mode ───────────────────────────────────────────────────────────────
+  if (isEditing) {
+    return (
+      <div className="rounded-2xl border border-violet-300 dark:border-violet-500/50 bg-card shadow-sm p-5 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/15">
+            <Pencil className="size-3.5 text-violet-600 dark:text-violet-400" />
+          </span>
+          <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
+            Editing FAQ
+          </span>
+        </div>
+        <Input
+          value={editQuestion}
+          onChange={(e) => onEditQuestion(e.target.value)}
+          placeholder="Question"
+          className="bg-background/60 dark:bg-slate-900/60"
+        />
+        <textarea
+          value={editAnswer}
+          onChange={(e) => onEditAnswer(e.target.value)}
+          placeholder="Answer"
+          className="min-h-24 w-full resize-y rounded-xl border border-input bg-background/60 dark:bg-slate-900/60 px-3 py-2.5 text-sm outline-none focus-visible:border-violet-400 focus-visible:ring-2 focus-visible:ring-violet-400/30 transition-all"
+        />
+        <div className="flex items-center gap-2 justify-end">
+          <Button
+            type="button"
+            size="sm"
+            onClick={onSaveEdit}
+            disabled={isSavingEdit || !editQuestion.trim() || !editAnswer.trim()}
+            className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-sm"
+          >
+            <Check className="size-3.5 mr-1.5" />
+            {isSavingEdit ? "Saving…" : "Save Changes"}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={onCancelEdit}>
+            <X className="size-3.5 mr-1.5" />
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── View mode ───────────────────────────────────────────────────────────────
+  return (
+    <div
+      className={cn(
+        "group rounded-2xl border bg-card transition-all duration-200 overflow-hidden",
+        "border-slate-200 dark:border-slate-800",
+        open
+          ? "border-violet-200 dark:border-violet-500/40 shadow-md shadow-violet-500/5"
+          : "hover:border-violet-200/70 dark:hover:border-violet-500/30 hover:shadow-sm"
+      )}
+    >
+      {/* ── Header row: outer is a plain div, click zone is a div[role=button] */}
+      <div className="flex items-center gap-2 pr-3">
+        {/* Clickable question area — uses div+role so buttons can sit beside it */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setOpen((v) => !v)}
+          className="flex-1 min-w-0 flex items-center gap-3 px-5 py-4 cursor-pointer select-none"
+        >
+          <span
+            className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-colors",
+              open
+                ? "bg-gradient-to-br from-violet-500 to-sky-500 text-white"
+                : "bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 group-hover:bg-violet-100 dark:group-hover:bg-violet-500/15"
+            )}
+          >
+            <MessageSquareText className="size-4" />
+          </span>
+          <span className="text-sm font-semibold text-foreground leading-snug">
+            {item.question}
+          </span>
+        </div>
+
+        {/* Right side: admin actions + chevron — siblings of the click zone, NOT inside it */}
+        <div className="flex items-center gap-1 shrink-0">
+          {isAdmin && (
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                type="button"
+                onClick={onStartEdit}
+                className="rounded-lg p-1.5 text-muted-foreground hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10 transition-colors"
+                title="Edit"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+
+              {deletingId === item.id ? (
+                <span className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={onConfirmDelete}
+                    className="rounded-lg px-2.5 py-1 bg-rose-600 text-white text-xs font-medium hover:bg-rose-700 transition-colors"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onCancelDelete}
+                    className="rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onRequestDelete}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Chevron — also a plain div click so it doesn't nest inside role=button */}
+          <div
+            onClick={() => setOpen((v) => !v)}
+            className="p-2 cursor-pointer rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+          >
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                open && "rotate-180 text-violet-500"
+              )}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Answer panel — CSS height transition */}
+      <div
+        className={cn(
+          "overflow-hidden transition-all duration-300",
+          open ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+        )}
+      >
+        <div className="px-5 pb-5">
+          <div className="ml-11 pl-4 border-l-2 border-violet-200/80 dark:border-violet-500/30">
+            <p className="text-sm leading-7 text-muted-foreground">
+              {item.answer}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function HelpDeskPage() {
   const adminFormRef = React.useRef<HTMLDivElement | null>(null);
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [query, setQuery] = React.useState("");
-  const [newQuestion, setNewQuestion] = React.useState("");
-  const [adminQuestion, setAdminQuestion] = React.useState("");
-  const [adminAnswer, setAdminAnswer] = React.useState("");
   const [faqItems, setFaqItems] = React.useState<FaqItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState("");
+
+  const [adminQuestion, setAdminQuestion] = React.useState("");
+  const [adminAnswer, setAdminAnswer] = React.useState("");
   const [isAdding, setIsAdding] = React.useState(false);
 
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editQuestion, setEditQuestion] = React.useState("");
+  const [editAnswer, setEditAnswer] = React.useState("");
+  const [isSavingEdit, setIsSavingEdit] = React.useState(false);
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+
   React.useEffect(() => {
-    const role = window.localStorage.getItem("predictix.user.role");
-    setIsAdmin(role === "ADMIN");
+    const r = window.localStorage.getItem("predictix.user.role") ?? "";
+    setIsAdmin(r === "admin" || r === "ADMIN");
   }, []);
 
   const fetchFaqs = React.useCallback(async () => {
-    if (!hasSupabaseConfig || !supabase) {
-      setLoadError(
-        "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in frontend env."
-      );
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     setLoadError("");
-
-    const { data, error } = await supabase
-      .from("faqs")
-      .select("id,question,answer,category,tags,is_active,created_at,updated_at")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      setLoadError(error.message);
+    try {
+      const data = await apiGet<FaqItem[]>("/faqs/");
+      setFaqItems(data ?? []);
+    } catch (err: any) {
+      setLoadError(err?.message ?? "Failed to load FAQs");
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    setFaqItems(data ?? []);
-    setIsLoading(false);
   }, []);
 
-  React.useEffect(() => {
-    fetchFaqs();
-  }, [fetchFaqs]);
+  React.useEffect(() => { fetchFaqs(); }, [fetchFaqs]);
 
   const filteredFaqs = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return faqItems;
-
-    return faqItems.filter((item) => {
-      return (
+    return faqItems.filter(
+      (item) =>
         item.question.toLowerCase().includes(q) ||
         item.answer.toLowerCase().includes(q)
-      );
-    });
+    );
   }, [faqItems, query]);
 
-  const sendQuestionToAdmin = () => {
-    const trimmed = newQuestion.trim();
-    if (!trimmed) return;
-
-    const subject = encodeURIComponent("New Help Desk Question");
-    const body = encodeURIComponent(
-      `Hello Admin Team,%0D%0A%0D%0APlease review this new user question:%0D%0A${trimmed}%0D%0A%0D%0AThanks.`
-    );
-
-    window.location.href = `mailto:${ADMIN_SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
-  };
-
-  const addFaqItem = async () => {
+  async function handleAddFaq() {
     const question = adminQuestion.trim();
     const answer = adminAnswer.trim();
     if (!question || !answer) return;
-    if (!hasSupabaseConfig || !supabase) {
-      setLoadError(
-        "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in frontend env."
-      );
-      return;
-    }
-
     setIsAdding(true);
-
-    const { data, error } = await supabase
-      .from("faqs")
-      .insert({
-        question,
-        answer,
-        is_active: true,
-      })
-      .select("id,question,answer,category,tags,is_active,created_at,updated_at")
-      .single();
-
-    if (error) {
+    try {
+      const created = await apiPost<FaqItem>("/faqs/", { question, answer });
+      setFaqItems((prev) => [created, ...prev]);
+      setAdminQuestion("");
+      setAdminAnswer("");
+      toast.success("FAQ published successfully");
+    } catch (err: any) {
+      toast.error("Failed to add FAQ", { description: err?.message });
+    } finally {
       setIsAdding(false);
-      setLoadError(error.message);
-      return;
     }
+  }
 
-    setFaqItems((current) => [data, ...current]);
+  function startEdit(item: FaqItem) {
+    setEditingId(item.id);
+    setEditQuestion(item.question);
+    setEditAnswer(item.answer);
+  }
 
-    setAdminQuestion("");
-    setAdminAnswer("");
-    setIsAdding(false);
-  };
+  function cancelEdit() {
+    setEditingId(null);
+    setEditQuestion("");
+    setEditAnswer("");
+  }
 
-  const scrollToAdminForm = () => {
-    adminFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  async function saveEdit(id: string) {
+    const question = editQuestion.trim();
+    const answer = editAnswer.trim();
+    if (!question || !answer) return;
+    setIsSavingEdit(true);
+    try {
+      const updated = await apiPut<FaqItem>(`/faqs/${id}`, { question, answer });
+      setFaqItems((prev) => prev.map((f) => (f.id === id ? updated : f)));
+      setEditingId(null);
+      toast.success("FAQ updated");
+    } catch (err: any) {
+      toast.error("Failed to update FAQ", { description: err?.message });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await apiDelete(`/faqs/${id}`);
+      setFaqItems((prev) => prev.filter((f) => f.id !== id));
+      setDeletingId(null);
+      toast.success("FAQ deleted");
+    } catch (err: any) {
+      toast.error("Failed to delete FAQ", { description: err?.message });
+    }
+  }
+
+  const Navbar = isAdmin ? AdminNavbar : UserNavbar;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <AdminNavbar />
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-        <Card className="border-border/70">
-          <CardHeader className="pb-4">
-            <div className="flex items-start justify-between gap-4">
+    <div className="relative min-h-screen flex flex-col">
+      <AmbientBackground />
+      <Navbar />
+
+      <main className="relative z-10 flex-1 mx-auto w-full max-w-5xl px-4 py-8 space-y-6">
+
+        {/* ── Hero header ── */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-linear-to-br from-slate-50 via-white to-slate-50 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent dark:bg-white/2 p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-primary/10 dark:bg-white/6 p-2.5">
+                <CircleHelp className="h-5 w-5 text-primary dark:text-white/70" />
+              </div>
               <div>
-                <CardTitle className="flex items-center gap-2 text-2xl md:text-3xl">
-                  <CircleHelp className="size-7 text-primary" />
-                  Help Desk
-                </CardTitle>
-                <p className="mt-2 text-sm text-muted-foreground md:text-base">
-                  Find answers to common questions. If your question is not listed, send it to
-                  admin support and we will add it to FAQ.
+                <h1 className="text-2xl font-bold tracking-tight">Help Desk</h1>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Browse curated answers to common questions.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                {isAdmin ? (
-                  <Button type="button" onClick={scrollToAdminForm} className="h-9">
-                    <PlusCircle className="size-4" />
-                    Add New Q&A
-                  </Button>
-                ) : null}
-                <a
-                  href={`mailto:${ADMIN_SUPPORT_EMAIL}`}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/25 px-3 py-1 text-xs font-medium text-violet-700 dark:text-violet-300">
+                <BookOpen className="h-3.5 w-3.5" />
+                {faqItems.length} articles
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                <Sparkles className="h-3.5 w-3.5" />
+                Knowledge Base
+              </span>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-8 gap-1.5 rounded-full"
+                  onClick={() =>
+                    adminFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
                 >
-                  <Mail className="size-4" />
-                  {ADMIN_SUPPORT_EMAIL}
-                </a>
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  Add Q&amp;A
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Search ─────────────────────────────────────────────────────── */}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card shadow-sm p-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-10 h-11 bg-background/60 dark:bg-slate-900/60 rounded-xl border-slate-200 dark:border-slate-700"
+              placeholder="Search questions and answers…"
+              aria-label="Search FAQ"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── FAQ List ────────────────────────────────────────────────────── */}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card shadow-sm overflow-hidden">
+          {/* Section header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-white/[0.02]">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/15">
+                <FileQuestion className="size-4 text-violet-600 dark:text-violet-400" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Frequently Asked Questions</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {query
+                    ? `${filteredFaqs.length} result${filteredFaqs.length !== 1 ? "s" : ""} for "${query}"`
+                    : `${filteredFaqs.length} article${filteredFaqs.length !== 1 ? "s" : ""} available`}
+                </p>
               </div>
             </div>
-          </CardHeader>
+          </div>
 
-          <CardContent className="pt-0">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="pl-9"
-                placeholder="Search question or answer"
-                aria-label="Search FAQ"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70">
-          <CardHeader>
-            <CardTitle className="text-lg md:text-xl">Frequently Asked Questions</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <div className="p-5">
             {isLoading ? (
-              <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                Loading FAQs...
-              </p>
+              <div className="space-y-3">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={n} className="rounded-2xl border border-slate-200 dark:border-slate-800 p-5 animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-xl bg-slate-200 dark:bg-slate-700 shrink-0" />
+                      <div className="h-4 rounded-lg bg-slate-200 dark:bg-slate-700 flex-1" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : loadError ? (
-              <div className="space-y-3 rounded-xl border border-dashed border-destructive/40 p-4 text-sm">
-                <p className="text-destructive">Failed to load FAQs: {loadError}</p>
-                <Button type="button" variant="outline" onClick={fetchFaqs}>
-                  Retry
-                </Button>
+              <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-destructive/40 p-10 text-center">
+                <div className="rounded-full bg-red-100 dark:bg-red-500/10 p-3">
+                  <X className="size-5 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-destructive">Failed to load FAQs</p>
+                  <p className="text-xs text-muted-foreground mt-1">{loadError}</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={fetchFaqs}>Retry</Button>
               </div>
             ) : filteredFaqs.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                No matching FAQ found. Ask a new question below and send it to admins.
-              </p>
+              <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-12 text-center">
+                <div className="rounded-2xl bg-violet-100/80 dark:bg-violet-500/10 p-4">
+                  <Search className="size-6 text-violet-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">No matching FAQ found</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                    {query
+                      ? `No results for "${query}". Try a different term.`
+                      : "No FAQs have been added yet. Ask your admin to add some."}
+                  </p>
+                </div>
+                {query && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setQuery("")}>
+                    Clear search
+                  </Button>
+                )}
+              </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {filteredFaqs.map((item) => (
-                  <details
+                  <FaqCard
                     key={item.id}
-                    className="group rounded-xl border border-border bg-card px-4 py-3 open:border-primary/40"
-                  >
-                    <summary className="cursor-pointer list-none text-sm font-semibold md:text-base">
-                      <span className="inline-flex items-center gap-2">
-                        <MessageSquareText className="size-4 text-primary" />
-                        {item.question}
-                      </span>
-                    </summary>
-                    <p className="mt-3 text-sm leading-6 text-muted-foreground md:text-[15px]">
-                      {item.answer}
-                    </p>
-                  </details>
+                    item={item}
+                    isAdmin={isAdmin}
+                    isEditing={editingId === item.id}
+                    editQuestion={editQuestion}
+                    editAnswer={editAnswer}
+                    isSavingEdit={isSavingEdit}
+                    deletingId={deletingId}
+                    onStartEdit={() => startEdit(item)}
+                    onCancelEdit={cancelEdit}
+                    onSaveEdit={() => saveEdit(item.id)}
+                    onEditQuestion={setEditQuestion}
+                    onEditAnswer={setEditAnswer}
+                    onConfirmDelete={() => handleDelete(item.id)}
+                    onRequestDelete={() => setDeletingId(item.id)}
+                    onCancelDelete={() => setDeletingId(null)}
+                  />
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="border-border/70">
-          <CardHeader>
-            <CardTitle className="text-lg md:text-xl">Ask A New Question</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <textarea
-              value={newQuestion}
-              onChange={(event) => setNewQuestion(event.target.value)}
-              placeholder="Type your question here"
-              className="min-h-28 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              aria-label="New help desk question"
-            />
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground md:text-sm">
-                This sends your question to admin email: {ADMIN_SUPPORT_EMAIL}
-              </p>
-              <Button type="button" onClick={sendQuestionToAdmin} disabled={!newQuestion.trim()}>
-                Send To Admin
-              </Button>
+        {/* ── Contact Support (non-admin users) ──────────────────────────── */}
+        {!isAdmin && (
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card shadow-sm overflow-hidden">
+            <div className="relative p-6">
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-50 to-sky-50 dark:from-violet-950/30 dark:to-sky-950/20 pointer-events-none" />
+              <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-sky-500 text-white shadow-md shadow-violet-500/25">
+                  <LifeBuoy className="size-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Still need help?</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Contact your administrator directly if you can't find an answer here.
+                  </p>
+                </div>
+                <a
+                  href="mailto:support@lankalogix.lk"
+                  className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-violet-200 dark:border-violet-500/30 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-500/10 transition-colors shadow-sm"
+                >
+                  <Mail className="size-4" />
+                  Contact Admin
+                </a>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
-        {isAdmin ? (
-          <Card className="border-border/70" ref={adminFormRef}>
-            <CardHeader>
-              <CardTitle className="text-lg md:text-xl">Admin: Add FAQ Item</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Input
-                value={adminQuestion}
-                onChange={(event) => setAdminQuestion(event.target.value)}
-                placeholder="FAQ question"
-                aria-label="FAQ question"
-              />
-              <textarea
-                value={adminAnswer}
-                onChange={(event) => setAdminAnswer(event.target.value)}
-                placeholder="FAQ answer"
-                className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                aria-label="FAQ answer"
-              />
-              <div className="flex justify-end">
+        {/* ── Admin: Add FAQ ──────────────────────────────────────────────── */}
+        {isAdmin && (
+          <div
+            ref={adminFormRef}
+            className="relative rounded-2xl border border-slate-200 dark:border-slate-800 bg-card shadow-sm overflow-hidden"
+          >
+            {/* Accent top bar */}
+            <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-sky-500" />
+
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-white/[0.02]">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/15">
+                  <PlusCircle className="size-4 text-violet-600 dark:text-violet-400" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Add New FAQ</p>
+                  <p className="text-[11px] text-muted-foreground">Publish a new question and answer to the knowledge base.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Question</label>
+                <Input
+                  value={adminQuestion}
+                  onChange={(e) => setAdminQuestion(e.target.value)}
+                  placeholder="e.g. How do I reset my password?"
+                  aria-label="FAQ question"
+                  className="bg-background/60 dark:bg-slate-900/60 rounded-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Answer</label>
+                <textarea
+                  value={adminAnswer}
+                  onChange={(e) => setAdminAnswer(e.target.value)}
+                  placeholder="Provide a clear and concise answer…"
+                  className="min-h-28 w-full resize-y rounded-xl border border-input bg-background/60 dark:bg-slate-900/60 px-3.5 py-2.5 text-sm outline-none transition-all focus-visible:border-violet-400 focus-visible:ring-2 focus-visible:ring-violet-400/30"
+                  aria-label="FAQ answer"
+                />
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <p className="text-xs text-muted-foreground">
+                  This FAQ will be visible to all users immediately.
+                </p>
                 <Button
                   type="button"
-                  onClick={addFaqItem}
+                  onClick={handleAddFaq}
                   disabled={!adminQuestion.trim() || !adminAnswer.trim() || isAdding}
+                  className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white shadow-md shadow-violet-500/25"
                 >
-                  {isAdding ? "Saving..." : "Add Question & Answer"}
+                  <PlusCircle className="size-4 mr-1.5" />
+                  {isAdding ? "Publishing…" : "Publish FAQ"}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        ) : null}
-        </div>
+            </div>
+          </div>
+        )}
+
       </main>
+      
+      <Footer />
     </div>
   );
 }

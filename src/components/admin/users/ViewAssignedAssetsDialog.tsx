@@ -12,20 +12,29 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Box, MapPin, Loader2, AlertCircle } from "lucide-react";
 
-import { fetchUserAssets } from "@/lib/api/userProfileApi";
-import type { UserAssetData } from "@/lib/api/userProfileApi";
+import { Box, MapPin, X } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+export type AssetItem = {
+  id: string;
+  name: string;
+  category: string;
+  location: string;
+  healthPercent: number;
+};
+
 type Props = {
-  userId: string;
   userName: string;
+  assets: AssetItem[];
+  /** Shows a loading state while assigned assets are being fetched. */
+  loading?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When provided, shows a "Back to User Details" button. */
   onBackToDetails?: () => void;
 };
 
@@ -42,59 +51,51 @@ function HealthBadge({ percent }: { percent: number }) {
         : "border-red-500/40 text-red-400";
 
   return (
-    <Badge variant="outline" className={`text-xs font-semibold ${color}`}>
+    <Badge
+      variant="outline"
+      className={`text-xs font-semibold ${color}`}
+    >
       Health: {percent}%
     </Badge>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const color =
-    status === "active"
-      ? "border-transparent bg-emerald-600 text-white"
-      : "border-transparent bg-zinc-600 text-white";
-  return <Badge className={`text-xs ${color}`}>{status}</Badge>;
-}
-
-function AssetCard({ asset }: { asset: UserAssetData }) {
+function AssetCard({
+  asset,
+  onRemove,
+}: {
+  asset: AssetItem;
+  onRemove: (id: string) => void;
+}) {
   return (
-    <div className="flex items-start gap-4 rounded-xl border border-border p-4">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15">
-        <Box className="h-5 w-5 text-indigo-400" />
-      </div>
-
-      <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-base font-semibold">{asset.name}</p>
-          <StatusBadge status={asset.status} />
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-border p-4">
+      {/* Left: icon + info */}
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15">
+          <Box className="h-5 w-5 text-indigo-400" />
         </div>
-
-        <p className="text-sm text-muted-foreground">
-          {asset.asset_type}
-          {asset.category ? ` · ${asset.category}` : ""}
-        </p>
-
-        <p className="text-xs font-mono text-muted-foreground">
-          {asset.asset_code}
-        </p>
-
-        <div className="flex flex-wrap items-center gap-2 pt-0.5">
-          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-            <MapPin className="h-3.5 w-3.5 text-red-400" />
-            {asset.location}
-          </span>
-          <HealthBadge percent={Math.round(asset.healthPercent)} />
-        </div>
-
-        {asset.nextServiceDate && (
-          <p className="text-xs text-muted-foreground">
-            Next service:{" "}
-            <span className="font-medium text-amber-400">
-              {new Date(asset.nextServiceDate).toLocaleDateString()}
+        <div className="min-w-0 space-y-1">
+          <p className="text-base font-semibold">{asset.name}</p>
+          <p className="text-sm text-muted-foreground">{asset.category}</p>
+          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+            <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 text-red-400" />
+              {asset.location}
             </span>
-          </p>
-        )}
+            <HealthBadge percent={asset.healthPercent} />
+          </div>
+        </div>
       </div>
+
+      {/* Right: remove button */}
+      <button
+        type="button"
+        onClick={() => onRemove(asset.id)}
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-1.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10"
+      >
+        <X className="h-3.5 w-3.5" />
+        Remove
+      </button>
     </div>
   );
 }
@@ -104,94 +105,62 @@ function AssetCard({ asset }: { asset: UserAssetData }) {
 // ---------------------------------------------------------------------------
 
 export default function ViewAssignedAssetsDialog({
-  userId,
   userName,
+  assets: initialAssets,
+  loading = false,
   open,
   onOpenChange,
   onBackToDetails,
 }: Props) {
-  const [assets, setAssets] = React.useState<UserAssetData[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [assets, setAssets] = React.useState<AssetItem[]>(initialAssets);
 
-  // Fetch real assets whenever dialog opens
+  // Sync when dialog opens with new data
   React.useEffect(() => {
-    if (!open || !userId) return;
+    if (open) setAssets(initialAssets);
+  }, [open, initialAssets]);
 
-    async function load() {
-      setIsLoading(true);
-      setError(null);
-      setAssets([]);
-      try {
-        const data = await fetchUserAssets(userId);
-        setAssets(Array.isArray(data) ? data : []);
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : "Failed to load assets.";
-        setError(message);
-        toast.error("Failed to load assets.", { description: message });
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    load();
-  }, [open, userId]);
-
-  const assetCount = assets?.length ?? 0;
+  function handleRemove(assetId: string) {
+    const removed = assets.find((a) => a.id === assetId);
+    setAssets((prev) => prev.filter((a) => a.id !== assetId));
+    toast.success(`Removed ${removed?.name ?? "asset"} from view`, {
+      description: "Unassignment is not yet persisted to the backend.",
+    });
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[560px]">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[540px]">
         <DialogHeader>
           <DialogTitle className="text-xl">Assigned Assets</DialogTitle>
           <DialogDescription>
-            {userName}
-            {!isLoading && !error && (
-              <> — {assetCount} asset{assetCount !== 1 ? "s" : ""}</>
-            )}
+            {userName} – {assets.length} asset{assets.length !== 1 ? "s" : ""}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Loading state */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-10">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            <span className="ml-3 text-muted-foreground">Loading assets…</span>
-          </div>
-        )}
-
-        {/* Error state */}
-        {!isLoading && error && (
-          <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-            <AlertCircle className="h-5 w-5 shrink-0 text-red-400" />
-            <p className="text-sm text-red-400">{error}</p>
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!isLoading && !error && assetCount === 0 && (
-          <p className="py-8 text-center text-muted-foreground">
-            No assets currently assigned to this user.
+        {/* Asset cards list */}
+        {loading ? (
+          <p className="py-6 text-center text-muted-foreground">
+            Loading assigned assets…
           </p>
-        )}
-
-        {/* Asset list */}
-        {!isLoading && !error && assetCount > 0 && (
+        ) : assets.length === 0 ? (
+          <p className="py-6 text-center text-muted-foreground">
+            No assets currently assigned.
+          </p>
+        ) : (
           <div className="grid gap-3 pt-1">
             {assets.map((asset) => (
-              <AssetCard key={asset.asset_id} asset={asset} />
+              <AssetCard
+                key={asset.id}
+                asset={asset}
+                onRemove={handleRemove}
+              />
             ))}
           </div>
         )}
 
         {/* Back button */}
         {onBackToDetails && (
-          <Button
-            onClick={onBackToDetails}
-            className="mt-2 w-full"
-            variant="secondary"
-          >
+          <Button onClick={onBackToDetails} className="mt-1 w-full">
             Back to User Details
           </Button>
         )}

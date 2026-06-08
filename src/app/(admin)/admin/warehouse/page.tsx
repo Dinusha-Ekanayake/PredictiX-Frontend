@@ -4,17 +4,15 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, FileText } from "lucide-react";
 
-import PageHero from "@/components/common/PageHero";
 import WarehouseOverviewCards from "@/components/admin/warehouse/WarehouseOverviewCards";
 import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsightsSection";
 import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
 
 // ── Warehouse Report (my section — warehouse components only) ──
 import WarehouseReportModal, { type WarehouseReportPayload } from "@/components/admin/warehouse/WarehouseReportModal";
-import { getWarehouseSummary, type WarehouseSummaryData } from "@/lib/warehouseService";
+import type { WarehouseSummaryData } from "@/lib/warehouseService";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const REPORT_API = `${API_BASE_URL}/warehouse-dashboard/generate-report`;
+const REPORT_API = "http://127.0.0.1:8000/warehouse-dashboard/generate-report";
 
 export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
@@ -24,12 +22,21 @@ export default function WarehousePage() {
   async function fetchData() {
     setRefreshing(true);
     try {
-      const result = await getWarehouseSummary();
+      const response = await fetch("http://127.0.0.1:8000/warehouse-dashboard/summary", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
       setData(result);
     } catch (e) {
-      // Backend may be offline in dev — log as a warning so it doesn't trip
-      // the Next.js error overlay, and render the empty/loading state instead.
-      console.warn("Failed to fetch warehouse data:", e);
+      console.error("Failed to fetch warehouse data:", e);
       setData(null);
     } finally {
       setRefreshing(false);
@@ -93,27 +100,31 @@ export default function WarehousePage() {
   return (
     <div className="w-full space-y-6">
       {/* ── Page header ── */}
-      <PageHero
-        crumbs={["PredictiX", "Admin", "Warehouse"]}
-        title="Warehouse"
-        subtitle="Overview of asset health, tickets, and predictive maintenance signals."
-        right={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={fetchData} disabled={refreshing}>
-              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-            <Button
-              variant="secondary"
-              id="btn-generate-warehouse-report"
-              onClick={openModalAndGenerate}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Generate Report
-            </Button>
-          </div>
-        }
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Warehouse</h1>
+          <p className="text-sm text-muted-foreground">
+            Overview of asset health, tickets, and predictive maintenance signals.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={fetchData} disabled={refreshing}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+
+          {/* Generate Report → Skip confirmation, go directly to generating */}
+          <Button
+            variant="secondary"
+            id="btn-generate-warehouse-report"
+            onClick={openModalAndGenerate}
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            Generate Report
+          </Button>
+        </div>
+      </div>
 
       {/* ── Existing dashboard (completely untouched) ── */}
       <WarehouseOverviewCards data={data} isLoading={refreshing && !data} />

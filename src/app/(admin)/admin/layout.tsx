@@ -1,28 +1,20 @@
 import { Suspense } from "react";
 import AdminNavbar from "@/components/navigation/AdminNavbar";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
-import AuthGuard from "@/components/auth/AuthGuard";
-import AmbientBackground from "@/components/background/AmbientBackground";
-import Footer from "@/components/navigation/Footer";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthGuard requiredRole="ADMIN">
-      {/* Transparent shell so the ambient particle field shows through in both themes */}
-      <div className="relative min-h-screen flex flex-col">
-        <AmbientBackground />
-        <AdminNavbar />
-        <main className="relative z-10 flex-1 mx-auto w-full max-w-6xl px-4 py-6">
-          <Suspense fallback={
-            <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
-              <PredictiXLoader label="Loading…" />
-            </div>
-          }>
-            {children}
-          </Suspense>
-        </main>
-        <Footer />
-      </div>
-    </AuthGuard>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <AdminNavbar />
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        <Suspense fallback={
+          <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+            <PredictiXLoader label="Loading…" />
+          </div>
+        }>
+          {children}
+        </Suspense>
+      </main>
+    </div>
   );
 }

@@ -42,12 +42,30 @@ function uiPriority(p: string): TicketPriority {
   return map[p?.toLowerCase()] ?? "Medium";
 }
 
-function mapRow(row: any): Ticket {
+interface TicketRow {
+  id: string;
+  ticket_number: string | null;
+  asset_id: string | null;
+  assets?: { asset_name?: string | null } | null;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  predicted_category: string | null;
+  final_category: string | null;
+  created_by: string | null;
+  assigned_to: string | null;
+  opened_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function mapRow(row: TicketRow): Ticket {
   return {
     id: row.id,
     ticket_number: row.ticket_number,
     asset_id: row.asset_id,
-    asset_name: row.assets?.asset_name ?? null,
+    asset_name: row.assets?.asset_name ?? undefined,
     title: row.title,
     description: row.description,
     status: uiStatus(row.status),
@@ -76,8 +94,7 @@ export async function fetchTickets(
   let query = supabase
     .from("tickets")
     .select("*, assets(asset_name)", { count: "exact" })
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: true });
+    .order("created_at", { ascending: false });
 
   if (search.trim()) {
     query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
@@ -104,7 +121,6 @@ export async function createTicket(payload: {
   description: string;
   priority: TicketPriority;
   category: TicketCategory;
-  assigned_to?: string | null;
 }): Promise<Ticket> {
   if (!supabase) throw new Error("Supabase not configured");
 
@@ -117,7 +133,6 @@ export async function createTicket(payload: {
       status: "open",
       priority: dbPriority(payload.priority),
       predicted_category: payload.category === "General" ? "mechanical" : payload.category.toLowerCase(),
-      assigned_to: payload.assigned_to || null,
       opened_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -127,26 +142,6 @@ export async function createTicket(payload: {
 
   if (error) throw error;
   return mapRow(data);
-}
-
-export async function fetchTicketStatusCounts(): Promise<Record<string, number>> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const statuses = ["open", "in_progress", "resolved", "closed"];
-  const counts: Record<string, number> = { open: 0, "in-progress": 0, resolved: 0, closed: 0 };
-
-  await Promise.all(
-    statuses.map(async (s) => {
-      const { count } = await supabase!
-        .from("tickets")
-        .select("id", { count: "exact", head: true })
-        .eq("status", s);
-      const uiKey = s === "in_progress" ? "in-progress" : s;
-      counts[uiKey] = count ?? 0;
-    })
-  );
-
-  return counts;
 }
 
 export async function updateTicketStatus(id: string, status: TicketStatus): Promise<void> {
@@ -164,143 +159,8 @@ export async function updateTicketStatus(id: string, status: TicketStatus): Prom
   if (error) throw error;
 }
 
-export async function updateTicketPriority(id: string, priority: TicketPriority): Promise<void> {
-  if (!supabase) throw new Error("Supabase not configured");
-  const { error } = await supabase
-    .from("tickets")
-    .update({ priority: dbPriority(priority), updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
-}
-
 export async function deleteTicket(id: string): Promise<void> {
   if (!supabase) throw new Error("Supabase not configured");
   const { error } = await supabase.from("tickets").delete().eq("id", id);
   if (error) throw error;
-}
-
-export type TicketHistoryEntry = {
-  id: string;
-  old_status: string | null;
-  new_status: string;
-  changed_by: string | null;
-  changed_by_name: string | null;
-  note: string | null;
-  created_at: string;
-};
-
-export type TicketEnrichment = {
-  creator_name: string | null;
-  creator_email: string | null;
-  assignee_name: string | null;
-  warehouse_name: string | null;
-  department_name: string | null;
-  history: TicketHistoryEntry[];
-};
-
-export async function fetchTicketEnrichment(ticket: {
-  id: string;
-  created_by: string | null;
-  assigned_to: string | null;
-  asset_id: string | null;
-}): Promise<TicketEnrichment> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const result: TicketEnrichment = {
-    creator_name: null,
-    creator_email: null,
-    assignee_name: null,
-    warehouse_name: null,
-    department_name: null,
-    history: [],
-  };
-
-  const profileIds = new Set<string>();
-  if (ticket.created_by) profileIds.add(ticket.created_by);
-  if (ticket.assigned_to) profileIds.add(ticket.assigned_to);
-
-  const { data: historyData, error: historyError } = await supabase
-    .from("ticket_status_history")
-    .select("id,old_status,new_status,changed_by,note,created_at")
-    .eq("ticket_id", ticket.id)
-    .order("created_at", { ascending: true });
-
-  if (historyError) throw historyError;
-
-  const historyRows = (historyData ?? []) as Array<{
-    id: string;
-    old_status: string | null;
-    new_status: string;
-    changed_by: string | null;
-    note: string | null;
-    created_at: string;
-  }>;
-  for (const h of historyRows) {
-    if (h.changed_by) profileIds.add(h.changed_by);
-  }
-
-  let nameById = new Map<string, { name: string | null; email: string | null }>();
-  if (profileIds.size > 0) {
-    const { data: profiles, error: profilesError } = await supabase
-      .from("profiles")
-      .select("id,full_name,email")
-      .in("id", Array.from(profileIds));
-
-    if (profilesError) throw profilesError;
-
-    nameById = new Map(
-      ((profiles ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>).map(
-        (p) => [p.id, { name: p.full_name, email: p.email }],
-      ),
-    );
-
-    if (ticket.created_by) {
-      const p = nameById.get(ticket.created_by);
-      result.creator_name = p?.name ?? null;
-      result.creator_email = p?.email ?? null;
-    }
-    if (ticket.assigned_to) {
-      result.assignee_name = nameById.get(ticket.assigned_to)?.name ?? null;
-    }
-
-    result.history = historyRows.map((h) => ({
-      id: h.id,
-      old_status: h.old_status,
-      new_status: h.new_status,
-      changed_by: h.changed_by,
-      changed_by_name: h.changed_by ? nameById.get(h.changed_by)?.name ?? null : null,
-      note: h.note,
-      created_at: h.created_at,
-    }));
-  }
-
-  if (ticket.asset_id) {
-    const { data: asset, error: assetError } = await supabase
-      .from("assets")
-      .select("warehouse_id,department_id")
-      .eq("id", ticket.asset_id)
-      .maybeSingle();
-
-    if (assetError) throw assetError;
-
-    const a = asset as { warehouse_id: string | null; department_id: string | null } | null;
-    if (a?.warehouse_id) {
-      const { data: w } = await supabase
-        .from("warehouses")
-        .select("name")
-        .eq("id", a.warehouse_id)
-        .maybeSingle();
-      result.warehouse_name = (w as { name: string } | null)?.name ?? null;
-    }
-    if (a?.department_id) {
-      const { data: d } = await supabase
-        .from("departments")
-        .select("name")
-        .eq("id", a.department_id)
-        .maybeSingle();
-      result.department_name = (d as { name: string } | null)?.name ?? null;
-    }
-  }
-
-  return result;
 }

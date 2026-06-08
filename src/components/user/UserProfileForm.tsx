@@ -9,7 +9,6 @@ import { Separator } from "@/components/ui/separator";
 import { Mail, Phone, MapPin, Briefcase, Building2, User, AlertCircle } from "lucide-react";
 import { UserProfileData, updateMyProfile } from "@/lib/api/userProfileApi";
 import { toast } from "sonner";
-import ProfilePhotoUpload from "@/components/common/ProfilePhotoUpload";
 
 interface UserProfileFormProps {
   initialProfile: UserProfileData;
@@ -144,12 +143,8 @@ export function UserProfileForm({
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
               {/* Avatar */}
-              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xl font-bold overflow-hidden">
-                {initialProfile.avatar_url ? (
-                  <img src={initialProfile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  initials
-                )}
+              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xl font-bold">
+                {initials}
               </div>
 
               {/* Profile Info */}
@@ -271,14 +266,9 @@ export function UserProfileForm({
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Edit Profile</CardTitle>
-            <CardDescription>Update your personal information and profile photo.</CardDescription>
+            <CardDescription>Update your personal information</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Profile Photo Upload */}
-            <div className="mb-6">
-              <ProfilePhotoUpload />
-            </div>
-
             {/* First Name */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">First Name</label>

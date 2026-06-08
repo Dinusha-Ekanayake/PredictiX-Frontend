@@ -29,7 +29,6 @@ import type { NewUser } from "@/components/admin/users/AddUserDialog";
 import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
 import EditUserDialog from "@/components/admin/users/EditUserDialog";
-import type { AssetItem } from "@/components/admin/users/ViewAssignedAssetsDialog";
 import { toast } from "sonner";
 
 import {
@@ -190,6 +189,50 @@ export default function AdminUsersPage() {
     };
   }, []);
 
+  function generateUserId(role: UserRole, department: string): string {
+    const roleLetter = role === "admin" ? "A" : "U";
+    const deptLetter = department.charAt(0).toUpperCase() || "X";
+
+    const relevantUsers = users.filter((u) => u.id.startsWith(roleLetter));
+    let maxNumber = 0;
+
+    for (const u of relevantUsers) {
+      const match = u.id.match(/^[AU](\d{4})[A-Z]?$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!Number.isNaN(num) && num > maxNumber) {
+          maxNumber = num;
+        }
+      }
+    }
+
+    const next = String(maxNumber + 1).padStart(4, "0");
+    return `${roleLetter}${next}${deptLetter}`;
+  }
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const data = await listUsers();
+        if (!cancelled) setUsers(data);
+      } catch (err) {
+        if (!cancelled) {
+          toast.error("Failed to load users", {
+            description: err instanceof Error ? err.message : undefined,
+          });
+          setUsers([]);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const filteredUsers = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
@@ -284,6 +327,14 @@ export default function AdminUsersPage() {
     } finally {
       setAssetsLoading(false);
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <PredictiXLoader label="Loading users…" />
+      </div>
+    );
   }
 
   if (isLoading) {
@@ -515,9 +566,8 @@ export default function AdminUsersPage() {
 
       {/* View Assigned Assets Dialog */}
       <ViewAssignedAssetsDialog
+        userId={assetsUser?.id ?? ""}
         userName={assetsUser?.name ?? ""}
-        assets={assignedAssets}
-        loading={assetsLoading}
         open={assetsUser !== null}
         onOpenChange={(open) => {
           if (!open) setAssetsUser(null);

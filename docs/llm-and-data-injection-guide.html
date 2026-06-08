@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PredictiX — LLM &amp; Data Injection: Complete Guide</title>
+<style>
+  :root{
+    --violet:#7c3aed; --indigo:#4f46e5; --teal:#0d9488; --emerald:#059669;
+    --amber:#d97706; --rose:#e11d48; --sky:#0284c7; --navy:#0f172a;
+    --ink:#1e293b; --muted:#64748b; --line:#e2e8f0; --bg:#f8fafc; --card:#ffffff;
+    --code-bg:#0f172a; --code-ink:#e2e8f0;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--bg);line-height:1.65;font-size:15.5px}
+  a{color:var(--indigo);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{display:flex;min-height:100vh}
+  nav.toc{width:290px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--navy);color:#cbd5e1;padding:24px 18px}
+  nav.toc h2{color:#fff;font-size:15px;margin:0 0 4px} nav.toc .sub{color:#94a3b8;font-size:11px;margin-bottom:18px}
+  nav.toc a{display:block;color:#cbd5e1;font-size:13px;padding:5px 10px;border-radius:7px;margin:1px 0}
+  nav.toc a:hover{background:#1e293b;color:#fff;text-decoration:none}
+  nav.toc .grp{color:#7c3aed;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;margin:16px 0 4px;padding-left:10px}
+  main{flex:1;max-width:960px;margin:0 auto;padding:40px 48px 120px}
+  h1{font-size:34px;line-height:1.15;margin:0 0 6px;color:var(--navy);letter-spacing:-.5px}
+  .lede{font-size:17px;color:var(--muted);margin:0 0 32px}
+  h2.sec{font-size:24px;margin:46px 0 10px;color:var(--navy);padding-bottom:8px;border-bottom:3px solid var(--violet);letter-spacing:-.3px}
+  h3{font-size:18px;margin:28px 0 8px;color:var(--indigo)} h4{font-size:15px;margin:18px 0 6px}
+  p{margin:10px 0} ul,ol{margin:10px 0;padding-left:24px} li{margin:5px 0}
+  .pill{display:inline-block;background:#ede9fe;color:var(--violet);font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.05em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:16px 0;box-shadow:0 1px 3px rgba(15,23,42,.04)}
+  .note{border-left:4px solid var(--sky);background:#f0f9ff;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+  .warn{border-left:4px solid var(--amber);background:#fffbeb;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+  .tip{border-left:4px solid var(--emerald);background:#ecfdf5;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+  code{background:#eef2ff;color:#4338ca;padding:1.5px 6px;border-radius:5px;font-size:13px;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;margin:14px 0}
+  pre code{background:none;color:inherit;padding:0}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th{background:var(--navy);color:#fff;text-align:left;padding:10px 12px;font-weight:600;font-size:12.5px}
+  td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}
+  tr:nth-child(even) td{background:#fbfcfe}
+  .mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+  .flow{background:#0b1220;color:#cbd5e1;border-radius:12px;padding:22px;margin:18px 0;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.5;overflow-x:auto;white-space:pre}
+  .steps{counter-reset:s;list-style:none;padding-left:0}
+  .steps>li{counter-increment:s;position:relative;padding:12px 12px 12px 52px;margin:10px 0;background:var(--card);border:1px solid var(--line);border-radius:10px}
+  .steps>li::before{content:counter(s);position:absolute;left:12px;top:12px;width:28px;height:28px;background:var(--violet);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+  footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  .be{color:var(--teal)} .fe{color:var(--indigo)}
+  @media(max-width:880px){nav.toc{display:none}main{padding:24px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="toc">
+  <h2>LLM &amp; Data Injection</h2>
+  <div class="sub">Complete Guide · PredictiX</div>
+  <div class="grp">Foundations</div>
+  <a href="#llm">1 · What is an LLM</a>
+  <a href="#inject">2 · What is data injection</a>
+  <a href="#why">3 · Injection vs fine-tuning</a>
+  <div class="grp">In this project</div>
+  <a href="#used">4 · How it's used</a>
+  <a href="#dialg">5 · Data-injection algorithm</a>
+  <a href="#llmalg">6 · The LLM call algorithm</a>
+  <a href="#prompt">7 · Prompt engineering</a>
+  <a href="#files">8 · File map</a>
+  <div class="grp">Operate</div>
+  <a href="#use">9 · How to use it</a>
+  <a href="#tech">10 · Technologies</a>
+  <a href="#limits">11 · Limitations</a>
+  <a href="#glossary">12 · Glossary</a>
+</nav>
+
+<main>
+  <span class="pill">PredictiX · Groq Llama 3.3 · RAG</span>
+  <h1>The LLM &amp; Data-Injection Algorithm</h1>
+  <p class="lede">Ground-to-high-level: what a Large Language Model actually is, what "data injection" means,
+  the precise algorithm PredictiX uses to feed live database facts into the model, how it's implemented,
+  the files involved, how to run it, and its limits.</p>
+
+  <!-- 1 -->
+  <h2 class="sec" id="llm">1 · What is an LLM (ground level)?</h2>
+  <p>A <strong>Large Language Model</strong> is a neural network trained to do one deceptively simple thing:
+  <strong>predict the next token</strong> (a token ≈ a word-piece) given all the tokens before it. Stack that
+  prediction billions of times over a huge corpus and the model learns grammar, facts, reasoning patterns and style.</p>
+
+  <ul>
+    <li><strong>Tokens</strong> — text is chopped into sub-word units. "maintenance" might be <span class="mono">["main","ten","ance"]</span>.</li>
+    <li><strong>Autoregressive generation</strong> — to write a sentence, the model emits one token, appends it, and predicts the next, repeating until done.</li>
+    <li><strong>Transformer + attention</strong> — each token "attends" to the others, so the model weighs context when choosing the next word.</li>
+    <li><strong>Context window</strong> — the maximum tokens it can read at once (prompt + output). Everything the model "knows for this request" must fit here.</li>
+    <li><strong>Temperature</strong> — randomness of the choice. Low (≈0.2) = focused/deterministic; high = creative/varied.</li>
+  </ul>
+
+  <div class="card">
+    <h4>The specific model PredictiX uses</h4>
+    <table>
+      <tr><th>Property</th><th>Value</th><th>Why it matters</th></tr>
+      <tr><td>Model</td><td class="mono">llama-3.3-70b-versatile</td><td>Strong open model, good at structured/JSON output</td></tr>
+      <tr><td>Host</td><td>Groq (LPU inference)</td><td>Very fast tokens/sec → report in seconds, not minutes</td></tr>
+      <tr><td>Client</td><td>LangChain <span class="mono">ChatGroq</span></td><td>Simple message API + key handling</td></tr>
+      <tr><td>Temperature</td><td>0.25 (warehouse report)</td><td>Faithful, low-variance prose</td></tr>
+    </table>
+  </div>
+  <div class="warn"><strong>Key limitation to remember:</strong> an LLM <em>does not know your data</em>. It only knows
+  general patterns from training. To make it talk about <em>your</em> 1,156 assets, you must put that data into the
+  prompt — that's <strong>data injection</strong>.</div>
+
+  <!-- 2 -->
+  <h2 class="sec" id="inject">2 · What is "data injection"?</h2>
+  <p><strong>Data injection</strong> is the act of placing your real, live information directly into the model's
+  prompt (its context window) at request time, so the model generates text <em>grounded</em> in those facts. In
+  PredictiX this is the engine of <strong>RAG</strong> (Retrieval-Augmented Generation): we <em>retrieve/compute</em>
+  the right facts, then <em>inject</em> them into the prompt before <em>generating</em>.</p>
+
+  <div class="flow">PROMPT  =  [ SYSTEM INSTRUCTIONS ]            ← how to behave + output JSON
+        +  [ LIVE DATABASE DATA   ]            ← injected facts (your warehouse)
+        +  [ KNOWLEDGE BASE CONTEXT ]          ← injected standards (ISO/SMRP/OEM)
+                         │
+                         ▼
+                   LLM (Llama 3.3)
+                         │
+                         ▼
+        JSON { insight_summary, risk_analysis, ... }   ← grounded narrative</div>
+
+  <p>Two kinds of data are injected in this project:</p>
+  <table>
+    <tr><th>Injected block</th><th>Built by</th><th>Contains</th></tr>
+    <tr><td><strong>LIVE DATABASE DATA</strong></td><td><code>build_warehouse_context()</code> → <code>_context_to_prompt_text()</code></td><td>~30 computed metrics: fleet, health, costs, tickets, SHAP, MTTR…</td></tr>
+    <tr><td><strong>KNOWLEDGE BASE CONTEXT</strong></td><td>KB vector store (TF-IDF retrieval)</td><td>Relevant maintenance standards as text</td></tr>
+  </table>
+
+  <!-- 3 -->
+  <h2 class="sec" id="why">3 · Injection vs fine-tuning (why we inject)</h2>
+  <table>
+    <tr><th></th><th>Data injection (what we do)</th><th>Fine-tuning</th></tr>
+    <tr><td>Mechanism</td><td>Put facts in the prompt at runtime</td><td>Retrain model weights on your data</td></tr>
+    <tr><td>Freshness</td><td>Always current (reads the DB live)</td><td>Frozen at training time</td></tr>
+    <tr><td>Cost/effort</td><td>None — just prompt assembly</td><td>Expensive, slow, needs ML ops</td></tr>
+    <tr><td>Numbers</td><td>Exact (from SQL), not memorised</td><td>Model may hallucinate memorised values</td></tr>
+    <tr><td>Best for</td><td>Facts that change (your fleet)</td><td>Style/behaviour, not facts</td></tr>
+  </table>
+  <div class="tip">For a reporting tool whose numbers change every day, <strong>injection is the correct choice</strong> —
+  the model stays a fluent writer, while the database stays the single source of truth.</div>
+
+  <!-- 4 -->
+  <h2 class="sec" id="used">4 · How it's used in this project</h2>
+  <p>The LLM sits at <strong>step 4 of 5</strong> in the report pipeline (<code>run_warehouse_agent()</code> in
+  <span class="mono">app/agents/report_agents.py</span>):</p>
+  <ol class="steps">
+    <li><strong>Build context</strong> — <code>build_warehouse_context(db)</code> runs all SQL into a dict.</li>
+    <li><strong>Retrieve KB</strong> — the TF-IDF vector store fetches relevant standards per section.</li>
+    <li><strong>Annotate</strong> — deterministic Python computes every number (no LLM).</li>
+    <li><strong>Generate (LLM)</strong> — inject data + KB into the prompt, call Groq Llama 3.3, get JSON prose.</li>
+    <li><strong>Guard</strong> — post-process: append authoritative trend facts, flag contradictions, strip stray tags.</li>
+  </ol>
+  <p>The LLM produces <em>only the readable prose</em> in 5 keys. All charts, KPIs and tables come from the
+  injected numbers — so even if the prose were imperfect, the figures stay exact.</p>
+
+  <!-- 5 -->
+  <h2 class="sec" id="dialg">5 · The data-injection algorithm (step by step)</h2>
+
+  <h3>5.1 Collect &amp; deduplicate</h3>
+  <p>Assets accumulate many prediction rows over time. The algorithm first reduces to <strong>one latest row per
+  asset</strong> so health bands can't double-count:</p>
+  <pre><code>SELECT DISTINCT ON (asset_id)
+       asset_id, health_score, failure_probability, risk_level, days_until_maintenance
+FROM asset_failure_predictions
+ORDER BY asset_id, created_at DESC</code></pre>
+
+  <h3>5.2 Aggregate into metrics</h3>
+  <p>Counts, averages and <code>GROUP BY</code> breakdowns become plain numbers/dicts: fleet by type &amp; status,
+  health buckets (≥80 / 60–79 / &lt;60 / &lt;50), risk distribution, cost forecast, maintenance events
+  (windowed), tickets, MTTR, component health, vendors.</p>
+
+  <h3>5.3 Pre-compute <em>every</em> derived figure in Python</h3>
+  <p>Rates and ratios are computed here — never left to the model: e.g. <code>critical_rate_pct</code>,
+  <code>at_risk_rate_pct</code>, <code>pm_ratio_pct = preventive ÷ all events (≤100%)</code>. These become the
+  authoritative values the prose must reuse verbatim.</p>
+
+  <h3>5.4 Window anchoring (a real-world fix)</h3>
+  <p>The 3-month maintenance window anchors to the <strong>latest activity</strong>, not "today", so seed/demo data
+  dated in the past still populates the report; the 3-month total equals the sum of the monthly buckets (they can never disagree).</p>
+
+  <h3>5.5 Serialize to a compact, labelled text block</h3>
+  <p><code>_context_to_prompt_text(ctx)</code> turns the dict into a token-efficient, human-readable block the model
+  parses reliably:</p>
+  <pre><code>▶ FLEET ASSETS (Total: 1156)
+  Active: 800 | Under Maintenance: 15 | ...
+▶ HEALTH &amp; PREDICTIVE ANALYTICS
+  Average Fleet Health Score: 68%
+  Critical Rate: 29.5% (341 of 1156)   ← use this EXACT value
+  Top SHAP Failure Drivers: engine hours, coolant temp, ...
+▶ MAINTENANCE EVENTS (Last 3 Months)
+  Total Events: 1250 | PM Ratio: 99.0% | ...</code></pre>
+
+  <h3>5.6 Assemble the final prompt &amp; inject</h3>
+  <pre><code>combined_prompt = (
+  f"LIVE DATABASE DATA:\n{context_text}\n\n"
+  f"KNOWLEDGE BASE CONTEXT (ISO 55000 / SMRP):\n{kb_full_context}"
+)
+messages = [
+  SystemMessage(content=WAREHOUSE_SYSTEM_PROMPT),
+  HumanMessage(content=f"Generate the full KB-Enhanced warehouse report:\n\n{combined_prompt}"),
+]</code></pre>
+  <div class="note">That's the whole "injection": the live numbers + standards now live inside the model's context
+  window for this single request. No training, no database access by the model itself.</div>
+
+  <!-- 6 -->
+  <h2 class="sec" id="llmalg">6 · The LLM-call algorithm (step by step)</h2>
+  <ol class="steps">
+    <li><strong>Instantiate</strong> the client: <code>_get_llm(temperature=0.25)</code> → <code>ChatGroq(model_name="llama-3.3-70b-versatile")</code> (raises a clear error if <code>GROQ_API_KEY</code> is missing).</li>
+    <li><strong>Invoke</strong>: <code>response = llm.invoke(messages)</code>. Groq tokenises the prompt, runs autoregressive generation, and returns the full completion.</li>
+    <li><strong>Clean</strong>: strip any ```` ``` ```` code fences the model may wrap around the JSON.</li>
+    <li><strong>Parse</strong>: <code>json.loads(content)</code>; on failure, a regex extracts the first <code>{ ... }</code> block; on total failure, fall back to putting the raw text in <code>insight_summary</code>.</li>
+    <li><strong>Guard</strong>: <code>_guard_narrative()</code> appends data-grounded trend facts &amp; flags contradictions; <code>_strip_kb_referenced()</code> removes stray meta-tags.</li>
+    <li><strong>Return</strong>: <code>{ ai_sections, context, kb_annotations }</code> to the router → frontend.</li>
+  </ol>
+  <div class="warn">It's a <strong>single, stateless call</strong> per report — no multi-turn chat, no tool-calling.
+  Simplicity = predictability and speed, at the cost of not being able to "ask the model to fetch more".</div>
+
+  <!-- 7 -->
+  <h2 class="sec" id="prompt">7 · Prompt engineering (how reliability is enforced)</h2>
+  <p><code>WAREHOUSE_SYSTEM_PROMPT</code> is where behaviour is controlled. It declares the role, demands a strict
+  JSON object with exactly 5 keys, gives per-section instructions, and lays down <strong>STRICT RULES</strong>:</p>
+  <ul>
+    <li>Use <strong>only</strong> numbers from the provided data — never invent or estimate.</li>
+    <li><strong>Do not compute</strong> any percentage/ratio/delta — narrate the provided values (e.g. use the given <code>PM Ratio</code> / <code>Critical Rate</code> verbatim).</li>
+    <li>A part-of-whole ratio can never exceed 100%.</li>
+    <li>"Critical" = the &lt;50% health band only; don't blend it with the at-risk (&lt;60%) count.</li>
+    <li>Describe the est-vs-actual cost gap neutrally — don't assert "underspend"/"savings".</li>
+    <li>No markdown, no bullet points, no text outside the JSON, no "KB Referenced" meta-tags.</li>
+  </ul>
+  <div class="tip"><strong>The core principle:</strong> <em>numbers come from Python; only language comes from the LLM.</em>
+  Combined with low temperature and post-generation guards, this is what keeps an inherently probabilistic model
+  producing a trustworthy document.</div>
+
+  <!-- 8 -->
+  <h2 class="sec" id="files">8 · File map</h2>
+  <h3 class="be">Backend &nbsp;<span class="mono">PredictiX_backend/PredictiX_backend</span></h3>
+  <table>
+    <tr><th>File</th><th>Role in LLM / injection</th></tr>
+    <tr><td class="mono">app/agents/report_agents.py</td><td>Everything: <code>_get_llm()</code>, <code>build_warehouse_context()</code> (injection data), <code>_context_to_prompt_text()</code> (serialization), <code>WAREHOUSE_SYSTEM_PROMPT</code>, <code>run_warehouse_agent()</code> (invoke + parse), <code>_guard_narrative()</code>, <code>_strip_kb_referenced()</code>.</td></tr>
+    <tr><td class="mono">app/kb/kb_vector_store.py</td><td>Produces the injected <em>KNOWLEDGE BASE CONTEXT</em> block via retrieval.</td></tr>
+    <tr><td class="mono">app/kb/kb_annotator.py</td><td>Deterministic numbers referenced by the prose (so the LLM doesn't compute).</td></tr>
+    <tr><td class="mono">app/db/session.py</td><td>The Supabase connection the injection data is read from.</td></tr>
+    <tr><td class="mono">app/routers/warehouse_dashboard.py</td><td>Exposes <code>/generate-report</code> which calls <code>run_warehouse_agent()</code>.</td></tr>
+    <tr><td class="mono">requirements.txt / .env</td><td><code>langchain-groq</code>, <code>GROQ_API_KEY</code>, model id.</td></tr>
+  </table>
+  <h3 class="fe">Frontend</h3>
+  <table>
+    <tr><td class="mono">components/admin/warehouse/WarehouseReportModal.tsx</td><td>Triggers generation and renders the returned <code>ai_sections</code> prose.</td></tr>
+    <tr><td class="mono">lib/professionalPdfExport.ts</td><td>Places the LLM prose into the printable PDF.</td></tr>
+  </table>
+
+  <!-- 9 -->
+  <h2 class="sec" id="use">9 · How to use it</h2>
+  <h3>Configure</h3>
+  <pre><code># PredictiX_backend/PredictiX_backend/.env
+GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxx        # free key from console.groq.com</code></pre>
+  <pre><code>pip install -r requirements.txt           # includes langchain-groq</code></pre>
+  <h3>Tune (optional)</h3>
+  <ul>
+    <li>Model / temperature: <code>_get_llm()</code> in <span class="mono">report_agents.py</span> (<code>model_name</code>, <code>temperature</code>).</li>
+    <li>Behaviour / sections / rules: edit <code>WAREHOUSE_SYSTEM_PROMPT</code>.</li>
+    <li>What data is injected: edit <code>build_warehouse_context()</code> + <code>_context_to_prompt_text()</code>.</li>
+  </ul>
+  <h3>Run &amp; generate</h3>
+  <pre><code>uvicorn app.main:app --reload         # backend (restart fully after edits!)
+# then: admin → /admin/warehouse → "Generate Report"</code></pre>
+  <div class="warn">After editing the prompt or injection code, <strong>fully restart Uvicorn</strong> — a stale process
+  is the usual reason a change "doesn't show up".</div>
+
+  <!-- 10 -->
+  <h2 class="sec" id="tech">10 · Technologies used</h2>
+  <table>
+    <tr><th>Technology</th><th>Role</th></tr>
+    <tr><td>Groq <span class="mono">llama-3.3-70b-versatile</span></td><td>The LLM that writes the prose</td></tr>
+    <tr><td>LangChain <span class="mono">langchain-groq</span> (<code>ChatGroq</code>, <code>SystemMessage</code>, <code>HumanMessage</code>)</td><td>LLM client &amp; message API</td></tr>
+    <tr><td>SQLAlchemy + Supabase Postgres</td><td>Source of injected live data</td></tr>
+    <tr><td>scikit-learn TF-IDF</td><td>Retrieves the injected KB context</td></tr>
+    <tr><td>Python <code>json</code> + <code>re</code></td><td>Parsing &amp; repairing the model's JSON output</td></tr>
+    <tr><td>FastAPI</td><td>Serves <code>/generate-report</code></td></tr>
+  </table>
+
+  <!-- 11 -->
+  <h2 class="sec" id="limits">11 · Limitations</h2>
+  <ul>
+    <li><strong>Hallucination risk in prose.</strong> The model can still phrase things loosely; mitigated by computing numbers in Python, strict rules, low temperature and guards — not eliminated. Spot-check narrative claims.</li>
+    <li><strong>Context-window budget.</strong> All injected data + KB must fit the window; a much larger fleet/KB would need summarisation or stricter top-k retrieval.</li>
+    <li><strong>JSON fragility.</strong> The model must return valid JSON; a regex fallback exists, but malformed output degrades to raw text in one field.</li>
+    <li><strong>Single stateless call.</strong> No tool-use or follow-up — the model can't request missing data; everything must be injected up front.</li>
+    <li><strong>External dependency &amp; cost.</strong> Needs <code>GROQ_API_KEY</code> and network; subject to rate limits and model deprecation (the model id may need updating over time).</li>
+    <li><strong>Determinism is partial.</strong> Even at low temperature, wording varies run-to-run; only the injected numbers are guaranteed stable.</li>
+    <li><strong>Prompt coupling.</strong> Section instructions and the injected text format are tightly coupled — changing one without the other can confuse the model.</li>
+  </ul>
+
+  <!-- 12 -->
+  <h2 class="sec" id="glossary">12 · Glossary</h2>
+  <table>
+    <tr><th>Term</th><th>Meaning</th></tr>
+    <tr><td><strong>LLM</strong></td><td>Large Language Model — predicts the next token; here Llama 3.3 70B.</td></tr>
+    <tr><td><strong>Token</strong></td><td>A word-piece the model reads/writes.</td></tr>
+    <tr><td><strong>Context window</strong></td><td>Max tokens (prompt + output) the model handles per request.</td></tr>
+    <tr><td><strong>Data injection</strong></td><td>Putting live facts directly into the prompt to ground generation.</td></tr>
+    <tr><td><strong>RAG</strong></td><td>Retrieval-Augmented Generation — retrieve/compute facts, inject, then generate.</td></tr>
+    <tr><td><strong>Temperature</strong></td><td>Randomness of token choice; low = faithful, high = creative.</td></tr>
+    <tr><td><strong>System / Human message</strong></td><td>LangChain message roles: instructions vs the request payload.</td></tr>
+    <tr><td><strong>Autoregressive</strong></td><td>Generating one token at a time, each conditioned on all previous.</td></tr>
+  </table>
+
+  <footer>
+    PredictiX — LLM &amp; Data-Injection Complete Guide. Self-contained; open in any browser. Pairs with
+    <em>warehouse-report-guide.html</em>. Grounded in <span class="mono">report_agents.py</span>'s
+    <span class="mono">build_warehouse_context</span> / <span class="mono">_context_to_prompt_text</span> /
+    <span class="mono">run_warehouse_agent</span> pipeline.
+  </footer>
+</main>
+</div>
+</body>
+</html>

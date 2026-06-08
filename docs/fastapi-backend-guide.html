@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PredictiX — FastAPI Backend: Complete Guide</title>
+<style>
+  :root{
+    --violet:#7c3aed; --indigo:#4f46e5; --teal:#0d9488; --emerald:#059669;
+    --amber:#d97706; --rose:#e11d48; --sky:#0284c7; --navy:#0f172a;
+    --ink:#1e293b; --muted:#64748b; --line:#e2e8f0; --bg:#f8fafc; --card:#ffffff;
+    --code-bg:#0f172a; --code-ink:#e2e8f0;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--bg);line-height:1.65;font-size:15.5px}
+  a{color:var(--indigo);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{display:flex;min-height:100vh}
+  nav.toc{width:290px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--navy);color:#cbd5e1;padding:24px 18px}
+  nav.toc h2{color:#fff;font-size:15px;margin:0 0 4px} nav.toc .sub{color:#94a3b8;font-size:11px;margin-bottom:18px}
+  nav.toc a{display:block;color:#cbd5e1;font-size:13px;padding:5px 10px;border-radius:7px;margin:1px 0}
+  nav.toc a:hover{background:#1e293b;color:#fff;text-decoration:none}
+  nav.toc .grp{color:#10b981;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;margin:16px 0 4px;padding-left:10px}
+  main{flex:1;max-width:960px;margin:0 auto;padding:40px 48px 120px}
+  h1{font-size:34px;line-height:1.15;margin:0 0 6px;color:var(--navy);letter-spacing:-.5px}
+  .lede{font-size:17px;color:var(--muted);margin:0 0 32px}
+  h2.sec{font-size:24px;margin:46px 0 10px;color:var(--navy);padding-bottom:8px;border-bottom:3px solid var(--emerald);letter-spacing:-.3px}
+  h3{font-size:18px;margin:28px 0 8px;color:var(--teal)} h4{font-size:15px;margin:18px 0 6px}
+  p{margin:10px 0} ul,ol{margin:10px 0;padding-left:24px} li{margin:5px 0}
+  .pill{display:inline-block;background:#ccfbf1;color:#0f766e;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.05em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:16px 0;box-shadow:0 1px 3px rgba(15,23,42,.04)}
+  .note{border-left:4px solid var(--sky);background:#f0f9ff;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+  .warn{border-left:4px solid var(--amber);background:#fffbeb;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+  .tip{border-left:4px solid var(--emerald);background:#ecfdf5;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+  code{background:#e7f6f3;color:#0f766e;padding:1.5px 6px;border-radius:5px;font-size:13px;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;margin:14px 0}
+  pre code{background:none;color:inherit;padding:0}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th{background:var(--navy);color:#fff;text-align:left;padding:10px 12px;font-weight:600;font-size:12.5px}
+  td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}
+  tr:nth-child(even) td{background:#fbfcfe}
+  .mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+  .flow{background:#0b1220;color:#cbd5e1;border-radius:12px;padding:22px;margin:18px 0;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.5;overflow-x:auto;white-space:pre}
+  .steps{counter-reset:s;list-style:none;padding-left:0}
+  .steps>li{counter-increment:s;position:relative;padding:12px 12px 12px 52px;margin:10px 0;background:var(--card);border:1px solid var(--line);border-radius:10px}
+  .steps>li::before{content:counter(s);position:absolute;left:12px;top:12px;width:28px;height:28px;background:var(--emerald);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+  footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  @media(max-width:880px){nav.toc{display:none}main{padding:24px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="toc">
+  <h2>FastAPI Backend</h2>
+  <div class="sub">Complete Guide · PredictiX</div>
+  <div class="grp">Foundations</div>
+  <a href="#what">1 · What is FastAPI</a>
+  <a href="#used">2 · How it's used here</a>
+  <a href="#arch">3 · Architecture &amp; layers</a>
+  <a href="#lifecycle">4 · Request lifecycle</a>
+  <div class="grp">Internals</div>
+  <a href="#boot">5 · App bootstrap (main.py)</a>
+  <a href="#auth">6 · Auth &amp; dependencies</a>
+  <a href="#data">7 · Data &amp; validation layers</a>
+  <a href="#files">8 · File map</a>
+  <a href="#impl">9 · How it was implemented</a>
+  <div class="grp">Operate</div>
+  <a href="#use">10 · How to use it</a>
+  <a href="#tech">11 · Technologies</a>
+  <a href="#limits">12 · Limitations</a>
+  <a href="#glossary">13 · Glossary</a>
+</nav>
+
+<main>
+  <span class="pill">PredictiX · FastAPI · SQLAlchemy · Supabase</span>
+  <h1>The FastAPI Backend</h1>
+  <p class="lede">Ground-to-high-level: what FastAPI is, how PredictiX's API is structured, the request lifecycle,
+  every folder and key file, how auth and the database work, how to run it, and its limits.</p>
+
+  <!-- 1 -->
+  <h2 class="sec" id="what">1 · What is FastAPI (ground level)?</h2>
+  <p><strong>FastAPI</strong> is a modern Python web framework for building HTTP APIs. You write plain Python
+  functions, annotate them with type hints, and FastAPI handles routing, request parsing, validation, and
+  documentation automatically.</p>
+  <ul>
+    <li><strong>ASGI &amp; async</strong> — runs on an ASGI server (<code>uvicorn</code>); endpoints can be <code>async</code> for concurrency.</li>
+    <li><strong>Type hints → behaviour</strong> — a parameter typed <code>page: int</code> is auto-parsed and validated; a Pydantic model body is auto-validated.</li>
+    <li><strong>Pydantic</strong> — data-validation library; defines request/response shapes ("schemas").</li>
+    <li><strong>Dependency injection</strong> — <code>Depends(...)</code> wires shared logic (DB session, current user) into endpoints.</li>
+    <li><strong>Auto docs</strong> — interactive Swagger UI at <span class="mono">/docs</span> and the OpenAPI spec at <span class="mono">/openapi.json</span>, generated from your code.</li>
+  </ul>
+  <div class="note">Mental model: <strong>a router maps a URL to a Python function; FastAPI fills that function's
+  arguments (from the request + dependencies), runs it, and serialises the return value to JSON.</strong></div>
+
+  <!-- 2 -->
+  <h2 class="sec" id="used">2 · How it's used in this project</h2>
+  <p>The backend is the <strong>single API layer</strong> between the Next.js frontend and everything else —
+  the Supabase database, the ML models, the LLM, and the knowledge base. It exposes <strong>34 routers</strong>
+  covering auth, users/profiles, assets, tickets, predictions, the warehouse dashboard/report, notifications,
+  a chatbot, FAQs, and diagnostics.</p>
+  <div class="card">
+    <h4>Representative endpoints</h4>
+    <table>
+      <tr><th>Endpoint</th><th>Purpose</th></tr>
+      <tr><td class="mono">POST /auth/login</td><td>Authenticate → JWT</td></tr>
+      <tr><td class="mono">GET /warehouse-dashboard/generate-report</td><td>The KB-Enhanced warehouse report (LLM + RAG)</td></tr>
+      <tr><td class="mono">GET /user/tickets &amp; /user/tickets/stats</td><td>User's own tickets + authoritative KPI counts</td></tr>
+      <tr><td class="mono">POST /tickets/prioritize &amp; /categorize</td><td>ML ticket priority / category</td></tr>
+      <tr><td class="mono">POST /asset-summaries/generate</td><td>Per-asset AI summary</td></tr>
+      <tr><td class="mono">GET /docs</td><td>Interactive API explorer (Swagger)</td></tr>
+    </table>
+  </div>
+
+  <!-- 3 -->
+  <h2 class="sec" id="arch">3 · Architecture &amp; layers</h2>
+  <p>The code is organised in clean layers — each has one job:</p>
+  <div class="flow">HTTP request
+   │
+   ▼
+routers/        ← URL → function; parse &amp; validate I/O (thin)
+   │  Depends(get_db), Depends(get_current_user)
+   ▼
+services/  +  agents/  +  ai/        ← business logic, ML, LLM, RAG
+   │
+   ▼
+models.py  (SQLAlchemy ORM)          ← table definitions
+   │
+   ▼
+db/session.py → Supabase Postgres    ← the database
+   ▲
+schemas/   (Pydantic)                ← request/response shapes used by routers
+core/      (config, security/JWT)    ← cross-cutting settings &amp; auth
+deps.py    (get_db, get_current_user)← shared dependencies</div>
+  <div class="tip"><strong>Why layers?</strong> Routers stay thin (easy to read), business logic is reusable and
+  testable in <code>services/</code>, and the data shape (schemas) is decoupled from the DB tables (models).</div>
+
+  <!-- 4 -->
+  <h2 class="sec" id="lifecycle">4 · Request lifecycle (a concrete trace)</h2>
+  <p>Example: <span class="mono">GET /user/tickets/stats</span> (the user-ticket KPI counts):</p>
+  <ol class="steps">
+    <li><strong>Routing</strong> — FastAPI matches the path to <code>my_ticket_stats()</code> in <span class="mono">routers/user_tickets.py</span>.</li>
+    <li><strong>Dependencies resolve</strong> — <code>Depends(get_current_user)</code> decodes the JWT bearer; <code>Depends(get_db)</code> opens a SQLAlchemy session.</li>
+    <li><strong>Validation</strong> — query/path params are coerced &amp; checked against their type hints (else auto-422).</li>
+    <li><strong>Business logic</strong> — the endpoint calls <code>svc.get_user_ticket_status_counts(db, current_user.id)</code> in <span class="mono">services/user_ticket_service.py</span>.</li>
+    <li><strong>Data access</strong> — SQLAlchemy issues a <code>GROUP BY status</code> query to Supabase.</li>
+    <li><strong>Serialization</strong> — the return value is converted to JSON (validated against a Pydantic <code>response_model</code> when declared).</li>
+    <li><strong>Cleanup</strong> — <code>get_db</code>'s <code>finally</code> closes the session; the JSON response is sent.</li>
+  </ol>
+
+  <!-- 5 -->
+  <h2 class="sec" id="boot">5 · App bootstrap (<span class="mono">app/main.py</span>)</h2>
+  <p><code>main.py</code> builds the application and wires everything together:</p>
+  <ul>
+    <li><strong>Lifespan</strong> — an <code>@asynccontextmanager</code> runs on startup: it loads the local
+        predictive-maintenance models (classifier + regressor <code>.pkl</code>) and optionally warms the
+        HuggingFace models (ticket categoriser, asset summariser), unless <code>DISABLE_HF_MODELS=true</code>.</li>
+    <li><strong>CORS</strong> — allows the frontend origins (<span class="mono">localhost:3000/3001</span>, Vite <span class="mono">5173</span>) to call the API.</li>
+    <li><strong>Router registration</strong> — ~34 <code>app.include_router(...)</code> calls grouped by domain (auth, assets, tickets, predictions, reports, chatbot, diagnostics).</li>
+    <li><strong>Health</strong> — a root <code>/</code> endpoint for liveness.</li>
+  </ul>
+  <pre><code>@asynccontextmanager
+async def lifespan(_: FastAPI):
+    clf_model = _load_pickle(CLF_MODEL_PATH)      # PdM classifier
+    reg_model = _load_pickle(REG_MODEL_PATH)      # days-to-maintenance regressor
+    if os.getenv("DISABLE_HF_MODELS") != "true":
+        warmup_ticket_categorizer(); warmup_asset_summary_model()
+    yield                                          # ← app serves requests here
+app = FastAPI(title="PredictiX API", version="1.0", lifespan=lifespan)</code></pre>
+
+  <!-- 6 -->
+  <h2 class="sec" id="auth">6 · Auth &amp; dependencies (<span class="mono">app/deps.py</span>)</h2>
+  <p>Two dependencies power most endpoints:</p>
+  <h4><code>get_db()</code></h4>
+  <p>Yields a SQLAlchemy session and always closes it in <code>finally</code> (session-per-request). If no DB is
+  configured it yields <code>None</code> so dev environments don't hang.</p>
+  <h4><code>get_current_user()</code></h4>
+  <p>Uses <code>OAuth2PasswordBearer(tokenUrl="/auth/login")</code> to read the <code>Authorization: Bearer …</code>
+  header, decodes the JWT with <strong>python-jose</strong> (<code>JWT_SECRET</code>, HS256), looks up the
+  <code>Profile</code>, and returns it (with a dev-friendly mock-profile fallback). Invalid/missing token → <code>401</code>.</p>
+  <pre><code>def get_current_user(token=Depends(oauth2_scheme), db=Depends(get_db)):
+    payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    user_id = payload["sub"]
+    return db.query(Profile).filter(Profile.id == user_id).first()  # → endpoint</code></pre>
+  <div class="note">Any endpoint that declares <code>current_user: Profile = Depends(get_current_user)</code> is
+  automatically protected — no token, no access. This is how <code>/user/tickets</code> scopes data to the caller.</div>
+
+  <!-- 7 -->
+  <h2 class="sec" id="data">7 · Data &amp; validation layers</h2>
+  <h3>Database — SQLAlchemy + Supabase</h3>
+  <p><code>db/session.py</code> creates the engine from <code>DATABASE_URL</code> (or builds it from
+  <code>PROJECT_REF</code> + <code>DATABASE_PASSWORD</code> for the Supabase pooler), with
+  <code>pool_pre_ping</code> for resilient connections. <code>models.py</code> defines the ORM tables
+  (Asset, AssetFailurePrediction, AssetCostPrediction, MaintenanceEvent, Ticket, Profile, Warehouse, …).</p>
+  <h3>Validation — Pydantic schemas</h3>
+  <p><code>schemas/</code> holds request and response models. A router declares
+  <code>response_model=TicketOut</code> and FastAPI guarantees the output matches that shape (and documents it).
+  Bad input is rejected with an automatic <code>422</code> and a precise error.</p>
+
+  <!-- 8 -->
+  <h2 class="sec" id="files">8 · File map</h2>
+  <table>
+    <tr><th>Path</th><th>Role</th></tr>
+    <tr><td class="mono">app/main.py</td><td>App factory: lifespan (model warmup), CORS, registers all routers, health.</td></tr>
+    <tr><td class="mono">app/deps.py</td><td><code>get_db</code> (session-per-request) &amp; <code>get_current_user</code> (JWT auth).</td></tr>
+    <tr><td class="mono">app/routers/ (34 files)</td><td>Endpoint definitions per domain: <code>auth</code>, <code>users</code>, <code>profile</code>, <code>assets</code>, <code>tickets</code>, <code>user_tickets</code>, <code>predictions</code>, <code>warehouse_dashboard</code>, <code>admin_dashboard</code>, <code>chatbot</code>, <code>db_debug</code>, …</td></tr>
+    <tr><td class="mono">app/schemas/</td><td>Pydantic request/response models (the API contract).</td></tr>
+    <tr><td class="mono">app/services/</td><td>Business logic kept out of routers (e.g. <code>user_ticket_service.py</code>).</td></tr>
+    <tr><td class="mono">app/agents/report_agents.py</td><td>The warehouse-report RAG/LLM orchestration.</td></tr>
+    <tr><td class="mono">app/ai/</td><td>ML model services (PdM, ticket priority/category, asset summary), agent &amp; LLM services.</td></tr>
+    <tr><td class="mono">app/kb/</td><td>Knowledge base: documents, TF-IDF vector store, deterministic annotator.</td></tr>
+    <tr><td class="mono">app/models.py</td><td>SQLAlchemy ORM table models.</td></tr>
+    <tr><td class="mono">app/db/session.py</td><td>Engine + <code>SessionLocal</code> → Supabase Postgres.</td></tr>
+    <tr><td class="mono">app/core/</td><td>Config (<code>config.py</code>) &amp; security helpers (<code>security.py</code>).</td></tr>
+    <tr><td class="mono">app/repositories/ · app/tests/</td><td>Data-access helpers · test suite.</td></tr>
+    <tr><td class="mono">requirements.txt · .env · alembic</td><td>Dependencies · secrets/config · DB migrations.</td></tr>
+  </table>
+
+  <!-- 9 -->
+  <h2 class="sec" id="impl">9 · How it was implemented (patterns)</h2>
+  <ul>
+    <li><strong>APIRouter per domain</strong> — each file does <code>router = APIRouter(prefix="/tickets", tags=["Tickets"])</code> and <code>main.py</code> includes them; clean URL grouping &amp; docs.</li>
+    <li><strong>Thin routers, fat services</strong> — endpoints validate &amp; delegate; logic lives in <code>services/</code>/<code>agents/</code>.</li>
+    <li><strong>Dependency injection</strong> — DB session &amp; current user via <code>Depends</code>, so they're consistent and testable.</li>
+    <li><strong>Schema-first I/O</strong> — Pydantic models define and enforce every request/response.</li>
+    <li><strong>Session-per-request</strong> — one DB session opened/closed per call (no leaks).</li>
+    <li><strong>Startup warmup</strong> — heavy models load once at boot, not per request.</li>
+    <li><strong>Graceful degradation</strong> — missing DB/HF config yields safe fallbacks instead of crashes (dev-friendly).</li>
+    <li><strong>Numbers in Python, prose in LLM</strong> — the report layer computes figures deterministically (see the LLM guide).</li>
+  </ul>
+
+  <!-- 10 -->
+  <h2 class="sec" id="use">10 · How to use it</h2>
+  <h3>Setup</h3>
+  <pre><code>cd PredictiX_backend/PredictiX_backend
+python -m venv .venv &amp;&amp; .venv\Scripts\activate    # Windows
+pip install -r requirements.txt</code></pre>
+  <p>Create <code>.env</code>:</p>
+  <pre><code>DATABASE_URL=postgresql+psycopg2://...        # or PROJECT_REF + DATABASE_PASSWORD
+JWT_SECRET=change-me                          # JWT signing
+JWT_ALGORITHM=HS256
+GROQ_API_KEY=gsk_xxx                          # LLM (report/chatbot)
+HF_TOKEN=hf_xxx                               # HF models
+# DISABLE_HF_MODELS=true                       # skip HF warmup in dev</code></pre>
+  <h3>Run</h3>
+  <pre><code>uvicorn app.main:app --reload                 # dev server on :8000</code></pre>
+  <h3>Explore &amp; call</h3>
+  <ul>
+    <li>Open <span class="mono">http://127.0.0.1:8000/docs</span> — try any endpoint interactively.</li>
+    <li>From code/cURL:</li>
+  </ul>
+  <pre><code>curl -X POST http://127.0.0.1:8000/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"email":"...","password":"...","role":"admin"}'
+# then send the returned token:
+curl http://127.0.0.1:8000/user/tickets/stats \
+     -H "Authorization: Bearer &lt;token&gt;"</code></pre>
+  <div class="warn"><strong>Restart rule:</strong> after editing backend code (or pulling/merging), do a full
+  Uvicorn restart — <code>--reload</code> can miss git-delivered changes, leaving stale code serving stale results.</div>
+
+  <!-- 11 -->
+  <h2 class="sec" id="tech">11 · Technologies used</h2>
+  <table>
+    <tr><th>Area</th><th>Library</th></tr>
+    <tr><td>Web framework / server</td><td>FastAPI, Uvicorn</td></tr>
+    <tr><td>Validation / settings</td><td>Pydantic, pydantic-settings, python-multipart</td></tr>
+    <tr><td>ORM / DB / migrations</td><td>SQLAlchemy, psycopg, Supabase (Postgres), Alembic</td></tr>
+    <tr><td>Auth / security</td><td>python-jose (JWT), passlib + bcrypt (password hashing), OAuth2PasswordBearer</td></tr>
+    <tr><td>LLM / RAG</td><td>groq, langchain-groq, scikit-learn (TF-IDF), sentence-transformers, nltk</td></tr>
+    <tr><td>ML / DS</td><td>scikit-learn, xgboost, catboost, shap, lifelines, pandas, numpy, joblib</td></tr>
+    <tr><td>Aux models</td><td>transformers, torch, huggingface_hub, safetensors</td></tr>
+  </table>
+
+  <!-- 12 -->
+  <h2 class="sec" id="limits">12 · Limitations</h2>
+  <ul>
+    <li><strong>Heavy startup.</strong> Loading PdM pickles + warming HF models slows boot and uses memory; HF warmup can fail the whole startup unless <code>DISABLE_HF_MODELS=true</code>.</li>
+    <li><strong>Sync DB driver.</strong> SQLAlchemy + psycopg is synchronous, so <code>async</code> endpoints can still block on DB I/O under load; no async pool/ORM yet.</li>
+    <li><strong>Dev-oriented auth.</strong> <code>JWT_SECRET</code> defaults to a placeholder and there's a mock-profile fallback — fine for dev, must be hardened (real secret, no mock) for production.</li>
+    <li><strong>Single Supabase pooler connection string</strong> with modest pool settings; high concurrency would need tuning.</li>
+    <li><strong>External dependencies.</strong> Groq + HuggingFace must be reachable and correctly scoped (e.g. the ticket-priority XGBoost model can't run on HF's serverless inference).</li>
+    <li><strong>CORS allowlist is hard-coded</strong> to localhost dev origins — deployment needs the real frontend origin added.</li>
+    <li><strong>Reload gotcha.</strong> Code changes need a real restart to take effect reliably.</li>
+    <li><strong>Mixed concerns in places.</strong> Some routers/agents are large; ongoing refactor into <code>services/</code> keeps them thin.</li>
+  </ul>
+
+  <!-- 13 -->
+  <h2 class="sec" id="glossary">13 · Glossary</h2>
+  <table>
+    <tr><th>Term</th><th>Meaning</th></tr>
+    <tr><td><strong>ASGI</strong></td><td>Async Server Gateway Interface — the protocol Uvicorn uses to run FastAPI.</td></tr>
+    <tr><td><strong>Router</strong></td><td>A group of related endpoints (<code>APIRouter</code>) mounted under a URL prefix.</td></tr>
+    <tr><td><strong>Dependency (Depends)</strong></td><td>Reusable logic injected into endpoints (DB session, current user).</td></tr>
+    <tr><td><strong>Pydantic schema</strong></td><td>A typed model validating request/response data.</td></tr>
+    <tr><td><strong>ORM</strong></td><td>Object-Relational Mapping — Python classes ↔ DB tables (SQLAlchemy).</td></tr>
+    <tr><td><strong>JWT</strong></td><td>JSON Web Token — signed token proving the caller's identity.</td></tr>
+    <tr><td><strong>Lifespan</strong></td><td>Startup/shutdown hook where models are loaded once.</td></tr>
+    <tr><td><strong>OpenAPI / Swagger</strong></td><td>Auto-generated API spec &amp; interactive docs at <code>/docs</code>.</td></tr>
+  </table>
+
+  <footer>
+    PredictiX — FastAPI Backend Complete Guide. Self-contained; open in any browser. Companion to
+    <em>warehouse-report-guide.html</em> and <em>llm-and-data-injection-guide.html</em>. Reflects the real
+    layout: <span class="mono">main.py</span>, <span class="mono">deps.py</span>, 34 routers, and the
+    <span class="mono">routers/services/models/schemas/db/core/ai/agents/kb</span> structure.
+  </footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PredictiX — Warehouse Report: Complete Guide</title>
+<style>
+  :root{
+    --violet:#7c3aed; --indigo:#4f46e5; --teal:#0d9488; --emerald:#059669;
+    --amber:#d97706; --rose:#e11d48; --sky:#0284c7; --navy:#0f172a;
+    --ink:#1e293b; --muted:#64748b; --line:#e2e8f0; --bg:#f8fafc; --card:#ffffff;
+    --code-bg:#0f172a; --code-ink:#e2e8f0;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--bg);line-height:1.65;font-size:15.5px}
+  a{color:var(--indigo);text-decoration:none}
+  a:hover{text-decoration:underline}
+  /* layout */
+  .wrap{display:flex;min-height:100vh}
+  nav.toc{width:280px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;
+          background:var(--navy);color:#cbd5e1;padding:24px 18px}
+  nav.toc h2{color:#fff;font-size:15px;margin:0 0 4px;letter-spacing:.3px}
+  nav.toc .sub{color:#94a3b8;font-size:11px;margin-bottom:18px}
+  nav.toc a{display:block;color:#cbd5e1;font-size:13px;padding:5px 10px;border-radius:7px;margin:1px 0}
+  nav.toc a:hover{background:#1e293b;color:#fff;text-decoration:none}
+  nav.toc .grp{color:#7c3aed;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;margin:16px 0 4px;padding-left:10px}
+  main{flex:1;max-width:960px;margin:0 auto;padding:40px 48px 120px}
+  /* headings */
+  h1{font-size:34px;line-height:1.15;margin:0 0 6px;color:var(--navy);letter-spacing:-.5px}
+  .lede{font-size:17px;color:var(--muted);margin:0 0 32px}
+  h2.sec{font-size:24px;margin:46px 0 10px;color:var(--navy);padding-bottom:8px;border-bottom:3px solid var(--teal);letter-spacing:-.3px}
+  h3{font-size:18px;margin:28px 0 8px;color:var(--indigo)}
+  h4{font-size:15px;margin:18px 0 6px;color:var(--ink)}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:24px}
+  li{margin:5px 0}
+  /* components */
+  .pill{display:inline-block;background:#ede9fe;color:var(--violet);font-size:11px;font-weight:700;
+        padding:2px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.05em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:16px 0;box-shadow:0 1px 3px rgba(15,23,42,.04)}
+  .note{border-left:4px solid var(--sky);background:#f0f9ff;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+  .warn{border-left:4px solid var(--amber);background:#fffbeb;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+  .tip{border-left:4px solid var(--emerald);background:#ecfdf5;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+  .danger{border-left:4px solid var(--rose);background:#fff1f2;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+  code{background:#eef2ff;color:#4338ca;padding:1.5px 6px;border-radius:5px;font-size:13px;
+       font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;border-radius:10px;overflow-x:auto;
+      font-size:13px;line-height:1.55;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;margin:14px 0}
+  pre code{background:none;color:inherit;padding:0}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px;background:var(--card);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th{background:var(--navy);color:#fff;text-align:left;padding:10px 12px;font-weight:600;font-size:12.5px}
+  td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}
+  tr:nth-child(even) td{background:#fbfcfe}
+  .mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:var(--ink)}
+  .flow{background:#0b1220;color:#cbd5e1;border-radius:12px;padding:22px;margin:18px 0;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.5;overflow-x:auto;white-space:pre}
+  .kpi-row{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}
+  .kpi{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--violet);border-radius:10px;padding:14px}
+  .kpi .v{font-size:22px;font-weight:800;color:var(--violet)}
+  .kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  .tag{font-size:11px;font-weight:600;padding:1px 7px;border-radius:5px;background:#f1f5f9;color:var(--muted)}
+  .be{color:var(--teal)} .fe{color:var(--indigo)}
+  @media(max-width:880px){nav.toc{display:none}main{padding:24px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Warehouse Report</h2>
+  <div class="sub">Complete Guide · PredictiX</div>
+  <div class="grp">Understand</div>
+  <a href="#what">1 · What is it</a>
+  <a href="#used">2 · How it's used</a>
+  <a href="#arch">3 · Architecture &amp; flow</a>
+  <a href="#sections">4 · The 7 report sections</a>
+  <div class="grp">Build</div>
+  <a href="#files">5 · File map</a>
+  <a href="#impl">6 · How it was implemented</a>
+  <a href="#pdf">7 · The PDF engine</a>
+  <a href="#tech">8 · Technologies</a>
+  <div class="grp">Operate</div>
+  <a href="#use">9 · How to use it</a>
+  <a href="#trouble">10 · Troubleshooting</a>
+  <a href="#limits">11 · Limitations</a>
+  <a href="#glossary">12 · Glossary</a>
+</nav>
+
+<main>
+  <span class="pill">PredictiX · KB-Enhanced RAG</span>
+  <h1>The Warehouse Report</h1>
+  <p class="lede">A ground-to-high-level guide: what this report is, how it works inside PredictiX,
+  every file involved, how to run it, how it was built, what it's made of, and where its limits are.</p>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="what">1 · What is the Warehouse Report?</h2>
+  <p>The Warehouse Report is PredictiX's <strong>executive-grade, AI-generated intelligence document</strong>
+  for a fleet/warehouse. In one click an admin turns the live operational database into a multi-page report
+  that reads like it was written by a senior maintenance analyst who has also read the relevant engineering
+  standards (ISO 55000/55001, SMRP, OEM service schedules, the Sri Lanka Factories Ordinance, FMEA).</p>
+
+  <p>It answers, for a manager: <em>How healthy is my fleet? What's about to fail and why? What will maintenance
+  cost? Where are the tickets piling up? What should I do first?</em> — and it grounds every recommendation in
+  both <strong>live data</strong> and <strong>codified domain knowledge</strong>.</p>
+
+  <div class="card">
+    <h4>It blends three kinds of intelligence</h4>
+    <table>
+      <tr><th>Layer</th><th>Source</th><th>Example output</th></tr>
+      <tr><td><strong>Live facts</strong></td><td>Supabase Postgres (assets, predictions, tickets, events)</td><td>"341 critical assets, 1,250 maintenance events in 3 months"</td></tr>
+      <tr><td><strong>Domain knowledge</strong></td><td>Curated Knowledge Base + ML explainability (SHAP)</td><td>"Engine hours &gt;500h → overdue (OEM interval)"</td></tr>
+      <tr><td><strong>Narrative</strong></td><td>LLM (Groq Llama 3.3) grounded by the two above</td><td>The readable executive prose in each section</td></tr>
+    </table>
+  </div>
+
+  <div class="note"><strong>Why "KB-Enhanced RAG"?</strong> RAG = Retrieval-Augmented Generation. The LLM is given
+  ("augmented" with) the retrieved knowledge + live numbers <em>before</em> it writes — like an open-book exam. The
+  "KB" is PredictiX's curated maintenance knowledge base.</div>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="used">2 · How it's used in this project</h2>
+  <p>The report lives in the <strong>admin Warehouse section</strong>. The journey:</p>
+  <ol>
+    <li>An admin opens <span class="mono">/admin/warehouse</span> (the warehouse dashboard).</li>
+    <li>They click <strong>“Generate Report”</strong> in the page header.</li>
+    <li>A full-screen modal opens and immediately calls the backend to generate the report (~10–25s).</li>
+    <li>The modal renders 7 sections with live KPIs, interactive charts, and AI narrative.</li>
+    <li>In §3 the admin can <strong>tick specific critical assets</strong> and click <em>“Summarise ticked assets”</em>
+        to attach per-asset AI summaries.</li>
+    <li>They click <strong>“PDF”</strong> to export a print-ready, branded PDF (and the server is notified of the print).</li>
+  </ol>
+  <div class="kpi-row">
+    <div class="kpi"><div class="v">1 click</div><div class="l">to generate</div></div>
+    <div class="kpi"><div class="v">7</div><div class="l">report sections</div></div>
+    <div class="kpi"><div class="v">8</div><div class="l">data tables read</div></div>
+    <div class="kpi"><div class="v">~10–25s</div><div class="l">generation time</div></div>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="arch">3 · Architecture &amp; data flow</h2>
+  <p>Two applications cooperate: a <span class="fe">Next.js frontend</span> and a <span class="be">FastAPI backend</span>,
+  over a Supabase Postgres database, with a Groq-hosted LLM and several ML models.</p>
+
+  <div class="flow">┌─────────────── FRONTEND (Next.js / React / TS) ───────────────┐
+│  admin/warehouse/page.tsx                                     │
+│     │  click "Generate Report"                                │
+│     ▼                                                         │
+│  WarehouseReportModal.tsx  ──GET /warehouse-dashboard/generate-report
+└───────────────────────────────────────────────────────────┬─┘
+                                                              │
+┌──────────────── BACKEND (FastAPI / SQLAlchemy) ────────────▼─┐
+│  routers/warehouse_dashboard.py  →  run_warehouse_agent(db)   │
+│                                                               │
+│  1. build_warehouse_context(db)   ── queries ALL tables ──►  Supabase
+│  2. KBVectorStore.retrieve()      ── TF-IDF + cosine     ──►  KB_DOCUMENTS
+│  3. kb_annotator.*()              ── deterministic numbers    │
+│  4. LLM (Groq Llama 3.3 70B)      ── writes 5 prose sections  │
+│  5. _guard_narrative + _strip_kb_referenced  (post-process)   │
+│                                                               │
+│  returns { ai_sections, context, kb_annotations }             │
+└───────────────────────────────────────────────────────────┬─┘
+                                                              │ JSON
+┌─────────────────────────── FRONTEND ───────────────────────▼─┐
+│  ReportStep renders sections + recharts                       │
+│  (optional) tick assets → POST /asset-summaries/generate      │
+│  click PDF → professionalPdfExport.ts → print via iframe      │
+└───────────────────────────────────────────────────────────────┘</div>
+
+  <h3>The 5-step backend pipeline (the heart)</h3>
+  <ol>
+    <li><strong>Data injection</strong> — <code>build_warehouse_context()</code> runs ~30 live SQL aggregations into one context dict.</li>
+    <li><strong>Retrieval</strong> — the KB vector store finds the most relevant standards for each section (semantic search).</li>
+    <li><strong>Annotation</strong> — deterministic Python computes all the <em>numbers</em> (rates, ratios, thresholds, recommendations) — never the LLM.</li>
+    <li><strong>Generation</strong> — the LLM writes 5 flowing prose sections, grounded by steps 1–3.</li>
+    <li><strong>Guarding</strong> — post-processing appends authoritative trend facts, flags contradictions, and strips unwanted tags.</li>
+  </ol>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="sections">4 · The 7 report sections</h2>
+  <table>
+    <tr><th>#</th><th>Section</th><th>What it shows</th><th>Mainly from</th></tr>
+    <tr><td>1</td><td>Executive Insight Summary</td><td>8 KPI cards, AI overview, benchmark + high-priority alerts</td><td>context + LLM + kb_annotations</td></tr>
+    <tr><td>2</td><td>Fleet Asset Overview</td><td>Composition by type, status distribution, fleet age, warranty, workforce</td><td>context</td></tr>
+    <tr><td>3</td><td>Health &amp; Risk Analysis</td><td>Risk pie, health buckets, SHAP drivers, <em>tickable</em> critical assets, component health</td><td>predictions + SHAP + kb</td></tr>
+    <tr><td>4</td><td>Maintenance Intelligence</td><td>PM ratio, cost forecast vs actual, vendors, predictive schedule</td><td>events + cost predictions</td></tr>
+    <tr><td>5</td><td>Ticket Management</td><td>Status, priority/category, 3-month trend, MTTR, AI reclassification</td><td>tickets + kb</td></tr>
+    <tr><td>6</td><td>Recommendations</td><td>3-tier (Critical/High/Medium) KB-grounded prescriptive actions</td><td>kb_annotations</td></tr>
+    <tr><td>7</td><td>Conclusion</td><td>Final KPI dashboard + executive conclusion</td><td>context + LLM</td></tr>
+  </table>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="files">5 · File map — what each file does</h2>
+
+  <h3 class="be">Backend &nbsp;<span class="tag">PredictiX_backend/PredictiX_backend</span></h3>
+  <table>
+    <tr><th>File</th><th>Role</th></tr>
+    <tr><td class="mono">app/routers/warehouse_dashboard.py</td><td>HTTP endpoints: <code>/generate-report</code>, <code>/summary</code>, <code>/maintenance-schedule</code>, <code>/notify-print</code>.</td></tr>
+    <tr><td class="mono">app/agents/report_agents.py</td><td><strong>The orchestrator.</strong> <code>build_warehouse_context()</code> (all SQL), <code>run_warehouse_agent()</code> (RAG pipeline), <code>_context_to_prompt_text()</code>, <code>WAREHOUSE_SYSTEM_PROMPT</code>, <code>_guard_narrative()</code>, <code>_strip_kb_referenced()</code>.</td></tr>
+    <tr><td class="mono">app/kb/kb_documents.py</td><td>The <strong>Knowledge Base</strong>: <code>KB_DOCUMENTS</code> (~15 curated chunks) + lookup tables (<code>SHAP_KB_MAP</code>, <code>HEALTH_BAND_KB</code>, <code>BENCHMARKS</code>, <code>TICKET_CATEGORY_KB</code>, OEM/statutory/FMEA/climate).</td></tr>
+    <tr><td class="mono">app/kb/kb_vector_store.py</td><td>The <strong>vector store</strong>: <code>KBVectorStore</code> (TF-IDF matrix + cosine), <code>retrieve()</code>, <code>get_all_text_for_section()</code>, <code>get_kb_store()</code> singleton.</td></tr>
+    <tr><td class="mono">app/kb/kb_annotator.py</td><td><strong>Deterministic</strong> (no-LLM) numbers: <code>annotate_shap_features()</code>, <code>annotate_health_bands()</code>, <code>compute_benchmark_alerts()</code>, <code>get_ticket_category_kb()</code>, <code>generate_recommendations()</code>.</td></tr>
+    <tr><td class="mono">app/ai/services/asset_summary_service.py</td><td>Per-asset AI summaries (HF Seq2Seq) with a quality guard + clean deterministic fallback.</td></tr>
+    <tr><td class="mono">app/db/session.py</td><td>SQLAlchemy engine/session → Supabase Postgres (pooler).</td></tr>
+    <tr><td class="mono">app/models.py</td><td>ORM models: Asset, AssetFailurePrediction, AssetCostPrediction, MaintenanceEvent, Ticket, Profile, Warehouse…</td></tr>
+  </table>
+
+  <h3 class="fe">Frontend &nbsp;<span class="tag">PredictiX-Frontend/src</span></h3>
+  <table>
+    <tr><th>File</th><th>Role</th></tr>
+    <tr><td class="mono">app/(admin)/admin/warehouse/page.tsx</td><td>Warehouse dashboard page; hosts the <strong>“Generate Report”</strong> button and the modal; calls <code>/generate-report</code>.</td></tr>
+    <tr><td class="mono">components/admin/warehouse/WarehouseReportModal.tsx</td><td><strong>The report UI.</strong> Steps: Confirm → Loading → Report (or Error). Renders KPIs, recharts charts, the tickable critical-asset table + “Summarise ticked assets”, and triggers PDF export.</td></tr>
+    <tr><td class="mono">lib/professionalPdfExport.ts</td><td><strong>The PDF engine.</strong> <code>generateProfessionalHTML()</code> builds the full HTML report (SVG charts, tables); <code>downloadProfessionalPDF()</code> prints it via a hidden iframe.</td></tr>
+    <tr><td class="mono">lib/warehouseService.ts</td><td>API client: <code>getWarehouseSummary()</code>, <code>getMaintenanceSchedule()</code>.</td></tr>
+    <tr><td class="mono">components/admin/warehouse/Warehouse*.tsx</td><td>Dashboard widgets (OverviewCards, InsightsSection, ComponentHealth, MaintenanceSchedule, RecentMaintenance) — the live page, separate from the report modal.</td></tr>
+  </table>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="impl">6 · How it was implemented</h2>
+
+  <h3>Step 1 — Data injection (<span class="mono">build_warehouse_context</span>)</h3>
+  <p>~30 SQLAlchemy aggregations build one dictionary of <em>everything</em>: fleet counts, health bands
+  (deduplicated to the <em>latest</em> prediction per asset), risk distribution, SHAP features, cost forecasts,
+  maintenance events (windowed to the 3 calendar months ending at the latest activity), tickets, MTTR, users,
+  component health, vendors. Every number the report shows originates here or in the annotator.</p>
+  <div class="tip"><strong>Design rule:</strong> the window <em>anchors to the latest data</em>, not “today”, so seed/demo
+  data dated in the past still populates the report. Totals are the sum of the monthly buckets, so they can never disagree.</div>
+
+  <h3>Step 2 — Retrieval (the vector store)</h3>
+  <p>The KB is embedded once with scikit-learn <code>TfidfVectorizer</code> (unigrams+bigrams, English stop-words,
+  sublinear TF) into a small in-memory matrix. For each report section a query string is embedded the same way and
+  compared by <strong>cosine similarity</strong>; the top-k chunks above a score floor are concatenated into the prompt.</p>
+  <pre><code>q_vec  = vectorizer.transform([query])          # query → same space
+scores = cosine_similarity(q_vec, matrix)[0]    # compare to all chunks
+top_idx = argsort(scores)[::-1][:top_k]         # rank, keep best k</code></pre>
+  <div class="note">TF-IDF (not neural embeddings) was chosen deliberately: the KB is tiny (~15 docs), sklearn is already
+  installed, there's no model download/GPU, and startup is instant. Supabase's <code>pgvector</code> is reserved for a future dense-embedding upgrade.</div>
+
+  <h3>Step 3 — Deterministic annotation (<span class="mono">kb_annotator</span>)</h3>
+  <p>Every <em>computed</em> figure — critical rate, PM ratio, benchmark deltas, SHAP thresholds, 3-tier
+  recommendations — is produced in plain Python here, <strong>not</strong> by the LLM. This is the single most
+  important reliability decision in the system.</p>
+
+  <h3>Step 4 — Generation (the LLM)</h3>
+  <p>The live context text + retrieved KB are injected into <code>WAREHOUSE_SYSTEM_PROMPT</code> and sent to
+  <strong>Groq Llama 3.3 70B</strong> (low temperature). The model returns strict JSON with 5 keys
+  (<code>insight_summary</code>, <code>risk_analysis</code>, <code>maintenance_intelligence</code>,
+  <code>pattern_and_trend</code>, <code>conclusion</code>). The prompt forbids the model from computing
+  percentages/ratios itself — it narrates the provided numbers.</p>
+
+  <h3>Step 5 — Guarding &amp; cleanup</h3>
+  <ul>
+    <li><code>_guard_narrative()</code> appends authoritative trend facts and flags any LLM claim that contradicts the computed trend directions.</li>
+    <li><code>_strip_kb_referenced()</code> deletes stray "KB Referenced" meta-tags from the prose.</li>
+    <li>Numeric guardrails in the annotator keep ratios ≤100% and definitions consistent across pages.</li>
+  </ul>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="pdf">7 · The PDF engine</h2>
+  <p><code>professionalPdfExport.ts</code> doesn't use a heavy PDF library. It:</p>
+  <ol>
+    <li>Builds a complete, print-styled <strong>HTML string</strong> with <code>generateProfessionalHTML()</code>
+        — page-by-page sections, hand-rolled <strong>SVG charts</strong> (donut/bar/line), and tables.</li>
+    <li>Writes that HTML into a <strong>hidden iframe</strong> and calls the browser's native <code>print()</code>
+        (<code>downloadProfessionalPDF()</code>), which the user saves as PDF.</li>
+    <li>Before building, it optionally fetches per-asset AI summaries for the <em>ticked</em> critical assets.</li>
+    <li>After printing it pings <code>/warehouse-dashboard/notify-print</code>.</li>
+  </ol>
+  <div class="note">Because the on-screen modal (recharts) and the PDF (SVG) are two separate renderers, both read the
+  same backend payload — so the numbers always match even though the visuals differ.</div>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="tech">8 · Technologies used</h2>
+  <table>
+    <tr><th>Area</th><th>Technology</th><th>Used for</th></tr>
+    <tr><td>Backend framework</td><td>FastAPI + Uvicorn</td><td>HTTP API, async lifespan model warmup</td></tr>
+    <tr><td>ORM / DB</td><td>SQLAlchemy + Supabase Postgres</td><td>All live data queries</td></tr>
+    <tr><td>LLM</td><td>Groq <span class="mono">llama-3.3-70b-versatile</span> via LangChain</td><td>Narrative generation</td></tr>
+    <tr><td>Retrieval</td><td>scikit-learn TF-IDF + cosine similarity</td><td>KB semantic search (RAG)</td></tr>
+    <tr><td>ML models</td><td>CatBoost / XGBoost (health, failure, cost, ticket priority/category)</td><td>Predictions + SHAP explainability</td></tr>
+    <tr><td>Aux AI models</td><td>HuggingFace (Seq2Seq asset summaries; ticket priority/category)</td><td>Per-asset summaries, ticket AI</td></tr>
+    <tr><td>NLP utils</td><td>nltk (stopwords, stemming)</td><td>Ticket-priority text preprocessing</td></tr>
+    <tr><td>Frontend</td><td>Next.js + React + TypeScript</td><td>Dashboard &amp; report modal</td></tr>
+    <tr><td>UI / charts</td><td>Tailwind CSS, recharts, lucide-react, sonner</td><td>Styling, on-screen charts, icons, toasts</td></tr>
+    <tr><td>PDF</td><td>Hand-built HTML + SVG → browser print (hidden iframe)</td><td>Print-ready export</td></tr>
+  </table>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="use">9 · How to use it (setup → run → generate)</h2>
+
+  <h3>A. One-time setup</h3>
+  <h4>Backend</h4>
+  <pre><code>cd PredictiX_backend/PredictiX_backend
+python -m venv .venv &amp;&amp; .venv\Scripts\activate     # Windows
+pip install -r requirements.txt                      # incl. xgboost, nltk, joblib</code></pre>
+  <p>Create <code>.env</code> with at least:</p>
+  <pre><code>DATABASE_URL=postgresql+psycopg2://...     # or PROJECT_REF + DATABASE_PASSWORD
+GROQ_API_KEY=gsk_xxx                        # required for the LLM
+HF_TOKEN=hf_xxx                             # for HF models (summaries/ticket AI)
+HF_ASSET_SUMMARIZATION_REPO=...
+HF_TICKET_PRIORITIZATION_REPO=...
+HF_TICKET_CATEGORIZATION_REPO=...
+# DISABLE_HF_MODELS=true   # optional: skip HF warmup in dev</code></pre>
+  <h4>Frontend</h4>
+  <pre><code>cd PredictiX-Frontend
+npm install
+# .env.local
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000</code></pre>
+
+  <h3>B. Run</h3>
+  <pre><code># terminal 1 — backend
+cd PredictiX_backend/PredictiX_backend
+uvicorn app.main:app --reload
+
+# terminal 2 — frontend
+cd PredictiX-Frontend
+npm run dev</code></pre>
+
+  <h3>C. Generate the report</h3>
+  <ol>
+    <li>Log in as an <strong>admin</strong>, go to <span class="mono">/admin/warehouse</span>.</li>
+    <li>Click <strong>“Generate Report”</strong> → wait ~10–25s.</li>
+    <li>Review the 7 sections; in §3 tick critical assets → <em>“Summarise ticked assets”</em> if you want AI summaries.</li>
+    <li>Click <strong>“PDF”</strong> → in the print dialog choose “Save as PDF”.</li>
+  </ol>
+  <div class="warn"><strong>Golden rule:</strong> after pulling/merging or editing backend code,
+  <strong>fully restart Uvicorn</strong> before regenerating — auto-reload can miss changes that arrive via git, leaving
+  the running process on stale code (the usual cause of “zeros / not available” sections).</div>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="trouble">10 · Troubleshooting</h2>
+  <table>
+    <tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+    <tr><td>§4 events / §5.5 MTTR breakdown show 0 / “not available”, but other cells are fine</td><td>Running server on <strong>stale code</strong> (didn't reload the fix)</td><td>Fully stop &amp; restart Uvicorn, then regenerate</td></tr>
+    <tr><td>Report window says “Apr–Jun” with all zeros</td><td>Window anchored to “now” while data is older (old code)</td><td>Restart — current code anchors to latest activity</td></tr>
+    <tr><td>Ticket priority/category endpoint returns <code>HF API 403</code></td><td>HF token lacks Inference-Provider permission, or XGBoost not servable on hf-inference</td><td>Use a scoped token, or the local-model service (download <code>.pkl</code> + joblib)</td></tr>
+    <tr><td><code>ModuleNotFoundError: xgboost</code> at ticket-priority load</td><td>Dependency not installed in venv</td><td><code>pip install -r requirements.txt</code></td></tr>
+    <tr><td>Asset summaries look garbled in the PDF</td><td>Unreliable Seq2Seq output</td><td>Already guarded: a quality check falls back to a clean deterministic summary</td></tr>
+    <tr><td>Report fails with API-key error</td><td><code>GROQ_API_KEY</code> missing</td><td>Add it to backend <code>.env</code></td></tr>
+  </table>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="limits">11 · Limitations &amp; known issues</h2>
+  <ul>
+    <li><strong>LLM faithfulness.</strong> Free-text models can paraphrase/invent numbers. Mitigated by computing
+        all figures in Python, hardening the prompt, and post-generation guards — but prose should still be spot-checked.</li>
+    <li><strong>TF-IDF retrieval</strong> matches distinctive vocabulary, not deep semantics. Fine at ~15 docs;
+        a larger KB should move to dense embeddings + <code>pgvector</code>.</li>
+    <li><strong>Single warehouse.</strong> The context builder reads one warehouse (<code>Warehouse.first()</code>); multi-warehouse needs a filter/parameter.</li>
+    <li><strong>Time-windowed data.</strong> Anchoring to latest activity keeps demo data visible but means “last 3 months” follows the data, not the wall clock.</li>
+    <li><strong>External model availability.</strong> Ticket priority/category and asset summaries depend on HuggingFace
+        (token scope, model serving). The HF Inference API can't serve raw XGBoost — needs local <code>.pkl</code> loading.</li>
+    <li><strong>Data quality gaps.</strong> Null <code>vehicle_type</code> (“Other”) and null <code>manufacture_year</code>
+        appear as explicit “Unknown” buckets; fixing them is a source-data task.</li>
+    <li><strong>PDF via browser print.</strong> Output depends on the browser's print engine; no server-side PDF rendering.</li>
+    <li><strong>“Critical” is a product definition</strong> (health &lt; 50%), standardised across pages — distinct from the
+        operational <code>status='critical'</code> column.</li>
+    <li><strong>Operational gotcha:</strong> code changes need a real server restart to take effect.</li>
+  </ul>
+
+  <!-- ============================================================= -->
+  <h2 class="sec" id="glossary">12 · Glossary</h2>
+  <table>
+    <tr><th>Term</th><th>Meaning</th></tr>
+    <tr><td><strong>RAG</strong></td><td>Retrieval-Augmented Generation — feed retrieved knowledge into the prompt before the LLM writes.</td></tr>
+    <tr><td><strong>Knowledge Base (KB)</strong></td><td>Curated chunks of maintenance standards stored as <code>KB_DOCUMENTS</code>.</td></tr>
+    <tr><td><strong>Vector store</strong></td><td>TF-IDF matrix + cosine similarity enabling semantic search over the KB.</td></tr>
+    <tr><td><strong>TF-IDF</strong></td><td>Term-Frequency × Inverse-Document-Frequency — weights words by how distinctive they are.</td></tr>
+    <tr><td><strong>SHAP</strong></td><td>Model-explainability technique ranking which features drive a prediction.</td></tr>
+    <tr><td><strong>MTTR</strong></td><td>Mean Time To Resolve — average ticket resolution time.</td></tr>
+    <tr><td><strong>PM ratio</strong></td><td>Preventive maintenance events ÷ all events (SMRP gold standard ≥90%).</td></tr>
+    <tr><td><strong>kb_annotations</strong></td><td>Deterministic, non-LLM computed numbers (thresholds, alerts, recommendations) sent to the frontend.</td></tr>
+  </table>
+
+  <footer>
+    PredictiX — Warehouse Report Complete Guide. Generated as a self-contained reference for the
+    <span class="be">FastAPI backend</span> + <span class="fe">Next.js frontend</span> KB-Enhanced RAG report pipeline.
+    Open this file in any browser; no internet required.
+  </footer>
+</main>
+</div>
+</body>
+</html>

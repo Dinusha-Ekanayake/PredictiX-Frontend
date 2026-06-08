@@ -108,6 +108,12 @@ export async function updateMyProfile(data: {
   lastName?: string;
   contactNumber?: string;
   address?: string;
+  settings?: {
+    emailNotifications?: boolean;
+    criticalAlerts?: boolean;
+    maintenanceAlerts?: boolean;
+    compactView?: boolean;
+  };
 }): Promise<UserProfileData> {
   const res = await fetch(`${API_URL}/user-profile/me`, {
     method: "PUT",

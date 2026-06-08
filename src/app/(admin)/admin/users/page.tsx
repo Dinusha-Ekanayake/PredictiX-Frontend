@@ -142,52 +142,6 @@ export default function AdminUsersPage() {
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [editUser, setEditUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
-  const [assignedAssets, setAssignedAssets] = React.useState<AssetItem[]>([]);
-  const [assetsLoading, setAssetsLoading] = React.useState(false);
-
-  function generateUserId(role: UserRole, department: string): string {
-    const roleLetter = role === "admin" ? "A" : "U";
-    const deptLetter = department.charAt(0).toUpperCase() || "X";
-
-    const relevantUsers = users.filter((u) => u.id.startsWith(roleLetter));
-    let maxNumber = 0;
-
-    for (const u of relevantUsers) {
-      const match = u.id.match(/^[AU](\d{4})[A-Z]?$/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (!Number.isNaN(num) && num > maxNumber) {
-          maxNumber = num;
-        }
-      }
-    }
-
-    const next = String(maxNumber + 1).padStart(4, "0");
-    return `${roleLetter}${next}${deptLetter}`;
-  }
-
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setIsLoading(true);
-      try {
-        const data = await listUsers();
-        if (!cancelled) setUsers(data);
-      } catch (err) {
-        if (!cancelled) {
-          toast.error("Failed to load users", {
-            description: err instanceof Error ? err.message : undefined,
-          });
-          setUsers([]);
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   function generateUserId(role: UserRole, department: string): string {
     const roleLetter = role === "admin" ? "A" : "U";
@@ -306,35 +260,6 @@ export default function AdminUsersPage() {
 
   async function handleViewAssets(user: UserItem) {
     setAssetsUser(user);
-    setAssignedAssets([]);
-    setAssetsLoading(true);
-    try {
-      const rows = await getUserAssets(user.id);
-      setAssignedAssets(
-        rows.map((a) => ({
-          id: a.asset_id,
-          name: a.name,
-          category: a.category ?? a.asset_type ?? "General",
-          location: a.location,
-          healthPercent: Math.round(a.healthPercent),
-        }))
-      );
-    } catch (err) {
-      toast.error("Failed to load assigned assets", {
-        description: err instanceof Error ? err.message : undefined,
-      });
-      setAssignedAssets([]);
-    } finally {
-      setAssetsLoading(false);
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
-        <PredictiXLoader label="Loading users…" />
-      </div>
-    );
   }
 
   if (isLoading) {

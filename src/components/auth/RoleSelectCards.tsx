@@ -4,7 +4,7 @@ import * as React from "react";
 import { Shield, User as UserIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type Role = "ADMIN" | "USER" | "SUPER_ADMIN";
+export type Role = "ADMIN" | "USER";
 
 type Props = {
   value: Role | "";
@@ -13,7 +13,7 @@ type Props = {
 
 export default function RoleSelectCards({ value, onChange }: Props) {
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 gap-4">
       <RoleCard
         title="User"
         icon={<UserIcon className="h-5 w-5" />}
@@ -25,12 +25,6 @@ export default function RoleSelectCards({ value, onChange }: Props) {
         icon={<Shield className="h-5 w-5" />}
         selected={value === "ADMIN"}
         onClick={() => onChange("ADMIN")}
-      />
-      <RoleCard
-        title="Super Admin"
-        icon={<Shield className="h-5 w-5 text-indigo-500" />}
-        selected={value === "SUPER_ADMIN"}
-        onClick={() => onChange("SUPER_ADMIN")}
       />
     </div>
   );

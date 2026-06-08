@@ -228,20 +228,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 import RoleSelectCards, { type Role } from "@/components/auth/RoleSelectCards";
 import PredictiXLogo from "@/components/brand/PredictiXLogo";
 import ThemeToggle from "@/components/theme/ThemeToggle";
-import { login, storeAuthSession } from "@/lib/authService";
-
-// ─── Background decoration ────────────────────────────────────────────────────
 
 // ─── Background decoration ────────────────────────────────────────────────────
 
@@ -303,25 +293,13 @@ export default function LoginPage() {
   const [role, setRole] = React.useState<Role | "">("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
-  const [warehouseId, setWarehouseId] = React.useState("");
-  const [warehouses, setWarehouses] = React.useState<Array<{id: string, name: string}>>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
-
-  React.useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/warehouses`)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setWarehouses(data);
-      })
-      .catch(err => console.error("Failed to load warehouses:", err));
-  }, []);
 
   const canSubmit =
     role !== "" &&
     email.trim().length > 0 &&
     password.trim().length > 0 &&
-    (String(role).toUpperCase() === "SUPER_ADMIN" ? warehouseId !== "" : true) &&
     !isSubmitting;
 
   async function onSubmit(e: React.FormEvent) {
@@ -563,12 +541,10 @@ export default function LoginPage() {
                     {isSubmitting ? "Logging in…" : "Log in"}
                   </Button>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 break-all">
-                    <div className="font-medium text-slate-800 dark:text-slate-200">Demo accounts</div>
-                    <div>Super Admin: super.admin1@lankalogix.lk / super</div>
-                    <div>Admin: anjali.warnakulasuriya.adm1@lankalogix.lk / admin</div>
-                    <div>User: nuwan.gunasekara.tra1@lankalogix.lk / user</div>
-                    <div className="mt-1 text-slate-500">Other seeded users: password <span className="font-mono">Predictix@123</span></div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                    <div className="font-medium text-slate-800 dark:text-slate-200">Default Admin</div>
+                    <div>Email: admin@mail.com</div>
+                    <div>Password: admin</div>
                   </div>
 
 

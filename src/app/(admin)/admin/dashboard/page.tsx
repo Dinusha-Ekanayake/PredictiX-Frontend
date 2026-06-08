@@ -797,8 +797,6 @@ function PageParticles() {
     };
   }, []);
 
-function CTip({ active, payload, label, fmt }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string; fmt?: (v: number) => string }) {
-  if (!active || !payload?.length) return null;
   return (
     <canvas
       ref={canvasRef}

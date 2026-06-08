@@ -32,8 +32,6 @@ export type UserProfileData = {
   role: string;
   status: string;
   assignedAssetsCount: number;
-<<<<<<< HEAD
-=======
   avatar_url?: string | null;
   settings?: {
     emailNotifications?: boolean;
@@ -41,7 +39,6 @@ export type UserProfileData = {
     maintenanceAlerts?: boolean;
     compactView?: boolean;
   };
->>>>>>> 3e0080c (fix: change toast import to sonner instead of react-hot-toast)
 };
 
 export type UserAssetData = {
@@ -75,10 +72,12 @@ export type TeamMemberData = {
   status: string;
 };
 
-<<<<<<< HEAD
-=======
+// ---------------------------------------------------------------------------
+// My Profile endpoints
+// ---------------------------------------------------------------------------
+
 export async function fetchMyProfile(): Promise<UserProfileData> {
-  const res = await fetch(`${API_URL}/profiles/me`, {
+  const res = await fetch(`${API_URL}/user-profile/me`, {
     headers: getAuthHeaders(),
   });
   
@@ -102,7 +101,7 @@ export async function updateMyProfile(data: {
     compactView?: boolean;
   };
 }): Promise<UserProfileData> {
-  const res = await fetch(`${API_URL}/profiles/me`, {
+  const res = await fetch(`${API_URL}/user-profile/me`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
@@ -117,7 +116,7 @@ export async function updateMyProfile(data: {
 }
 
 export async function fetchMyAssets(): Promise<UserAssetData[]> {
-  const res = await fetch(`${API_URL}/profiles/me/assets`, {
+  const res = await fetch(`${API_URL}/user-profile/me/assets`, {
     headers: getAuthHeaders(),
   });
   
@@ -130,7 +129,7 @@ export async function fetchMyAssets(): Promise<UserAssetData[]> {
 }
 
 export async function fetchMyStats(): Promise<UserStatsData> {
-  const res = await fetch(`${API_URL}/profiles/me/stats`, {
+  const res = await fetch(`${API_URL}/user-profile/me/stats`, {
     headers: getAuthHeaders(),
   });
   
@@ -142,7 +141,6 @@ export async function fetchMyStats(): Promise<UserStatsData> {
   return res.json();
 }
 
->>>>>>> 3e0080c (fix: change toast import to sonner instead of react-hot-toast)
 export type UserItemOut = {
   id: string;
   firstName: string;
@@ -157,61 +155,6 @@ export type UserItemOut = {
   status: "active" | "inactive";
   assignedAssets: number;
 };
-
-// ---------------------------------------------------------------------------
-// My Profile endpoints
-// ---------------------------------------------------------------------------
-
-export async function fetchMyProfile(): Promise<UserProfileData> {
-  const res = await fetch(`${API_URL}/user-profile/me`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || `HTTP ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function updateMyProfile(data: {
-  firstName?: string;
-  lastName?: string;
-  contactNumber?: string;
-  address?: string;
-}): Promise<UserProfileData> {
-  const res = await fetch(`${API_URL}/user-profile/me`, {
-    method: "PUT",
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || `HTTP ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function fetchMyAssets(): Promise<UserAssetData[]> {
-  const res = await fetch(`${API_URL}/user-profile/me/assets`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || `HTTP ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function fetchMyStats(): Promise<UserStatsData> {
-  const res = await fetch(`${API_URL}/user-profile/me/stats`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || `HTTP ${res.status}`);
-  }
-  return res.json();
-}
 
 // ---------------------------------------------------------------------------
 // Admin Users — /users (maps to app/routers/users.py)

@@ -1,150 +1,588 @@
 "use client";
 
 import * as React from "react";
-import { Search, Users as UsersIcon, Mail, Phone } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
-import PageHero from "@/components/common/PageHero";
+import ViewAssignedAssetsDialog from "@/components/user/users/ViewAssignedAssetsDialog";
+
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Boxes,
+  CheckCircle2,
+  Mail,
+  Phone,
+  MapPin,
+  Building2,
+  Briefcase,
+  Edit2,
+  Save,
+  X,
+  Search,
+} from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  fetchMyProfile, getTeamMembers,
-  type UserProfileData, type TeamMemberData,
+  fetchMyProfile,
+  fetchMyAssets,
+  fetchMyStats,
+  updateMyProfile,
+  getTeamMembers,
+  UserProfileData,
+  UserAssetData,
+  UserStatsData,
+  TeamMemberData,
 } from "@/lib/api/userProfileApi";
 
-function getInitials(name: string) {
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+// ---------------------------------------------------------------------------
+// Helper: Get initials from name
+// ---------------------------------------------------------------------------
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
-export default function UserTeamPage() {
-  const [profile, setProfile] = React.useState<UserProfileData | null>(null);
-  const [team, setTeam] = React.useState<TeamMemberData[]>([]);
+// ---------------------------------------------------------------------------
+// Main Page: USER Profile
+// ---------------------------------------------------------------------------
+
+export default function UserProfilePage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState("");
-  const [search, setSearch] = React.useState("");
+  
+  // Profile data
+  const [profile, setProfile] = React.useState<UserProfileData | null>(null);
+  const [assets, setAssets] = React.useState<UserAssetData[]>([]);
+  const [stats, setStats] = React.useState<UserStatsData | null>(null);
+  const [teamMembers, setTeamMembers] = React.useState<TeamMemberData[]>([]);
+  const [teamMembersLoading, setTeamMembersLoading] = React.useState(false);
+  
+  // Edit mode
+  const [isEditMode, setIsEditMode] = React.useState(false);
+  const [editForm, setEditForm] = React.useState({
+    firstName: "",
+    lastName: "",
+    contactNumber: "",
+    address: "",
+  });
+  const [isSaving, setIsSaving] = React.useState(false);
+  
+  // Assets view modal
+  const [showAssetsDialog, setShowAssetsDialog] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [teamMembersSearchQuery, setTeamMembersSearchQuery] = React.useState("");
 
+  // Load profile, assets, and stats on mount
   React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setIsLoading(true);
-      setError("");
+    async function loadData() {
       try {
-        const [p, t] = await Promise.all([
+        setIsLoading(true);
+        setError("");
+        
+        const [profileData, assetsData, statsData] = await Promise.all([
           fetchMyProfile(),
-          getTeamMembers().catch(() => [] as TeamMemberData[]),
+          fetchMyAssets(),
+          fetchMyStats(),
         ]);
-        if (cancelled) return;
-        setProfile(p);
-        setTeam(t);
+        
+        setProfile(profileData);
+        setAssets(assetsData);
+        setStats(statsData);
+        
+        // Initialize edit form
+        setEditForm({
+          firstName: profileData.firstName || "",
+          lastName: profileData.lastName || "",
+          contactNumber: profileData.contactNumber || "",
+          address: profileData.address || "",
+        });
+        
+        // Load team members
+        try {
+          setTeamMembersLoading(true);
+          const teamData = await getTeamMembers();
+          setTeamMembers(teamData);
+        } catch (tmErr) {
+          console.error("Failed to load team members:", tmErr);
+          setTeamMembers([]);
+        } finally {
+          setTeamMembersLoading(false);
+        }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load users");
+        console.error("Failed to load profile:", err);
+        setError(err instanceof Error ? err.message : "Failed to load profile data");
       } finally {
-        if (!cancelled) setIsLoading(false);
+        setIsLoading(false);
       }
-    })();
-    return () => { cancelled = true; };
+    }
+    
+    loadData();
   }, []);
 
-  const filtered = React.useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return team;
-    return team.filter((m) =>
-      m.name.toLowerCase().includes(q) ||
-      m.email.toLowerCase().includes(q) ||
-      (m.department ?? "").toLowerCase().includes(q) ||
-      m.role.toLowerCase().includes(q)
+  // Handle save profile
+  async function handleSaveProfile() {
+    try {
+      setIsSaving(true);
+      await updateMyProfile({
+        firstName: editForm.firstName,
+        lastName: editForm.lastName,
+        contactNumber: editForm.contactNumber,
+        address: editForm.address,
+      });
+      
+      // Refresh profile data
+      const updatedProfile = await fetchMyProfile();
+      setProfile(updatedProfile);
+      setIsEditMode(false);
+      toast.success("Profile updated successfully!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update profile");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  // Filter assets by search
+  const filteredAssets = React.useMemo(() => {
+    if (!searchQuery.trim()) return assets;
+    const query = searchQuery.toLowerCase();
+    return assets.filter(
+      (a) =>
+        a.name.toLowerCase().includes(query) ||
+        a.category?.toLowerCase().includes(query) ||
+        a.location.toLowerCase().includes(query)
     );
-  }, [team, search]);
+  }, [assets, searchQuery]);
+
+  // Filter team members by search
+  const filteredTeamMembers = React.useMemo(() => {
+    if (!teamMembersSearchQuery.trim()) return teamMembers;
+    const query = teamMembersSearchQuery.toLowerCase();
+    return teamMembers.filter(
+      (m) =>
+        m.name.toLowerCase().includes(query) ||
+        m.firstName.toLowerCase().includes(query) ||
+        m.lastName.toLowerCase().includes(query) ||
+        m.email.toLowerCase().includes(query) ||
+        m.department?.toLowerCase().includes(query)
+    );
+  }, [teamMembers, teamMembersSearchQuery]);
 
   if (isLoading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
-        <PredictiXLoader label="Loading users…" />
+        <PredictiXLoader label="Loading your profile…" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <Card className="rounded-2xl border-red-500/50 bg-red-50/50 dark:bg-red-950/20">
-        <CardContent className="pt-6"><p className="text-red-700 dark:text-red-400">{error}</p></CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Card className="rounded-2xl border-red-500/50 bg-red-50/50 dark:bg-red-950/20">
+          <CardContent className="pt-6">
+            <p className="text-red-700 dark:text-red-400">{error}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="space-y-4">
+        <Card className="rounded-2xl">
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">No profile data found</p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="w-full space-y-6">
-      <PageHero
-        crumbs={["PredictiX", "User", "Users"]}
-        title="Users"
-        subtitle={`Team members in ${profile?.department ? `the ${profile.department} department` : "your department"}.`}
+      {/* KPI Cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="rounded-2xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-base font-medium text-muted-foreground">
+              My Assets
+            </CardTitle>
+            <Boxes className="h-8 w-8 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-bold">{stats?.assignedAssets || 0}</div>
+            <p className="text-sm text-muted-foreground mt-1">Assigned to you</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-base font-medium text-muted-foreground">
+              Status
+            </CardTitle>
+            <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-emerald-600 text-white">
+                {profile.status}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">Your account status</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* My Profile Section */}
+      <Card className="rounded-2xl">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-lg">My Profile</CardTitle>
+          {!isEditMode && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditMode(true)}
+              className="gap-2"
+            >
+              <Edit2 className="h-4 w-4" />
+              Edit My Profile
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {/* Profile Header */}
+            <div className="flex items-start gap-4 pb-6 border-b">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-xl font-semibold text-white">
+                {getInitials(profile.name)}
+              </div>
+              <div className="flex-1 space-y-2">
+                <div>
+                  <p className="text-2xl font-semibold">{profile.name}</p>
+                  <p className="text-sm text-muted-foreground">{profile.employee_id}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Badge className="bg-violet-600">{profile.role}</Badge>
+                  <Badge className="bg-emerald-600">{profile.status}</Badge>
+                </div>
+              </div>
+            </div>
+
+            {/* Profile Details */}
+            {!isEditMode ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Name</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-base">{profile.firstName} {profile.lastName}</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Email</p>
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-base">{profile.email}</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Phone</p>
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-base">{profile.contactNumber || "Not set"}</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Address</p>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-base">{profile.address || "Not set"}</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Department</p>
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-base">{profile.department || "N/A"}</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Warehouse</p>
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-base">{profile.warehouse || "N/A"}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="text-sm font-medium">First Name</label>
+                    <Input
+                      value={editForm.firstName}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          firstName: e.target.value,
+                        }))
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Last Name</label>
+                    <Input
+                      value={editForm.lastName}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          lastName: e.target.value,
+                        }))
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Phone</label>
+                    <Input
+                      value={editForm.contactNumber}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          contactNumber: e.target.value,
+                        }))
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Address</label>
+                    <Input
+                      value={editForm.address}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          address: e.target.value,
+                        }))
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    onClick={handleSaveProfile}
+                    disabled={isSaving}
+                    className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <Save className="h-4 w-4" />
+                    {isSaving ? "Saving…" : "Save Changes"}
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEditMode(false)}
+                    disabled={isSaving}
+                    className="gap-2"
+                  >
+                    <X className="h-4 w-4" />
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* My Assigned Assets Section */}
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="text-lg">My Assigned Assets ({assets.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search assets by name, category, or location…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Assets Table */}
+            {filteredAssets.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">
+                  {searchQuery ? "No assets match your search" : "No assets assigned yet"}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto overflow-y-auto scrollbar-styled max-h-96">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Asset Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead className="text-right">Health</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAssets.map((asset) => (
+                      <TableRow key={asset.asset_id}>
+                        <TableCell className="font-medium">{asset.name}</TableCell>
+                        <TableCell>{asset.category || "—"}</TableCell>
+                        <TableCell>{asset.location}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="w-24 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  asset.healthPercent >= 80
+                                    ? "bg-emerald-500"
+                                    : asset.healthPercent >= 60
+                                    ? "bg-amber-500"
+                                    : "bg-red-500"
+                                }`}
+                                style={{
+                                  width: `${asset.healthPercent}%`,
+                                }}
+                              ></div>
+                            </div>
+                            <span className="text-sm font-medium w-12 text-right">
+                              {Math.round(asset.healthPercent)}%
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* View Assets Dialog */}
+      <ViewAssignedAssetsDialog
+        userName={profile.name}
+        assets={filteredAssets.map((a) => ({
+          id: a.asset_id,
+          name: a.name,
+          category: a.category || "",
+          location: a.location,
+          healthPercent: a.healthPercent,
+        }))}
+        isLoading={false}
+        open={showAssetsDialog}
+        onOpenChange={setShowAssetsDialog}
       />
 
+      {/* Team Members in Same Department Section */}
       <Card className="rounded-2xl">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <UsersIcon className="h-5 w-5 text-muted-foreground" /> Team Members ({filtered.length})
+        <CardHeader>
+          <CardTitle className="text-lg">
+            Team Members in {profile?.department || "Your Department"} ({filteredTeamMembers.length})
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search by name, email, or role…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-          </div>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search team members by name, email, or role…"
+                value={teamMembersSearchQuery}
+                onChange={(e) => setTeamMembersSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
 
-          {filtered.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">
-              {search ? "No team members match your search." : "No other team members in your department."}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((m) => (
-                    <TableRow key={m.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-purple-600 text-xs font-semibold text-white">
-                            {getInitials(m.name)}
-                          </div>
-                          <div className="flex flex-col">
-                            <span>{m.name}</span>
-                            {m.employee_id && <span className="text-xs text-muted-foreground">{m.employee_id}</span>}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={m.role === "admin" ? "bg-violet-600" : "bg-blue-600"}>{m.role}</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <span className="inline-flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-muted-foreground" />{m.email}</span>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {m.contactNumber
-                          ? <span className="inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-muted-foreground" />{m.contactNumber}</span>
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={m.status === "active" ? "bg-emerald-600" : "bg-gray-500"}>{m.status}</Badge>
-                      </TableCell>
+            {/* Team Members Table */}
+            {teamMembersLoading ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading team members…</p>
+              </div>
+            ) : filteredTeamMembers.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">
+                  {teamMembersSearchQuery ? "No team members match your search" : "No other team members in your department"}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto overflow-y-auto scrollbar-styled max-h-96">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTeamMembers.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-xs font-semibold text-white">
+                              {getInitials(member.name)}
+                            </div>
+                            <div className="flex flex-col">
+                              <span>{member.name}</span>
+                              <span className="text-xs text-muted-foreground">{member.employee_id}</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={member.role === "admin" ? "bg-violet-600" : "bg-blue-600"}>
+                            {member.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">{member.email}</TableCell>
+                        <TableCell className="text-sm">{member.contactNumber || "—"}</TableCell>
+                        <TableCell>
+                          <Badge className={member.status === "active" ? "bg-emerald-600" : "bg-gray-600"}>
+                            {member.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

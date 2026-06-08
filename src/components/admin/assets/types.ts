@@ -32,6 +32,7 @@ export type Asset = {
   meta?: {
     image_url?: string; // Legacy
     images?: string[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
   };
   created_at: string;
@@ -134,10 +135,10 @@ export type VehiclePredictionResult = {
   features_used: Record<string, unknown>;
 };
 
-// ─── Survival Prediction (FRSO) ────────────────────────────────────────────────
+// ─── Survival Prediction ─────────────────────────────────────────────────────────
 export type SurvivalCurvePoint = {
-  day: number;
-  survival_prob: number;
+  days: number;
+  probability: number;
 };
 
 export type ComponentSurvivalResponse = {

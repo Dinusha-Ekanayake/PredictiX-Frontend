@@ -224,16 +224,39 @@ export default function UserTicketsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">My Tickets</h1>
-          <p className="text-sm text-muted-foreground">
-            Track issues you&apos;ve reported and the work assigned to you.
-          </p>
+      {/* ── Welcome header ── */}
+      <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-white/10 dark:bg-white/2">
+        <div className="absolute inset-0 bg-linear-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent pointer-events-none" />
+        <div className="relative px-7 py-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-violet-500 dark:text-violet-400">PredictiX</span>
+              <span className="text-muted-foreground/30 text-xs font-light">/</span>
+              <span className="text-[10px] tracking-widest uppercase text-muted-foreground/60">User</span>
+              <span className="text-muted-foreground/30 text-xs font-light">/</span>
+              <span className="text-[10px] tracking-widest uppercase text-muted-foreground/80">Tickets</span>
+            </div>
+            <h1 className="text-[26px] font-semibold tracking-[-0.025em] leading-none text-foreground">
+              My Tickets
+            </h1>
+            <div className="flex items-center gap-2.5 mt-2.5">
+              <p className="text-[12px] text-muted-foreground leading-tight max-w-sm">
+                Track issues you&apos;ve reported and the work assigned to you.
+              </p>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 shrink-0">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-2.5 shrink-0">
+            {refreshing && (
+              <Badge variant="outline" className="gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium text-muted-foreground bg-background/50 backdrop-blur-sm border-border">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Refreshing
+              </Badge>
+            )}
+          </div>
         </div>
-        {refreshing && (
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-2" />
-        )}
       </div>
 
       {/* Search + filters bar */}

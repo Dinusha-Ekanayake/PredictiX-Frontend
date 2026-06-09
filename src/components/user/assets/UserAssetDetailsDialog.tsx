@@ -68,7 +68,7 @@ export default function UserAssetDetailsDialog({
               <p className="text-sm font-medium text-red-700 dark:text-red-400">{error}</p>
             </div>
           ) : detail ? (
-            <div className="max-w-4xl mx-auto w-full shadow-sm rounded-2xl overflow-hidden ring-1 ring-slate-200 dark:ring-white/10">
+            <div className="w-full">
               <AssetDetailsPanel
                 detail={detail}
                 onRefresh={() => {}}

@@ -348,88 +348,105 @@ export default function UserTicketsPage() {
       )}
 
       {/* Tickets list */}
-      <div className="flex flex-col gap-4">
-        {tickets.length === 0 && !errorMsg && (
-          <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-            No tickets match your filters. Click <strong>+ New Ticket</strong> to
-            create one.
-          </div>
-        )}
+      <div className="rounded-[24px] border border-border/50 bg-card/30 backdrop-blur-xl shadow-sm overflow-hidden flex flex-col h-[600px]">
+        {/* Header row (hidden on small screens) */}
+        <div className="hidden md:flex items-center gap-4 p-4 px-6 border-b border-border/40 bg-muted/20 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+          <div className="w-[100px]">Ticket ID</div>
+          <div className="flex-1">Details</div>
+          <div className="w-[130px]">Status</div>
+          <div className="w-[130px]">Priority</div>
+          <div className="w-[100px] text-right">Created</div>
+        </div>
 
-        {tickets.map((t) => {
-          const displayPriority = t.final_priority || t.priority || t.predicted_priority;
-          const displayCategory = t.final_category || t.predicted_category;
-          return (
-            <div
-              key={t.id}
-              className="ticket-dynamic rounded-xl border p-4 cursor-pointer transform-gpu will-change-transform hover:scale-[1.01] hover:bg-muted/10 dark:hover:bg-muted/20 hover:shadow-lg transition-transform duration-150 ease-out"
-              onClick={() => openDetail(t.id)}
-            >
-              <div className="flex items-start justify-between gap-3">
+        {/* Scrollable list area */}
+        <div className="flex-1 overflow-y-auto scrollbar-styled p-2 md:p-3 flex flex-col gap-1">
+          {tickets.length === 0 && !errorMsg && (
+            <div className="flex h-full flex-col items-center justify-center p-12 text-center">
+              <CheckCircle className="h-8 w-8 text-violet-500 opacity-90 mb-4" />
+              <p className="text-base font-bold text-foreground">No tickets found</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Try adjusting your filters, or click <strong className="text-violet-600 dark:text-violet-400 font-semibold">+ New Ticket</strong>.
+              </p>
+            </div>
+          )}
+
+          {tickets.map((t) => {
+            const displayPriority = t.final_priority || t.priority || t.predicted_priority;
+            const displayCategory = t.final_category || t.predicted_category;
+            
+            return (
+              <div
+                key={t.id}
+                onClick={() => openDetail(t.id)}
+                className="group flex flex-col md:flex-row md:items-center gap-3 md:gap-4 p-3 px-4 md:px-3 rounded-xl hover:bg-card/80 hover:shadow-sm transition-all cursor-pointer border border-transparent hover:border-border/50"
+              >
+                <div className="w-auto md:w-[100px] flex items-center">
+                  <span className="inline-flex items-center rounded-full bg-background/80 px-2.5 py-0.5 text-[10px] font-bold text-muted-foreground ring-1 ring-inset ring-border">
+                    #{t.ticket_number}
+                  </span>
+                </div>
+
                 <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="rounded-md bg-muted/30 px-3 py-1 text-sm font-medium">
-                      {t.ticket_number}
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`inline-flex items-center justify-center h-5 w-5 rounded-full ${priorityRingClass(displayPriority)}`}
-                      >
-                        {priorityIcon(displayPriority)}
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[14px] font-bold text-foreground group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors truncate">
+                      {t.title}
+                    </h3>
+                    {t.predicted_priority && !t.final_priority && t.predicted_priority !== t.priority && (
+                      <span className="hidden sm:flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-full ring-1 ring-violet-500/20">
+                        <Sparkles className="h-3 w-3" /> AI
                       </span>
-                      <span className="text-sm font-medium capitalize">
-                        {displayPriority || "unset"}
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    {displayCategory && (
+                      <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">
+                        {displayCategory}
                       </span>
-                    </div>
+                    )}
+                    {t.assigned_to && (
+                      <>
+                        <span className="text-[9px] text-muted-foreground/40">•</span>
+                        <span className="text-[10px] font-semibold text-violet-600/80 dark:text-violet-400/80">
+                          {userMap.get(t.assigned_to) ?? t.assigned_to.slice(0, 8)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
 
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`inline-flex items-center justify-center h-5 w-5 rounded-full ${statusRingClass(t.status)}`}
-                      >
+                <div className="flex items-center gap-2 md:gap-4 flex-wrap mt-2 md:mt-0">
+                  <div className="w-auto md:w-[130px]">
+                    <div className="inline-flex items-center gap-1.5 bg-background/60 rounded-full pr-2.5 ring-1 ring-border/50">
+                      <span className={`flex items-center justify-center h-5 w-5 rounded-full shadow-inner ${statusRingClass(t.status)}`}>
                         {statusIcon(t.status)}
                       </span>
-                      <span className="text-sm font-medium capitalize">
+                      <span className="text-[10px] font-bold capitalize text-foreground/80 tracking-wide">
                         {t.status.replace(/[-_]/g, " ")}
                       </span>
                     </div>
-
-                    {t.predicted_priority &&
-                      !t.final_priority &&
-                      t.predicted_priority !== t.priority && (
-                        <span className="inline-flex items-center gap-1 text-xs text-violet-600">
-                          <Sparkles className="h-3 w-3" />
-                          AI suggested
-                        </span>
-                      )}
                   </div>
 
-                  <h3 className="mt-3 text-lg font-semibold truncate">{t.title}</h3>
+                  <div className="w-auto md:w-[130px]">
+                    <div className="inline-flex items-center gap-1.5 bg-background/60 rounded-full pr-2.5 ring-1 ring-border/50">
+                      <span className={`flex items-center justify-center h-5 w-5 rounded-full shadow-inner ${priorityRingClass(displayPriority)}`}>
+                        {priorityIcon(displayPriority)}
+                      </span>
+                      <span className="text-[10px] font-bold capitalize text-foreground/80 tracking-wide">
+                        {displayPriority || "unset"}
+                      </span>
+                    </div>
+                  </div>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    {displayCategory && (
-                      <Badge className={categoryBadgeClass(displayCategory)}>
-                        {displayCategory}
-                      </Badge>
-                    )}
-                    <span className="text-sm text-muted-foreground">
-                      Created: {formatDate(t.created_at)}
+                  <div className="w-auto md:w-[100px] md:text-right hidden sm:block">
+                    <span className="text-[10px] font-semibold text-muted-foreground whitespace-nowrap">
+                      {formatDate(t.created_at)}
                     </span>
                   </div>
                 </div>
-
-                <div className="ml-2 shrink-0 flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap">
-                  <span className="text-[10px] uppercase tracking-wide">Assigned</span>
-                  {t.assigned_to ? (
-                    <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300 font-medium">{userMap.get(t.assigned_to) ?? t.assigned_to.slice(0, 8)}</Badge>
-                  ) : (
-                    <span className="italic">Unassigned</span>
-                  )}
-                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       <UserNewTicketDialog

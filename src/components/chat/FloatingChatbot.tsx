@@ -40,7 +40,7 @@ type ChatMessage = {
 const CHATBOT_API_BASE =
   process.env.NEXT_PUBLIC_CHATBOT_API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://127.0.0.1:8000";
+  "http://127.0.0.1:8002";
 const CHATBOT_AGENT_ENDPOINT = "/chatbot/agent";
 const CHATBOT_FALLBACK_ENDPOINTS = ["/chatbot/ask", "/chatbot", "/chatbot/message"];
 
@@ -360,54 +360,6 @@ export default function FloatingChatbot() {
                           </div>
                         ) : null}
 
-                        {message.role === "assistant" && message.toolTrace && message.toolTrace.length > 0 ? (
-                          <div className="mt-2 border-t border-border/40 pt-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setExpandedTraces((prev) => ({
-                                  ...prev,
-                                  [message.id]: !prev[message.id],
-                                }))
-                              }
-                              className="flex items-center gap-1 text-[10px] font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
-                            >
-                              {expandedTraces[message.id] ? (
-                                <ChevronDown className="size-3" />
-                              ) : (
-                                <ChevronRight className="size-3" />
-                              )}
-                              <Wrench className="size-3" />
-                              {message.toolTrace.length} tool{message.toolTrace.length === 1 ? "" : "s"} used
-                            </button>
-                            {expandedTraces[message.id] ? (
-                              <ul className="mt-1.5 space-y-1.5 pl-3">
-                                {message.toolTrace.map((step, i) => (
-                                  <li
-                                    key={`${message.id}-tool-${i}`}
-                                    className="rounded-md bg-muted/50 dark:bg-slate-900/50 px-2 py-1 text-[10px] font-mono"
-                                  >
-                                    <div className="flex items-center gap-1 text-violet-600 dark:text-violet-400 font-semibold">
-                                      <span>→</span>
-                                      <span>{step.name}</span>
-                                      <span className="text-muted-foreground font-normal">
-                                        ({Object.keys(step.args || {}).length
-                                          ? Object.entries(step.args)
-                                              .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
-                                              .join(", ")
-                                          : ""}
-                                        )
-                                      </span>
-                                    </div>
-                                    <div className="mt-0.5 text-muted-foreground break-all">
-                                      {step.result_preview}
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : null}
-                          </div>
-                        ) : null}
                       </div>
                     </div>
                   ))}

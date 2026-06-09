@@ -3,7 +3,7 @@
  * Handles all API calls to backend warehouse endpoints
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
 
 /** Generic chart data point — keys vary per chart (name/value/count/etc.). */
 export type ChartDatum = Record<string, string | number | null | undefined>;

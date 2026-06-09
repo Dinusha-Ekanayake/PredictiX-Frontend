@@ -20,7 +20,8 @@ export default function MaintenanceScheduleTable() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("http://127.0.0.1:8000/warehouse-dashboard/maintenance-schedule", {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8002";
+      const response = await fetch(`${apiBaseUrl}/warehouse-dashboard/maintenance-schedule`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",

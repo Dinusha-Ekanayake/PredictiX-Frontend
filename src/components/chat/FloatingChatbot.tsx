@@ -83,6 +83,7 @@ export default function FloatingChatbot() {
   const isHelpDeskRoute = HELPDESK_ROUTE_PREFIXES.some((p) => pathname?.startsWith(p) ?? false);
 
   const [isMounted, setIsMounted] = React.useState(false);
+  const [isLoaderPresent, setIsLoaderPresent] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSending, setIsSending] = React.useState(false);
   const [draft, setDraft] = React.useState("");
@@ -102,6 +103,20 @@ export default function FloatingChatbot() {
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  React.useEffect(() => {
+    if (!isMounted) return;
+    
+    const checkLoader = () => {
+      setIsLoaderPresent(!!document.querySelector('[data-predictix-loader="true"]'));
+    };
+    
+    checkLoader();
+    const observer = new MutationObserver(checkLoader);
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    return () => observer.disconnect();
+  }, [isMounted]);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -238,12 +253,12 @@ export default function FloatingChatbot() {
     inputRef.current?.focus();
   };
 
-  if (!isMounted || isHiddenRoute) {
+  if (!isMounted || isHiddenRoute || isLoaderPresent) {
     return null;
   }
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50" aria-hidden={false}>
+    <div id="predictix-chatbot" className="pointer-events-none fixed inset-0 z-50" aria-hidden={false}>
       {isOpen ? (
         <div className="pointer-events-auto absolute bottom-24 right-6 w-[calc(100vw-32px)] sm:w-[380px] h-[520px] max-h-[calc(100vh-120px)]">
           <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-md motion-reduce:transition-none">

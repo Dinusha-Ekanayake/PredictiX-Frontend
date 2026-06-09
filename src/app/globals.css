@@ -285,3 +285,8 @@ html {
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   scrollbar-width: thin;
 }
+
+/* Hide the chatbot globally whenever a loader component is on screen */
+body:has([data-predictix-loader="true"]) #predictix-chatbot {
+  display: none !important;
+}

@@ -259,8 +259,8 @@ export default function HelpDeskPage() {
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const r = window.localStorage.getItem("predictix.user.role") ?? "";
-    setIsAdmin(r === "admin" || r === "ADMIN");
+    const r = (window.localStorage.getItem("predictix.user.role") ?? "").toLowerCase();
+    setIsAdmin(r === "admin" || r === "super_admin");
   }, []);
 
   const fetchFaqs = React.useCallback(async () => {

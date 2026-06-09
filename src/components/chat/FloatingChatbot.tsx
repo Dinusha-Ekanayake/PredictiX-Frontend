@@ -3,8 +3,10 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import {
+  Check,
   ChevronDown,
   ChevronRight,
+  Copy,
   Loader2,
   MessageCircle,
   SendHorizontal,
@@ -88,6 +90,7 @@ export default function FloatingChatbot() {
   const [isSending, setIsSending] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
+  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
 
   const [expandedTraces, setExpandedTraces] = React.useState<Record<string, boolean>>({});
 
@@ -233,13 +236,23 @@ export default function FloatingChatbot() {
         },
       ]);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Unable to connect to chatbot backend";
+      const isNetworkError =
+        error instanceof Error &&
+        (error.message.toLowerCase().includes("fetch") ||
+         error.message.toLowerCase().includes("network") ||
+         error.message.toLowerCase().includes("failed to connect") ||
+         error.message.toLowerCase().includes("cors"));
+
+      const friendlyMessage = isNetworkError
+        ? "I am sorry, but I am unable to reach the PredictiX service right now. Please verify that the backend server is running and try again."
+        : `An unexpected issue occurred: ${error instanceof Error ? error.message : String(error)}`;
+
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: `Connection error: ${msg}`,
+          text: friendlyMessage,
           createdAt: Date.now(),
         },
       ]);
@@ -330,17 +343,43 @@ export default function FloatingChatbot() {
                         )}
                       >
                         <p className="whitespace-pre-wrap">{message.text}</p>
-                        <p
-                          className={cn(
-                            "mt-1 text-[10px]",
-                            message.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                        <div className="mt-1.5 flex items-center justify-between gap-4">
+                          <span
+                            className={cn(
+                              "text-[10px]",
+                              message.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                            )}
+                          >
+                            {new Date(message.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          {message.role === "assistant" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void navigator.clipboard.writeText(message.text);
+                                setCopiedMessageId(message.id);
+                                setTimeout(() => setCopiedMessageId(null), 2000);
+                              }}
+                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors outline-none focus:ring-0"
+                              title="Copy message to clipboard"
+                            >
+                              {copiedMessageId === message.id ? (
+                                <>
+                                  <Check className="size-3 text-emerald-500" />
+                                  <span className="text-emerald-500 font-medium">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="size-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
                           )}
-                        >
-                          {new Date(message.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
+                        </div>
 
                         {message.role === "assistant" && message.sources && message.sources.length > 0 ? (
                           <div className="mt-2 flex flex-wrap gap-1.5">

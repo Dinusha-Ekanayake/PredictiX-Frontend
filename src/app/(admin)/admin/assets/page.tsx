@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import AssetsSummary from "@/components/admin/assets/AssetsSummary";
+import AssetsAnalytics from "@/components/admin/assets/AssetsAnalytics";
 import AssetsToolbar, { DEFAULT_FILTERS } from "@/components/admin/assets/AssetsToolbar";
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel, { AssetDetailsSkeleton } from "@/components/admin/assets/AssetDetailsPanel";
@@ -211,10 +212,6 @@ export default function AdminAssetsPage() {
               <Radio className="h-3 w-3 animate-pulse" />
               Live
             </Badge>
-            <Button size="sm" className="h-7 gap-1.5 rounded-full" onClick={openCreate}>
-              <Plus className="h-3.5 w-3.5" />
-              Add Asset
-            </Button>
           </div>
         </div>
       </div>
@@ -239,6 +236,9 @@ export default function AdminAssetsPage() {
       {/* ── Summary KPIs ── */}
       <AssetsSummary assets={assets} />
 
+      {/* ── Descriptive Analytics ── */}
+      {!listLoading && assets.length > 0 && <AssetsAnalytics assets={assets} />}
+
       {/* ── Toolbar ── */}
       <AssetsToolbar
         filters={filters}
@@ -246,22 +246,25 @@ export default function AdminAssetsPage() {
         resultsCount={assets.length}
         warehouseOptions={warehouseOptions}
         loading={listLoading}
+        onAddAsset={openCreate}
       />
 
       {/* ── Table + Details ── */}
       <div className="grid grid-cols-12 gap-5">
         {/* List */}
-        <div className="col-span-12 xl:col-span-5">
-          <AssetsTable
-            assets={assets}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            loading={listLoading}
-          />
+        <div className="col-span-12 lg:col-span-5 relative h-[520px] lg:h-auto">
+          <div className="h-full w-full lg:absolute lg:inset-0">
+            <AssetsTable
+              assets={assets}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              loading={listLoading}
+            />
+          </div>
         </div>
 
         {/* Detail panel */}
-        <div className="col-span-12 xl:col-span-7">
+        <div className="col-span-12 lg:col-span-7">
           {detailLoading ? (
             <AssetDetailsSkeleton />
           ) : detailError ? (

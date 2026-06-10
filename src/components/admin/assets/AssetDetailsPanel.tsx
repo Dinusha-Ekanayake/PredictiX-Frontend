@@ -9,12 +9,14 @@ import {
   TrendingUp, TrendingDown, Minus, Pencil, Trash2, Bot,
   ClipboardList, Users, ShieldCheck, Zap, AlertTriangle,
   RefreshCw, Ticket, ChevronRight, Loader2,
-  Info, Gauge, Hash,
+  Info, Gauge, Hash, Wrench,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
-import type { AssetDetail } from "./types";
+import type { AssetDetail, ComponentSurvivalResponse } from "./types";
 import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
+import LogMaintenanceDialog from "./LogMaintenanceDialog";
 
 /* ══════════════════════════════════════════════════════════════════════════════
    Helpers
@@ -110,11 +112,11 @@ function InfoField({ icon, label, value, mono, valueClass }: {
   icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
+    <div className="h-full rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
       {icon && <div className="mt-0.5 text-muted-foreground/60 shrink-0">{icon}</div>}
       <div className="min-w-0">
         <div className="text-[11px] text-muted-foreground/80 font-medium">{label}</div>
-        <div className={cn("text-sm font-medium mt-0.5 truncate", mono && "font-mono text-xs", valueClass)}>
+        <div className={cn("text-sm font-medium mt-0.5 leading-snug break-words", mono && "font-mono text-xs", valueClass)}>
           {value}
         </div>
       </div>
@@ -123,10 +125,13 @@ function InfoField({ icon, label, value, mono, valueClass }: {
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────────────── */
-function EmptyState({ message }: { message: string }) {
+function EmptyState({ message, icon: Icon = Info }: { message: string, icon?: React.ElementType }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-200 dark:border-white/8 p-8 text-center text-sm text-muted-foreground/60">
-      {message}
+    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 dark:border-white/8 bg-slate-50/30 dark:bg-white/2 p-8 text-center">
+      <div className="rounded-full bg-slate-100 dark:bg-white/5 p-3">
+        <Icon className="h-5 w-5 text-muted-foreground/40" />
+      </div>
+      <p className="text-sm font-medium text-muted-foreground/70">{message}</p>
     </div>
   );
 }
@@ -216,16 +221,21 @@ type Props = {
 };
 
 export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit }: Props) {
-  const { asset, prediction, costPrediction, maintenanceEvents, tickets, assignments } = detail;
+  const { asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments } = detail;
   const router = useNavRouter();
 
   const [runningPrediction, setRunningPrediction] = React.useState(false);
+  const [showLogMaintenance, setShowLogMaintenance] = React.useState(false);
 
   const healthScore = deriveHealthScore(asset, prediction);
   const failureProb = deriveFailureProbability(prediction);
 
   const daysUntilMaint = asset.next_service_date
     ? Math.ceil((new Date(asset.next_service_date).getTime() - Date.now()) / 86_400_000)
+    : null;
+
+  const aiDaysUntilMaint = prediction?.predicted_maintenance_date
+    ? Math.ceil((new Date(prediction.predicted_maintenance_date).getTime() - Date.now()) / 86_400_000)
     : null;
 
   const predDiff =
@@ -251,9 +261,11 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
     setRunningPrediction(true);
     try {
       await runVehiclePrediction(asset.id);
+      toast.success("Prediction generated successfully!");
       onRefresh();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Prediction failed:", e);
+      toast.error(e.message || "Failed to generate prediction");
     } finally {
       setRunningPrediction(false);
     }
@@ -288,6 +300,15 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-xl gap-1.5 text-xs border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+            onClick={() => setShowLogMaintenance(true)}
+          >
+            <Wrench className="h-3 w-3" />
+            Log Maint.
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -374,6 +395,31 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
         )}
       </div>
 
+      {/* ── Image Gallery ── */}
+      {(() => {
+        const existing = asset?.meta?.images || [];
+        const legacy = asset?.meta?.image_url;
+        let allImages = [...existing];
+        if (legacy && !allImages.includes(legacy)) {
+          allImages.unshift(legacy);
+        }
+        
+        if (allImages.length === 0) return null;
+        
+        return (
+          <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/20 dark:bg-slate-900/10">
+            <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Asset Images</h3>
+            <div className="flex flex-wrap gap-3">
+              {allImages.map((url, idx) => (
+                <div key={idx} className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-black group">
+                  <img src={url} alt={`Asset image ${idx}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Fields grid ── */}
       <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -414,11 +460,13 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
             icon={<CalendarClock className="h-3.5 w-3.5" />}
             label="Next Scheduled Service"
             value={
-              asset.next_service_date
-                ? `${fmt(asset.next_service_date)}${daysUntilMaint !== null ? ` (${daysUntilMaint > 0 ? `in ${daysUntilMaint}d` : `${Math.abs(daysUntilMaint)}d overdue`})` : ""}`
-                : "—"
+              asset.status === "maintenance"
+                ? "Currently in Maintenance"
+                : asset.next_service_date
+                  ? `${fmt(asset.next_service_date)}${daysUntilMaint !== null ? ` (${daysUntilMaint > 0 ? `in ${daysUntilMaint}d` : `${Math.abs(daysUntilMaint)}d overdue`})` : ""}`
+                  : "—"
             }
-            valueClass={daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
+            valueClass={asset.status !== "maintenance" && daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
           />
           <InfoField
             icon={<Bot className="h-3.5 w-3.5" />}
@@ -426,7 +474,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
             value={fmt(prediction?.predicted_maintenance_date)}
           />
           {/* Cost prediction */}
-          <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
+          <div className="h-full rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
             <div className={cn("mt-0.5 shrink-0", costDeltaColor)}>
               <CostDeltaIcon className="h-3.5 w-3.5" />
             </div>
@@ -498,86 +546,313 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
           </TabsList>
 
           {/* ═══ Insights ═══ */}
-          <TabsContent value="insights" className="mt-4 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {[
-                "Health Score Trend & Forecast",
-                "Failure Probability (8-week)",
-              ].map((title) => (
-                <div
-                  key={title}
-                  className="rounded-xl border border-dashed border-slate-200 dark:border-white/8 bg-slate-50/30 dark:bg-white/2 p-4 flex flex-col items-center justify-center gap-2"
-                  style={{ height: 180 }}
+          <TabsContent value="insights" className="mt-4 space-y-4">
+            {!prediction ? (
+              /* ── Empty state ── */
+              <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-slate-200 dark:border-white/8 bg-slate-50/30 dark:bg-white/2 p-10 text-center">
+                <div className="rounded-full bg-primary/8 dark:bg-white/6 p-4">
+                  <Bot className="h-8 w-8 text-primary/50 dark:text-white/30" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground/80">No prediction data yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground/70">
+                    Click <strong>Run AI</strong> to generate health, risk, and cost predictions for this asset.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="gap-1.5 rounded-xl px-4"
+                  onClick={handleRunPrediction}
+                  disabled={runningPrediction}
                 >
-                  <Bot className="h-7 w-7 text-muted-foreground/20" />
-                  <div className="text-xs text-muted-foreground/60 text-center">
-                    {title}
-                    <br />
-                    <span className="text-[10px] opacity-70">(XGBoost — coming soon)</span>
+                  {runningPrediction ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                  {runningPrediction ? "Running…" : "Run AI Now"}
+                </Button>
+              </div>
+            ) : (
+              <>
+                {/* ── Row 1: Health score + Failure probability gauges ── */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Health Score Card */}
+                  <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
+                    <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Health Score</div>
+                    <div className="flex items-center gap-4">
+                      <HealthRing score={healthScore} />
+                      <div className="flex-1 space-y-1.5">
+                        {[
+                          { label: "Brake", key: "brake_health_pct" },
+                          { label: "Tire", key: "tire_health_pct" },
+                          { label: "Battery", key: "battery_health_pct" },
+                          { label: "Oil", key: "oil_life_pct" },
+                          { label: "Hydraulic", key: "hydraulic_health_pct" },
+                        ].map(({ label, key }) => {
+                          const raw = prediction?.top_explanations as Record<string, unknown> | null;
+                          const factors = Array.isArray(raw?.top_factors) ? (raw!.top_factors as Array<{ feature: string; value?: number }>) : [];
+                          const found = factors.find((f) => f.feature === key);
+                          const pct = found?.value != null ? Math.min(100, Math.max(0, Math.round(Number(found.value)))) : null;
+                          const color = pct == null ? "bg-slate-200 dark:bg-white/10" : pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
+                          return (
+                            <div key={key} className="space-y-0.5">
+                              <div className="flex justify-between text-[10px] text-muted-foreground/70">
+                                <span>{label}</span>
+                                <span className="tabular-nums font-medium">{pct != null ? `${pct}%` : "—"}</span>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
+                                <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: pct != null ? `${pct}%` : "30%" }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Failure Probability Card */}
+                  <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
+                    <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Failure Risk Profile</div>
+                    <div className="space-y-3">
+                      {/* Big probability number */}
+                      <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${
+                        failureProb >= 0.7
+                          ? "bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400"
+                          : failureProb >= 0.4
+                          ? "bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                          : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                      }`}>
+                        <div>
+                          <div className="text-xs font-medium opacity-80">Failure Probability</div>
+                          <div className="text-2xl font-bold tabular-nums">{Math.round(failureProb * 100)}%</div>
+                        </div>
+                        <div className={`rounded-full px-3 py-1.5 text-xs font-bold ring-1 ring-inset ${
+                          failureProb >= 0.7 ? "ring-red-200/60 dark:ring-red-500/30 bg-red-100/60 dark:bg-red-500/20"
+                          : failureProb >= 0.4 ? "ring-amber-200/60 dark:ring-amber-500/30 bg-amber-100/60 dark:bg-amber-500/20"
+                          : "ring-emerald-200/60 dark:ring-emerald-500/30 bg-emerald-100/60 dark:bg-emerald-500/20"
+                        }`}>
+                          {prediction.risk_level?.toUpperCase() ?? "UNKNOWN"}
+                        </div>
+                      </div>
+                      {/* Risk bar */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-muted-foreground/60">
+                          <span>Low risk</span><span>High risk</span>
+                        </div>
+                        <div className="h-2.5 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${failureProb >= 0.7 ? "bg-red-500" : failureProb >= 0.4 ? "bg-amber-500" : "bg-emerald-500"}`}
+                            style={{ width: `${Math.round(failureProb * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                      {/* Maintenance countdown */}
+                      {aiDaysUntilMaint != null && (
+                        <div className="flex items-center justify-between text-xs border-t border-slate-200/60 dark:border-white/6 pt-2">
+                          <span className="text-muted-foreground">Days until maintenance</span>
+                          <span className={`font-bold tabular-nums ${aiDaysUntilMaint < 0 ? "text-red-600 dark:text-red-400" : aiDaysUntilMaint <= 14 ? "text-red-500" : aiDaysUntilMaint <= 30 ? "text-amber-500" : "text-foreground"}`}>
+                            {aiDaysUntilMaint < 0 ? `${Math.abs(aiDaysUntilMaint)}d overdue` : `${aiDaysUntilMaint}d`}
+                          </span>
+                        </div>
+                      )}
+                      {prediction.confidence != null && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground flex items-center gap-1"><Bot className="h-3 w-3" />Confidence</span>
+                          <span className="font-semibold">{Math.round(Number(prediction.confidence) * 100)}%</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            {/* Dynamic AI summary bullets */}
-            <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
-              <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
-                AI Insight Summary
-              </div>
-              <div className="space-y-2.5">
-                {!prediction && (
-                  <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
-                    <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>No prediction available. Click <strong>Run AI</strong> to generate insights.</span>
+                {/* ── Row 2: SHAP Top Feature Importance ── */}
+                {(() => {
+                  const raw = prediction?.top_explanations as Record<string, unknown> | null;
+                  const topFactors = Array.isArray(raw?.top_factors) ? (raw!.top_factors as Array<{ feature: string; value?: number; impact?: number }>) : [];
+                  if (topFactors.length === 0) return null;
+                  const maxVal = Math.max(...topFactors.map((f) => Math.abs(Number(f.impact ?? f.value ?? 0))), 1);
+                  return (
+                    <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
+                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Top Risk Factors (SHAP)</div>
+                      <div className="space-y-2">
+                        {topFactors.map((f, i) => {
+                          const impact = Math.abs(Number(f.impact ?? f.value ?? 0));
+                          const pct = Math.round((impact / maxVal) * 100);
+                          const label = f.feature.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                          return (
+                            <div key={i} className="space-y-0.5">
+                              <div className="flex justify-between text-[11px]">
+                                <span className="text-muted-foreground font-medium truncate">{label}</span>
+                                <span className="text-xs font-mono text-muted-foreground/70 shrink-0 ml-2">
+                                  {f.value != null ? String(Number(f.value).toFixed(1)) : "—"}
+                                </span>
+                              </div>
+                              <div className="h-2 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all duration-700 bg-violet-500/80"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* ── Row 3: AI Insight bullets + Cost card ── */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* AI summary bullets */}
+                  <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
+                    <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">AI Recommendations</div>
+                    <div className="space-y-2.5">
+                      {predDiff !== null && predDiff < 0 && (
+                        <div className="flex items-start gap-2.5 text-sm text-red-600 dark:text-red-400">
+                          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>AI predicts failure <strong>{Math.abs(predDiff)} days earlier</strong> than scheduled service.</span>
+                        </div>
+                      )}
+                      {predDiff !== null && predDiff > 0 && (
+                        <div className="flex items-start gap-2.5 text-sm text-amber-600 dark:text-amber-400">
+                          <Zap className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>Asset may last <strong>{predDiff} more days</strong> beyond scheduled service.</span>
+                        </div>
+                      )}
+                      {failureProb >= 0.7 && (
+                        <div className="flex items-start gap-2.5 text-sm text-red-600 dark:text-red-400">
+                          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>Very high failure risk — <strong>schedule immediate inspection</strong>.</span>
+                        </div>
+                      )}
+                      {failureProb >= 0.4 && failureProb < 0.7 && (
+                        <div className="flex items-start gap-2.5 text-sm text-amber-600 dark:text-amber-400">
+                          <Zap className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>Elevated failure risk — <strong>inspect within the next 2 weeks</strong>.</span>
+                        </div>
+                      )}
+                      {healthScore >= 80 && (
+                        <div className="flex items-start gap-2.5 text-sm text-emerald-600 dark:text-emerald-400">
+                          <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>Asset health is excellent — no immediate action required.</span>
+                        </div>
+                      )}
+                      {asset.lifetime_breakdown_count != null && asset.lifetime_breakdown_count > 0 && (
+                        <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
+                          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>Lifetime breakdowns: <strong>{asset.lifetime_breakdown_count}</strong> · Services: <strong>{asset.lifetime_service_count ?? "—"}</strong></span>
+                        </div>
+                      )}
+                      <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
+                        <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <span>
+                          {aiDaysUntilMaint !== null && aiDaysUntilMaint < 0 ? "Maintenance was due on:" : "Predicted maintenance date:"} 
+                          <strong> {prediction.predicted_maintenance_date ? new Date(prediction.predicted_maintenance_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cost estimate card */}
+                  {costPrediction && (
+                    <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
+                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Maintenance Cost Estimate</div>
+                      <div className="space-y-3">
+                        <div className="text-3xl font-bold tabular-nums">
+                          {fmtCost(costPrediction.estimated_cost, costPrediction.currency ?? "LKR")}
+                        </div>
+                        <div className="space-y-2">
+                          {[
+                            { label: "Minimum", value: costPrediction.min_cost, color: "bg-emerald-500" },
+                            { label: "Estimated", value: costPrediction.estimated_cost, color: "bg-violet-500" },
+                            { label: "Maximum", value: costPrediction.max_cost, color: "bg-red-500" },
+                          ].map(({ label, value, color }) => {
+                            const max = Number(costPrediction.max_cost) || 1;
+                            const pct = Math.min(100, Math.round((Number(value) / max) * 100));
+                            return (
+                              <div key={label} className="space-y-0.5">
+                                <div className="flex justify-between text-[11px] text-muted-foreground/70">
+                                  <span>{label}</span>
+                                  <span className="font-mono font-medium">{fmtCost(value, costPrediction.currency ?? "LKR")}</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
+                                  <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {costPrediction.confidence_score != null && (
+                          <div className="flex items-center justify-between text-xs border-t border-slate-200/60 dark:border-white/6 pt-2">
+                            <span className="text-muted-foreground">Cost model confidence</span>
+                            <span className="font-semibold">{Math.round(Number(costPrediction.confidence_score) * 100)}%</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Row 4: Survival Analysis (Component RUL) ── */}
+                {survivalPrediction && (
+                  <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-4 mt-3">
+                    <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
+                      Component Remaining Useful Life (RUL)
+                    </div>
+                    {survivalPrediction.components.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">No component survival data available.</div>
+                    ) : (
+                      <div className="space-y-4">
+                        {survivalPrediction.components.map((c, i) => {
+                          if ("error" in c) {
+                            return (
+                              <div key={i} className="flex justify-between items-center text-[11px] text-red-500/80">
+                                <span className="capitalize">{c.component}</span>
+                                <span>{c.error}</span>
+                              </div>
+                            );
+                          }
+                          const comp = c as ComponentSurvivalResponse;
+                          const isCritical = comp.median_days < 30;
+                          return (
+                            <div key={i} className="space-y-1.5">
+                              <div className="flex justify-between text-[11px]">
+                                <span className="capitalize font-medium text-muted-foreground">{comp.component}</span>
+                                <span className={cn("font-bold tabular-nums", isCritical ? "text-red-500" : "text-foreground")}>
+                                  {Math.round(comp.median_days)} days
+                                </span>
+                              </div>
+                              <div className="relative h-2 rounded-full bg-slate-200/60 dark:bg-white/8">
+                                {/* Error margin (P10 to P90) */}
+                                <div 
+                                  className="absolute h-full bg-primary/20 rounded-full"
+                                  style={{
+                                    left: `${Math.min(100, (comp.p10_days / 365) * 100)}%`,
+                                    width: `${Math.min(100, ((comp.p90_days - comp.p10_days) / 365) * 100)}%`
+                                  }}
+                                />
+                                {/* Median tick */}
+                                <div 
+                                  className={cn("absolute h-3 w-1 -top-0.5 rounded-full", isCritical ? "bg-red-500" : "bg-primary")}
+                                  style={{ left: `${Math.min(100, (comp.median_days / 365) * 100)}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between text-[9px] text-muted-foreground/50 font-mono">
+                                <span>0</span>
+                                <span>1 Year</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
-                {prediction && predDiff !== null && predDiff < 0 && (
-                  <div className="flex items-start gap-2.5 text-sm text-red-600 dark:text-red-400">
-                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>AI predicts maintenance needed <strong>{Math.abs(predDiff)} days earlier</strong> than scheduled.</span>
-                  </div>
-                )}
-                {prediction && failureProb > 0.6 && (
-                  <div className="flex items-start gap-2.5 text-sm text-amber-600 dark:text-amber-400">
-                    <Zap className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>High failure probability ({Math.round(failureProb * 100)}%) — consider immediate inspection.</span>
-                  </div>
-                )}
-                {prediction && healthScore >= 80 && (
-                  <div className="flex items-start gap-2.5 text-sm text-emerald-600 dark:text-emerald-400">
-                    <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>Asset health is excellent. No immediate action required.</span>
-                  </div>
-                )}
-                {prediction && (
-                  <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
-                    <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>
-                      Model confidence:{" "}
-                      {prediction.confidence != null
-                        ? `${Math.round(Number(prediction.confidence) * 100)}%`
-                        : "N/A"}
-                      . Risk level: <strong>{prediction.risk_level ?? "Unknown"}</strong>.
-                    </span>
-                  </div>
-                )}
-                {asset.lifetime_breakdown_count != null && asset.lifetime_breakdown_count > 0 && (
-                  <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
-                    <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    <span>
-                      Lifetime breakdowns: <strong>{asset.lifetime_breakdown_count}</strong> · Services:{" "}
-                      <strong>{asset.lifetime_service_count ?? "—"}</strong>
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
+              </>
+            )}
           </TabsContent>
 
           {/* ═══ Tickets ═══ */}
           <TabsContent value="tickets" className="mt-4 space-y-3">
             {tickets.length === 0 ? (
-              <EmptyState message="No tickets raised for this asset." />
+              <EmptyState message="No tickets raised for this asset." icon={Ticket} />
             ) : (
               tickets.map((t) => (
                 <button
@@ -618,7 +893,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
           {/* ═══ Maintenance Logs ═══ */}
           <TabsContent value="maintenance" className="mt-4 space-y-3">
             {maintenanceEvents.length === 0 ? (
-              <EmptyState message="No maintenance events recorded for this asset." />
+              <EmptyState message="No maintenance events recorded for this asset." icon={ClipboardList} />
             ) : (
               maintenanceEvents.map((e) => (
                 <div
@@ -659,7 +934,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
           {/* ═══ Assignments ═══ */}
           <TabsContent value="assignments" className="mt-4 space-y-3">
             {assignments.length === 0 ? (
-              <EmptyState message="No assignment history for this asset." />
+              <EmptyState message="No assignment history for this asset." icon={Users} />
             ) : (
               assignments.map((a) => (
                 <div
@@ -694,6 +969,13 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
           </TabsContent>
         </Tabs>
       </div>
+
+      <LogMaintenanceDialog
+        open={showLogMaintenance}
+        onOpenChange={setShowLogMaintenance}
+        asset={asset}
+        onSaved={onRefresh}
+      />
     </div>
   );
 }

@@ -41,22 +41,22 @@ export default function AmbientBackground() {
     resize();
     window.addEventListener("resize", resize);
 
-    const COUNT = 80;
+    const COUNT = 100;
     for (let i = 0; i < COUNT; i++) {
       particles.push({
         x: Math.random() * window.innerWidth,
         y: Math.random() * window.innerHeight,
-        r: Math.random() * 1.6 + 0.3,
+        r: Math.random() * 2.2 + 0.8,
         vx: (Math.random() - 0.5) * 0.18,
         vy: (Math.random() - 0.5) * 0.18,
-        alpha: Math.random() * 0.45 + 0.08,
+        alpha: Math.random() * 0.6 + 0.1,
         va: (Math.random() - 0.5) * 0.002,
       });
     }
 
     // Violet field — brighter on OLED black, deeper/softer on white.
-    const dot = (a: number) => (isDark ? `rgba(167,139,250,${a})` : `rgba(109,40,217,${a * 0.4})`);
-    const line = (a: number) => (isDark ? `rgba(167,139,250,${a})` : `rgba(109,40,217,${a})`);
+    const dot = (a: number) => (isDark ? `rgba(167,139,250,${a * 1.5})` : `rgba(109,40,217,${a * 1.2})`);
+    const line = (a: number) => (isDark ? `rgba(167,139,250,${a})` : `rgba(109,40,217,${a * 0.8})`);
 
     function draw() {
       if (!ctx || !canvas) return;
@@ -81,13 +81,13 @@ export default function AmbientBackground() {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
           const d = Math.sqrt(dx * dx + dy * dy);
-          if (d < 90) {
-            const a = (1 - d / 90) * (isDark ? 0.1 : 0.05);
+          if (d < 110) {
+            const a = (1 - d / 110) * (isDark ? 0.25 : 0.2);
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
             ctx.strokeStyle = line(a);
-            ctx.lineWidth = 0.5;
+            ctx.lineWidth = 0.8;
             ctx.stroke();
           }
         }

@@ -503,25 +503,29 @@ export default function AdminDashboardPage() {
               <ArrowUpRight className="h-3.5 w-3.5" /> Manage
             </button>
           </div>
-          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] bg-muted/40 border-b border-slate-200 dark:border-slate-700">
-            {["Ticket", "Asset", "Priority", "Status", "Assigned"].map((h) => (
-              <div key={h} className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{h}</div>
-            ))}
-          </div>
-          {tickets.length === 0 ? <EmptyRow>No tickets found.</EmptyRow> : tickets.map((t) => (
-            <div key={t.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] border-b border-slate-200 dark:border-slate-700 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer">
-              <div className="px-4 py-3">
-                <p className="text-[12px] font-semibold">{t.title}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{t.id}</p>
+          <div className="overflow-x-auto">
+            <div className="min-w-[600px]">
+              <div className="grid grid-cols-[1fr_auto_auto_auto_auto] bg-muted/40 border-b border-slate-200 dark:border-slate-700">
+                {["Ticket", "Asset", "Priority", "Status", "Assigned"].map((h) => (
+                  <div key={h} className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{h}</div>
+                ))}
               </div>
-              <div className="px-4 py-3 flex items-center"><span className="text-[11px] text-muted-foreground">{t.asset}</span></div>
-              <div className="px-4 py-3 flex items-center"><Chip label={t.priority} cls={PRI[t.priority]} /></div>
-              <div className="px-4 py-3 flex items-center">
-                <Chip label={t.status === "in_progress" ? "In progress" : t.status === "resolved" ? "Resolved" : t.status === "closed" ? "Closed" : "Open"} cls={STA[t.status]} />
-              </div>
-              <div className="px-4 py-3 flex items-center"><span className="text-[11px] text-muted-foreground">{t.assignedTo}</span></div>
+              {tickets.length === 0 ? <EmptyRow>No tickets found.</EmptyRow> : tickets.map((t) => (
+                <div key={t.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] border-b border-slate-200 dark:border-slate-700 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer">
+                  <div className="px-4 py-3">
+                    <p className="text-[12px] font-semibold">{t.title}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{t.id}</p>
+                  </div>
+                  <div className="px-4 py-3 flex items-center"><span className="text-[11px] text-muted-foreground">{t.asset}</span></div>
+                  <div className="px-4 py-3 flex items-center"><Chip label={t.priority} cls={PRI[t.priority]} /></div>
+                  <div className="px-4 py-3 flex items-center">
+                    <Chip label={t.status === "in_progress" ? "In progress" : t.status === "resolved" ? "Resolved" : t.status === "closed" ? "Closed" : "Open"} cls={STA[t.status]} />
+                  </div>
+                  <div className="px-4 py-3 flex items-center"><span className="text-[11px] text-muted-foreground">{t.assignedTo}</span></div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </Card>
 
         {/* ══ AI summary banner ═════════════════════════════════════════════ */}

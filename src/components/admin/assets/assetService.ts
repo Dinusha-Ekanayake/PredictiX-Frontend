@@ -15,6 +15,7 @@ import type {
   Ticket,
   AssetAssignment,
   VehiclePredictionResult,
+  AssetSurvivalResponse,
 } from "./types";
 
 // ─── Create / update payloads ────────────────────────────────────────────────
@@ -43,6 +44,17 @@ export interface IdNameOption {
   name: string;
 }
 
+// ─── Log Maintenance Payload ───────────────────────────────────────────────────
+export interface LogMaintenancePayload {
+  title: string;
+  description?: string;
+  cost_amount: number;
+  odometer_reading: number;
+  next_service_date?: string;
+  performed_at?: string;
+  notes?: string;
+}
+
 // ─── List / filter assets ──────────────────────────────────────────────────────
 
 export async function listAssets(filters: AssetFilters): Promise<Asset[]> {
@@ -55,7 +67,7 @@ export async function listAssets(filters: AssetFilters): Promise<Asset[]> {
   if (filters.warehouse_id && filters.warehouse_id !== "all")
     params.set("warehouse_id", filters.warehouse_id);
 
-  params.set("limit", "200");
+  params.set("limit", "1500");
   params.set("sort_by", "created_at");
   params.set("sort_order", "desc");
 
@@ -107,6 +119,16 @@ export async function getCostPrediction(assetId: string): Promise<CostPrediction
   }
 }
 
+// ─── Survival prediction for an asset ──────────────────────────────────────────
+
+export async function getSurvivalPrediction(assetId: string): Promise<AssetSurvivalResponse | null> {
+  try {
+    return await apiGet<AssetSurvivalResponse>(`/survival/${assetId}`);
+  } catch {
+    return null;
+  }
+}
+
 // ─── Run new prediction for an asset (POST to vehicle-predictions) ─────────────
 
 export async function runVehiclePrediction(
@@ -128,23 +150,51 @@ export async function runVehiclePrediction(
 
 export async function getAssetDetail(assetId: string): Promise<AssetDetail> {
   // Run all fetches in parallel for speed
-  const [asset, prediction, costPrediction, maintenanceEvents, tickets, assignments] =
+  const [asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments] =
     await Promise.all([
       getAsset(assetId),
       getFailurePrediction(assetId),
       getCostPrediction(assetId),
+      getSurvivalPrediction(assetId),
       getMaintenanceEvents(assetId).catch(() => [] as MaintenanceEvent[]),
       getAssetTickets(assetId).catch(() => [] as Ticket[]),
       getAssetAssignments(assetId).catch(() => [] as AssetAssignment[]),
     ]);
 
-  return { asset, prediction, costPrediction, maintenanceEvents, tickets, assignments };
+  return { asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments };
 }
 
 // ─── Create asset ────────────────────────────────────────────────────────────
 
 export async function createAsset(payload: AssetWritePayload): Promise<Asset> {
   return apiPost<Asset>("/assets/", payload);
+}
+
+// ─── Log Maintenance ───────────────────────────────────────────────────────────
+
+export async function logMaintenance(assetId: string, payload: LogMaintenancePayload): Promise<MaintenanceEvent> {
+  return apiPost<MaintenanceEvent>(`/maintenance/log-maintenance/${assetId}`, payload);
+}
+
+// ─── Upload Asset Image ────────────────────────────────────────────────────────
+
+export async function uploadAssetImage(assetId: string, file: File): Promise<Asset> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await apiFetch(`/assets/${assetId}/image`, {
+    method: "POST",
+    body: formData,
+    // Note: Do NOT set Content-Type header manually for FormData, 
+    // the browser will automatically set it with the boundary.
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Upload failed" }));
+    throw new Error(err.detail || "Image upload failed");
+  }
+
+  return response.json();
 }
 
 // ─── Update asset (full edit) ──────────────────────────────────────────────────

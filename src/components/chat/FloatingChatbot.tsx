@@ -3,11 +3,16 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import {
-  GripHorizontal,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
   Loader2,
   MessageCircle,
   SendHorizontal,
+  Sparkles,
   Trash2,
+  Wrench,
   X,
 } from "lucide-react";
 
@@ -19,9 +24,10 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type Position = {
-  x: number;
-  y: number;
+type ToolTraceItem = {
+  name: string;
+  args: Record<string, unknown>;
+  result_preview: string;
 };
 
 type ChatMessage = {
@@ -30,39 +36,15 @@ type ChatMessage = {
   text: string;
   createdAt: number;
   sources?: ChatbotSource[];
+  toolTrace?: ToolTraceItem[];
 };
 
-const STORAGE_KEY = "predictix.chatbot.launcher.position";
-const LAUNCHER_SIZE = 56;
-const LAUNCHER_MARGIN = 20;
-const PANEL_GAP = 12;
 const CHATBOT_API_BASE =
   process.env.NEXT_PUBLIC_CHATBOT_API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://127.0.0.1:8000";
-const CHATBOT_ENDPOINTS = [
-  "/chatbot/ask",
-  "/chatbot",
-  "/chatbot/message",
-];
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-function getDefaultPosition(viewportWidth: number, viewportHeight: number): Position {
-  return {
-    x: Math.max(LAUNCHER_MARGIN, viewportWidth - LAUNCHER_SIZE - LAUNCHER_MARGIN),
-    y: Math.max(LAUNCHER_MARGIN, viewportHeight - LAUNCHER_SIZE - LAUNCHER_MARGIN),
-  };
-}
-
-function sanitizePosition(raw: Position, viewportWidth: number, viewportHeight: number): Position {
-  return {
-    x: clamp(raw.x, LAUNCHER_MARGIN, viewportWidth - LAUNCHER_SIZE - LAUNCHER_MARGIN),
-    y: clamp(raw.y, LAUNCHER_MARGIN, viewportHeight - LAUNCHER_SIZE - LAUNCHER_MARGIN),
-  };
-}
+  "http://127.0.0.1:8002";
+const CHATBOT_AGENT_ENDPOINT = "/chatbot/agent";
+const CHATBOT_FALLBACK_ENDPOINTS = ["/chatbot/ask", "/chatbot", "/chatbot/message"];
 
 function extractAssistantReply(payload: unknown): string {
   if (!payload) return "";
@@ -96,27 +78,24 @@ const AUTH_ROUTE_PREFIXES = [
   "/auth",
 ];
 
+const HELPDESK_ROUTE_PREFIXES = ["/help-desk", "/admin/help-desk", "/user/help-desk"];
+
 export default function FloatingChatbot() {
   const pathname = usePathname();
+  const isHelpDeskRoute = HELPDESK_ROUTE_PREFIXES.some((p) => pathname?.startsWith(p) ?? false);
 
   const [isMounted, setIsMounted] = React.useState(false);
+  const [isLoaderPresent, setIsLoaderPresent] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
-  const [isDragging, setIsDragging] = React.useState(false);
   const [isSending, setIsSending] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
-  const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
-  const [position, setPosition] = React.useState<Position>({ x: 0, y: 0 });
+  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
+
+  const [expandedTraces, setExpandedTraces] = React.useState<Record<string, boolean>>({});
 
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const messageEndRef = React.useRef<HTMLDivElement | null>(null);
-  const dragRef = React.useRef({
-    active: false,
-    moved: false,
-    pointerId: -1,
-    offsetX: 0,
-    offsetY: 0,
-  });
 
   const isHiddenRoute = React.useMemo(() => {
     return AUTH_ROUTE_PREFIXES.some((prefix) => {
@@ -125,61 +104,25 @@ export default function FloatingChatbot() {
   }, [pathname]);
 
   React.useEffect(() => {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    setViewport({ width, height });
-
-    const fallbackPosition = getDefaultPosition(width, height);
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-
-    if (!saved) {
-      setPosition(fallbackPosition);
-      setIsMounted(true);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(saved) as Position;
-      setPosition(sanitizePosition(parsed, width, height));
-    } catch {
-      setPosition(fallbackPosition);
-    }
-
     setIsMounted(true);
   }, []);
 
   React.useEffect(() => {
-    if (!isMounted) {
-      return;
-    }
-
-    const handleResize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      setViewport({ width, height });
-      setPosition((current) => sanitizePosition(current, width, height));
+    if (!isMounted) return;
+    
+    const checkLoader = () => {
+      setIsLoaderPresent(!!document.querySelector('[data-predictix-loader="true"]'));
     };
-
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
+    
+    checkLoader();
+    const observer = new MutationObserver(checkLoader);
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    return () => observer.disconnect();
   }, [isMounted]);
 
   React.useEffect(() => {
-    if (!isMounted) {
-      return;
-    }
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(position));
-  }, [isMounted, position]);
-
-  React.useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
+    if (!isOpen) return;
     inputRef.current?.focus();
 
     const onEscape = (event: KeyboardEvent) => {
@@ -195,51 +138,13 @@ export default function FloatingChatbot() {
   }, [isOpen]);
 
   React.useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
+    if (!isOpen) return;
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [isSending, isOpen, messages]);
 
-  const panelDimensions = React.useMemo(() => {
-    const width = Math.min(380, Math.max(320, viewport.width - 24));
-    const height = Math.min(520, Math.max(360, viewport.height - 100));
-    return { width, height };
-  }, [viewport.height, viewport.width]);
-
-  const panelPosition = React.useMemo(() => {
-    if (!isMounted) {
-      return { left: 0, top: 0 };
-    }
-
-    const openToRight = position.x < viewport.width / 2;
-
-    let left = openToRight
-      ? position.x + LAUNCHER_SIZE + PANEL_GAP
-      : position.x - panelDimensions.width - PANEL_GAP;
-
-    let top = position.y - panelDimensions.height + LAUNCHER_SIZE;
-
-    left = clamp(left, 12, viewport.width - panelDimensions.width - 12);
-    top = clamp(top, 12, viewport.height - panelDimensions.height - 12);
-
-    return { left, top };
-  }, [
-    isMounted,
-    panelDimensions.height,
-    panelDimensions.width,
-    position.x,
-    position.y,
-    viewport.height,
-    viewport.width,
-  ]);
-
   const sendMessage = async () => {
     const text = draft.trim();
-    if (!text || isSending) {
-      return;
-    }
+    if (!text || isSending) return;
 
     setIsSending(true);
     const userMessage: ChatMessage = {
@@ -249,49 +154,69 @@ export default function FloatingChatbot() {
       createdAt: Date.now(),
     };
 
-    setMessages((current) => [
-      ...current,
-      userMessage,
-    ]);
+    const historyForAgent = messages.map((m) => ({
+      role: m.role,
+      content: m.text,
+    }));
+
+    setMessages((current) => [...current, userMessage]);
     setDraft("");
 
     try {
-      const token = window.localStorage.getItem("token") || window.localStorage.getItem("predictix.access_token");
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      const token =
+        window.localStorage.getItem("token") ||
+        window.localStorage.getItem("predictix.access_token");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
 
       let replyText = "";
+      let toolTrace: ToolTraceItem[] | undefined;
+      let sources: ChatbotSource[] | undefined;
       let lastError = "";
 
-      for (const path of CHATBOT_ENDPOINTS) {
-        try {
-          const response = await fetch(`${CHATBOT_API_BASE}${path}`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-                  question: text,
-              }),
-          });
-
-          if (!response.ok) {
-            lastError = `${response.status} ${response.statusText}`;
-            continue;
-          }
-
+      // 1) Try the agentic endpoint first
+      try {
+        const response = await fetch(`${CHATBOT_API_BASE}${CHATBOT_AGENT_ENDPOINT}`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ question: text, history: historyForAgent }),
+        });
+        if (response.ok) {
           const payload = await response.json();
-          replyText = extractAssistantReply(payload);
-          if (replyText) {
-            break;
+          replyText = typeof payload?.answer === "string" ? payload.answer : "";
+          if (Array.isArray(payload?.tool_trace)) {
+            toolTrace = payload.tool_trace as ToolTraceItem[];
           }
+        } else {
+          lastError = `${response.status} ${response.statusText}`;
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : "Network error";
+      }
 
-          lastError = "Chat endpoint returned no reply text";
-        } catch (error) {
-          lastError = error instanceof Error ? error.message : "Network error";
+      // 2) Fall back to the legacy RAG endpoints if agent didn't reply
+      if (!replyText) {
+        for (const path of CHATBOT_FALLBACK_ENDPOINTS) {
+          try {
+            const response = await fetch(`${CHATBOT_API_BASE}${path}`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ question: text }),
+            });
+            if (!response.ok) {
+              lastError = `${response.status} ${response.statusText}`;
+              continue;
+            }
+            const payload = await response.json();
+            replyText = extractAssistantReply(payload);
+            if (Array.isArray((payload as { sources?: unknown })?.sources)) {
+              sources = (payload as { sources: ChatbotSource[] }).sources;
+            }
+            if (replyText) break;
+            lastError = "Chat endpoint returned no reply text";
+          } catch (error) {
+            lastError = error instanceof Error ? error.message : "Network error";
+          }
         }
       }
 
@@ -306,16 +231,28 @@ export default function FloatingChatbot() {
           role: "assistant",
           text: replyText,
           createdAt: Date.now(),
+          toolTrace,
+          sources,
         },
       ]);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unable to connect to chatbot backend";
+      const isNetworkError =
+        error instanceof Error &&
+        (error.message.toLowerCase().includes("fetch") ||
+         error.message.toLowerCase().includes("network") ||
+         error.message.toLowerCase().includes("failed to connect") ||
+         error.message.toLowerCase().includes("cors"));
+
+      const friendlyMessage = isNetworkError
+        ? "I am sorry, but I am unable to reach the PredictiX service right now. Please verify that the backend server is running and try again."
+        : `An unexpected issue occurred: ${error instanceof Error ? error.message : String(error)}`;
+
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: `Connection error: ${errorMessage}`,
+          text: friendlyMessage,
           createdAt: Date.now(),
         },
       ]);
@@ -329,105 +266,29 @@ export default function FloatingChatbot() {
     inputRef.current?.focus();
   };
 
-  const onLauncherPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
-    if (event.pointerType === "mouse" && event.button !== 0) {
-      return;
-    }
-
-    const target = event.currentTarget;
-    target.setPointerCapture(event.pointerId);
-
-    dragRef.current.active = true;
-    dragRef.current.moved = false;
-    dragRef.current.pointerId = event.pointerId;
-    dragRef.current.offsetX = event.clientX - position.x;
-    dragRef.current.offsetY = event.clientY - position.y;
-
-    setIsDragging(true);
-  };
-
-  const onLauncherPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
-    if (!dragRef.current.active || dragRef.current.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const nextX = event.clientX - dragRef.current.offsetX;
-    const nextY = event.clientY - dragRef.current.offsetY;
-
-    if (!dragRef.current.moved) {
-      const distanceX = Math.abs(nextX - position.x);
-      const distanceY = Math.abs(nextY - position.y);
-      if (distanceX > 2 || distanceY > 2) {
-        dragRef.current.moved = true;
-      }
-    }
-
-    setPosition(sanitizePosition({ x: nextX, y: nextY }, viewport.width, viewport.height));
-  };
-
-  const onLauncherPointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
-    if (!dragRef.current.active || dragRef.current.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const target = event.currentTarget;
-    if (target.hasPointerCapture(event.pointerId)) {
-      target.releasePointerCapture(event.pointerId);
-    }
-
-    const wasDragged = dragRef.current.moved;
-
-    dragRef.current.active = false;
-    dragRef.current.pointerId = -1;
-    dragRef.current.moved = false;
-    setIsDragging(false);
-
-    if (!wasDragged) {
-      setIsOpen((current) => !current);
-    }
-  };
-
-  const onLauncherPointerCancel = (event: React.PointerEvent<HTMLButtonElement>) => {
-    if (!dragRef.current.active || dragRef.current.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const target = event.currentTarget;
-    if (target.hasPointerCapture(event.pointerId)) {
-      target.releasePointerCapture(event.pointerId);
-    }
-
-    dragRef.current.active = false;
-    dragRef.current.pointerId = -1;
-    dragRef.current.moved = false;
-    setIsDragging(false);
-  };
-
-  if (!isMounted || isHiddenRoute) {
+  if (!isMounted || isHiddenRoute || isLoaderPresent) {
     return null;
   }
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[45]" aria-hidden={false}>
+    <div id="predictix-chatbot" className="pointer-events-none fixed inset-0 z-50" aria-hidden={false}>
       {isOpen ? (
-        <div
-          className="pointer-events-auto absolute"
-          style={{
-            left: `${panelPosition.left}px`,
-            top: `${panelPosition.top}px`,
-            width: `${panelDimensions.width}px`,
-            height: `${panelDimensions.height}px`,
-          }}
-        >
-          <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-sm motion-reduce:transition-none">
-            <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+        <div className="pointer-events-auto absolute bottom-24 right-6 w-[calc(100vw-32px)] sm:w-[380px] h-[520px] max-h-[calc(100vh-120px)]">
+          <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-md motion-reduce:transition-none">
+            <div className="relative flex items-center justify-between border-b border-border/60 px-4 py-3 bg-gradient-to-r from-violet-500/10 via-fuchsia-500/5 to-sky-500/10 dark:from-violet-500/15 dark:via-fuchsia-500/10 dark:to-sky-500/15">
               <div className="flex items-center gap-2">
-                <div className="rounded-full bg-primary/15 p-1.5 text-primary">
+                <div className="rounded-full bg-gradient-to-br from-violet-500 to-sky-500 p-1.5 text-white shadow-sm">
                   <MessageCircle className="size-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Chatbot</p>
-                  <p className="text-xs text-muted-foreground">Live backend mode</p>
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    PredictiX Assistant
+                    <Sparkles className="size-3 text-violet-500" />
+                  </p>
+                  <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Online
+                  </p>
                 </div>
               </div>
 
@@ -453,10 +314,18 @@ export default function FloatingChatbot() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1 px-3 py-4">
+            <ScrollArea type="always" className="flex-1 px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20">
               {messages.length === 0 ? (
-                <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                  Ask a question to send it to the backend chatbot.
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center pb-12">
+                  <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3">
+                    <Sparkles className="size-6 text-violet-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">How can I help?</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Ask about assets, tickets, or maintenance.
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3 pb-2">
@@ -469,22 +338,48 @@ export default function FloatingChatbot() {
                         className={cn(
                           "max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm",
                           message.role === "user"
-                            ? "rounded-br-md bg-primary text-primary-foreground"
-                            : "rounded-bl-md border border-border/70 bg-muted text-foreground"
+                            ? "rounded-br-md bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white"
+                            : "rounded-bl-md border border-border/70 bg-card text-foreground dark:bg-slate-800/80"
                         )}
                       >
-                        <p>{message.text}</p>
-                        <p
-                          className={cn(
-                            "mt-1 text-[10px]",
-                            message.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                        <p className="whitespace-pre-wrap">{message.text}</p>
+                        <div className="mt-1.5 flex items-center justify-between gap-4">
+                          <span
+                            className={cn(
+                              "text-[10px]",
+                              message.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                            )}
+                          >
+                            {new Date(message.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          {message.role === "assistant" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void navigator.clipboard.writeText(message.text);
+                                setCopiedMessageId(message.id);
+                                setTimeout(() => setCopiedMessageId(null), 2000);
+                              }}
+                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors outline-none focus:ring-0"
+                              title="Copy message to clipboard"
+                            >
+                              {copiedMessageId === message.id ? (
+                                <>
+                                  <Check className="size-3 text-emerald-500" />
+                                  <span className="text-emerald-500 font-medium">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="size-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
                           )}
-                        >
-                          {new Date(message.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
+                        </div>
 
                         {message.role === "assistant" && message.sources && message.sources.length > 0 ? (
                           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -503,6 +398,7 @@ export default function FloatingChatbot() {
                             ))}
                           </div>
                         ) : null}
+
                       </div>
                     </div>
                   ))}
@@ -557,28 +453,19 @@ export default function FloatingChatbot() {
       <button
         type="button"
         className={cn(
-          "pointer-events-auto absolute flex items-center justify-center rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-xl",
-          "transition-transform duration-200 motion-reduce:transition-none",
-          isDragging ? "scale-105 cursor-grabbing" : "cursor-grab hover:scale-105"
+          "pointer-events-auto group absolute bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full border border-white/20 text-white shadow-[0_10px_30px_-10px_rgba(124,58,237,0.6)]",
+          "bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500",
+          "cursor-pointer hover:scale-105 transition-all duration-300 ease-out",
+          isHelpDeskRoute && "animate-pulse" // Just a small bonus
         )}
-        style={{
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-          width: `${LAUNCHER_SIZE}px`,
-          height: `${LAUNCHER_SIZE}px`,
-        }}
-        onPointerDown={onLauncherPointerDown}
-        onPointerMove={onLauncherPointerMove}
-        onPointerUp={onLauncherPointerUp}
-        onPointerCancel={onLauncherPointerCancel}
+        onClick={() => setIsOpen((current) => !current)}
         aria-label={isOpen ? "Collapse chatbot" : "Open chatbot"}
       >
         <span className="sr-only">Chatbot launcher</span>
-        <MessageCircle className="size-6" />
-        <span className="absolute -bottom-7 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-card px-2 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm">
-          <GripHorizontal className="size-3" />
-          Drag
-        </span>
+        <span className="pointer-events-none absolute inset-0 rounded-full bg-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-violet-400/40 to-sky-400/40 blur-md opacity-60" />
+        <MessageCircle className="relative size-6 drop-shadow-sm" />
+        <Sparkles className="absolute -top-1 -right-1 size-3 text-white/90 drop-shadow" />
       </button>
     </div>
   );

@@ -2,7 +2,7 @@ import PredictiXLoader from "@/components/loading/PredictiXLoader";
 
 export default function Loading() {
   return (
-    <main className="fixed inset-0 z-50 overflow-hidden bg-slate-50 dark:bg-slate-950">
+    <main className="fixed inset-0 z-[999] overflow-hidden bg-slate-50 dark:bg-slate-950">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-56 -left-56 h-225 w-225 rounded-full bg-sky-200/60 blur-[140px] float-slow-1 dark:hidden" />
         <div className="absolute top-1/3 left-1/2 h-225 w-225 -translate-x-1/2 rounded-full bg-violet-200/50 blur-[160px] float-slow-2 dark:hidden" />

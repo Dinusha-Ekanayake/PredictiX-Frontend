@@ -216,11 +216,12 @@ export function AssetDetailsSkeleton() {
 type Props = {
   detail: AssetDetail;
   onRefresh: () => void;
-  onDelete: (id: string) => void;
-  onEdit: (asset: AssetDetail["asset"]) => void;
+  onDelete?: (id: string) => void;
+  onEdit?: (asset: AssetDetail["asset"]) => void;
+  readOnly?: boolean;
 };
 
-export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit }: Props) {
+export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, readOnly = false }: Props) {
   const { asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments } = detail;
   const router = useNavRouter();
 
@@ -300,45 +301,53 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit 
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 rounded-xl gap-1.5 text-xs border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
-            onClick={() => setShowLogMaintenance(true)}
-          >
-            <Wrench className="h-3 w-3" />
-            Log Maint.
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 rounded-xl gap-1.5 text-xs border-slate-200 dark:border-slate-700"
-            onClick={handleRunPrediction}
-            disabled={runningPrediction}
-          >
-            {runningPrediction
-              ? <Loader2 className="h-3 w-3 animate-spin" />
-              : <RefreshCw className="h-3 w-3" />}
-            {runningPrediction ? "Running…" : "Run AI"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 rounded-xl gap-1.5 text-xs border-slate-200 dark:border-slate-700"
-            onClick={() => onEdit(asset)}
-          >
-            <Pencil className="h-3 w-3" />
-            Edit
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            className="h-8 rounded-xl gap-1.5 text-xs"
-            onClick={() => onDelete(asset.id)}
-          >
-            <Trash2 className="h-3 w-3" />
-            Delete
-          </Button>
+          {!readOnly && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-xl gap-1.5 text-xs border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+                onClick={() => setShowLogMaintenance(true)}
+              >
+                <Wrench className="h-3 w-3" />
+                Log Maint.
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-xl gap-1.5 text-xs border-slate-200 dark:border-slate-700"
+                onClick={handleRunPrediction}
+                disabled={runningPrediction}
+              >
+                {runningPrediction
+                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                  : <RefreshCw className="h-3 w-3" />}
+                {runningPrediction ? "Running…" : "Run AI"}
+              </Button>
+              {onEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-xl gap-1.5 text-xs border-slate-200 dark:border-slate-700"
+                  onClick={() => onEdit(asset)}
+                >
+                  <Pencil className="h-3 w-3" />
+                  Edit
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-8 rounded-xl gap-1.5 text-xs"
+                  onClick={() => onDelete(asset.id)}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Delete
+                </Button>
+              )}
+            </>
+          )}
         </div>
       </div>
 

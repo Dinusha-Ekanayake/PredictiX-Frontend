@@ -78,6 +78,7 @@ export default function UserNavbar() {
 
   // Hydrate richer data from backend (department, warehouse)
   React.useEffect(() => {
+    const storedAvatarUrl = typeof window !== "undefined" ? localStorage.getItem("predictix.avatar_url") : null;
     fetchMyProfile()
       .then((data) => {
         setProfileUser({
@@ -86,11 +87,14 @@ export default function UserNavbar() {
           role: (data.role?.toUpperCase() as "ADMIN" | "USER") || "USER",
           department: data.department ?? null,
           warehouse: data.warehouse ?? null,
-          avatar_url: data.avatar_url ?? null,
+          avatar_url: data.avatar_url ?? storedAvatarUrl ?? null,
         });
       })
       .catch(() => {
         // Silently fall back to localStorage values already set
+        if (storedAvatarUrl) {
+          setProfileUser((prev) => ({ ...prev, avatar_url: storedAvatarUrl }));
+        }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { fetchMyProfile } from "@/lib/api/userProfileApi";
 import { Camera, Loader2, Upload } from "lucide-react";
@@ -109,7 +110,7 @@ export default function ProfilePhotoUpload() {
         onClick={() => fileInputRef.current?.click()}
       >
         {avatarUrl ? (
-          <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+          <Image src={avatarUrl} alt="Avatar" width={96} height={96} className="h-full w-full object-cover" />
         ) : (
           initials
         )}

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -231,7 +232,7 @@ export default function UserNavbar() {
                           )}
                         >
                           {profileUser.avatar_url ? (
-                            <img src={profileUser.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                            <Image src={profileUser.avatar_url} alt="Avatar" width={44} height={44} className="h-full w-full object-cover" />
                           ) : (
                             avatarText
                           )}

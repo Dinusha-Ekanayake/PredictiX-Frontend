@@ -18,9 +18,10 @@ export default function ProfilePhotoUpload() {
     // Load current profile to get avatar_url and initials
     fetchMyProfile()
       .then((data) => {
-        if (data.avatar_url) {
-          setAvatarUrl(data.avatar_url);
-        }
+        // Prefer DB avatar, fall back to localStorage (for stub users like super_admin)
+        const storedUrl = localStorage.getItem("predictix.avatar_url");
+        const url = data.avatar_url || storedUrl || null;
+        if (url) setAvatarUrl(url);
         if (data.name) {
           const parts = data.name.trim().split(/\s+/).filter(Boolean);
           if (parts.length > 0) {
@@ -33,6 +34,9 @@ export default function ProfilePhotoUpload() {
         }
       })
       .catch((err) => {
+        // Even if profile fetch fails, try localStorage
+        const storedUrl = localStorage.getItem("predictix.avatar_url");
+        if (storedUrl) setAvatarUrl(storedUrl);
         console.error("Failed to load profile for avatar:", err);
       });
   }, []);
@@ -61,7 +65,7 @@ export default function ProfilePhotoUpload() {
 
     try {
       const token = localStorage.getItem("token") || localStorage.getItem("predictix.access_token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002"}/profiles/me/avatar`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/profiles/me/avatar`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -70,18 +74,20 @@ export default function ProfilePhotoUpload() {
       });
 
       if (!res.ok) {
-        throw new Error("Upload failed");
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Upload failed");
       }
 
       const data = await res.json();
+      // Persist to localStorage so stub users (super_admin) can see it after reload
+      localStorage.setItem("predictix.avatar_url", data.avatar_url);
       setAvatarUrl(data.avatar_url);
-      
+
       // Force page reload so the Navbar picks up the new avatar
-      // A more robust app might use React Context, but a reload is safe and easy here.
       window.location.reload();
     } catch (err: any) {
       console.error(err);
-      setError("Failed to upload profile photo. Please try again.");
+      setError(err.message || "Failed to upload profile photo. Please try again.");
     } finally {
       setIsUploading(false);
       // Reset input

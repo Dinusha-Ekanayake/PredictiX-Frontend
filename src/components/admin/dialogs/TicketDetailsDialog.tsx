@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, AlertCircle, CheckCircle, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { updateTicketStatus, updateTicketPriority, type Ticket, type TicketStatus, type TicketPriority } from "@/lib/ticketService";
+import { updateTicketStatus, updateTicketPriority, updateTicketAssignee, type Ticket, type TicketStatus, type TicketPriority } from "@/lib/ticketService";
+import { getAssetDetail } from "@/components/admin/assets/assetService";
+import type { AssetDetail } from "@/components/admin/assets/types";
+import type { UserItem } from "@/lib/userService";
 
 type Props = {
   open: boolean;
@@ -15,6 +18,7 @@ type Props = {
   onDelete?: (id: string) => void;
   onUpdated?: (ticket: Ticket) => void;
   isAdmin?: boolean;
+  users?: UserItem[];
 };
 
 const selectCls =
@@ -26,17 +30,40 @@ function PriorityIcon({ priority }: { priority: string }) {
   return <CheckCircle className="h-4 w-4 text-emerald-500" />;
 }
 
-export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDelete, onUpdated, isAdmin = false }: Props) {
+export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDelete, onUpdated, isAdmin = false, users }: Props) {
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [statusUpdating, setStatusUpdating] = React.useState(false);
   const [priorityUpdating, setPriorityUpdating] = React.useState(false);
   const [localStatus, setLocalStatus] = React.useState<TicketStatus>("open");
   const [localPriority, setLocalPriority] = React.useState<TicketPriority>("Medium");
+  
+  const [localAssignee, setLocalAssignee] = React.useState<string>("");
+  const [assigneeUpdating, setAssigneeUpdating] = React.useState(false);
+  
+  const [assetDetail, setAssetDetail] = React.useState<AssetDetail | null>(null);
+  const [assetLoading, setAssetLoading] = React.useState(false);
+
+  const maintenanceUsers = React.useMemo(() => {
+    if (!users) return [];
+    const filtered = users.filter((u) => u.department?.toLowerCase().includes("maintenance"));
+    return filtered.length > 0 ? filtered : users;
+  }, [users]);
 
   React.useEffect(() => {
     if (ticket) {
       setLocalStatus(ticket.status);
       setLocalPriority(ticket.priority);
+      setLocalAssignee(ticket.assigned_to || "");
+      
+      if (ticket.asset_id && open) {
+        setAssetLoading(true);
+        getAssetDetail(ticket.asset_id)
+          .then(setAssetDetail)
+          .catch((err) => console.error("Failed to load asset detail", err))
+          .finally(() => setAssetLoading(false));
+      } else {
+        setAssetDetail(null);
+      }
     }
     if (!open) setConfirmOpen(false);
   }, [ticket, open]);
@@ -67,13 +94,32 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     setLocalPriority(newPriority);
     try {
       await updateTicketPriority(ticket.id, newPriority);
-      onUpdated?.({ ...ticket, status: localStatus, priority: newPriority });
+      onUpdated?.({ ...ticket, status: localStatus, priority: newPriority, assigned_to: localAssignee || null });
       toast.success("Priority updated");
     } catch (err: any) {
       setLocalPriority(prev);
       toast.error("Failed to update priority", { description: err?.message });
     } finally {
       setPriorityUpdating(false);
+    }
+  }
+
+  async function handleAssigneeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const newAssignee = e.target.value;
+    if (!ticket || newAssignee === localAssignee) return;
+    setAssigneeUpdating(true);
+    const prev = localAssignee;
+    setLocalAssignee(newAssignee);
+    try {
+      const assignedToVal = newAssignee === "" ? null : newAssignee;
+      await updateTicketAssignee(ticket.id, assignedToVal);
+      onUpdated?.({ ...ticket, status: localStatus, priority: localPriority, assigned_to: assignedToVal });
+      toast.success("Assignee updated");
+    } catch (err: any) {
+      setLocalAssignee(prev);
+      toast.error("Failed to update assignee", { description: err?.message });
+    } finally {
+      setAssigneeUpdating(false);
     }
   }
 
@@ -200,13 +246,78 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
           <div className="rounded-md border p-3 bg-muted/30">
             <h4 className="text-sm font-medium text-muted-foreground">Assigned To</h4>
             <div className="mt-2 text-sm">
-              {ticket?.assigned_to ? (
-                <Badge className="bg-purple-100 text-purple-800">{ticket.assigned_to.slice(0, 8)}</Badge>
+              {isAdmin ? (
+                assigneeUpdating ? (
+                  <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />Updating…
+                  </span>
+                ) : (
+                  <select
+                    value={localAssignee}
+                    onChange={handleAssigneeChange}
+                    disabled={assigneeUpdating}
+                    className={selectCls + " w-full max-w-[250px]"}
+                  >
+                    <option value="">Unassigned</option>
+                    {maintenanceUsers.map(u => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.department})</option>
+                    ))}
+                  </select>
+                )
               ) : (
-                "Unassigned"
+                ticket?.assigned_to ? (
+                  <Badge className="bg-purple-100 text-purple-800">
+                    {users?.find(u => u.id === ticket.assigned_to)?.name ?? ticket.assigned_to.slice(0, 8)}
+                  </Badge>
+                ) : (
+                  "Unassigned"
+                )
               )}
             </div>
           </div>
+
+          {/* Asset Info Section */}
+          {ticket?.asset_id && (
+            <div className="rounded-md border p-3 bg-muted/30">
+              <h4 className="text-sm font-medium text-muted-foreground mb-3">Asset Information</h4>
+              {assetLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading asset details...
+                </div>
+              ) : assetDetail ? (
+                <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Asset Code:</span>{" "}
+                    <span className="font-medium">{assetDetail.asset.asset_code}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Name:</span>{" "}
+                    <span className="font-medium">{assetDetail.asset.asset_name}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Type:</span>{" "}
+                    <span className="font-medium">{assetDetail.asset.asset_type || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Make / Model:</span>{" "}
+                    <span className="font-medium">
+                      {assetDetail.asset.make || "—"} {assetDetail.asset.model || ""}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Status:</span>{" "}
+                    <Badge variant="outline" className="ml-1 capitalize">{assetDetail.asset.status}</Badge>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Health Band:</span>{" "}
+                    <span className="font-medium capitalize">{assetDetail.asset.health_band || "—"}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">Could not load asset information.</div>
+              )}
+            </div>
+          )}
         </div>
 
         {confirmOpen && (

@@ -173,6 +173,15 @@ export async function updateTicketPriority(id: string, priority: TicketPriority)
   if (error) throw error;
 }
 
+export async function updateTicketAssignee(id: string, assignedTo: string | null): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase
+    .from("tickets")
+    .update({ assigned_to: assignedTo, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function deleteTicket(id: string): Promise<void> {
   if (!supabase) throw new Error("Supabase not configured");
   const { error } = await supabase.from("tickets").delete().eq("id", id);

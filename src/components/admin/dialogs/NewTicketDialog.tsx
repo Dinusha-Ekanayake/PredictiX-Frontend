@@ -97,7 +97,7 @@ export default function NewTicketDialog({
       }, 200);
       return () => clearTimeout(t);
     }
-  }, [open]);
+  }, [open, presetAssetId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

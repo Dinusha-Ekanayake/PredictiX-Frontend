@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -421,7 +422,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             <div className="flex flex-wrap gap-3">
               {allImages.map((url, idx) => (
                 <div key={idx} className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden ring-1 ring-slate-200 dark:ring-slate-700 bg-white dark:bg-black group">
-                  <img src={url} alt={`Asset image ${idx}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                  <Image src={url} alt={`Asset image ${idx}`} width={128} height={128} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                 </div>
               ))}
             </div>

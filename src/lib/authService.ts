@@ -137,6 +137,7 @@ export function logout(): void {
   localStorage.removeItem("predictix.user.email");
   localStorage.removeItem("predictix.user.id");
   localStorage.removeItem("predictix.user.name");
+  localStorage.removeItem("predictix.avatar_url");
 }
 
 /** True if a JWT is present in localStorage. */

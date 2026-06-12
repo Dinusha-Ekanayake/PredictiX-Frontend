@@ -312,7 +312,7 @@ export default function LoginPage() {
       .then(data => {
         if (Array.isArray(data)) setWarehouses(data);
       })
-      .catch(err => console.error("Failed to load warehouses:", err));
+      .catch(err => console.warn("Failed to load warehouses. Is the backend running?", err));
   }, []);
 
   const canSubmit =

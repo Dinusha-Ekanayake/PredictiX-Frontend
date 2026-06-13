@@ -22,6 +22,7 @@
 import * as React from "react";
 import {
   AlertCircle,
+  Bot,
   Check,
   CheckCircle2,
   Loader2,
@@ -56,6 +57,21 @@ import {
   type UserTicketDetail,
 } from "@/lib/api/userTickets";
 import { listUsers, type UserItem } from "@/lib/userService";
+import { apiGet } from "@/lib/apiClient";
+
+type Asset = {
+  id: string;
+  asset_name: string;
+};
+
+type AssetSummaryResponse = {
+  summary: string;
+  generated_at: string;
+  model_version: string;
+};
+
+const selectCls =
+  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring focus:border-ring disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer h-9";
 
 type Props = {
   open: boolean;
@@ -69,12 +85,19 @@ export default function UserNewTicketDialog({
   onCreated,
 }: Props) {
   // -------- Form state --------
+  const [assetId, setAssetId] = React.useState("");
+  const [assets, setAssets] = React.useState<Asset[]>([]);
+  const [assetsLoading, setAssetsLoading] = React.useState(false);
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [priority, setPriority] = React.useState<string>("");
   const [assignedTo, setAssignedTo] = React.useState("");
   const [users, setUsers] = React.useState<UserItem[]>([]);
   const [usersLoading, setUsersLoading] = React.useState(false);
+
+  // -------- Asset summary state --------
+  const [assetSummary, setAssetSummary] = React.useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = React.useState(false);
 
   // -------- AI preview state --------
   const [preview, setPreview] = React.useState<TicketPreviewResponse | null>(null);
@@ -85,10 +108,39 @@ export default function UserNewTicketDialog({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [result, setResult] = React.useState<UserTicketDetail | null>(null);
 
+  // Fetch asset summary whenever assetId changes
+  React.useEffect(() => {
+    if (!assetId) {
+      setAssetSummary(null);
+      return;
+    }
+    let cancelled = false;
+    setSummaryLoading(true);
+    setAssetSummary(null);
+    apiGet<AssetSummaryResponse>(`/asset-summaries/by-asset/${assetId}`)
+      .then((data) => {
+        if (!cancelled) setAssetSummary(data?.summary ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setAssetSummary(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSummaryLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [assetId]);
+
   // Reset everything shortly after the dialog closes so the closing animation
   // doesn't show empty/stale values mid-fade.
   React.useEffect(() => {
     if (open) {
+      // Load assets dropdown
+      setAssetsLoading(true);
+      apiGet<Asset[]>("/assets/dropdown")
+        .then((data) => setAssets(data ?? []))
+        .catch((err) => console.error("Failed to load assets:", err))
+        .finally(() => setAssetsLoading(false));
+
       setUsersLoading(true);
       listUsers()
         .then((data) => setUsers(data ?? []))
@@ -97,6 +149,8 @@ export default function UserNewTicketDialog({
       return;
     }
     const t = setTimeout(() => {
+      setAssetId("");
+      setAssets([]);
       setTitle("");
       setDescription("");
       setPriority("");
@@ -107,6 +161,7 @@ export default function UserNewTicketDialog({
       setIsSubmitting(false);
       setResult(null);
       setUsers([]);
+      setAssetSummary(null);
     }, 200);
     return () => clearTimeout(t);
   }, [open]);
@@ -255,12 +310,14 @@ export default function UserNewTicketDialog({
                   variant="secondary"
                   onClick={() => {
                     // Re-enter form mode but keep the dialog open.
+                    setAssetId("");
                     setTitle("");
                     setDescription("");
                     setPriority("");
                     setPreview(null);
                     setPreviewAccepted(false);
                     setResult(null);
+                    setAssetSummary(null);
                   }}
                   className="w-full"
                 >
@@ -293,6 +350,49 @@ export default function UserNewTicketDialog({
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="grid gap-3 pt-2">
+              {/* Asset selector */}
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Asset (optional)</p>
+                {assetsLoading ? (
+                  <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input text-sm text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading assets…
+                  </div>
+                ) : (
+                  <select
+                    value={assetId}
+                    onChange={(e) => setAssetId(e.target.value)}
+                    className={selectCls}
+                    disabled={isSubmitting}
+                  >
+                    <option value="">Select an asset (optional)</option>
+                    {assets.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.asset_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Asset Summary Panel */}
+              {(summaryLoading || assetSummary) && (
+                <div className="rounded-md border border-violet-200/60 bg-violet-50/50 dark:bg-violet-950/20 dark:border-violet-800/40 px-3 py-2.5">
+                  <p className="text-xs font-medium text-violet-600 dark:text-violet-400 flex items-center gap-1.5 mb-1">
+                    <Bot className="h-3.5 w-3.5" />
+                    AI Asset Summary
+                  </p>
+                  {summaryLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-500" />
+                      Generating summary…
+                    </div>
+                  ) : (
+                    <p className="text-sm text-foreground/90 leading-relaxed">{assetSummary}</p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Title</p>
                 <Input

@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseBrowserClient";
-import { apiPost } from "./apiClient";
+import { apiPost, apiGet, apiDelete } from "./apiClient";
 
 // ─── FastAPI-backed ticket preview (calls POST /tickets/preview) ──────────────
 
@@ -241,6 +241,34 @@ export async function deleteTicket(id: string): Promise<void> {
   if (!supabase) throw new Error("Supabase not configured");
   const { error } = await supabase.from("tickets").delete().eq("id", id);
   if (error) throw error;
+}
+
+export async function addTicketAttachment(
+  ticketId: string,
+  filePath: string,
+  mimeType?: string | null,
+  originalFilename?: string | null
+): Promise<void> {
+  await apiPost(`/ticket-attachments/`, {
+    ticket_id: ticketId,
+    file_path: filePath,
+    mime_type: mimeType,
+    original_filename: originalFilename,
+  });
+}
+
+export async function fetchTicketAttachments(ticketId: string): Promise<any[]> {
+  try {
+    const data = await apiGet<any[]>(`/ticket-attachments/?ticket_id=${ticketId}`);
+    return data || [];
+  } catch (err) {
+    console.error("Failed to fetch attachments via API", err);
+    return [];
+  }
+}
+
+export async function deleteTicketAttachment(attachmentId: string): Promise<void> {
+  await apiDelete(`/ticket-attachments/${attachmentId}`);
 }
 
 export type TicketHistoryEntry = {

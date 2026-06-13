@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -137,7 +138,7 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
           )}
         >
           {user.avatar_url ? (
-            <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+            <Image src={user.avatar_url} alt="Avatar" width={40} height={40} className="h-full w-full object-cover" />
           ) : (
             avatarText
           )}
@@ -168,7 +169,7 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
         aria-expanded={open}
       >
         {user.avatar_url ? (
-          <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+          <Image src={user.avatar_url} alt="Avatar" width={40} height={40} className="h-full w-full object-cover" />
         ) : (
           avatarText
         )}
@@ -202,7 +203,7 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
               )}
             >
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                <Image src={user.avatar_url} alt="Avatar" width={64} height={64} className="h-full w-full object-cover" />
               ) : (
                 avatarText
               )}

@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 
 type ToolTraceItem = {
   name: string;
@@ -312,7 +312,7 @@ export default function FloatingChatbot() {
               </div>
             </div>
 
-            <ScrollArea type="always" className="flex-1 px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20">
+            <div className="flex-1 overflow-y-auto px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-violet-500/20 hover:[&::-webkit-scrollbar-thumb]:bg-violet-500/40 [&::-webkit-scrollbar-thumb]:rounded-full">
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center pb-12">
                   <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3">
@@ -415,7 +415,7 @@ export default function FloatingChatbot() {
                   <div ref={messageEndRef} />
                 </div>
               )}
-            </ScrollArea>
+            </div>
 
             <form
               className="border-t border-border/60 p-3"

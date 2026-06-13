@@ -495,7 +495,7 @@ function ReportStep({
     // Trigger Server Notification
     const token = typeof window !== 'undefined' ? localStorage.getItem('predictix.access_token') : null;
     if (token) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8002'}/warehouse-dashboard/notify-print`, {
+      fetch(`${"/api/proxy"}/warehouse-dashboard/notify-print`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

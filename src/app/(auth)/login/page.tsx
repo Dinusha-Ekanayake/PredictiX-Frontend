@@ -307,7 +307,7 @@ export default function LoginPage() {
   const [error, setError] = React.useState("");
 
   React.useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/warehouses`)
+    fetch(`${"/api/proxy"}/warehouses`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setWarehouses(data);
@@ -527,7 +527,7 @@ export default function LoginPage() {
                     <div>Super Admin: super.admin1@lankalogix.lk / super</div>
                     <div>Admin: anjali.warnakulasuriya.adm1@lankalogix.lk / admin</div>
                     <div>User: nuwan.gunasekara.tra1@lankalogix.lk / user</div>
-                    <div className="mt-1 text-slate-500">Other seeded users: password <span className="font-mono">Predictix@123</span></div>
+                    <div className="mt-1 text-slate-500">Other seeded users: password <span className="font-mono">user</span></div>
                   </div>
 
 

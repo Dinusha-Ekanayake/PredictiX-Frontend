@@ -6,7 +6,7 @@
 
 import { getAccessToken, logout } from "./authService";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8002";
+const API_BASE_URL = "/api/proxy";
 
 /**
  * Core fetch wrapper — attaches JWT and handles 401.
@@ -117,7 +117,7 @@ export type ChatbotAskResponse = {
 };
 
 export async function askChatbot(question: string): Promise<ChatbotAskResponse> {
-  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8002";
+  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || "/api/proxy";
 
   const response = await fetch(`${chatbotUrl}/chatbot/ask`, {
     method: "POST",

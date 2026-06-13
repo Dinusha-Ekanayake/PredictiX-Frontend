@@ -58,12 +58,21 @@ export default function NotificationBell() {
   const { user } = useUser();
   const userId = user?.id;
 
-  // WebSocket Connection
-  React.useEffect(() => {
-    if (!userId) return;
+    const [wsPort, setWsPort] = React.useState<number | null>(null);
 
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8002";
-    const ws = new WebSocket(`${wsUrl}/ws/notifications/${userId}`);
+    React.useEffect(() => {
+      fetch("/api/proxy-port")
+        .then(res => res.json())
+        .then(data => setWsPort(data.port))
+        .catch(err => console.error("Could not fetch proxy port", err));
+    }, []);
+
+    // WebSocket Connection
+    React.useEffect(() => {
+      if (!userId || !wsPort) return;
+
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || `ws://127.0.0.1:${wsPort}`;
+      const ws = new WebSocket(`${wsUrl}/ws/notifications/${userId}`);
 
     ws.onmessage = (event) => {
       try {

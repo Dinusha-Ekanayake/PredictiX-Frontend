@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
+import { Bot, Loader2, Plus } from "lucide-react";
 
 import {
   Dialog,
@@ -12,7 +13,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Plus } from "lucide-react";
 import { apiGet } from "@/lib/apiClient";
 import { createTicket, type Ticket, type TicketPriority, type TicketCategory } from "@/lib/ticketService";
 import { listUsers, type UserItem } from "@/lib/userService";
@@ -20,6 +20,12 @@ import { listUsers, type UserItem } from "@/lib/userService";
 type Asset = {
   id: string;
   asset_name: string;
+};
+
+type AssetSummaryResponse = {
+  summary: string;
+  generated_at: string;
+  model_version: string;
 };
 
 type Props = {
@@ -64,6 +70,32 @@ export default function NewTicketDialog({
   const [assets, setAssets] = React.useState<Asset[]>([]);
   const [assetsLoading, setAssetsLoading] = React.useState(false);
 
+  // Asset summary state
+  const [assetSummary, setAssetSummary] = React.useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = React.useState(false);
+
+  // Fetch asset summary whenever assetId changes
+  React.useEffect(() => {
+    if (!assetId) {
+      setAssetSummary(null);
+      return;
+    }
+    let cancelled = false;
+    setSummaryLoading(true);
+    setAssetSummary(null);
+    apiGet<AssetSummaryResponse>(`/asset-summaries/by-asset/${assetId}`)
+      .then((data) => {
+        if (!cancelled) setAssetSummary(data?.summary ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setAssetSummary(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSummaryLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [assetId]);
+
   React.useEffect(() => {
     if (open) {
       if (presetAssetId) setAssetId(presetAssetId);
@@ -94,6 +126,7 @@ export default function NewTicketDialog({
         setIsSubmitting(false);
         setAssets([]);
         setUsers([]);
+        setAssetSummary(null);
       }, 200);
       return () => clearTimeout(t);
     }
@@ -131,7 +164,7 @@ export default function NewTicketDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[640px]">
+      <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Plus className="h-5 w-5" />
@@ -173,6 +206,24 @@ export default function NewTicketDialog({
               </select>
             )}
           </div>
+
+          {/* Asset Summary Panel */}
+          {(summaryLoading || assetSummary) && (
+            <div className="rounded-md border border-violet-200/60 bg-violet-50/50 dark:bg-violet-950/20 dark:border-violet-800/40 px-3 py-2.5">
+              <p className="text-xs font-medium text-violet-600 dark:text-violet-400 flex items-center gap-1.5 mb-1">
+                <Bot className="h-3.5 w-3.5" />
+                AI Asset Summary
+              </p>
+              {summaryLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-500" />
+                  Generating summary…
+                </div>
+              ) : (
+                <p className="text-sm text-foreground/90 leading-relaxed">{assetSummary}</p>
+              )}
+            </div>
+          )}
 
           {/* Title */}
           <div>

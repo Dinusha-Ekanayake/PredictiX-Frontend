@@ -469,9 +469,7 @@ export default function AdminUsersPage() {
                             title="Delete user"
                             className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-500"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Delete
-                          </button>
+                            <Trash2 className="h-3.5 w-3.5" />                          </button>
                         </div>
                       </TableCell>
                     </TableRow>

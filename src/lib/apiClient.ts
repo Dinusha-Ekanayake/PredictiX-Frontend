@@ -49,8 +49,13 @@ export async function apiGet<T>(endpoint: string): Promise<T> {
   const response = await apiFetch(endpoint, { method: "GET" });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(error.detail || "Request failed");
+    let errorObj: any;
+    try {
+      errorObj = await response.json();
+    } catch {
+      errorObj = { detail: "Request failed to parse JSON" };
+    }
+    throw new Error(errorObj.detail || errorObj.error || `Request failed with status ${response.status}`);
   }
 
   return response.json();

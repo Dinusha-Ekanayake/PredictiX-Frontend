@@ -387,12 +387,12 @@ export default function AdminUsersPage() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="min-w-60 pl-6">User</TableHead>
+                  <TableHead className="min-w-60 pl-6"><span className="ml-38">User</span></TableHead>
                   <TableHead className="w-25">Role</TableHead>
-                  <TableHead className="w-40">Department</TableHead>
+                  <TableHead className="w-40"><span className="ml-8">Department</span></TableHead>
                   <TableHead className="w-25">Status</TableHead>
                   <TableHead className="w-35">Assigned Assets</TableHead>
-                  <TableHead className="w-45">Actions</TableHead>
+                  <TableHead className="w-45"><span className="ml-38">Action</span></TableHead>
                 </TableRow>
               </TableHeader>
 

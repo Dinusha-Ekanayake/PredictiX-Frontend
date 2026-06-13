@@ -442,6 +442,7 @@ export default function AdminTicketsPage() {
         onDelete={isAdmin ? handleDeleteTicket : undefined}
         onUpdated={isAdmin ? handleTicketUpdated : undefined}
         isAdmin={isAdmin}
+        users={users}
       />
     </div>
   );

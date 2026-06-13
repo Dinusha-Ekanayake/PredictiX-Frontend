@@ -13,7 +13,7 @@ import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/Warehouse
 import WarehouseReportModal, { type WarehouseReportPayload } from "@/components/admin/warehouse/WarehouseReportModal";
 import { getWarehouseSummary, type WarehouseSummaryData } from "@/lib/warehouseService";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8002";
+const API_BASE_URL = "/api/proxy";
 const REPORT_API = `${API_BASE_URL}/warehouse-dashboard/generate-report`;
 
 export default function WarehousePage() {

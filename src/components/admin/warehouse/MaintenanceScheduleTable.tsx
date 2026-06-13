@@ -20,7 +20,7 @@ export default function MaintenanceScheduleTable() {
     setLoading(true);
     setError(null);
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8002";
+      const apiBaseUrl = "/api/proxy";
       const response = await fetch(`${apiBaseUrl}/warehouse-dashboard/maintenance-schedule`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },

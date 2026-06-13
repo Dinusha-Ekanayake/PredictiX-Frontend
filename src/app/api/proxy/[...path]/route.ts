@@ -7,7 +7,10 @@ async function handleRequest(req: NextRequest, props: { params: Promise<{ path: 
   // Next.js 15+ has `params` as a promise, earlier versions it is an object
   // We handle both gracefully to prevent build issues
   const params = await props.params;
-  const path = params.path.join("/");
+  let path = params.path.join("/");
+  if (req.nextUrl.pathname.endsWith("/")) {
+    path += "/";
+  }
   const search = req.nextUrl.search;
   
   const backendUrl = `http://127.0.0.1:${port}/${path}${search}`;

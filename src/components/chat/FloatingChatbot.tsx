@@ -3,8 +3,10 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import {
+  Check,
   ChevronDown,
   ChevronRight,
+  Copy,
   Loader2,
   MessageCircle,
   SendHorizontal,
@@ -22,11 +24,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type Position = {
-  x: number;
-  y: number;
-};
-
 type ToolTraceItem = {
   name: string;
   args: Record<string, unknown>;
@@ -42,63 +39,12 @@ type ChatMessage = {
   toolTrace?: ToolTraceItem[];
 };
 
-type LocalMessage = ChatMessage;
-
-const STORAGE_KEY = "predictix.chatbot.launcher.position";
-const LAUNCHER_SIZE = 56;
-const LAUNCHER_MARGIN = 20;
-const PANEL_GAP = 12;
 const CHATBOT_API_BASE =
   process.env.NEXT_PUBLIC_CHATBOT_API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
   "http://127.0.0.1:8000";
 const CHATBOT_AGENT_ENDPOINT = "/chatbot/agent";
 const CHATBOT_FALLBACK_ENDPOINTS = ["/chatbot/ask", "/chatbot", "/chatbot/message"];
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-function getCorners(viewportWidth: number, viewportHeight: number): Position[] {
-  const maxX = Math.max(LAUNCHER_MARGIN, viewportWidth - LAUNCHER_SIZE - LAUNCHER_MARGIN);
-  const maxY = Math.max(LAUNCHER_MARGIN, viewportHeight - LAUNCHER_SIZE - LAUNCHER_MARGIN);
-  return [
-    { x: LAUNCHER_MARGIN, y: LAUNCHER_MARGIN },
-    { x: maxX, y: LAUNCHER_MARGIN },
-    { x: LAUNCHER_MARGIN, y: maxY },
-    { x: maxX, y: maxY },
-  ];
-}
-
-function nearestCorner(raw: Position, viewportWidth: number, viewportHeight: number): Position {
-  const corners = getCorners(viewportWidth, viewportHeight);
-  let best = corners[0];
-  let bestDist = Infinity;
-  for (const c of corners) {
-    const dx = c.x - raw.x;
-    const dy = c.y - raw.y;
-    const d = dx * dx + dy * dy;
-    if (d < bestDist) {
-      bestDist = d;
-      best = c;
-    }
-  }
-  return best;
-}
-
-function getDefaultPosition(viewportWidth: number, viewportHeight: number): Position {
-  return {
-    x: Math.max(LAUNCHER_MARGIN, viewportWidth - LAUNCHER_SIZE - LAUNCHER_MARGIN),
-    y: Math.max(LAUNCHER_MARGIN, viewportHeight - LAUNCHER_SIZE - LAUNCHER_MARGIN),
-  };
-}
-
-function sanitizePosition(raw: Position, viewportWidth: number, viewportHeight: number): Position {
-  return {
-    x: clamp(raw.x, LAUNCHER_MARGIN, viewportWidth - LAUNCHER_SIZE - LAUNCHER_MARGIN),
-    y: clamp(raw.y, LAUNCHER_MARGIN, viewportHeight - LAUNCHER_SIZE - LAUNCHER_MARGIN),
-  };
-}
 
 function extractAssistantReply(payload: unknown): string {
   if (!payload) return "";
@@ -139,25 +85,17 @@ export default function FloatingChatbot() {
   const isHelpDeskRoute = HELPDESK_ROUTE_PREFIXES.some((p) => pathname?.startsWith(p) ?? false);
 
   const [isMounted, setIsMounted] = React.useState(false);
+  const [isLoaderPresent, setIsLoaderPresent] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
-  const [isDragging, setIsDragging] = React.useState(false);
   const [isSending, setIsSending] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
-  const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
-  const [position, setPosition] = React.useState<Position>({ x: 0, y: 0 });
+  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
 
   const [expandedTraces, setExpandedTraces] = React.useState<Record<string, boolean>>({});
 
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const messageEndRef = React.useRef<HTMLDivElement | null>(null);
-  const dragRef = React.useRef({
-    active: false,
-    moved: false,
-    pointerId: -1,
-    offsetX: 0,
-    offsetY: 0,
-  });
 
   const isHiddenRoute = React.useMemo(() => {
     return AUTH_ROUTE_PREFIXES.some((prefix) => {
@@ -165,64 +103,26 @@ export default function FloatingChatbot() {
     });
   }, [pathname]);
 
-
-
   React.useEffect(() => {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    setViewport({ width, height });
-
-    const fallbackPosition = getDefaultPosition(width, height);
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-
-    if (!saved) {
-      setPosition(fallbackPosition);
-      setIsMounted(true);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(saved) as Position;
-      setPosition(sanitizePosition(parsed, width, height));
-    } catch {
-      setPosition(fallbackPosition);
-    }
-
     setIsMounted(true);
   }, []);
 
   React.useEffect(() => {
-    if (!isMounted) {
-      return;
-    }
-
-    const handleResize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      setViewport({ width, height });
-      setPosition((current) => sanitizePosition(current, width, height));
+    if (!isMounted) return;
+    
+    const checkLoader = () => {
+      setIsLoaderPresent(!!document.querySelector('[data-predictix-loader="true"]'));
     };
-
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
+    
+    checkLoader();
+    const observer = new MutationObserver(checkLoader);
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    return () => observer.disconnect();
   }, [isMounted]);
 
   React.useEffect(() => {
-    if (!isMounted) {
-      return;
-    }
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(position));
-  }, [isMounted, position]);
-
-  React.useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
+    if (!isOpen) return;
     inputRef.current?.focus();
 
     const onEscape = (event: KeyboardEvent) => {
@@ -238,51 +138,13 @@ export default function FloatingChatbot() {
   }, [isOpen]);
 
   React.useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
+    if (!isOpen) return;
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [isSending, isOpen, messages]);
 
-  const panelDimensions = React.useMemo(() => {
-    const width = Math.min(380, Math.max(320, viewport.width - 24));
-    const height = Math.min(520, Math.max(360, viewport.height - 100));
-    return { width, height };
-  }, [viewport.height, viewport.width]);
-
-  const panelPosition = React.useMemo(() => {
-    if (!isMounted) {
-      return { left: 0, top: 0 };
-    }
-
-    const openToRight = position.x < viewport.width / 2;
-
-    let left = openToRight
-      ? position.x + LAUNCHER_SIZE + PANEL_GAP
-      : position.x - panelDimensions.width - PANEL_GAP;
-
-    let top = position.y - panelDimensions.height + LAUNCHER_SIZE;
-
-    left = clamp(left, 12, viewport.width - panelDimensions.width - 12);
-    top = clamp(top, 12, viewport.height - panelDimensions.height - 12);
-
-    return { left, top };
-  }, [
-    isMounted,
-    panelDimensions.height,
-    panelDimensions.width,
-    position.x,
-    position.y,
-    viewport.height,
-    viewport.width,
-  ]);
-
   const sendMessage = async () => {
     const text = draft.trim();
-    if (!text || isSending) {
-      return;
-    }
+    if (!text || isSending) return;
 
     setIsSending(true);
     const userMessage: ChatMessage = {
@@ -292,8 +154,6 @@ export default function FloatingChatbot() {
       createdAt: Date.now(),
     };
 
-    // Snapshot history BEFORE appending the new user message so we don't
-    // duplicate it into the request body.
     const historyForAgent = messages.map((m) => ({
       role: m.role,
       content: m.text,
@@ -376,13 +236,23 @@ export default function FloatingChatbot() {
         },
       ]);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Unable to connect to chatbot backend";
+      const isNetworkError =
+        error instanceof Error &&
+        (error.message.toLowerCase().includes("fetch") ||
+         error.message.toLowerCase().includes("network") ||
+         error.message.toLowerCase().includes("failed to connect") ||
+         error.message.toLowerCase().includes("cors"));
+
+      const friendlyMessage = isNetworkError
+        ? "I am sorry, but I am unable to reach the PredictiX service right now. Please verify that the backend server is running and try again."
+        : `An unexpected issue occurred: ${error instanceof Error ? error.message : String(error)}`;
+
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: `Connection error: ${msg}`,
+          text: friendlyMessage,
           createdAt: Date.now(),
         },
       ]);
@@ -396,99 +266,14 @@ export default function FloatingChatbot() {
     inputRef.current?.focus();
   };
 
-  const onLauncherPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
-    if (event.pointerType === "mouse" && event.button !== 0) {
-      return;
-    }
-
-    const target = event.currentTarget;
-    target.setPointerCapture(event.pointerId);
-
-    dragRef.current.active = true;
-    dragRef.current.moved = false;
-    dragRef.current.pointerId = event.pointerId;
-    dragRef.current.offsetX = event.clientX - position.x;
-    dragRef.current.offsetY = event.clientY - position.y;
-
-    setIsDragging(true);
-  };
-
-  const onLauncherPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
-    if (!dragRef.current.active || dragRef.current.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const nextX = event.clientX - dragRef.current.offsetX;
-    const nextY = event.clientY - dragRef.current.offsetY;
-
-    if (!dragRef.current.moved) {
-      const distanceX = Math.abs(nextX - position.x);
-      const distanceY = Math.abs(nextY - position.y);
-      if (distanceX > 2 || distanceY > 2) {
-        dragRef.current.moved = true;
-      }
-    }
-
-    setPosition(sanitizePosition({ x: nextX, y: nextY }, viewport.width, viewport.height));
-  };
-
-  const onLauncherPointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
-    if (!dragRef.current.active || dragRef.current.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const target = event.currentTarget;
-    if (target.hasPointerCapture(event.pointerId)) {
-      target.releasePointerCapture(event.pointerId);
-    }
-
-    const wasDragged = dragRef.current.moved;
-
-    dragRef.current.active = false;
-    dragRef.current.pointerId = -1;
-    dragRef.current.moved = false;
-    setIsDragging(false);
-
-    if (wasDragged) {
-      // Snap to nearest corner once the mouse is released.
-      setPosition((current) => nearestCorner(current, viewport.width, viewport.height));
-    } else {
-      setIsOpen((current) => !current);
-    }
-  };
-
-  const onLauncherPointerCancel = (event: React.PointerEvent<HTMLButtonElement>) => {
-    if (!dragRef.current.active || dragRef.current.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const target = event.currentTarget;
-    if (target.hasPointerCapture(event.pointerId)) {
-      target.releasePointerCapture(event.pointerId);
-    }
-
-    dragRef.current.active = false;
-    dragRef.current.pointerId = -1;
-    dragRef.current.moved = false;
-    setIsDragging(false);
-  };
-
-  if (!isMounted || isHiddenRoute) {
+  if (!isMounted || isHiddenRoute || isLoaderPresent) {
     return null;
   }
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-45" aria-hidden={false}>
+    <div id="predictix-chatbot" className="pointer-events-none fixed inset-0 z-50" aria-hidden={false}>
       {isOpen ? (
-        <div
-          className="pointer-events-auto absolute"
-          style={{
-            left: `${panelPosition.left}px`,
-            top: `${panelPosition.top}px`,
-            width: `${panelDimensions.width}px`,
-            height: `${panelDimensions.height}px`,
-          }}
-        >
+        <div className="pointer-events-auto absolute bottom-24 right-6 w-[calc(100vw-32px)] sm:w-[380px] h-[520px] max-h-[calc(100vh-120px)]">
           <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-md motion-reduce:transition-none">
             <div className="relative flex items-center justify-between border-b border-border/60 px-4 py-3 bg-gradient-to-r from-violet-500/10 via-fuchsia-500/5 to-sky-500/10 dark:from-violet-500/15 dark:via-fuchsia-500/10 dark:to-sky-500/15">
               <div className="flex items-center gap-2">
@@ -529,9 +314,9 @@ export default function FloatingChatbot() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1 px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20">
+            <ScrollArea type="always" className="flex-1 px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20">
               {messages.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center pb-12">
                   <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3">
                     <Sparkles className="size-6 text-violet-500" />
                   </div>
@@ -557,18 +342,44 @@ export default function FloatingChatbot() {
                             : "rounded-bl-md border border-border/70 bg-card text-foreground dark:bg-slate-800/80"
                         )}
                       >
-                        <p>{message.text}</p>
-                        <p
-                          className={cn(
-                            "mt-1 text-[10px]",
-                            message.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                        <p className="whitespace-pre-wrap">{message.text}</p>
+                        <div className="mt-1.5 flex items-center justify-between gap-4">
+                          <span
+                            className={cn(
+                              "text-[10px]",
+                              message.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                            )}
+                          >
+                            {new Date(message.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          {message.role === "assistant" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void navigator.clipboard.writeText(message.text);
+                                setCopiedMessageId(message.id);
+                                setTimeout(() => setCopiedMessageId(null), 2000);
+                              }}
+                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors outline-none focus:ring-0"
+                              title="Copy message to clipboard"
+                            >
+                              {copiedMessageId === message.id ? (
+                                <>
+                                  <Check className="size-3 text-emerald-500" />
+                                  <span className="text-emerald-500 font-medium">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="size-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
                           )}
-                        >
-                          {new Date(message.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
+                        </div>
 
                         {message.role === "assistant" && message.sources && message.sources.length > 0 ? (
                           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -588,54 +399,6 @@ export default function FloatingChatbot() {
                           </div>
                         ) : null}
 
-                        {message.role === "assistant" && message.toolTrace && message.toolTrace.length > 0 ? (
-                          <div className="mt-2 border-t border-border/40 pt-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setExpandedTraces((prev) => ({
-                                  ...prev,
-                                  [message.id]: !prev[message.id],
-                                }))
-                              }
-                              className="flex items-center gap-1 text-[10px] font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
-                            >
-                              {expandedTraces[message.id] ? (
-                                <ChevronDown className="size-3" />
-                              ) : (
-                                <ChevronRight className="size-3" />
-                              )}
-                              <Wrench className="size-3" />
-                              {message.toolTrace.length} tool{message.toolTrace.length === 1 ? "" : "s"} used
-                            </button>
-                            {expandedTraces[message.id] ? (
-                              <ul className="mt-1.5 space-y-1.5 pl-3">
-                                {message.toolTrace.map((step, i) => (
-                                  <li
-                                    key={`${message.id}-tool-${i}`}
-                                    className="rounded-md bg-muted/50 dark:bg-slate-900/50 px-2 py-1 text-[10px] font-mono"
-                                  >
-                                    <div className="flex items-center gap-1 text-violet-600 dark:text-violet-400 font-semibold">
-                                      <span>→</span>
-                                      <span>{step.name}</span>
-                                      <span className="text-muted-foreground font-normal">
-                                        ({Object.keys(step.args || {}).length
-                                          ? Object.entries(step.args)
-                                              .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
-                                              .join(", ")
-                                          : ""}
-                                        )
-                                      </span>
-                                    </div>
-                                    <div className="mt-0.5 text-muted-foreground break-all">
-                                      {step.result_preview}
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : null}
-                          </div>
-                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -690,25 +453,12 @@ export default function FloatingChatbot() {
       <button
         type="button"
         className={cn(
-          "pointer-events-auto group absolute flex items-center justify-center rounded-full border border-white/20 text-white shadow-[0_10px_30px_-10px_rgba(124,58,237,0.6)]",
+          "pointer-events-auto group absolute bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full border border-white/20 text-white shadow-[0_10px_30px_-10px_rgba(124,58,237,0.6)]",
           "bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500",
-          "motion-reduce:transition-none",
-          isDragging
-            ? "scale-105 cursor-grabbing transition-transform duration-100"
-            : isHelpDeskRoute
-            ? "cursor-pointer hover:scale-105 transition-all duration-300 ease-out"
-            : "cursor-grab hover:scale-105 transition-all duration-300 ease-out"
+          "cursor-pointer hover:scale-105 transition-all duration-300 ease-out",
+          isHelpDeskRoute && "animate-pulse" // Just a small bonus
         )}
-        style={{
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-          width: `${LAUNCHER_SIZE}px`,
-          height: `${LAUNCHER_SIZE}px`,
-        }}
-        onPointerDown={onLauncherPointerDown}
-        onPointerMove={onLauncherPointerMove}
-        onPointerUp={onLauncherPointerUp}
-        onPointerCancel={onLauncherPointerCancel}
+        onClick={() => setIsOpen((current) => !current)}
         aria-label={isOpen ? "Collapse chatbot" : "Open chatbot"}
       >
         <span className="sr-only">Chatbot launcher</span>

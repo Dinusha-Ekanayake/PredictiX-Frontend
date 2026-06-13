@@ -60,14 +60,27 @@ export default function WarehousePage() {
       
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
-        throw new Error(err.detail || `HTTP ${res.status}`);
+        const detail: string = err.detail || `HTTP ${res.status}`;
+        // Provide a friendly message for rate-limit errors
+        if (res.status === 429 || detail.toLowerCase().includes("rate limit")) {
+          throw new Error(
+            "The AI report generator hit the API rate limit. " +
+            "The system will automatically retry — please wait up to 60 seconds and try again."
+          );
+        }
+        throw new Error(detail);
       }
       
       const result = await res.json();
       setReportData(result);
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : String(e);
-      console.error("Report generation error:", errorMsg);
+      // Only console.error for unexpected errors; rate-limit is expected on free tier
+      if (!errorMsg.includes("rate limit")) {
+        console.error("Report generation error:", errorMsg);
+      } else {
+        console.warn("Report generation rate-limited:", errorMsg);
+      }
       setReportError(errorMsg);
     } finally {
       setGenerating(false);

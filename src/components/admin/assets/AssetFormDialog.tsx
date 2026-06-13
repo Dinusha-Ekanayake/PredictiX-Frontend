@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
+import Image from "next/image";
 import { Loader2, Boxes, Upload, X, Image as ImageIcon } from "lucide-react";
 
 import {
@@ -241,14 +242,14 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
                 {/* Existing Images (Read-only) */}
                 {existingImages.map((url, idx) => (
                   <div key={`existing-${idx}`} className="relative w-16 h-16 rounded-md overflow-hidden ring-1 ring-slate-200 dark:ring-slate-700 opacity-80">
-                    <img src={url} alt={`Existing ${idx}`} className="w-full h-full object-cover" />
+                    <Image src={url} alt={`Existing ${idx}`} width={64} height={64} className="w-full h-full object-cover" />
                   </div>
                 ))}
                 
                 {/* New Images */}
                 {imagePreviews.map((preview, idx) => (
                   <div key={`new-${idx}`} className="relative w-16 h-16 rounded-md overflow-hidden ring-2 ring-indigo-500/50">
-                    <img src={preview} alt={`New ${idx}`} className="w-full h-full object-cover" />
+                    <Image src={preview} alt={`New ${idx}`} width={64} height={64} className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeNewImage(idx)}

@@ -30,7 +30,7 @@ export default function PredictiXLoader({
   const step = 360 / ICONS.length;
 
   return (
-    <div className={cn("flex flex-col items-center justify-center", className)}>
+    <div data-predictix-loader="true" className={cn("flex flex-col items-center justify-center", className)}>
       <div className="relative flex h-[380px] w-[380px] items-center justify-center">
         
         {/* Deep, rich pulsating glow */}

@@ -36,6 +36,7 @@ export default function RootLayout({
       data-scroll-behavior="smooth"
     >
       <body
+        suppressHydrationWarning
         className={`${plusJakarta.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
         <ThemeProvider>

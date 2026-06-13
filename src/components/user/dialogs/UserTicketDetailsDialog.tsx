@@ -102,6 +102,8 @@ export default function UserTicketDetailsDialog({
   const [editDescription, setEditDescription] = React.useState("");
   const [editPriority, setEditPriority] = React.useState<string>("");
 
+  const [fullSizeImage, setFullSizeImage] = React.useState<string | null>(null);
+
   React.useEffect(() => {
     if (!open || !ticketId) return;
     let cancelled = false;
@@ -194,7 +196,30 @@ export default function UserTicketDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[760px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        {/* Full size image overlay */}
+        {fullSizeImage && (
+          <div 
+            className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
+            onClick={() => setFullSizeImage(null)}
+          >
+            <img 
+              src={fullSizeImage} 
+              alt="Full size" 
+              className="max-w-full max-h-full object-contain cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <Button 
+              variant="secondary" 
+              size="icon" 
+              className="absolute top-4 right-4 rounded-full"
+              onClick={() => setFullSizeImage(null)}
+            >
+              <XCircle className="h-5 w-5" />
+            </Button>
+          </div>
+        )}
+
         {loading || !ticket ? (
           <>
             {/* Radix requires a DialogTitle for screen readers. The loading
@@ -375,6 +400,30 @@ export default function UserTicketDetailsDialog({
                         </Badge>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Attachments */}
+              {ticket.attachments && ticket.attachments.length > 0 && (
+                <div className="rounded-md border p-3 bg-muted/30">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-3">
+                    Attachments
+                  </h4>
+                  <div className="flex flex-wrap gap-3">
+                    {ticket.attachments.map((a) => (
+                      <div 
+                        key={a.id} 
+                        className="relative group cursor-zoom-in rounded-md border bg-background overflow-hidden w-24 h-24 flex items-center justify-center"
+                        onClick={() => setFullSizeImage(a.file_path)}
+                      >
+                        <img 
+                          src={a.file_path} 
+                          alt={a.original_filename || "Attachment"} 
+                          className="object-cover w-full h-full"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

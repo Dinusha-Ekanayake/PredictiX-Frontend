@@ -1,4 +1,59 @@
 import { supabase } from "./supabaseBrowserClient";
+import { apiPost } from "./apiClient";
+
+// ─── FastAPI-backed ticket preview (calls POST /tickets/preview) ──────────────
+
+export interface TicketAiPreview {
+  predicted_category: string | null;
+  predicted_priority: string | null;
+  errors: Record<string, string>;
+}
+
+export async function previewTicketAI(title: string, description: string): Promise<TicketAiPreview> {
+  return apiPost<TicketAiPreview>("/tickets/preview", { title, description });
+}
+
+// ─── FastAPI-backed admin ticket create (POST /tickets/) ──────────────────────
+
+export interface AdminTicketCreatePayload {
+  asset_id: string | null;
+  title: string;
+  description: string;
+  priority: string;
+  predicted_priority?: string | null;
+  predicted_category?: string | null;
+  assigned_to?: string | null;
+  created_by: string;
+}
+
+export async function createTicketViaApi(payload: AdminTicketCreatePayload): Promise<Ticket> {
+  const data = await apiPost<any>("/tickets/", {
+    asset_id: payload.asset_id || null,
+    title: payload.title,
+    description: payload.description,
+    priority: payload.priority.toLowerCase(),
+    predicted_priority: payload.predicted_priority?.toLowerCase() ?? null,
+    predicted_category: payload.predicted_category?.toLowerCase() ?? null,
+    assigned_to: payload.assigned_to || null,
+    created_by: payload.created_by,
+  });
+  return {
+    id: data.id,
+    ticket_number: data.ticket_number,
+    asset_id: data.asset_id,
+    title: data.title,
+    description: data.description,
+    status: data.status ?? "open",
+    priority: uiPriority(data.priority ?? "medium"),
+    predicted_category: data.predicted_category ?? null,
+    final_category: data.final_category ?? null,
+    created_by: data.created_by,
+    assigned_to: data.assigned_to,
+    opened_at: data.opened_at,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+  };
+}
 
 export type TicketStatus = "open" | "in-progress" | "resolved" | "closed";
 export type TicketPriority = "High" | "Medium" | "Low";

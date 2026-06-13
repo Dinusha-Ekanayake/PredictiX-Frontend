@@ -13,7 +13,6 @@ import PageHero from "@/components/common/PageHero";
 import { fetchMyAssets, type UserAssetData } from "@/lib/api/userProfileApi";
 import { listAssets } from "@/components/admin/assets/assetService";
 import type { Asset } from "@/components/admin/assets/types";
-import { createMyTicket } from "@/lib/userTicketService";
 import UserAssetDetailsDialog from "@/components/user/assets/UserAssetDetailsDialog";
 
 function healthColor(p: number) {
@@ -236,7 +235,6 @@ export default function UserAssetsPage() {
       <NewTicketDialog
         open={ticketAsset !== null}
         onOpenChange={(o) => { if (!o) setTicketAsset(null); }}
-        createFn={createMyTicket}
         presetAssetId={ticketAsset?.id}
         presetAssetName={ticketAsset?.name}
         lockAsset

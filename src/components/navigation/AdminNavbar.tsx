@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -81,6 +82,7 @@ export default function AdminNavbar() {
 
   // Hydrate richer data from backend (department, warehouse)
   React.useEffect(() => {
+    const storedAvatarUrl = typeof window !== "undefined" ? localStorage.getItem("predictix.avatar_url") : null;
     fetchMyProfile()
       .then((data) => {
         setProfileUser({
@@ -89,11 +91,14 @@ export default function AdminNavbar() {
           role: (data.role?.toUpperCase() as "ADMIN" | "USER") || "ADMIN",
           department: data.department ?? null,
           warehouse: data.warehouse ?? null,
-          avatar_url: data.avatar_url ?? null,
+          avatar_url: data.avatar_url ?? storedAvatarUrl ?? null,
         });
       })
       .catch(() => {
         // Silently fall back to localStorage values already set
+        if (storedAvatarUrl) {
+          setProfileUser((prev) => ({ ...prev, avatar_url: storedAvatarUrl }));
+        }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -231,7 +236,7 @@ export default function AdminNavbar() {
                           )}
                         >
                           {profileUser.avatar_url ? (
-                            <img src={profileUser.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                            <Image src={profileUser.avatar_url} alt="Avatar" width={44} height={44} className="h-full w-full object-cover" />
                           ) : (
                             avatarText
                           )}

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -146,7 +147,7 @@ export function UserProfileForm({
               {/* Avatar */}
               <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xl font-bold overflow-hidden">
                 {initialProfile.avatar_url ? (
-                  <img src={initialProfile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                  <Image src={initialProfile.avatar_url} alt="Avatar" width={64} height={64} className="w-full h-full object-cover" />
                 ) : (
                   initials
                 )}

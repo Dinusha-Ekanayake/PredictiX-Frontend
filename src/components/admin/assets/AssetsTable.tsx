@@ -170,7 +170,7 @@ export default function AssetsTable({ assets, selectedId, onSelect, loading }: P
                   <div className="col-span-5 min-w-0 flex items-center gap-3">
                     <div className="w-9 h-9 rounded bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden border border-slate-200/60 dark:border-white/10 flex items-center justify-center">
                       {(a.meta?.images?.[0] || a.meta?.image_url) ? (
-                        <Image src={a.meta?.images?.[0] || a.meta?.image_url} alt="" width={36} height={36} className="w-full h-full object-cover" />
+                        <Image src={(a.meta?.images?.[0] || a.meta?.image_url) as string} alt="" width={36} height={36} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-xs font-bold text-slate-400 dark:text-slate-500">
                           {displayName.charAt(0).toUpperCase()}

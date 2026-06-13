@@ -1,220 +1,3 @@
-// "use client";
-
-// import * as React from "react";
-
-// import AntigravityDotsBackground from "@/components/background/AntigravityDotsBackground";
-// import PredictiXLoader from "@/components/loading/PredictiXLoader";
-// import { useMinDelay } from "@/hooks/useMinDelay";
-// import { useNavRouter } from "@/components/navigation/useNavRouter";
-
-// import { Card, CardContent, CardHeader } from "@/components/ui/card";
-// import { Button } from "@/components/ui/button";
-// import { Input } from "@/components/ui/input";
-// import { Label } from "@/components/ui/label";
-
-// import RoleSelectCards, { type Role } from "@/components/auth/RoleSelectCards";
-// import PredictiXLogo from "@/components/brand/PredictiXLogo";
-// import ThemeToggle from "@/components/theme/ThemeToggle";
-// import { login, storeAuthSession } from "@/lib/authService";
-
-// function BackgroundBlobs() {
-//   return (
-//     <div className="pointer-events-none absolute inset-0 z-0">
-//       <div className="absolute -top-56 -left-56 h-225 w-225 rounded-full bg-sky-200/60 blur-[140px] float-slow-1 dark:hidden" />
-//       <div className="absolute top-1/3 left-1/2 h-225 w-[900px] -translate-x-1/2 rounded-full bg-violet-200/50 blur-[160px] float-slow-2 dark:hidden" />
-//       <div className="absolute -bottom-56 -right-56 h-[900px] w-225 rounded-full bg-white/70 blur-[160px] float-slow-3 dark:hidden" />
-
-//       <div className="hidden dark:block absolute -top-56 -left-56 h-225 w-225 rounded-full bg-sky-500/10 blur-[160px] float-slow-1" />
-//       <div className="hidden dark:block absolute top-1/3 left-1/2 h-[900px] w-[900px] -translate-x-1/2 rounded-full bg-violet-500/10 blur-[180px] float-slow-2" />
-//       <div className="hidden dark:block absolute -bottom-56 -right-56 h-[900px] w-[900px] rounded-full bg-white/5 blur-[180px] float-slow-3" />
-
-//       <div className="absolute -top-32 left-[-25%] h-[520px] w-[150%] rotate-[-10deg] bg-linear-to-r from-transparent via-white/40 to-transparent blur-2xl dark:via-white/10" />
-
-//       <div
-//         className="absolute inset-0 opacity-[0.05] dark:opacity-[0.06]"
-//         style={{
-//           backgroundImage:
-//             "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.3'/%3E%3C/svg%3E\")",
-//         }}
-//       />
-//     </div>
-//   );
-// }
-
-// export default function LoginPage() {
-//   const router = useNavRouter();
-//   const ready = useMinDelay(2000);
-
-//   const [role, setRole] = React.useState<Role | "">("");
-//   const [email, setEmail] = React.useState("");
-//   const [password, setPassword] = React.useState("");
-//   const [isSubmitting, setIsSubmitting] = React.useState(false);
-//   const [error, setError] = React.useState("");
-
-//   const canSubmit =
-//     role !== "" &&
-//     email.trim().length > 0 &&
-//     password.trim().length > 0 &&
-//     !isSubmitting;
-
-//   async function onSubmit(e: React.FormEvent) {
-//     e.preventDefault();
-//     if (!canSubmit) return;
-
-//     setIsSubmitting(true);
-//     setError("");
-
-//     try {
-//       const data = await login({ email: email.trim().toLowerCase(), password });
-//       storeAuthSession(data);
-
-//       if (data.user.role.toUpperCase() === "ADMIN") {
-//         router.push("/admin/dashboard");
-//       } else {
-//         router.push("/user/users");
-//       }
-//     } catch (err) {
-//       setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.");
-//     } finally {
-//       setIsSubmitting(false);
-//     }
-//   }
-
-//   if (!ready) {
-//     return (
-//       <main className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
-//         <BackgroundBlobs />
-
-//         <AntigravityDotsBackground
-//           className="pointer-events-none absolute inset-0 z-[1]"
-//           dotSpacing={22}
-//           dotRadius={0.9}
-//           dotAlpha={0.2}
-//           baseVisibility={0.055}
-//           intensity={1.2}
-//           influenceRadius={300}
-//           blueBoost={0.24}
-//         />
-
-//         <div className="relative z-20 px-4">
-//           <PredictiXLoader label="Preparing log in…" />
-//         </div>
-//       </main>
-//     );
-//   }
-
-//   return (
-//     <main className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
-//       <BackgroundBlobs />
-
-//       <AntigravityDotsBackground
-//         className="pointer-events-none absolute inset-0 z-[1]"
-//         dotSpacing={22}
-//         dotRadius={0.9}
-//         dotAlpha={0.5}
-//         baseVisibility={0.055}
-//         intensity={1.25}
-//         influenceRadius={320}
-//         blueBoost={0.35}
-//       />
-
-//       <div className="absolute right-4 top-4 z-30">
-//         <ThemeToggle />
-//       </div>
-
-//       <div className="relative z-20 mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-4 py-12">
-//         <div className="grid w-full grid-cols-1 items-center gap-12 lg:grid-cols-2">
-//           <section className="hidden lg:flex flex-col justify-center">
-//             <PredictiXLogo size={72} />
-
-//             <h2 className="mt-10 text-4xl font-semibold leading-tight tracking-tight text-slate-900 dark:text-slate-50">
-//               AI-Powered Predictive Maintenance & Smart Ticket Categorization for Asset Management
-//             </h2>
-
-//             <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 dark:text-slate-300">
-//               Monitor asset health, predict failures, and manage maintenance tickets efficiently — all in one intelligent platform.
-//             </p>
-//           </section>
-
-//           <section className="flex items-center justify-center">
-//             <Card className="w-full max-w-md rounded-3xl border border-slate-200 bg-white/90 shadow-sm backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/75">
-//               <CardHeader className="space-y-3">
-//                 <div className="lg:hidden">
-//                   <PredictiXLogo size={48} />
-//                 </div>
-
-//                 <div>
-//                   <h2 className="text-2xl font-medium tracking-[-0.015em] text-slate-900 dark:text-slate-50">
-//                     Log in
-//                   </h2>
-//                   <p className="text-sm text-slate-600 dark:text-slate-300">
-//                     Select your role and enter your credentials.
-//                   </p>
-//                 </div>
-//               </CardHeader>
-
-//               <CardContent>
-//                 <form onSubmit={onSubmit} className="space-y-6" aria-busy={isSubmitting}>
-//                   <div className="space-y-2">
-//                     <Label className="text-sm font-medium text-slate-900 dark:text-slate-100">
-//                       Role
-//                     </Label>
-//                     <RoleSelectCards value={role} onChange={setRole} />
-//                   </div>
-
-//                   <div className="space-y-2">
-//                     <Label htmlFor="email" className="text-sm font-medium text-slate-900 dark:text-slate-100">
-//                       Email
-//                     </Label>
-//                     <Input
-//                       id="email"
-//                       type="email"
-//                       placeholder="you@example.com"
-//                       className="h-11"
-//                       value={email}
-//                       onChange={(e) => setEmail(e.target.value)}
-//                       autoComplete="email"
-//                       disabled={isSubmitting}
-//                     />
-//                   </div>
-
-//                   <div className="space-y-2">
-//                     <Label htmlFor="password" className="text-sm font-medium text-slate-900 dark:text-slate-100">
-//                       Password
-//                     </Label>
-//                     <Input
-//                       id="password"
-//                       type="password"
-//                       placeholder="••••••••"
-//                       className="h-11"
-//                       value={password}
-//                       onChange={(e) => setPassword(e.target.value)}
-//                       autoComplete="current-password"
-//                       disabled={isSubmitting}
-//                     />
-//                   </div>
-
-//                   {error && (
-//                     <p className="text-sm font-medium text-red-500">{error}</p>
-//                   )}
-
-//                   <Button type="submit" className="h-11 w-full rounded-xl" disabled={!canSubmit}>
-//                     {isSubmitting ? "Logging in..." : "Log in"}
-//                   </Button>
-
-//                   <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-//                     © {new Date().getFullYear()} PredictiX
-//                   </p>
-//                 </form>
-//               </CardContent>
-//             </Card>
-//           </section>
-//         </div>
-//       </div>
-//     </main>
-//   );
-// }
-
 "use client";
 
 import * as React from "react";
@@ -236,17 +19,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import RoleSelectCards, { type Role } from "@/components/auth/RoleSelectCards";
 import PredictiXLogo from "@/components/brand/PredictiXLogo";
 import ThemeToggle from "@/components/theme/ThemeToggle";
-import { login, storeAuthSession } from "@/lib/authService";
+import {
+  login,
+  selectWarehouse,
+  storeAuthSession,
+  type LoginResponse,
+  type WarehouseOption,
+} from "@/lib/authService";
 
 // ─── Background decoration ────────────────────────────────────────────────────
 
 function BackgroundBlobs() {
   return (
     <div className="pointer-events-none absolute inset-0 z-0">
-      {/* Light mode blobs — use inline style for arbitrary sizes to avoid Tailwind warnings */}
       <div
         className="absolute -top-56 -left-56 rounded-full bg-sky-200/60 blur-[140px] float-slow-1 dark:hidden"
         style={{ height: 225, width: 225 }}
@@ -259,8 +46,6 @@ function BackgroundBlobs() {
         className="absolute -bottom-56 -right-56 rounded-full bg-white/70 blur-[160px] float-slow-3 dark:hidden"
         style={{ height: 900, width: 225 }}
       />
-
-      {/* Dark mode blobs */}
       <div
         className="hidden dark:block absolute -top-56 -left-56 rounded-full bg-sky-500/10 blur-[160px] float-slow-1"
         style={{ height: 225, width: 225 }}
@@ -273,14 +58,10 @@ function BackgroundBlobs() {
         className="hidden dark:block absolute -bottom-56 -right-56 rounded-full bg-white/5 blur-[180px] float-slow-3"
         style={{ height: 900, width: 900 }}
       />
-
-      {/* Diagonal sheen */}
       <div
         className="absolute -top-32 left-[-25%] w-[150%] rotate-[-10deg] bg-linear-to-r from-transparent via-white/40 to-transparent blur-2xl dark:via-white/10"
         style={{ height: 520 }}
       />
-
-      {/* Noise texture */}
       <div
         className="absolute inset-0 opacity-[0.05] dark:opacity-[0.06]"
         style={{
@@ -298,59 +79,84 @@ export default function LoginPage() {
   const router = useNavRouter();
   const ready = useMinDelay(2000);
 
-  const [role, setRole] = React.useState<Role | "">("");
+  // Step-1 state
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
-  const [warehouseId, setWarehouseId] = React.useState("");
-  const [warehouses, setWarehouses] = React.useState<Array<{id: string, name: string}>>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
 
-  React.useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/warehouses`)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setWarehouses(data);
-      })
-      .catch(err => console.warn("Failed to load warehouses. Is the backend running?", err));
-  }, []);
+  // Step-2 state (super_admin warehouse selection)
+  const [step, setStep] = React.useState<"credentials" | "warehouse">("credentials");
+  const [selectionToken, setSelectionToken] = React.useState("");
+  const [warehouses, setWarehouses] = React.useState<WarehouseOption[]>([]);
+  const [warehouseId, setWarehouseId] = React.useState("");
+  const [superAdminName, setSuperAdminName] = React.useState("");
 
-  const canSubmit =
-    role !== "" &&
-    email.trim().length > 0 &&
-    password.trim().length > 0 &&
-    (String(role).toUpperCase() === "SUPER_ADMIN" ? warehouseId !== "" : true) &&
-    !isSubmitting;
+  function redirectAfterLogin(role: string) {
+    const r = role.toUpperCase();
+    if (r === "ADMIN" || r === "SUPER_ADMIN") {
+      router.push("/admin/dashboard");
+    } else {
+      router.push("/user/dashboard");
+    }
+  }
 
-  async function onSubmit(e: React.FormEvent) {
+  // ── Step 1: credential submit ──────────────────────────────────────────────
+
+  async function onCredentialsSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!email.trim() || !password.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
     setError("");
 
     try {
-      const data = await login({
-        email: email.trim().toLowerCase(),
-        password: password.trim(),
-        role: String(role).toUpperCase(), // backend validates declared role
-        warehouse_id: warehouseId,
-      });
+      const data: LoginResponse = await login(email.trim().toLowerCase(), password);
 
-      // Single source of truth for session storage (writes both token keys).
-      storeAuthSession(data);
-
-      const roleStr = data.role.toLowerCase();
-      if (roleStr === "admin" || roleStr === "super_admin") {
-        router.push("/admin/dashboard");
+      if (data.requires_warehouse_selection) {
+        // Super admin: move to step 2
+        setSelectionToken(data.selection_token ?? "");
+        setWarehouses(data.warehouses ?? []);
+        setSuperAdminName(data.full_name ?? "");
+        setStep("warehouse");
       } else {
-        router.push("/user/dashboard");
+        // User or admin: done
+        storeAuthSession(data);
+        redirectAfterLogin(data.role ?? "user");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.");
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  // ── Step 2: warehouse selection submit ────────────────────────────────────
+
+  async function onWarehouseSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!warehouseId || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      const data: LoginResponse = await selectWarehouse(selectionToken, warehouseId);
+      storeAuthSession(data);
+      redirectAfterLogin("super_admin");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to select warehouse. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function onBackToCredentials() {
+    setStep("credentials");
+    setSelectionToken("");
+    setWarehouses([]);
+    setWarehouseId("");
+    setError("");
   }
 
   // ── Loader screen ──────────────────────────────────────────────────────────
@@ -422,119 +228,132 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-medium tracking-[-0.015em] text-slate-900 dark:text-slate-50">
-                    Log in
+                    {step === "warehouse" ? "Select warehouse" : "Log in"}
                   </h2>
                   <p className="text-sm text-slate-600 dark:text-slate-300">
-                    Select your role and enter your credentials.
+                    {step === "warehouse"
+                      ? `Welcome, ${superAdminName || "Super Admin"}. Choose the warehouse you want to manage.`
+                      : "Enter your email and password to continue."}
                   </p>
                 </div>
               </CardHeader>
 
               <CardContent>
-                <form
-                  onSubmit={onSubmit}
-                  className="space-y-6"
-                  aria-busy={isSubmitting}
-                >
-                  {/* Role selector */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      Role
-                    </Label>
-                    <RoleSelectCards value={role} onChange={setRole} />
-                  </div>
 
-                  {/* Email */}
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="email"
-                      className="text-sm font-medium text-slate-900 dark:text-slate-100"
+                {/* ── Step 1: Credentials ─────────────────────────────────── */}
+                {step === "credentials" && (
+                  <form onSubmit={onCredentialsSubmit} className="space-y-5" aria-busy={isSubmitting}>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                        Email
+                      </Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="you@example.com"
+                        className="h-11"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        autoComplete="email"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                        Password
+                      </Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="••••••••"
+                        className="h-11"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="current-password"
+                        disabled={isSubmitting}
+                      />
+                    </div>
+
+                    {error && (
+                      <p role="alert" className="text-sm font-medium text-red-500">{error}</p>
+                    )}
+
+                    <Button
+                      type="submit"
+                      className="h-11 w-full rounded-xl"
+                      disabled={!email.trim() || !password.trim() || isSubmitting}
                     >
-                      Email
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="admin@mail.com"
-                      className="h-11"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      autoComplete="email"
-                      disabled={isSubmitting}
-                    />
-                  </div>
+                      {isSubmitting ? "Logging in…" : "Log in"}
+                    </Button>
 
-                  {/* Warehouse selector (Super Admin Only) */}
-                  {String(role).toUpperCase() === "SUPER_ADMIN" && (
+                    {/* Dev credentials hint */}
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                      <div className="font-medium text-slate-800 dark:text-slate-200 mb-1">Dev accounts</div>
+                      <div><span className="font-medium">Super Admin:</span> super.admin1@lankalogix.lk / super</div>
+                      <div><span className="font-medium">Admin:</span> anjali.warnakulasuriya.adm1@lankalogix.lk / admin</div>
+                      <div><span className="font-medium">User:</span> nuwan.gunasekara.tra1@lankalogix.lk / user</div>
+                      <div className="mt-1 text-slate-500">Other seeded accounts: <span className="font-mono">Predictix@123</span></div>
+                    </div>
+
+                    <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+                      © {new Date().getFullYear()} PredictiX
+                    </p>
+                  </form>
+                )}
+
+                {/* ── Step 2: Warehouse selection (super_admin only) ──────── */}
+                {step === "warehouse" && (
+                  <form onSubmit={onWarehouseSubmit} className="space-y-5" aria-busy={isSubmitting}>
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-slate-900 dark:text-slate-100">
                         Warehouse
                       </Label>
-                      <Select value={warehouseId} onValueChange={setWarehouseId} disabled={isSubmitting}>
-                        <SelectTrigger className="h-11 w-full text-left font-normal bg-white dark:bg-slate-950">
-                          <SelectValue placeholder="Select a warehouse" />
+                      <Select
+                        value={warehouseId}
+                        onValueChange={setWarehouseId}
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger className="h-11 w-full font-normal bg-white dark:bg-slate-950">
+                          <SelectValue placeholder="Choose a warehouse…" />
                         </SelectTrigger>
                         <SelectContent>
                           {warehouses.map((w) => (
                             <SelectItem key={w.id} value={w.id}>
-                              {w.name}
+                              {w.name}{w.city ? ` — ${w.city}` : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                  )}
 
+                    {error && (
+                      <p role="alert" className="text-sm font-medium text-red-500">{error}</p>
+                    )}
 
-                  {/* Password */}
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="password"
-                      className="text-sm font-medium text-slate-900 dark:text-slate-100"
+                    <Button
+                      type="submit"
+                      className="h-11 w-full rounded-xl"
+                      disabled={!warehouseId || isSubmitting}
                     >
-                      Password
-                    </Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="admin"
-                      className="h-11"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      autoComplete="current-password"
+                      {isSubmitting ? "Logging in…" : "Continue"}
+                    </Button>
+
+                    <button
+                      type="button"
+                      onClick={onBackToCredentials}
+                      className="w-full text-center text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                       disabled={isSubmitting}
-                    />
-                  </div>
+                    >
+                      ← Back
+                    </button>
 
-                  {/* Error message */}
-                  {error && (
-                    <p role="alert" className="text-sm font-medium text-red-500">
-                      {error}
+                    <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+                      © {new Date().getFullYear()} PredictiX
                     </p>
-                  )}
+                  </form>
+                )}
 
-                  {/* Submit */}
-                  <Button
-                    type="submit"
-                    className="h-11 w-full rounded-xl"
-                    disabled={!canSubmit}
-                  >
-                    {isSubmitting ? "Logging in…" : "Log in"}
-                  </Button>
-
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 break-all">
-                    <div className="font-medium text-slate-800 dark:text-slate-200">Demo accounts</div>
-                    <div>Super Admin: super.admin1@lankalogix.lk / super</div>
-                    <div>Admin: anjali.warnakulasuriya.adm1@lankalogix.lk / admin</div>
-                    <div>User: nuwan.gunasekara.tra1@lankalogix.lk / user</div>
-                    <div className="mt-1 text-slate-500">Other seeded users: password <span className="font-mono">Predictix@123</span></div>
-                  </div>
-
-
-                  <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-                    © {new Date().getFullYear()} PredictiX
-                  </p>
-                </form>
               </CardContent>
             </Card>
           </section>

@@ -120,12 +120,25 @@ export default function ViewAssignedAssetsDialog({
     if (open) setAssets(initialAssets);
   }, [open, initialAssets]);
 
-  function handleRemove(assetId: string) {
-    const removed = assets.find((a) => a.id === assetId);
-    setAssets((prev) => prev.filter((a) => a.id !== assetId));
-    toast.success(`Removed ${removed?.name ?? "asset"}`, {
-      description: "Asset unassigned from user. (Mock — will sync with backend later.)",
-    });
+  async function handleRemove(assetId: string) {
+    try {
+      const { apiFetch } = await import("@/lib/apiClient");
+      const response = await apiFetch(`/assets/${assetId}/assign`, { method: "PATCH" });
+      
+      if (!response.ok) {
+        throw new Error("Failed to unassign asset");
+      }
+
+      const removed = assets.find((a) => a.id === assetId);
+      setAssets((prev) => prev.filter((a) => a.id !== assetId));
+      toast.success(`Removed ${removed?.name ?? "asset"}`, {
+        description: "Asset successfully unassigned.",
+      });
+    } catch (error) {
+      toast.error("Failed to unassign asset", {
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
   }
 
   return (

@@ -17,6 +17,11 @@ export default function ProfilePage() {
         setIsLoading(true);
         setError(null);
         const profileData = await fetchMyProfile();
+        // Fall back to localStorage avatar for stub users (e.g. super_admin) with no DB row
+        if (!profileData.avatar_url && typeof window !== "undefined") {
+          const stored = localStorage.getItem("predictix.avatar_url");
+          if (stored) profileData.avatar_url = stored;
+        }
         setProfile(profileData);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to load profile";

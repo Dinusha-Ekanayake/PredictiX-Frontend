@@ -262,3 +262,19 @@ export async function addMyTicketComment(
     body: JSON.stringify({ comment }),
   });
 }
+
+export async function addMyTicketAttachment(
+  ticketId: string,
+  filePath: string,
+  mimeType?: string | null,
+  originalFilename?: string | null
+): Promise<UserTicketAttachment> {
+  return request<UserTicketAttachment>(`/user/tickets/${ticketId}/attachments`, {
+    method: "POST",
+    body: JSON.stringify({ 
+      file_path: filePath, 
+      mime_type: mimeType, 
+      original_filename: originalFilename 
+    }),
+  });
+}

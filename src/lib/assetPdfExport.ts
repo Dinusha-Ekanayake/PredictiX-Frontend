@@ -244,10 +244,7 @@ export interface AssetReportData {
             <div style="font-size:10px;font-weight:700;color:${C.teal};letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">Asset Performance Report</div>
             <h1 style="font-size:24px;font-weight:800;color:${C.textDark};line-height:1.2;margin-bottom:6px">${data.assetName}</h1>
             <div style="font-size:13px;color:${C.textLight};margin-bottom:13px">${data.warehouseName}</div>
-            <div style="border-top:1px solid ${C.tealBorder};padding-top:13px">
-              <div style="font-size:10px;color:${C.textLight}">Comprehensive Asset Health &nbsp;·&nbsp; Predictive Maintenance Analysis</div>
-              <div style="font-size:10px;color:${C.textLight};margin-top:2px">Powered by PredictiX AI &nbsp;·&nbsp; SHAP Explainability</div>
-            </div>
+  
           </div>
           <div style="font-size:11px;color:${C.textLight};margin-bottom:3px">Report Generated: <strong style="color:${C.textDark}">${data.reportDate}</strong></div>
           <div style="font-size:11px;color:${C.textLight};margin-bottom:13px">Asset Code: <strong style="color:${C.textDark}">${data.assetCode}</strong></div>

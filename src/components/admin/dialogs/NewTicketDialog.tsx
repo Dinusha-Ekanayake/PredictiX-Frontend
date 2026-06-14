@@ -13,7 +13,7 @@
  */
 
 import * as React from "react";
-import { AlertCircle, Bot, Loader2, Plus, Sparkles } from "lucide-react";
+import { AlertCircle, Bot, Loader2, Plus, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -330,9 +330,24 @@ export default function NewTicketDialog({
                   <SelectValue placeholder={aiBlocking ? "Analyzing…" : "AI will suggest"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="high">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      High
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="medium">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-500" />
+                      Medium
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="low">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      Low
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

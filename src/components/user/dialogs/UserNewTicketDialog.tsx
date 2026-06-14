@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Bot,
   CheckCircle2,
+  AlertTriangle,
   Loader2,
   Lock,
   Plus,
@@ -420,10 +421,13 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
                     {ai.status === "running" ? (
                       <><Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" /><span className="text-muted-foreground">Analyzing…</span></>
                     ) : predictedPriority ? (
-                      <>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${PRIORITY_COLORS[predictedPriority] ?? ""}`}>
-                          {predictedPriority.charAt(0).toUpperCase() + predictedPriority.slice(1)}
-                        </span>
+                        <>
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${PRIORITY_COLORS[predictedPriority] ?? ""}`}>
+                            {predictedPriority === "high" && <AlertTriangle className="h-3.5 w-3.5" />}
+                            {predictedPriority === "medium" && <AlertCircle className="h-3.5 w-3.5" />}
+                            {predictedPriority === "low" && <CheckCircle2 className="h-3.5 w-3.5" />}
+                            {predictedPriority.charAt(0).toUpperCase() + predictedPriority.slice(1)}
+                          </span>
                         <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
                           <Lock className="h-3 w-3" />AI set
                         </span>

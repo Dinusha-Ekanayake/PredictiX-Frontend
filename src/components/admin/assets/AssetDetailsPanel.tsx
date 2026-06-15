@@ -18,7 +18,7 @@ import { useNavRouter } from "@/components/navigation/useNavRouter";
 import type { AssetDetail, ComponentSurvivalResponse } from "./types";
 import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
 import LogMaintenanceDialog from "./LogMaintenanceDialog";
-
+import SendServiceReminderButton from "./SendServiceReminderButton";
 /* ══════════════════════════════════════════════════════════════════════════════
    Helpers
    ══════════════════════════════════════════════════════════════════════════════ */
@@ -109,18 +109,19 @@ function RiskGauge({ probability }: { probability: number }) {
 }
 
 /* ── Info field ──────────────────────────────────────────────────────────────── */
-function InfoField({ icon, label, value, mono, valueClass }: {
-  icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string;
+function InfoField({ icon, label, value, mono, valueClass, action }: {
+  icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string; action?: React.ReactNode;
 }) {
   return (
     <div className="h-full rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
       {icon && <div className="mt-0.5 text-muted-foreground/60 shrink-0">{icon}</div>}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="text-[11px] text-muted-foreground/80 font-medium">{label}</div>
         <div className={cn("text-sm font-medium mt-0.5 leading-snug break-words", mono && "font-mono text-xs", valueClass)}>
           {value}
         </div>
       </div>
+      {action && <div className="ml-auto -mr-1 -mt-1 shrink-0">{action}</div>}
     </div>
   );
 }
@@ -477,6 +478,14 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   : "—"
             }
             valueClass={asset.status !== "maintenance" && daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
+            action={
+              <SendServiceReminderButton
+                assetId={asset.id}
+                assetName={asset.asset_name}
+                hasAssignee={!!asset.assigned_to}
+                hasServiceDate={!!asset.next_service_date}
+              />
+            }
           />
           <InfoField
             icon={<Bot className="h-3.5 w-3.5" />}

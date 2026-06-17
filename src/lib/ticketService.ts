@@ -185,23 +185,7 @@ export async function createTicket(payload: {
 }
 
 export async function fetchTicketStatusCounts(): Promise<Record<string, number>> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const statuses = ["open", "in_progress", "resolved", "closed"];
-  const counts: Record<string, number> = { open: 0, "in-progress": 0, resolved: 0, closed: 0 };
-
-  await Promise.all(
-    statuses.map(async (s) => {
-      const { count } = await supabase!
-        .from("tickets")
-        .select("id", { count: "exact", head: true })
-        .eq("status", s);
-      const uiKey = s === "in_progress" ? "in-progress" : s;
-      counts[uiKey] = count ?? 0;
-    })
-  );
-
-  return counts;
+  return apiGet<Record<string, number>>("/tickets/status-counts");
 }
 
 export async function updateTicketStatus(id: string, status: TicketStatus): Promise<void> {

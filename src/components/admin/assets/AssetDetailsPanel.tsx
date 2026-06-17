@@ -864,12 +864,27 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             {tickets.length === 0 ? (
               <EmptyState message="No tickets raised for this asset." icon={Ticket} />
             ) : (
-              tickets.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => goToTicket(t.id)}
-                  className="w-full text-left ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all hover:border-primary/30 group"
-                >
+              tickets.map((t) => {
+                const displayPriority = t.final_priority ?? t.predicted_priority ?? t.priority;
+                const p = (displayPriority || "").toLowerCase();
+                const priorityBorder =
+                  p === "high" || p === "critical"
+                    ? "border-rose-500/30 dark:border-rose-500/25 hover:border-rose-500 dark:hover:border-rose-500/60"
+                    : p === "medium"
+                    ? "border-amber-500/30 dark:border-amber-500/25 hover:border-amber-500 dark:hover:border-amber-500/60"
+                    : p === "low"
+                    ? "border-emerald-500/30 dark:border-emerald-500/25 hover:border-emerald-500 dark:hover:border-emerald-500/60"
+                    : "border-slate-200/80 dark:border-white/6 hover:border-primary/30";
+
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => goToTicket(t.id)}
+                    className={cn(
+                      "w-full text-left ticket-dynamic rounded-xl border p-4 transition-all group",
+                      priorityBorder
+                    )}
+                  >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -896,8 +911,9 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                     <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary/60 transition-colors shrink-0 mt-1" />
                   </div>
                 </button>
-              ))
-            )}
+              );
+            })
+          )}
           </TabsContent>
 
           {/* ═══ Maintenance Logs ═══ */}

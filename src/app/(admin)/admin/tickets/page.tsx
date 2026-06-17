@@ -392,10 +392,24 @@ export default function AdminTicketsPage() {
                 : t.priority === "Medium"
                 ? "from-amber-500 to-amber-600"
                 : "from-emerald-500 to-emerald-600";
+
+            const p = (t.priority || "").toLowerCase();
+            const priorityBorder =
+              p === "high"
+                ? "border-rose-500/30 dark:border-rose-500/25 hover:border-rose-500 dark:hover:border-rose-500/60"
+                : p === "medium"
+                ? "border-amber-500/30 dark:border-amber-500/25 hover:border-amber-500 dark:hover:border-amber-500/60"
+                : p === "low"
+                ? "border-emerald-500/30 dark:border-emerald-500/25 hover:border-emerald-500 dark:hover:border-emerald-500/60"
+                : "border-slate-200 dark:border-slate-700 hover:border-violet-300/70 dark:hover:border-violet-500/40";
+
             return (
               <div
                 key={t.id}
-                className="group relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-card p-4 pl-5 cursor-pointer transition-all duration-200 hover:border-violet-300/70 dark:hover:border-violet-500/40 hover:shadow-md hover:-translate-y-0.5"
+                className={cn(
+                  "group relative overflow-hidden rounded-xl border bg-card p-4 pl-5 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
+                  priorityBorder
+                )}
                 onClick={() => { setSelectedTicket(t); setDetailOpen(true); }}
               >
                 {/* Left accent bar (priority colour) */}

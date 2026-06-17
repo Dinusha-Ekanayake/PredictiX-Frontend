@@ -413,15 +413,15 @@ export default function UserTicketsPage() {
             const displayPriority = t.final_priority || t.priority || t.predicted_priority;
             const displayCategory = t.final_category || t.predicted_category;
             
-            const p = (displayPriority || "").toLowerCase();
-            const priorityBorder =
-              p === "high" || p === "critical"
+            const s = (t.status || "").toLowerCase();
+            const statusBorder =
+              s === "open"
                 ? "border-rose-500/30 dark:border-rose-500/25 hover:border-rose-500 dark:hover:border-rose-500/60"
-                : p === "medium"
+                : s === "in-progress" || s === "in_progress"
                 ? "border-amber-500/30 dark:border-amber-500/25 hover:border-amber-500 dark:hover:border-amber-500/60"
-                : p === "low"
+                : s === "resolved"
                 ? "border-emerald-500/30 dark:border-emerald-500/25 hover:border-emerald-500 dark:hover:border-emerald-500/60"
-                : "border-transparent hover:border-border/50";
+                : "border-slate-500/30 dark:border-slate-500/25 hover:border-slate-500 dark:hover:border-slate-500/60";
 
             return (
               <div
@@ -429,7 +429,7 @@ export default function UserTicketsPage() {
                 onClick={() => openDetail(t.id)}
                 className={cn(
                   "group flex flex-col md:flex-row md:items-center gap-3 md:gap-4 p-3 px-4 md:px-3 rounded-xl hover:bg-card/80 hover:shadow-sm transition-all cursor-pointer border",
-                  priorityBorder
+                  statusBorder
                 )}
               >
                 <div className="w-auto md:w-[100px] flex items-center">

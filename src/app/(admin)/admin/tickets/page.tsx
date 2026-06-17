@@ -393,22 +393,22 @@ export default function AdminTicketsPage() {
                 ? "from-amber-500 to-amber-600"
                 : "from-emerald-500 to-emerald-600";
 
-            const p = (t.priority || "").toLowerCase();
-            const priorityBorder =
-              p === "high"
+            const s = (t.status || "").toLowerCase();
+            const statusBorder =
+              s === "open"
                 ? "border-rose-500/30 dark:border-rose-500/25 hover:border-rose-500 dark:hover:border-rose-500/60"
-                : p === "medium"
+                : s === "in-progress" || s === "in_progress"
                 ? "border-amber-500/30 dark:border-amber-500/25 hover:border-amber-500 dark:hover:border-amber-500/60"
-                : p === "low"
+                : s === "resolved"
                 ? "border-emerald-500/30 dark:border-emerald-500/25 hover:border-emerald-500 dark:hover:border-emerald-500/60"
-                : "border-slate-200 dark:border-slate-700 hover:border-violet-300/70 dark:hover:border-violet-500/40";
+                : "border-slate-500/30 dark:border-slate-500/25 hover:border-slate-500 dark:hover:border-slate-500/60";
 
             return (
               <div
                 key={t.id}
                 className={cn(
                   "group relative overflow-hidden rounded-xl border bg-card p-4 pl-5 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
-                  priorityBorder
+                  statusBorder
                 )}
                 onClick={() => { setSelectedTicket(t); setDetailOpen(true); }}
               >

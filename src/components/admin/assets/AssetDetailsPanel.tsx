@@ -874,16 +874,15 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
               <EmptyState message="No tickets raised for this asset." icon={Ticket} />
             ) : (
               tickets.map((t) => {
-                const displayPriority = t.final_priority ?? t.predicted_priority ?? t.priority;
-                const p = (displayPriority || "").toLowerCase();
-                const priorityBorder =
-                  p === "high" || p === "critical"
+                const s = (t.status || "").toLowerCase();
+                const statusBorder =
+                  s === "open"
                     ? "border-rose-500/30 dark:border-rose-500/25 hover:border-rose-500 dark:hover:border-rose-500/60"
-                    : p === "medium"
+                    : s === "in-progress" || s === "in_progress"
                     ? "border-amber-500/30 dark:border-amber-500/25 hover:border-amber-500 dark:hover:border-amber-500/60"
-                    : p === "low"
+                    : s === "resolved"
                     ? "border-emerald-500/30 dark:border-emerald-500/25 hover:border-emerald-500 dark:hover:border-emerald-500/60"
-                    : "border-slate-200/80 dark:border-white/6 hover:border-primary/30";
+                    : "border-slate-500/30 dark:border-slate-500/25 hover:border-slate-500 dark:hover:border-slate-500/60";
 
                 return (
                   <button
@@ -891,7 +890,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                     onClick={() => goToTicket(t.id)}
                     className={cn(
                       "w-full text-left ticket-dynamic rounded-xl border p-4 transition-all group",
-                      priorityBorder
+                      statusBorder
                     )}
                   >
                   <div className="flex items-start justify-between gap-3">

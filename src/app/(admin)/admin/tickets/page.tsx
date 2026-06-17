@@ -25,6 +25,36 @@ import {
 } from "@/lib/ticketService";
 import { listUsers, type UserItem } from "@/lib/userService";
 
+function AnimatedCounter({ value }: { value: number }) {
+  const [count, setCount] = React.useState(0);
+
+  React.useEffect(() => {
+    let start = 0;
+    const end = value;
+    if (start === end) return;
+    
+    // Total animation duration 1.5s
+    const totalDuration = 1500;
+    const incrementTime = 30; // ms per frame
+    const steps = totalDuration / incrementTime;
+    const increment = end / steps;
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= end) {
+        setCount(end);
+        clearInterval(timer);
+      } else {
+        setCount(Math.floor(start));
+      }
+    }, incrementTime);
+
+    return () => clearInterval(timer);
+  }, [value]);
+
+  return <>{count}</>;
+}
+
 export default function AdminTicketsPage() {
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -275,6 +305,22 @@ export default function AdminTicketsPage() {
             <Button variant="ghost" size="sm" className="h-10">
               <Filter className="h-4 w-4" />
             </Button>
+
+            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 text-muted-foreground hover:text-foreground hover:bg-muted/50 px-3 flex items-center gap-1.5"
+                onClick={() => {
+                  setQuery("");
+                  setSelectedStatus("all");
+                  setSelectedPriority("all");
+                }}
+              >
+                <XCircle className="h-4 w-4" />
+                Clear all
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -309,7 +355,9 @@ export default function AdminTicketsPage() {
                   </span>
                 )}
               </div>
-              <p className={cn("text-[22px] font-semibold tracking-tight leading-none", s.accent)}>{s.value}</p>
+              <p className={cn("text-[22px] font-semibold tracking-tight leading-none", s.accent)}>
+                <AnimatedCounter value={s.value} />
+              </p>
               <p className="mt-1.5 text-[12px] font-medium text-foreground">{s.label}</p>
               <p className="mt-0.5 text-[10px] text-muted-foreground">
                 {totalAll > 0 ? `${Math.round((s.value / totalAll) * 100)}% of total` : "—"}

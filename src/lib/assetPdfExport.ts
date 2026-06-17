@@ -6,6 +6,7 @@
 export interface AssetReportData {
     assetName: string; assetCode: string; warehouseName: string; reportDate: string;
     asset: {
+      asset_name?: string; asset_code?: string;
       asset_type?: string; vehicle_type?: string; make?: string; model?: string;
       manufacture_year?: number | string; status?: string; health_band?: string;
       criticality_score?: string | number; fuel_type?: string; current_mileage?: string | number;

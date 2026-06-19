@@ -10,8 +10,11 @@ import {
   RefreshCw,
   BookOpen,
   Users,
+  Ticket,
+  Package,
   ShieldAlert,
   Activity,
+  DollarSign,
   Loader2,
   CheckCircle,
   XCircle,
@@ -32,7 +35,7 @@ import {
   Legend,
 } from "recharts";
 
-const API_BASE = `${"/api/proxy"}/warehouse-dashboard`;
+const API_BASE = "http://127.0.0.1:8000/warehouse-dashboard";
 
 // ── Color palette ─────────────────────────────────────────
 const PALETTE = {

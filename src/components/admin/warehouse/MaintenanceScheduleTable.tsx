@@ -20,8 +20,7 @@ export default function MaintenanceScheduleTable() {
     setLoading(true);
     setError(null);
     try {
-      const apiBaseUrl = "/api/proxy";
-      const response = await fetch(`${apiBaseUrl}/warehouse-dashboard/maintenance-schedule`, {
+      const response = await fetch("http://127.0.0.1:8000/warehouse-dashboard/maintenance-schedule", {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",

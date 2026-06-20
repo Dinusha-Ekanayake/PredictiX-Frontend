@@ -10,7 +10,8 @@ import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsi
 import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
 import WarehouseComponentHealth from "@/components/admin/warehouse/WarehouseComponentHealth";
 import WarehouseRecentMaintenance from "@/components/admin/warehouse/WarehouseRecentMaintenance";
-import { getMaintenanceSchedule } from "@/lib/warehouseService";
+import WarehouseSurvivalAnalysis from "@/components/admin/warehouse/WarehouseSurvivalAnalysis";
+import { getMaintenanceSchedule, getSurvivalAnalysis, type SurvivalSummary } from "@/lib/warehouseService";
 
 // ── Warehouse Report (my section — warehouse components only) ──
 import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
@@ -21,18 +22,20 @@ export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
   const [data, setData] = React.useState<any>(null);
   const [maintenanceSchedule, setMaintenanceSchedule] = React.useState<any[]>([]);
+  const [survival, setSurvival] = React.useState<SurvivalSummary | null>(null);
   const [refreshing, setRefreshing] = React.useState(true);
 
   async function fetchData() {
     setRefreshing(true);
     try {
-      // Fetch summary and maintenance schedule in parallel
-      const [summaryRes, scheduleData] = await Promise.allSettled([
+      // Fetch summary, maintenance schedule, and survival analysis in parallel
+      const [summaryRes, scheduleData, survivalData] = await Promise.allSettled([
         fetch("http://127.0.0.1:8000/warehouse-dashboard/summary", {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         }),
         getMaintenanceSchedule(),
+        getSurvivalAnalysis(),
       ]);
 
       if (summaryRes.status === "fulfilled" && summaryRes.value.ok) {
@@ -46,6 +49,10 @@ export default function WarehousePage() {
 
       setMaintenanceSchedule(
         scheduleData.status === "fulfilled" ? scheduleData.value : []
+      );
+
+      setSurvival(
+        survivalData.status === "fulfilled" ? survivalData.value : null
       );
     } finally {
       setRefreshing(false);
@@ -142,6 +149,9 @@ export default function WarehousePage() {
         assetsWithSensors={data?.assetsWithSensors}
         isLoading={refreshing && !data}
       />
+
+      {/* ── FRSO Component Survival Analysis (Weibull AFT) ── */}
+      <WarehouseSurvivalAnalysis data={survival} isLoading={refreshing && !survival} />
 
       {/* ── Predictive Maintenance Schedule Chart ── */}
       <WarehouseMaintenanceSchedule data={maintenanceSchedule} />

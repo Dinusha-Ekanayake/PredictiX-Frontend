@@ -85,6 +85,13 @@ interface Ctx {
   avg_resolution_hours?: number;
   avg_resolution_days?: number;
   mttr_by_priority?: { priority: string; avg_hours: number }[];
+  // FRSO survival analysis (Weibull AFT) aggregated over critical assets
+  survival_summary?: {
+    assets_analyzed: number;
+    horizon_days: number;
+    component_summary: { component: string; avg_rul_days: number | null; at_risk_30d: number; at_risk_90d: number; assets_scored: number }[];
+    watchlist: { asset: string; component: string; rul_days: number; risk: string }[];
+  } | null;
 }
 
 interface MaintenanceScheduleItem {
@@ -582,6 +589,8 @@ function ReportStep({
         feature: feature.replace(/_/g, " "),
         importance: importance,
       })),
+      // FRSO survival analysis (Weibull AFT) — §4.8 dedicated page
+      survival: ctx.survival_summary ?? null,
     };
     // const pdfData = {
     //   title: "Warehouse Report",

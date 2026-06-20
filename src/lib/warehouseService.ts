@@ -18,6 +18,56 @@ export interface WarehouseSummaryData {
   maintenanceSchedule?: any[];
 }
 
+/** FRSO survival analysis (Weibull AFT) for the warehouse dashboard. */
+export interface SurvivalComponentSummary {
+  component: string;
+  avg_rul_days: number | null;
+  at_risk_30d: number;
+  at_risk_90d: number;
+  assets_scored: number;
+}
+
+export interface SurvivalWatchlistItem {
+  asset: string;
+  component: string;
+  rul_days: number;
+  risk: string;
+}
+
+export interface SurvivalSummary {
+  assets_analyzed: number;
+  horizon_days: number;
+  component_summary: SurvivalComponentSummary[];
+  watchlist: SurvivalWatchlistItem[];
+}
+
+/**
+ * Fetch FRSO component survival analysis (Weibull AFT) from the backend.
+ * Pure model inference — fast and not rate-limited (no LLM). Returns null if
+ * the backend is unreachable or no survival data is available.
+ */
+export async function getSurvivalAnalysis(): Promise<SurvivalSummary | null> {
+  try {
+    const url = `${API_BASE_URL}/warehouse-dashboard/survival`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      console.warn(`[warehouseService] Survival API error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return data?.survival_summary ?? null;
+  } catch (error) {
+    console.warn('[warehouseService] Survival analysis unavailable:', (error as Error).message);
+    return null;
+  }
+}
+
 /**
  * Fetch predictive maintenance schedule from PostgreSQL backend
  */

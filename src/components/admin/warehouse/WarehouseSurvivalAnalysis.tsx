@@ -108,7 +108,17 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
     );
   }
 
-  const { assets_analyzed, horizon_days, component_summary, watchlist } = data;
+  const { assets_analyzed, horizon_days, component_summary, watchlist, generated_at } = data;
+
+  // Human-friendly "last analyzed" label from the backend timestamp.
+  const lastAnalyzed = (() => {
+    if (!generated_at) return null;
+    const d = new Date(generated_at);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleString(undefined, {
+      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+    });
+  })();
 
   // ── Derived headline metrics (richer than the PDF) ──
   const totalAtRisk30 = component_summary.reduce((s, c) => s + (c.at_risk_30d || 0), 0);
@@ -146,9 +156,16 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
               <p className="text-xs text-muted-foreground">Weibull Accelerated Failure Time (AFT) · predicted Remaining Useful Life</p>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/10 px-3 py-1 text-xs font-medium text-teal-700 dark:text-teal-400">
-            <Clock className="h-3.5 w-3.5" /> {horizon_days}-day horizon
-          </span>
+          <div className="flex items-center gap-2">
+            {lastAnalyzed && (
+              <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                Last analyzed {lastAnalyzed}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/10 px-3 py-1 text-xs font-medium text-teal-700 dark:text-teal-400">
+              <Clock className="h-3.5 w-3.5" /> {horizon_days}-day horizon
+            </span>
+          </div>
         </div>
       </div>
 

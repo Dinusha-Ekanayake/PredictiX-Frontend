@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseBrowserClient";
-import { apiPost } from "./apiClient";
+import { apiPost, apiGet, apiDelete } from "./apiClient";
 
 // ─── FastAPI-backed ticket preview (calls POST /tickets/preview) ──────────────
 
@@ -185,23 +185,7 @@ export async function createTicket(payload: {
 }
 
 export async function fetchTicketStatusCounts(): Promise<Record<string, number>> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const statuses = ["open", "in_progress", "resolved", "closed"];
-  const counts: Record<string, number> = { open: 0, "in-progress": 0, resolved: 0, closed: 0 };
-
-  await Promise.all(
-    statuses.map(async (s) => {
-      const { count } = await supabase!
-        .from("tickets")
-        .select("id", { count: "exact", head: true })
-        .eq("status", s);
-      const uiKey = s === "in_progress" ? "in-progress" : s;
-      counts[uiKey] = count ?? 0;
-    })
-  );
-
-  return counts;
+  return apiGet<Record<string, number>>("/tickets/status-counts");
 }
 
 export async function updateTicketStatus(id: string, status: TicketStatus): Promise<void> {
@@ -241,6 +225,34 @@ export async function deleteTicket(id: string): Promise<void> {
   if (!supabase) throw new Error("Supabase not configured");
   const { error } = await supabase.from("tickets").delete().eq("id", id);
   if (error) throw error;
+}
+
+export async function addTicketAttachment(
+  ticketId: string,
+  filePath: string,
+  mimeType?: string | null,
+  originalFilename?: string | null
+): Promise<void> {
+  await apiPost(`/ticket-attachments/`, {
+    ticket_id: ticketId,
+    file_path: filePath,
+    mime_type: mimeType,
+    original_filename: originalFilename,
+  });
+}
+
+export async function fetchTicketAttachments(ticketId: string): Promise<any[]> {
+  try {
+    const data = await apiGet<any[]>(`/ticket-attachments/?ticket_id=${ticketId}`);
+    return data || [];
+  } catch (err) {
+    console.error("Failed to fetch attachments via API", err);
+    return [];
+  }
+}
+
+export async function deleteTicketAttachment(attachmentId: string): Promise<void> {
+  await apiDelete(`/ticket-attachments/${attachmentId}`);
 }
 
 export type TicketHistoryEntry = {

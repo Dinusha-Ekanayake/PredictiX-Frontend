@@ -9,7 +9,7 @@
  * Response shapes mirror `app/schemas/user_tickets.py`.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const API_URL = "/api/proxy";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -260,5 +260,21 @@ export async function addMyTicketComment(
   return request<UserTicketComment>(`/user/tickets/${ticketId}/comments`, {
     method: "POST",
     body: JSON.stringify({ comment }),
+  });
+}
+
+export async function addMyTicketAttachment(
+  ticketId: string,
+  filePath: string,
+  mimeType?: string | null,
+  originalFilename?: string | null
+): Promise<UserTicketAttachment> {
+  return request<UserTicketAttachment>(`/user/tickets/${ticketId}/attachments`, {
+    method: "POST",
+    body: JSON.stringify({ 
+      file_path: filePath, 
+      mime_type: mimeType, 
+      original_filename: originalFilename 
+    }),
   });
 }

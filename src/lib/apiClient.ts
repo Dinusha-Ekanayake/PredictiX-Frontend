@@ -6,7 +6,7 @@
 
 import { getAccessToken, logout } from "./authService";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const API_BASE_URL = "/api/proxy";
 
 /**
  * Core fetch wrapper — attaches JWT and handles 401.
@@ -49,8 +49,13 @@ export async function apiGet<T>(endpoint: string): Promise<T> {
   const response = await apiFetch(endpoint, { method: "GET" });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(error.detail || "Request failed");
+    let errorObj: any;
+    try {
+      errorObj = await response.json();
+    } catch {
+      errorObj = { detail: "Request failed to parse JSON" };
+    }
+    throw new Error(errorObj.detail || errorObj.error || `Request failed with status ${response.status}`);
   }
 
   return response.json();
@@ -117,7 +122,7 @@ export type ChatbotAskResponse = {
 };
 
 export async function askChatbot(question: string): Promise<ChatbotAskResponse> {
-  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || "/api/proxy";
 
   const response = await fetch(`${chatbotUrl}/chatbot/ask`, {
     method: "POST",

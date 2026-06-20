@@ -179,6 +179,13 @@ interface ReportData {
     maintenanceTrend?: Array<{ month: string; events: number; cost: number }>;
   };
   shapFeatures?: Array<{ feature: string; importance: number }>;
+  // FRSO survival analysis (Weibull AFT) aggregated over critical assets — §4.8
+  survival?: {
+    assets_analyzed: number;
+    horizon_days: number;
+    component_summary: Array<{ component: string; avg_rul_days: number | null; at_risk_30d: number; at_risk_90d: number; assets_scored: number }>;
+    watchlist: Array<{ asset: string; component: string; rul_days: number; risk: string }>;
+  } | null;
 }
 
 
@@ -1297,6 +1304,44 @@ export function generateProfessionalHTML(data: ReportData): string {
     `).join('')}
   </div>` : '';
 
+  // ── §4 (cont.): FRSO COMPONENT SURVIVAL ANALYSIS ──────────────
+  const surv = data.survival;
+  const section4e = (surv && surv.component_summary && surv.component_summary.length) ? `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
+    ${subHeader('4.8 FRSO Component Survival Analysis')}
+    <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 10px;">
+      Weibull Accelerated Failure Time (AFT) survival models — predicted Remaining Useful Life (RUL)
+      per component, aggregated across the ${fmtN(surv.assets_analyzed)} highest-risk assets over a
+      ${surv.horizon_days}-day horizon. "At Risk" counts assets whose median RUL falls within the window.
+    </p>
+    ${subHeader('Component RUL Summary', C.teal)}
+    ${lightTable(
+      ['Component', 'Avg Median RUL (days)', 'At Risk <30d', 'At Risk <90d', 'Assets Scored'],
+      surv.component_summary.map(r => [
+        r.component,
+        r.avg_rul_days == null ? '—' : r.avg_rul_days.toLocaleString(),
+        fmtN(r.at_risk_30d),
+        fmtN(r.at_risk_90d),
+        fmtN(r.assets_scored),
+      ])
+    )}
+    ${(surv.watchlist && surv.watchlist.length) ? `
+      ${subHeader('Soonest-Failing Watchlist', C.red)}
+      <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 8px;">
+        Each asset's soonest-failing component, sorted by predicted median RUL — prioritise these for inspection.
+      </p>
+      ${lightTable(
+        ['Asset', 'Component', 'Median RUL (days)', 'Risk'],
+        surv.watchlist.map(w => [w.asset, w.component, w.rul_days.toLocaleString(), w.risk])
+      )}
+    ` : ''}
+    ${alertBox(
+      `FRSO survival modelling flags component-level degradation ahead of scheduled service. Where median RUL is below the statutory/OEM service interval, bring the inspection forward — survival-driven scheduling is the recommended override over fixed-interval PM.`,
+      'benchmark'
+    )}
+  </div>` : '';
+
   // ── §5: TICKET MANAGEMENT ──────────────────────────────────────
   // Percentages are the share of each priority within the prioritised tickets
   // (High+Medium+Low) — NOT divided by the open-ticket count, which produced
@@ -1573,6 +1618,7 @@ export function generateProfessionalHTML(data: ReportData): string {
   ${section4b}
   ${section4c}
   ${section4d}
+  ${section4e}
   ${section5a}
   ${section5b}
   ${section5c}

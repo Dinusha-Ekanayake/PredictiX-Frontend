@@ -39,6 +39,8 @@ export interface SurvivalSummary {
   horizon_days: number;
   component_summary: SurvivalComponentSummary[];
   watchlist: SurvivalWatchlistItem[];
+  /** ISO-8601 UTC timestamp of when the analysis was scored (from the backend). */
+  generated_at?: string;
 }
 
 /**
@@ -61,7 +63,10 @@ export async function getSurvivalAnalysis(): Promise<SurvivalSummary | null> {
     }
 
     const data = await response.json();
-    return data?.survival_summary ?? null;
+    const summary = data?.survival_summary;
+    if (!summary) return null;
+    // Carry the backend timestamp onto the summary for display.
+    return { ...summary, generated_at: data.generated_at };
   } catch (error) {
     console.warn('[warehouseService] Survival analysis unavailable:', (error as Error).message);
     return null;

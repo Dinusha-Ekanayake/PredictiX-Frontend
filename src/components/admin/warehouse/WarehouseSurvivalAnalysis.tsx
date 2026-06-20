@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   TrendingDown,
   Timer,
+  Inbox,
 } from "lucide-react";
 import type {
   SurvivalSummary,
@@ -81,7 +82,31 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
     );
   }
 
-  if (!data || !data.component_summary?.length) return null;
+  // Empty state — backend unreachable or no critical assets scored. Show an
+  // informative card rather than silently hiding the feature.
+  if (!data || !data.component_summary?.length) {
+    return (
+      <Card className="rounded-2xl">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <HeartPulse className="h-4 w-4 text-teal-500" /> FRSO Component Survival Analysis
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+            <div className="rounded-full bg-slate-100 dark:bg-slate-800 p-3">
+              <Inbox className="h-6 w-6 text-slate-400" />
+            </div>
+            <p className="text-sm font-medium text-muted-foreground">No survival analysis available</p>
+            <p className="text-xs text-muted-foreground max-w-sm">
+              This appears once the backend has scored at-risk assets with the Weibull AFT models.
+              Check that the backend is running and that low-health predictions exist.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const { assets_analyzed, horizon_days, component_summary, watchlist } = data;
 

@@ -171,3 +171,28 @@ export async function getCriticalAssets() {
     return [];
   }
 }
+
+/**
+ * Fetch fleet-level FRSO survival summary (per-component RUL + watchlist)
+ * from the backend GET /survival/warehouse/summary endpoint.
+ */
+export async function getFleetSurvival(maxAssets = 12, horizonDays = 180) {
+  try {
+    const url = `${API_BASE_URL}/survival/warehouse/summary?max_assets=${maxAssets}&horizon_days=${horizonDays}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      console.warn(`[warehouseService] Fleet survival error: ${response.status}`);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.warn('[warehouseService] Fleet survival unavailable:', (error as Error).message);
+    return null;
+  }
+}

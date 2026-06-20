@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { downloadAssetPDF, type AssetReportData } from "@/lib/assetPdfExport";
 
-const API_URL = "/api/proxy";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 type Props = {
   isOpen: boolean;

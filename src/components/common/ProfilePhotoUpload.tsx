@@ -61,7 +61,7 @@ export default function ProfilePhotoUpload() {
 
     try {
       const token = localStorage.getItem("token") || localStorage.getItem("predictix.access_token");
-      const res = await fetch(`${"/api/proxy"}/profiles/me/avatar`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/profiles/me/avatar`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,

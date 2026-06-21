@@ -3,54 +3,51 @@
  * Handles login, token storage, and session management.
  */
 
-const API_BASE_URL = "/api/proxy";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/** Flat shape returned by POST /auth/login */
-interface LoginResponse {
-  access_token: string;
+export interface WarehouseOption {
+  id: string;
+  name: string;
+  code: string;
+  city?: string | null;
+}
+
+/** Shape returned by POST /auth/login */
+export interface LoginResponse {
+  access_token?: string | null;
   token_type: string;
-  user_id: string;
-  email: string;
-  role: string;       // "admin" | "user"
-  full_name: string;
+  user_id?: string | null;
+  email?: string | null;
+  role?: string | null;
+  full_name?: string | null;
+  warehouse_id?: string | null;
+  warehouse_name?: string | null;
+  // Super-admin step-1 fields
+  requires_warehouse_selection: boolean;
+  selection_token?: string | null;
+  warehouses?: WarehouseOption[] | null;
 }
 
 /** Normalised user stored in localStorage */
 export interface StoredUser {
   id: string;
   email: string;
-  role: string;       // uppercase: "ADMIN" | "USER"
+  role: string;       // uppercase: "ADMIN" | "USER" | "SUPER_ADMIN"
   full_name: string;
-}
-
-interface LoginPayload {
-  email: string;
-  password: string;
-  role: string;       // "ADMIN" | "USER" | "SUPER_ADMIN" — required by backend
   warehouse_id?: string;
-}
-
-interface RegisterPayload {
-  email: string;
-  password: string;
-  user_name: string;
-  full_name: string;
-  contact_no?: string;
+  warehouse_name?: string;
 }
 
 // ─── API calls ────────────────────────────────────────────────────────────────
 
-/**
- * Login — sends email, password AND role to /auth/login.
- * The backend validates that the declared role matches the stored account role.
- */
-export async function login({ email, password, role, warehouse_id }: LoginPayload): Promise<LoginResponse> {
+/** Step 1 — email + password only. Role is detected by the backend. */
+export async function login(email: string, password: string): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, role, warehouse_id }),
+    body: JSON.stringify({ email, password }),
   });
 
   if (!response.ok) {
@@ -61,19 +58,20 @@ export async function login({ email, password, role, warehouse_id }: LoginPayloa
   return response.json();
 }
 
-/**
- * Register new user
- */
-export async function register(payload: RegisterPayload) {
-  const response = await fetch(`${API_BASE_URL}/auth/register`, {
+/** Step 2 (super_admin only) — exchange selection_token + warehouse_id for a full JWT. */
+export async function selectWarehouse(
+  selectionToken: string,
+  warehouseId: string,
+): Promise<LoginResponse> {
+  const response = await fetch(`${API_BASE_URL}/auth/login/select-warehouse`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ selection_token: selectionToken, warehouse_id: warehouseId }),
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || "Registration failed.");
+    throw new Error(error.detail || "Warehouse selection failed. Please try again.");
   }
 
   return response.json();
@@ -82,19 +80,23 @@ export async function register(payload: RegisterPayload) {
 // ─── Session helpers ──────────────────────────────────────────────────────────
 
 /**
- * Persist the login response to localStorage.
- * Normalises the flat backend response into a StoredUser object.
+ * Persist a completed login response to localStorage.
+ * Only call this when access_token is present (not after step-1 super_admin).
  */
 export function storeAuthSession(data: LoginResponse): void {
+  if (!data.access_token || !data.user_id || !data.email || !data.role) {
+    throw new Error("Cannot store an incomplete auth session.");
+  }
+
   const user: StoredUser = {
     id: data.user_id,
     email: data.email,
-    role: data.role.toUpperCase(),   // always store as uppercase
-    full_name: data.full_name,
+    role: data.role.toUpperCase(),
+    full_name: data.full_name ?? data.email,
+    warehouse_id: data.warehouse_id ?? undefined,
+    warehouse_name: data.warehouse_name ?? undefined,
   };
 
-  // Canonical key + legacy "token" key (read by userProfileApi) — keep both in
-  // sync so every consumer finds the JWT regardless of which key it checks.
   localStorage.setItem("predictix.access_token", data.access_token);
   localStorage.setItem("token", data.access_token);
   localStorage.setItem("predictix.user", JSON.stringify(user));
@@ -102,8 +104,11 @@ export function storeAuthSession(data: LoginResponse): void {
   localStorage.setItem("predictix.user.email", user.email);
   localStorage.setItem("predictix.user.id", user.id);
   localStorage.setItem("predictix.user.name", user.full_name);
-  if ((data as any).active_warehouse_id) {
-    localStorage.setItem("predictix.user.warehouse_id", (data as any).active_warehouse_id);
+  if (user.warehouse_id) {
+    localStorage.setItem("predictix.user.warehouse_id", user.warehouse_id);
+  }
+  if (user.warehouse_name) {
+    localStorage.setItem("predictix.user.warehouse_name", user.warehouse_name);
   }
 }
 
@@ -137,6 +142,9 @@ export function logout(): void {
   localStorage.removeItem("predictix.user.email");
   localStorage.removeItem("predictix.user.id");
   localStorage.removeItem("predictix.user.name");
+  localStorage.removeItem("predictix.user.warehouse_id");
+  localStorage.removeItem("predictix.user.warehouse_name");
+  localStorage.removeItem("predictix.avatar_url");
 }
 
 /** True if a JWT is present in localStorage. */
@@ -149,9 +157,10 @@ export function getUserRole(): string | null {
   return getUser()?.role ?? null;
 }
 
-/** True if the stored role is ADMIN. */
+/** True if the stored role is ADMIN or SUPER_ADMIN. */
 export function isAdmin(): boolean {
-  return getUserRole() === "ADMIN";
+  const r = getUserRole();
+  return r === "ADMIN" || r === "SUPER_ADMIN";
 }
 
 /** True if the stored role is USER. */

@@ -231,6 +231,25 @@ export async function updateAssetStatus(assetId: string, status: string): Promis
   return response.json();
 }
 
+// ─── Generate asset PDF report ────────────────────────────────────────────────
+
+export async function generateAssetReport(assetId: string): Promise<void> {
+  const response = await apiFetch(`/asset-reports/${assetId}`, { method: "POST" });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: "Report generation failed" }));
+    throw new Error(err.detail || "Report generation failed");
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `asset-report-${assetId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // ─── Delete asset ──────────────────────────────────────────────────────────────
 
 export async function deleteAsset(assetId: string): Promise<void> {

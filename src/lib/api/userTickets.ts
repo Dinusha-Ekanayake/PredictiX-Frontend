@@ -9,7 +9,7 @@
  * Response shapes mirror `app/schemas/user_tickets.py`.
  */
 
-const API_URL = "/api/proxy";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // ---------------------------------------------------------------------------
 // Types

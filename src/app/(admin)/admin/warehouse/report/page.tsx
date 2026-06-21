@@ -213,10 +213,10 @@ export default function WarehouseReportPage() {
     : [];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="bg-slate-50 dark:bg-slate-950 -mx-4 -mt-6 pb-8">
       {/* ── Header ── */}
       <div className="bg-white border-b border-slate-200 dark:bg-slate-950 dark:border-slate-800">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex items-center gap-3">
@@ -272,7 +272,7 @@ export default function WarehouseReportPage() {
 
       {/* ── RAG Sources Panel ── */}
       {sourcesOpen && ctx && (
-        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6 lg:px-8">
           <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900 dark:bg-violet-950/30">
             <h3 className="mb-3 text-sm font-semibold text-violet-700 dark:text-violet-300">
               📊 RAG Data Sources — Live PostgreSQL Context Injected into LLM
@@ -289,7 +289,7 @@ export default function WarehouseReportPage() {
         </div>
       )}
 
-      <div ref={reportRef} className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <div ref={reportRef} className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         {/* ── State: Empty ── */}
         {!loading && !aiSections && !error && (
           <div className="flex min-h-[400px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">

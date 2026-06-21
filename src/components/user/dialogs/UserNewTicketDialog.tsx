@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Bot,
   CheckCircle2,
+  AlertTriangle,
   Loader2,
   Lock,
   Plus,
@@ -49,6 +50,8 @@ import {
 } from "@/lib/api/userTickets";
 import { listUsers, type UserItem } from "@/lib/userService";
 import { apiGet } from "@/lib/apiClient";
+import { addMyTicketAttachment } from "@/lib/api/userTickets";
+import { supabase } from "@/lib/supabaseBrowserClient";
 
 // ─── local types ──────────────────────────────────────────────────────────────
 
@@ -94,6 +97,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
   const [assignedTo, setAssignedTo] = React.useState("");
   const [users, setUsers] = React.useState<UserItem[]>([]);
   const [usersLoading, setUsersLoading] = React.useState(false);
+  const [file, setFile] = React.useState<File | null>(null);
 
   // asset summary
   const [assetSummary, setAssetSummary] = React.useState<string | null>(null);
@@ -173,7 +177,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
       setAssetId(""); setAssets([]); setTitle(""); setDescription("");
       setAssignedTo(""); setUsers([]); setAssetSummary(null);
       setAi({ status: "idle" }); setCategoryOverride("");
-      setIsSubmitting(false); setResult(null);
+      setIsSubmitting(false); setResult(null); setFile(null);
     }, 200);
     return () => clearTimeout(t);
   }, [open]);
@@ -200,6 +204,33 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
         predicted_category: categoryOverride || (aiResult?.predicted_category ?? undefined),
         ticket_summary: aiResult?.ticket_summary ?? undefined,
       });
+
+      if (file && supabase) {
+        const fileExt = file.name.split(".").pop();
+        const fileName = `${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from("ticket-attachments")
+          .upload(fileName, file);
+        
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          toast.error("Ticket created, but failed to upload image.");
+        } else {
+          const { data: publicUrlData } = supabase.storage
+            .from("ticket-attachments")
+            .getPublicUrl(fileName);
+            
+          if (publicUrlData?.publicUrl) {
+            await addMyTicketAttachment(
+              created.id,
+              publicUrlData.publicUrl,
+              file.type,
+              file.name
+            );
+          }
+        }
+      }
+
       toast.success("Ticket created", { description: `${created.ticket_number} — ${created.title}` });
       setResult(created);
       onCreated?.(created);
@@ -259,7 +290,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <Button variant="secondary" onClick={() => {
                   setTitle(""); setDescription(""); setAssetId(""); setAssignedTo("");
-                  setAi({ status: "idle" }); setCategoryOverride(""); setResult(null); setAssetSummary(null);
+                  setAi({ status: "idle" }); setCategoryOverride(""); setResult(null); setAssetSummary(null); setFile(null);
                 }}>
                   Create another
                 </Button>
@@ -332,6 +363,28 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
                 />
               </div>
 
+              {/* Image Upload */}
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Attach Image (optional)</p>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  disabled={isSubmitting}
+                  className="cursor-pointer file:text-foreground file:bg-transparent file:border-0 file:text-sm file:font-medium"
+                />
+                {file && (
+                  <div className="mt-3">
+                    <p className="text-xs text-muted-foreground mb-1">Preview:</p>
+                    <img 
+                      src={URL.createObjectURL(file)} 
+                      alt="Preview" 
+                      className="max-h-32 rounded-md object-contain border bg-muted/30" 
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* AI results: category (editable) + priority (locked) */}
               <div className="grid grid-cols-2 gap-3">
                 {/* Category — user CAN change */}
@@ -368,10 +421,13 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
                     {ai.status === "running" ? (
                       <><Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" /><span className="text-muted-foreground">Analyzing…</span></>
                     ) : predictedPriority ? (
-                      <>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${PRIORITY_COLORS[predictedPriority] ?? ""}`}>
-                          {predictedPriority.charAt(0).toUpperCase() + predictedPriority.slice(1)}
-                        </span>
+                        <>
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${PRIORITY_COLORS[predictedPriority] ?? ""}`}>
+                            {predictedPriority === "high" && <AlertTriangle className="h-3.5 w-3.5" />}
+                            {predictedPriority === "medium" && <AlertCircle className="h-3.5 w-3.5" />}
+                            {predictedPriority === "low" && <CheckCircle2 className="h-3.5 w-3.5" />}
+                            {predictedPriority.charAt(0).toUpperCase() + predictedPriority.slice(1)}
+                          </span>
                         <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
                           <Lock className="h-3 w-3" />AI set
                         </span>

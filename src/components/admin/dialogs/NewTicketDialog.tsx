@@ -13,7 +13,7 @@
  */
 
 import * as React from "react";
-import { AlertCircle, Bot, Loader2, Plus, Sparkles } from "lucide-react";
+import { AlertCircle, Bot, Loader2, Plus, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -40,9 +40,11 @@ import {
   type TicketPriority,
   type TicketCategory,
   type TicketAiPreview,
+  addTicketAttachment,
 } from "@/lib/ticketService";
 import { listUsers, type UserItem } from "@/lib/userService";
 import { getUser } from "@/lib/authService";
+import { supabase } from "@/lib/supabaseBrowserClient";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -81,6 +83,7 @@ export default function NewTicketDialog({
   const [users, setUsers] = React.useState<UserItem[]>([]);
   const [usersLoading, setUsersLoading] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [file, setFile] = React.useState<File | null>(null);
 
   // asset summary
   const [assetSummary, setAssetSummary] = React.useState<string | null>(null);
@@ -155,7 +158,7 @@ export default function NewTicketDialog({
     const t = setTimeout(() => {
       setAssetId(""); setTitle(""); setDescription(""); setPriority(""); setCategory("");
       setAssignedTo(""); setIsSubmitting(false); setAssets([]); setUsers([]);
-      setAssetSummary(null); setAi({ status: "idle" });
+      setAssetSummary(null); setAi({ status: "idle" }); setFile(null);
     }, 200);
     return () => clearTimeout(t);
   }, [open, presetAssetId]);
@@ -182,6 +185,33 @@ export default function NewTicketDialog({
         assigned_to: assignedTo || null,
         created_by: currentUser.id,
       });
+
+      if (file && supabase) {
+        const fileExt = file.name.split(".").pop();
+        const fileName = `${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from("ticket-attachments")
+          .upload(fileName, file);
+        
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          toast.error("Ticket created, but failed to upload image.");
+        } else {
+          const { data: publicUrlData } = supabase.storage
+            .from("ticket-attachments")
+            .getPublicUrl(fileName);
+            
+          if (publicUrlData?.publicUrl) {
+            await addTicketAttachment(
+              ticket.id,
+              publicUrlData.publicUrl,
+              file.type,
+              file.name
+            );
+          }
+        }
+      }
+
       toast.success("Ticket created", { description: ticket.title });
       onCreated?.(ticket);
       onOpenChange(false);
@@ -265,6 +295,28 @@ export default function NewTicketDialog({
             />
           </div>
 
+          {/* Image Upload */}
+          <div>
+            <p className="text-sm text-muted-foreground mb-2">Attach Image (optional)</p>
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              disabled={isSubmitting}
+              className="cursor-pointer file:text-foreground file:bg-transparent file:border-0 file:text-sm file:font-medium"
+            />
+            {file && (
+              <div className="mt-3">
+                <p className="text-xs text-muted-foreground mb-1">Preview:</p>
+                <img 
+                  src={URL.createObjectURL(file)} 
+                  alt="Preview" 
+                  className="max-h-32 rounded-md object-contain border bg-muted/30" 
+                />
+              </div>
+            )}
+          </div>
+
           {/* Priority + Category — both editable for admin */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -278,9 +330,24 @@ export default function NewTicketDialog({
                   <SelectValue placeholder={aiBlocking ? "Analyzing…" : "AI will suggest"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="high">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      High
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="medium">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-500" />
+                      Medium
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="low">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      Low
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

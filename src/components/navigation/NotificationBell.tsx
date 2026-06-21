@@ -58,13 +58,12 @@ export default function NotificationBell() {
   const { user } = useUser();
   const userId = user?.id;
 
-  // WebSocket Connection
-  React.useEffect(() => {
-    if (!userId) return;
+    // WebSocket Connection
+    React.useEffect(() => {
+      if (!userId) return;
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || apiUrl.replace(/^http/, "ws");
-    const ws = new WebSocket(`${wsUrl}/ws/notifications/${userId}`);
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
+      const ws = new WebSocket(`${wsUrl}/ws/notifications/${userId}`);
 
     ws.onmessage = (event) => {
       try {

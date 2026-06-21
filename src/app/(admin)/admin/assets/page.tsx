@@ -24,7 +24,7 @@ import type { Asset, AssetDetail, AssetFilters } from "@/components/admin/assets
 /* ── Warehouse options derived from asset list ────────────────────────────────── */
 function extractWarehouseOptions(assets: Asset[]) {
   const seen = new Map<string, string>();
-  assets.forEach((a) => seen.set(a.warehouse_id, a.warehouse_id)); // no name in Asset model
+  assets.forEach((a) => seen.set(a.warehouse_id, a.warehouse_id));
   return Array.from(seen.entries()).map(([value]) => ({
     value,
     label: `Warehouse ${value.slice(0, 8)}…`,
@@ -57,7 +57,7 @@ export default function AdminAssetsPage() {
 
   React.useEffect(() => {
     let cancelled = false;
-    const delay = filters.query ? 350 : 0; // debounce only text search
+    const delay = filters.query ? 350 : 0;
 
     const timer = setTimeout(async () => {
       setListLoading(true);
@@ -111,10 +111,10 @@ export default function AdminAssetsPage() {
     return () => { cancelled = true; };
   }, [selectedId]);
 
-  // ── Refresh detail (called after running a new prediction) ────────────────────
+  // ── Refresh detail ────────────────────────────────────────────────────────────
   function refreshDetail() {
     if (!selectedId) return;
-    setSelectedId((id) => id); // triggers the effect above
+    setSelectedId((id) => id);
   }
 
   // ── Delete handler ────────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ export default function AdminAssetsPage() {
     }
   }
 
-  // ── Create/edit handlers ────────────────────────────────────────────────────
+  // ── Create/edit handlers ──────────────────────────────────────────────────────
   function openCreate() {
     setEditingAsset(null);
     setFormOpen(true);
@@ -145,7 +145,6 @@ export default function AdminAssetsPage() {
       return exists ? prev.map((a) => (a.id === saved.id ? saved : a)) : [saved, ...prev];
     });
     setSelectedId(saved.id);
-    // refresh the detail panel for the saved asset
     setSelectedId((id) => id);
   }
 
@@ -247,6 +246,8 @@ export default function AdminAssetsPage() {
         warehouseOptions={warehouseOptions}
         loading={listLoading}
         onAddAsset={openCreate}
+        selectedAssetId={selectedId}
+        selectedAssetName={detail?.asset?.asset_name}
       />
 
       {/* ── Table + Details ── */}

@@ -3,9 +3,8 @@
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, ShieldCheck, AlertTriangle, Ticket, Truck, AlertCircle, Zap, DollarSign } from "lucide-react";
-import type { WarehouseSummaryData } from "@/lib/warehouseService";
 
-export default function WarehouseOverviewCards({ data, isLoading }: { data?: WarehouseSummaryData | null; isLoading?: boolean }) {
+export default function WarehouseOverviewCards({ data, isLoading }: { data?: any; isLoading?: boolean }) {
   if (isLoading) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -20,7 +19,7 @@ export default function WarehouseOverviewCards({ data, isLoading }: { data?: War
   const displayKpis = data && data.kpis && data.kpiGrid 
     ? [
         // First 4 cards from kpis array (from database queries)
-        ...data.kpis.map((kpi) => ({
+        ...data.kpis.map((kpi: any) => ({
           label: kpi.label,
           value: kpi.value,
           sub: kpi.sub,
@@ -30,7 +29,7 @@ export default function WarehouseOverviewCards({ data, isLoading }: { data?: War
                : Ticket,
         })),
         // Next 4 cards from kpiGrid array (from database queries)
-        ...data.kpiGrid.map((kpi) => ({
+        ...data.kpiGrid.map((kpi: any) => ({
           label: kpi.title,
           value: kpi.value,
           sub: kpi.subtitle,

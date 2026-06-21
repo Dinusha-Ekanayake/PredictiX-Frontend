@@ -10,15 +10,15 @@ import {
   TrendingUp, TrendingDown, Minus, Pencil, Trash2, Bot,
   ClipboardList, Users, ShieldCheck, Zap, AlertTriangle,
   RefreshCw, Ticket, ChevronRight, Loader2,
-  Info, Gauge, Hash, Wrench,
+  Info, Gauge, Hash, Wrench, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
 import type { AssetDetail, ComponentSurvivalResponse } from "./types";
-import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
+import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction, generateAssetReport } from "./assetService";
 import LogMaintenanceDialog from "./LogMaintenanceDialog";
-
+import SendServiceReminderButton from "./SendServiceReminderButton";
 /* ══════════════════════════════════════════════════════════════════════════════
    Helpers
    ══════════════════════════════════════════════════════════════════════════════ */
@@ -109,18 +109,19 @@ function RiskGauge({ probability }: { probability: number }) {
 }
 
 /* ── Info field ──────────────────────────────────────────────────────────────── */
-function InfoField({ icon, label, value, mono, valueClass }: {
-  icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string;
+function InfoField({ icon, label, value, mono, valueClass, action }: {
+  icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string; action?: React.ReactNode;
 }) {
   return (
     <div className="h-full rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
       {icon && <div className="mt-0.5 text-muted-foreground/60 shrink-0">{icon}</div>}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="text-[11px] text-muted-foreground/80 font-medium">{label}</div>
         <div className={cn("text-sm font-medium mt-0.5 leading-snug break-words", mono && "font-mono text-xs", valueClass)}>
           {value}
         </div>
       </div>
+      {action && <div className="ml-auto -mr-1 -mt-1 shrink-0">{action}</div>}
     </div>
   );
 }
@@ -227,6 +228,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
   const router = useNavRouter();
 
   const [runningPrediction, setRunningPrediction] = React.useState(false);
+  const [generatingReport, setGeneratingReport] = React.useState(false);
   const [showLogMaintenance, setShowLogMaintenance] = React.useState(false);
 
   const healthScore = deriveHealthScore(asset, prediction);
@@ -270,6 +272,19 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
       toast.error(e.message || "Failed to generate prediction");
     } finally {
       setRunningPrediction(false);
+    }
+  }
+
+  async function handleGenerateReport() {
+    setGeneratingReport(true);
+    try {
+      await generateAssetReport(asset.id);
+      toast.success("Report downloaded successfully!");
+    } catch (e: any) {
+      console.error("Report generation failed:", e);
+      toast.error(e.message || "Failed to generate report");
+    } finally {
+      setGeneratingReport(false);
     }
   }
 
@@ -324,6 +339,18 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   ? <Loader2 className="h-3 w-3 animate-spin" />
                   : <RefreshCw className="h-3 w-3" />}
                 {runningPrediction ? "Running…" : "Run AI"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-xl gap-1.5 text-xs border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                onClick={handleGenerateReport}
+                disabled={generatingReport}
+              >
+                {generatingReport
+                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                  : <FileText className="h-3 w-3" />}
+                {generatingReport ? "Generating…" : "Report"}
               </Button>
               {onEdit && (
                 <Button
@@ -477,6 +504,14 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   : "—"
             }
             valueClass={asset.status !== "maintenance" && daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
+            action={
+              <SendServiceReminderButton
+                assetId={asset.id}
+                assetName={asset.asset_name}
+                hasAssignee={!!asset.assigned_to}
+                hasServiceDate={!!asset.next_service_date}
+              />
+            }
           />
           <InfoField
             icon={<Bot className="h-3.5 w-3.5" />}
@@ -864,12 +899,26 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             {tickets.length === 0 ? (
               <EmptyState message="No tickets raised for this asset." icon={Ticket} />
             ) : (
-              tickets.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => goToTicket(t.id)}
-                  className="w-full text-left ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all hover:border-primary/30 group"
-                >
+              tickets.map((t) => {
+                const s = (t.status || "").toLowerCase();
+                const statusBorder =
+                  s === "open"
+                    ? "border-rose-500/30 dark:border-rose-500/25 hover:border-rose-500 dark:hover:border-rose-500/60"
+                    : s === "in-progress" || s === "in_progress"
+                    ? "border-amber-500/30 dark:border-amber-500/25 hover:border-amber-500 dark:hover:border-amber-500/60"
+                    : s === "resolved"
+                    ? "border-emerald-500/30 dark:border-emerald-500/25 hover:border-emerald-500 dark:hover:border-emerald-500/60"
+                    : "border-slate-500/30 dark:border-slate-500/25 hover:border-slate-500 dark:hover:border-slate-500/60";
+
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => goToTicket(t.id)}
+                    className={cn(
+                      "w-full text-left ticket-dynamic rounded-xl border p-4 transition-all group",
+                      statusBorder
+                    )}
+                  >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -896,8 +945,9 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                     <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary/60 transition-colors shrink-0 mt-1" />
                   </div>
                 </button>
-              ))
-            )}
+              );
+            })
+          )}
           </TabsContent>
 
           {/* ═══ Maintenance Logs ═══ */}

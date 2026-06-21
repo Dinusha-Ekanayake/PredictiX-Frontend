@@ -10,13 +10,13 @@ import {
   TrendingUp, TrendingDown, Minus, Pencil, Trash2, Bot,
   ClipboardList, Users, ShieldCheck, Zap, AlertTriangle,
   RefreshCw, Ticket, ChevronRight, Loader2,
-  Info, Gauge, Hash, Wrench,
+  Info, Gauge, Hash, Wrench, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
 import type { AssetDetail, ComponentSurvivalResponse } from "./types";
-import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
+import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction, generateAssetReport } from "./assetService";
 import LogMaintenanceDialog from "./LogMaintenanceDialog";
 import SendServiceReminderButton from "./SendServiceReminderButton";
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -228,6 +228,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
   const router = useNavRouter();
 
   const [runningPrediction, setRunningPrediction] = React.useState(false);
+  const [generatingReport, setGeneratingReport] = React.useState(false);
   const [showLogMaintenance, setShowLogMaintenance] = React.useState(false);
 
   const healthScore = deriveHealthScore(asset, prediction);
@@ -271,6 +272,19 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
       toast.error(e.message || "Failed to generate prediction");
     } finally {
       setRunningPrediction(false);
+    }
+  }
+
+  async function handleGenerateReport() {
+    setGeneratingReport(true);
+    try {
+      await generateAssetReport(asset.id);
+      toast.success("Report downloaded successfully!");
+    } catch (e: any) {
+      console.error("Report generation failed:", e);
+      toast.error(e.message || "Failed to generate report");
+    } finally {
+      setGeneratingReport(false);
     }
   }
 
@@ -325,6 +339,18 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   ? <Loader2 className="h-3 w-3 animate-spin" />
                   : <RefreshCw className="h-3 w-3" />}
                 {runningPrediction ? "Running…" : "Run AI"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-xl gap-1.5 text-xs border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                onClick={handleGenerateReport}
+                disabled={generatingReport}
+              >
+                {generatingReport
+                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                  : <FileText className="h-3 w-3" />}
+                {generatingReport ? "Generating…" : "Report"}
               </Button>
               {onEdit && (
                 <Button

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import Image from "next/image";
 import { Loader2, Boxes, Upload, X, Image as ImageIcon } from "lucide-react";
 

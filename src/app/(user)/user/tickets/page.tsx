@@ -26,7 +26,7 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 
 import PredictiXLoader from "@/components/loading/PredictiXLoader";

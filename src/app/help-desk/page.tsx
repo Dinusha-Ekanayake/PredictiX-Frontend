@@ -17,7 +17,7 @@ import {
   Mail,
   FileQuestion,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 
 import AdminNavbar from "@/components/navigation/AdminNavbar";
 import UserNavbar from "@/components/navigation/UserNavbar";

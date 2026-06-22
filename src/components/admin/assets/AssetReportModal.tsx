@@ -7,7 +7,7 @@ import {
   DollarSign, Ticket, BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { downloadAssetPDF, type AssetReportData } from "@/lib/assetPdfExport";
 

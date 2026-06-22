@@ -11,6 +11,7 @@ import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/Warehouse
 import WarehouseComponentHealth from "@/components/admin/warehouse/WarehouseComponentHealth";
 import WarehouseRecentMaintenance from "@/components/admin/warehouse/WarehouseRecentMaintenance";
 import WarehouseSurvivalAnalysis from "@/components/admin/warehouse/WarehouseSurvivalAnalysis";
+import WarehouseExecutiveSummary from "@/components/admin/warehouse/WarehouseExecutiveSummary";
 import { getMaintenanceSchedule, getSurvivalAnalysis, type SurvivalSummary } from "@/lib/warehouseService";
 
 // ── Warehouse Report (my section — warehouse components only) ──
@@ -142,6 +143,10 @@ export default function WarehousePage() {
 
       {/* ── Existing dashboard (completely untouched) ── */}
       <WarehouseOverviewCards data={data} isLoading={refreshing && !data} />
+
+      {/* ── AI Executive Overview (deterministic narrative from /summary) ── */}
+      <WarehouseExecutiveSummary summary={data?.executiveSummary} isLoading={refreshing && !data} />
+
       {data && <WarehouseInsightsSection data={data} />}
 
       {/* ── Component Health Overview (sensor_readings) ── */}

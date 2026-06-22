@@ -24,6 +24,7 @@ export interface LoginResponse {
   full_name?: string | null;
   warehouse_id?: string | null;
   warehouse_name?: string | null;
+  avatar_url?: string | null;
   // Super-admin step-1 fields
   requires_warehouse_selection: boolean;
   selection_token?: string | null;
@@ -109,6 +110,9 @@ export function storeAuthSession(data: LoginResponse): void {
   }
   if (user.warehouse_name) {
     localStorage.setItem("predictix.user.warehouse_name", user.warehouse_name);
+  }
+  if (data.avatar_url) {
+    localStorage.setItem("predictix.avatar_url", data.avatar_url);
   }
 }
 

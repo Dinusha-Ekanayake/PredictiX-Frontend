@@ -30,7 +30,7 @@ import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialo
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
 import EditUserDialog from "@/components/admin/users/EditUserDialog";
 import type { AssetItem } from "@/components/admin/users/ViewAssignedAssetsDialog";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 
 import {
   listUsers,

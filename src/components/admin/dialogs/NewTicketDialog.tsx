@@ -14,7 +14,7 @@
 
 import * as React from "react";
 import { AlertCircle, Bot, Loader2, Plus, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 
 import {
   Dialog,

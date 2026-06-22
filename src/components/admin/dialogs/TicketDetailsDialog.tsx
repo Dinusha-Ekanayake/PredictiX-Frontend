@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, AlertCircle, CheckCircle, Trash2, Loader2, Sparkles } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { 
   updateTicketStatus, 
   updateTicketPriority, 

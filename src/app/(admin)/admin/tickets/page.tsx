@@ -5,7 +5,7 @@ import { Search, Filter, AlertTriangle, CheckCircle, AlertCircle, RefreshCw, XCi
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";

@@ -10,7 +10,7 @@ import {
   deleteNotification,
   type NotificationOut
 } from "@/lib/api/notificationsApi";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/hooks/useAuth";

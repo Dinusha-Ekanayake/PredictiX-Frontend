@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import ProfilePhotoUpload from "@/components/common/ProfilePhotoUpload";
 import { fetchMyProfile, updateMyProfile } from "@/lib/api/userProfileApi";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 
 export default function AdminSettingsPage() {
   const [emailNotifications, setEmailNotifications] = useState(true);

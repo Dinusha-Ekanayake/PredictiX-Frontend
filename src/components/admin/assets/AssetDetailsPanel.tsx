@@ -12,7 +12,7 @@ import {
   RefreshCw, Ticket, ChevronRight, Loader2,
   Info, Gauge, Hash, Wrench, FileText,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
 import type { AssetDetail, ComponentSurvivalResponse } from "./types";

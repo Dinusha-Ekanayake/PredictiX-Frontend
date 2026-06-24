@@ -268,8 +268,10 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
       toast.success("Prediction generated successfully!");
       onRefresh();
     } catch (e: any) {
-      console.error("Prediction failed:", e);
-      toast.error(e.message || "Failed to generate prediction");
+      console.warn("Prediction failed:", e);
+      const msg = e.message || "Failed to generate prediction";
+      const isNoSensor = msg.toLowerCase().includes("no sensor reading");
+      toast.error(isNoSensor ? "No sensor data available for this asset. Please ensure sensor readings are recorded before running a prediction." : msg);
     } finally {
       setRunningPrediction(false);
     }

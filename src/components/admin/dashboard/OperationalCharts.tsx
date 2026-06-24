@@ -59,8 +59,8 @@ export default function OperationalCharts() {
 
           <TabsContent value="downtime" className="mt-3">
             <CardContent className="p-0">
-              <div className="h-[280px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-70 w-full min-h-70">
+                <ResponsiveContainer width="100%" height="100%" minHeight={280}>
                   <LineChart data={downtimeTrend} margin={{ top: 10, right: 16, left: -8, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
@@ -81,8 +81,8 @@ export default function OperationalCharts() {
 
           <TabsContent value="health" className="mt-3">
             <CardContent className="p-0">
-              <div className="h-[280px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-70 w-full min-h-70">
+                <ResponsiveContainer width="100%" height="100%" minHeight={280}>
                   <PieChart>
                     <Pie
                       data={healthDistribution}

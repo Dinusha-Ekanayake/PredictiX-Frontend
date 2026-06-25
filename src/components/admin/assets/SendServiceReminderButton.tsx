@@ -1,8 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { Mail, Loader2 } from "lucide-react";
-import { toast } from "@/lib/customToast";
+import { Mail, Loader2, Send } from "lucide-react";
+import { toast } from "sonner";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -18,17 +29,25 @@ export default function SendServiceReminderButton({
   hasAssignee,
   hasServiceDate,
 }: Props) {
+  const [open, setOpen] = React.useState(false);
+  const [note, setNote] = React.useState("");
   const [loading, setLoading] = React.useState(false);
 
-  const disabled = loading || !hasAssignee || !hasServiceDate;
+  const disabled = !hasAssignee || !hasServiceDate;
 
-  let title = "Send service reminder to assigned user";
-  if (!hasAssignee) title = "No user assigned to this asset";
-  else if (!hasServiceDate) title = "No service date set";
+  let disabledReason: string | null = null;
+  if (!hasAssignee) disabledReason = "No user assigned to this asset";
+  else if (!hasServiceDate) disabledReason = "No service date set";
 
-  async function handleClick(e: React.MouseEvent) {
+  function handleOpen(e: React.MouseEvent) {
     e.stopPropagation();
     e.preventDefault();
+    if (disabled) return;
+    setNote("");
+    setOpen(true);
+  }
+
+  async function handleSend() {
     setLoading(true);
     try {
       const token =
@@ -47,6 +66,7 @@ export default function SendServiceReminderButton({
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
+          body: JSON.stringify({ note: note.trim() || null }),
         }
       );
 
@@ -61,8 +81,9 @@ export default function SendServiceReminderButton({
           typeof body.days_remaining === "number"
             ? ` · ${body.days_remaining}d to service`
             : ""
-        }`,
+        }${note.trim() ? " · with admin note" : ""}`,
       });
+      setOpen(false);
     } catch (err: any) {
       toast.error("Failed to send reminder", {
         description: err?.message ?? "Unknown error",
@@ -73,26 +94,84 @@ export default function SendServiceReminderButton({
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={disabled}
-      title={title}
-      aria-label={`Send service reminder for ${assetName}`}
-      className={cn(
-        "inline-flex items-center justify-center h-6 w-6 rounded-md shrink-0",
-        "text-teal-500 dark:text-teal-400",
-        "hover:bg-teal-500/10 hover:text-teal-600 dark:hover:text-teal-300",
-        "disabled:text-slate-400 dark:disabled:text-slate-500",
-        "disabled:hover:bg-transparent disabled:cursor-not-allowed",
-        "transition-colors"
-      )}
-    >
-      {loading ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      ) : (
+    <>
+      <button
+        type="button"
+        onClick={handleOpen}
+        disabled={disabled}
+        title={disabledReason ?? "Send service reminder to assigned user"}
+        aria-label={`Send service reminder for ${assetName}`}
+        className={cn(
+          "inline-flex items-center justify-center h-6 w-6 rounded-md shrink-0",
+          "text-teal-500 dark:text-teal-400",
+          "hover:bg-teal-500/10 hover:text-teal-600 dark:hover:text-teal-300",
+          "disabled:text-slate-400 dark:disabled:text-slate-500",
+          "disabled:hover:bg-transparent disabled:cursor-not-allowed",
+          "transition-colors"
+        )}
+      >
         <Mail className="h-3.5 w-3.5" />
-      )}
-    </button>
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Send service reminder</DialogTitle>
+            <DialogDescription>
+              An email will be sent to the user assigned to{" "}
+              <span className="font-medium text-foreground">{assetName}</span>.
+              You can optionally add a note to include in the email.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-2 py-2">
+            <Label htmlFor="admin-note" className="text-sm">
+              Note (optional)
+            </Label>
+            <textarea
+              id="admin-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Please prioritize this — service was already missed once."
+              rows={4}
+              maxLength={1000}
+              disabled={loading}
+              className="
+                w-full rounded-md border border-input bg-background px-3 py-2
+                text-sm shadow-sm placeholder:text-muted-foreground
+                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring
+                disabled:cursor-not-allowed disabled:opacity-50 resize-none
+              "
+            />
+            <div className="text-[11px] text-muted-foreground text-right">
+              {note.length}/1000
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSend} disabled={loading} className="gap-2">
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  Send email
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

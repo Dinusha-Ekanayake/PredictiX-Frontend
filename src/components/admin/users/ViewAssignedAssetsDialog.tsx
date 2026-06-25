@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "@/lib/customToast";
+import { toast } from "sonner";
 
 import {
   Dialog,
@@ -12,8 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-import { Box, MapPin, X } from "lucide-react";
+import { Box, MapPin, ExternalLink } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,6 +20,7 @@ import { Box, MapPin, X } from "lucide-react";
 
 export type AssetItem = {
   id: string;
+  asset_id?: string;
   name: string;
   category: string;
   location: string;
@@ -30,12 +30,11 @@ export type AssetItem = {
 type Props = {
   userName: string;
   assets: AssetItem[];
-  /** Shows a loading state while assigned assets are being fetched. */
   loading?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** When provided, shows a "Back to User Details" button. */
   onBackToDetails?: () => void;
+  onNavigateToAsset?: (assetId: string) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -49,12 +48,8 @@ function HealthBadge({ percent }: { percent: number }) {
       : percent >= 60
         ? "border-amber-500/40 text-amber-400"
         : "border-red-500/40 text-red-400";
-
   return (
-    <Badge
-      variant="outline"
-      className={`text-xs font-semibold ${color}`}
-    >
+    <Badge variant="outline" className={`text-xs font-semibold ${color}`}>
       Health: {percent}%
     </Badge>
   );
@@ -62,20 +57,21 @@ function HealthBadge({ percent }: { percent: number }) {
 
 function AssetCard({
   asset,
-  onRemove,
+  onNavigate,
 }: {
   asset: AssetItem;
-  onRemove: (id: string) => void;
+  onNavigate?: (assetId: string) => void;
 }) {
+  const assetId = asset.asset_id ?? asset.id;
+
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-border p-4">
-      {/* Left: icon + info */}
+    <div className="rounded-xl border border-border p-4 transition-colors hover:bg-muted/30">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15">
           <Box className="h-5 w-5 text-indigo-400" />
         </div>
-        <div className="min-w-0 space-y-1">
-          <p className="text-base font-semibold">{asset.name}</p>
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="truncate text-base font-semibold">{asset.name}</p>
           <p className="text-sm text-muted-foreground">{asset.category}</p>
           <div className="flex flex-wrap items-center gap-2 pt-0.5">
             <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
@@ -87,15 +83,16 @@ function AssetCard({
         </div>
       </div>
 
-      {/* Right: remove button */}
-      <button
-        type="button"
-        onClick={() => onRemove(asset.id)}
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-1.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10"
-      >
-        <X className="h-3.5 w-3.5" />
-        Remove
-      </button>
+      {/* Navigate to Asset Details & Reports */}
+      {onNavigate && (
+        <button
+          onClick={() => onNavigate(assetId)}
+          className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 hover:text-emerald-300"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          View Full Asset Details &amp; Reports
+        </button>
+      )}
     </div>
   );
 }
@@ -111,21 +108,13 @@ export default function ViewAssignedAssetsDialog({
   open,
   onOpenChange,
   onBackToDetails,
+  onNavigateToAsset,
 }: Props) {
   const [assets, setAssets] = React.useState<AssetItem[]>(initialAssets);
 
-  // Sync when dialog opens with new data
   React.useEffect(() => {
     if (open) setAssets(initialAssets);
   }, [open, initialAssets]);
-
-  function handleRemove(assetId: string) {
-    const removed = assets.find((a) => a.id === assetId);
-    setAssets((prev) => prev.filter((a) => a.id !== assetId));
-    toast.success(`Removed ${removed?.name ?? "asset"} from view`, {
-      description: "Unassignment is not yet persisted to the backend.",
-    });
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -133,11 +122,13 @@ export default function ViewAssignedAssetsDialog({
         <DialogHeader>
           <DialogTitle className="text-xl">Assigned Assets</DialogTitle>
           <DialogDescription>
-            {userName} – {assets.length} asset{assets.length !== 1 ? "s" : ""}
+            {userName}
+            {!loading && (
+              <> — {assets.length} asset{assets.length !== 1 ? "s" : ""}</>
+            )}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Asset cards list */}
         {loading ? (
           <p className="py-6 text-center text-muted-foreground">
             Loading assigned assets…
@@ -152,15 +143,18 @@ export default function ViewAssignedAssetsDialog({
               <AssetCard
                 key={asset.id}
                 asset={asset}
-                onRemove={handleRemove}
+                onNavigate={onNavigateToAsset}
               />
             ))}
           </div>
         )}
 
-        {/* Back button */}
         {onBackToDetails && (
-          <Button onClick={onBackToDetails} className="mt-1 w-full">
+          <Button
+            onClick={onBackToDetails}
+            className="mt-2 w-full"
+            variant="secondary"
+          >
             Back to User Details
           </Button>
         )}

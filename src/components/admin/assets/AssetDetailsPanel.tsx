@@ -16,7 +16,8 @@ import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
 import type { AssetDetail, ComponentSurvivalResponse } from "./types";
-import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction, generateAssetReport } from "./assetService";
+// CHANGE 1: removed generateAssetReport from import — report now handled by parent via onReport prop
+import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
 import LogMaintenanceDialog from "./LogMaintenanceDialog";
 import SendServiceReminderButton from "./SendServiceReminderButton";
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -220,16 +221,17 @@ type Props = {
   onRefresh: () => void;
   onDelete?: (id: string) => void;
   onEdit?: (asset: AssetDetail["asset"]) => void;
+  onReport?: () => void; // CHANGE 2: added onReport prop — opens shared AssetReportModal in page.tsx
   readOnly?: boolean;
 };
 
-export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, readOnly = false }: Props) {
+export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, onReport, readOnly = false }: Props) {
   const { asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments } = detail;
   const router = useNavRouter();
 
   const [runningPrediction, setRunningPrediction] = React.useState(false);
-  const [generatingReport, setGeneratingReport] = React.useState(false);
   const [showLogMaintenance, setShowLogMaintenance] = React.useState(false);
+  // CHANGE 3: removed generatingReport state — no longer needed
 
   const healthScore = deriveHealthScore(asset, prediction);
   const failureProb = deriveFailureProbability(prediction);
@@ -275,20 +277,8 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
     }
   }
 
-  async function handleGenerateReport() {
-    setGeneratingReport(true);
-    try {
-      await generateAssetReport(asset.id);
-      toast.success("Report downloaded successfully!");
-    } catch (e: any) {
-      console.error("Report generation failed:", e);
-      toast.error(e.message || "Failed to generate report");
-    } finally {
-      setGeneratingReport(false);
-    }
-  }
+  // CHANGE 4: removed handleGenerateReport — Report button now calls onReport() directly
 
-  // Navigate to tickets page with the ticket pre-opened
   function goToTicket(ticketId: string) {
     router.push(`/admin/tickets?ticket_id=${ticketId}`);
   }
@@ -340,17 +330,15 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   : <RefreshCw className="h-3 w-3" />}
                 {runningPrediction ? "Running…" : "Run AI"}
               </Button>
+              {/* CHANGE 5: Report button now calls onReport() — opens shared modal in page.tsx */}
               <Button
                 variant="outline"
                 size="sm"
                 className="h-8 rounded-xl gap-1.5 text-xs border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
-                onClick={handleGenerateReport}
-                disabled={generatingReport}
+                onClick={onReport}
               >
-                {generatingReport
-                  ? <Loader2 className="h-3 w-3 animate-spin" />
-                  : <FileText className="h-3 w-3" />}
-                {generatingReport ? "Generating…" : "Report"}
+                <FileText className="h-3 w-3" />
+                Report
               </Button>
               {onEdit && (
                 <Button
@@ -440,9 +428,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
         if (legacy && !allImages.includes(legacy)) {
           allImages.unshift(legacy);
         }
-        
         if (allImages.length === 0) return null;
-        
         return (
           <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/20 dark:bg-slate-900/10">
             <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Asset Images</h3>
@@ -555,24 +541,9 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
           <TabsList className="rounded-xl w-full justify-start overflow-x-auto bg-slate-100/60 dark:bg-white/4">
             {[
               { value: "insights", icon: Bot, label: "Predictive Insights" },
-              {
-                value: "tickets",
-                icon: Ticket,
-                label: "Tickets",
-                count: tickets.length,
-              },
-              {
-                value: "maintenance",
-                icon: ClipboardList,
-                label: "Maintenance Logs",
-                count: maintenanceEvents.length,
-              },
-              {
-                value: "assignments",
-                icon: Users,
-                label: "Assignments",
-                count: assignments.length,
-              },
+              { value: "tickets", icon: Ticket, label: "Tickets", count: tickets.length },
+              { value: "maintenance", icon: ClipboardList, label: "Maintenance Logs", count: maintenanceEvents.length },
+              { value: "assignments", icon: Users, label: "Assignments", count: assignments.length },
             ].map(({ value, icon: Icon, label, count }) => (
               <TabsTrigger
                 key={value}
@@ -593,7 +564,6 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
           {/* ═══ Insights ═══ */}
           <TabsContent value="insights" className="mt-4 space-y-4">
             {!prediction ? (
-              /* ── Empty state ── */
               <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-slate-200 dark:border-white/8 bg-slate-50/30 dark:bg-white/2 p-10 text-center">
                 <div className="rounded-full bg-primary/8 dark:bg-white/6 p-4">
                   <Bot className="h-8 w-8 text-primary/50 dark:text-white/30" />
@@ -656,7 +626,6 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                     <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Failure Risk Profile</div>
                     <div className="space-y-3">
-                      {/* Big probability number */}
                       <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${
                         failureProb >= 0.7
                           ? "bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400"
@@ -676,7 +645,6 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                           {prediction.risk_level?.toUpperCase() ?? "UNKNOWN"}
                         </div>
                       </div>
-                      {/* Risk bar */}
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] text-muted-foreground/60">
                           <span>Low risk</span><span>High risk</span>
@@ -688,7 +656,6 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                           />
                         </div>
                       </div>
-                      {/* Maintenance countdown */}
                       {aiDaysUntilMaint != null && (
                         <div className="flex items-center justify-between text-xs border-t border-slate-200/60 dark:border-white/6 pt-2">
                           <span className="text-muted-foreground">Days until maintenance</span>
@@ -730,10 +697,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                                 </span>
                               </div>
                               <div className="h-2 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
-                                <div
-                                  className="h-full rounded-full transition-all duration-700 bg-violet-500/80"
-                                  style={{ width: `${pct}%` }}
-                                />
+                                <div className="h-full rounded-full transition-all duration-700 bg-violet-500/80" style={{ width: `${pct}%` }} />
                               </div>
                             </div>
                           );
@@ -745,7 +709,6 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
 
                 {/* ── Row 3: AI Insight bullets + Cost card ── */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* AI summary bullets */}
                   <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                     <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">AI Recommendations</div>
                     <div className="space-y-2.5">
@@ -788,14 +751,13 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
                         <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                         <span>
-                          {aiDaysUntilMaint !== null && aiDaysUntilMaint < 0 ? "Maintenance was due on:" : "Predicted maintenance date:"} 
+                          {aiDaysUntilMaint !== null && aiDaysUntilMaint < 0 ? "Maintenance was due on:" : "Predicted maintenance date:"}
                           <strong> {prediction.predicted_maintenance_date ? new Date(prediction.predicted_maintenance_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</strong>
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Cost estimate card */}
                   {costPrediction && (
                     <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                       <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Maintenance Cost Estimate</div>
@@ -835,7 +797,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   )}
                 </div>
 
-                {/* ── Row 4: Survival Analysis (Component RUL) ── */}
+                {/* ── Row 4: Survival Analysis ── */}
                 {survivalPrediction && (
                   <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-4 mt-3">
                     <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
@@ -865,16 +827,14 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                                 </span>
                               </div>
                               <div className="relative h-2 rounded-full bg-slate-200/60 dark:bg-white/8">
-                                {/* Error margin (P10 to P90) */}
-                                <div 
+                                <div
                                   className="absolute h-full bg-primary/20 rounded-full"
                                   style={{
                                     left: `${Math.min(100, (comp.p10_days / 365) * 100)}%`,
                                     width: `${Math.min(100, ((comp.p90_days - comp.p10_days) / 365) * 100)}%`
                                   }}
                                 />
-                                {/* Median tick */}
-                                <div 
+                                <div
                                   className={cn("absolute h-3 w-1 -top-0.5 rounded-full", isCritical ? "bg-red-500" : "bg-primary")}
                                   style={{ left: `${Math.min(100, (comp.median_days / 365) * 100)}%` }}
                                 />
@@ -909,45 +869,37 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                     : s === "resolved"
                     ? "border-emerald-500/30 dark:border-emerald-500/25 hover:border-emerald-500 dark:hover:border-emerald-500/60"
                     : "border-slate-500/30 dark:border-slate-500/25 hover:border-slate-500 dark:hover:border-slate-500/60";
-
                 return (
                   <button
                     key={t.id}
                     onClick={() => goToTicket(t.id)}
-                    className={cn(
-                      "w-full text-left ticket-dynamic rounded-xl border p-4 transition-all group",
-                      statusBorder
-                    )}
+                    className={cn("w-full text-left ticket-dynamic rounded-xl border p-4 transition-all group", statusBorder)}
                   >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-mono text-muted-foreground/60">
-                          {t.ticket_number}
-                        </span>
-                        <TicketStatusPill status={t.status} />
-                        <PriorityPill priority={t.final_priority ?? t.predicted_priority ?? t.priority} />
-                        {t.final_category && (
-                          <span className="text-[10px] text-muted-foreground/60 bg-muted/50 px-2 py-0.5 rounded-full">
-                            {t.final_category}
-                          </span>
-                        )}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-mono text-muted-foreground/60">{t.ticket_number}</span>
+                          <TicketStatusPill status={t.status} />
+                          <PriorityPill priority={t.final_priority ?? t.predicted_priority ?? t.priority} />
+                          {t.final_category && (
+                            <span className="text-[10px] text-muted-foreground/60 bg-muted/50 px-2 py-0.5 rounded-full">
+                              {t.final_category}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1.5 text-sm font-semibold truncate">{t.title}</div>
+                        <div className="text-[12px] text-muted-foreground/70 mt-0.5 line-clamp-1">{t.description}</div>
+                        <div className="text-[11px] text-muted-foreground/50 mt-1">
+                          Opened {fmt(t.opened_at)}
+                          {t.resolved_at && ` · Resolved ${fmt(t.resolved_at)}`}
+                        </div>
                       </div>
-                      <div className="mt-1.5 text-sm font-semibold truncate">{t.title}</div>
-                      <div className="text-[12px] text-muted-foreground/70 mt-0.5 line-clamp-1">
-                        {t.description}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground/50 mt-1">
-                        Opened {fmt(t.opened_at)}
-                        {t.resolved_at && ` · Resolved ${fmt(t.resolved_at)}`}
-                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary/60 transition-colors shrink-0 mt-1" />
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary/60 transition-colors shrink-0 mt-1" />
-                  </div>
-                </button>
-              );
-            })
-          )}
+                  </button>
+                );
+              })
+            )}
           </TabsContent>
 
           {/* ═══ Maintenance Logs ═══ */}
@@ -956,10 +908,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
               <EmptyState message="No maintenance events recorded for this asset." icon={ClipboardList} />
             ) : (
               maintenanceEvents.map((e) => (
-                <div
-                  key={e.id}
-                  className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 space-y-2 transition-all"
-                >
+                <div key={e.id} className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 space-y-2 transition-all">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20">
@@ -972,14 +921,10 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       </div>
                     </div>
                     <div className="text-sm font-bold shrink-0 tabular-nums">
-                      {e.cost_amount != null
-                        ? fmtCost(e.cost_amount, e.currency)
-                        : "—"}
+                      {e.cost_amount != null ? fmtCost(e.cost_amount, e.currency) : "—"}
                     </div>
                   </div>
-                  {e.notes && (
-                    <p className="text-sm text-muted-foreground/80 leading-relaxed">{e.notes}</p>
-                  )}
+                  {e.notes && <p className="text-sm text-muted-foreground/80 leading-relaxed">{e.notes}</p>}
                   {e.odometer_reading != null && (
                     <div className="text-[11px] text-muted-foreground/50">
                       Odometer: {Number(e.odometer_reading).toLocaleString()} km
@@ -997,10 +942,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
               <EmptyState message="No assignment history for this asset." icon={Users} />
             ) : (
               assignments.map((a) => (
-                <div
-                  key={a.id}
-                  className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all"
-                >
+                <div key={a.id} className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className={cn(
@@ -1011,18 +953,14 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       )}>
                         {a.is_active ? "Active" : "Past"}
                       </span>
-                      <div className="mt-1 text-xs font-mono text-muted-foreground/70">
-                        User: {a.user_id}
-                      </div>
+                      <div className="mt-1 text-xs font-mono text-muted-foreground/70">User: {a.user_id}</div>
                       <div className="text-[11px] text-muted-foreground/50 mt-0.5">
                         Assigned {fmt(a.assigned_at)}
                         {a.unassigned_at && ` · Removed ${fmt(a.unassigned_at)}`}
                       </div>
                     </div>
                   </div>
-                  {a.notes && (
-                    <p className="mt-2 text-sm text-muted-foreground/70">{a.notes}</p>
-                  )}
+                  {a.notes && <p className="mt-2 text-sm text-muted-foreground/70">{a.notes}</p>}
                 </div>
               ))
             )}

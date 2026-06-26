@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, RotateCcw, Plus, SlidersHorizontal, FileText } from "lucide-react";
+import { Search, RotateCcw, Plus, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { AssetFilters } from "./types";
-import AssetReportModal from "./AssetReportModal";
 
 type WarehouseOption = { value: string; label: string };
 
@@ -44,8 +43,6 @@ export default function AssetsToolbar({
   selectedAssetId,
   selectedAssetName,
 }: Props) {
-  const [reportOpen, setReportOpen] = React.useState(false);
-
   const isDirty =
     filters.query !== "" ||
     filters.status !== "all" ||
@@ -151,34 +148,13 @@ export default function AssetsToolbar({
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            {/* Generate Report button */}
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-9 rounded-xl px-4 text-sm gap-1.5"
-              onClick={() => setReportOpen(true)}
-              disabled={!selectedAssetId}
-              title={!selectedAssetId ? "Select an asset first" : "View & download asset report"}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Generate Report
-            </Button>
-
-            <Button className="h-9 rounded-xl px-4 text-sm gap-1.5" onClick={onAddAsset}>
+<Button className="h-9 rounded-xl px-4 text-sm gap-1.5" onClick={onAddAsset}>
               <Plus className="h-3.5 w-3.5" />
               Add Asset
             </Button>
           </div>
         </div>
       </div>
-
-      {/* Report Modal */}
-      <AssetReportModal
-        isOpen={reportOpen}
-        onClose={() => setReportOpen(false)}
-        assetId={selectedAssetId ?? null}
-        assetName={selectedAssetName}
-      />
     </>
   );
 }

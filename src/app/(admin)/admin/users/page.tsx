@@ -29,8 +29,8 @@ import type { NewUser } from "@/components/admin/users/AddUserDialog";
 import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
 import EditUserDialog from "@/components/admin/users/EditUserDialog";
-import type { AssetItem } from "@/components/admin/users/ViewAssignedAssetsDialog";
 import { toast } from "@/lib/customToast";
+import { useRouter } from "next/navigation";
 
 import {
   listUsers,
@@ -54,10 +54,18 @@ import {
   Trash2,
 } from "lucide-react";
 
-/**
- * Admin Users Management Page (PredictiX)
- * Fetches real users from the backend /users API.
- */
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type AssignedAsset = {
+  id: string;
+  asset_id?: string;
+  name: string;
+  category: string;
+  location: string;
+  healthPercent: number;
+};
 
 // ---------------------------------------------------------------------------
 // KPI helpers
@@ -78,7 +86,7 @@ function computeKpis(users: UserItem[]) {
 }
 
 // ---------------------------------------------------------------------------
-// Sub-components: Badges (solid fills matching Figma)
+// Badges
 // ---------------------------------------------------------------------------
 
 function RoleBadge({ role }: { role: UserRole }) {
@@ -104,22 +112,22 @@ function StatusBadge({ status }: { status: UserStatus }) {
       </Badge>
     );
   }
-  return (
-    <Badge variant="secondary">inactive</Badge>
-  );
+  return <Badge variant="secondary">inactive</Badge>;
 }
 
 // ---------------------------------------------------------------------------
-// Sub-component: User avatar
+// Avatar
 // ---------------------------------------------------------------------------
 
 function UserAvatar({ name }: { name: string }) {
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  const initials =
+    (name || "?")
+      .split(" ")
+      .filter((n) => n.length > 0)
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "?";
 
   return (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
@@ -133,6 +141,7 @@ function UserAvatar({ name }: { name: string }) {
 // ---------------------------------------------------------------------------
 
 export default function AdminUsersPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(true);
   const [users, setUsers] = React.useState<UserItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -143,26 +152,21 @@ export default function AdminUsersPage() {
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [editUser, setEditUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
-  const [assignedAssets, setAssignedAssets] = React.useState<AssetItem[]>([]);
+  const [assignedAssets, setAssignedAssets] = React.useState<AssignedAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = React.useState(false);
 
   function generateUserId(role: UserRole, department: string): string {
     const roleLetter = role === "admin" ? "A" : "U";
     const deptLetter = department.charAt(0).toUpperCase() || "X";
-
     const relevantUsers = users.filter((u) => u.id.startsWith(roleLetter));
     let maxNumber = 0;
-
     for (const u of relevantUsers) {
       const match = u.id.match(/^[AU](\d{4})[A-Z]?$/);
       if (match) {
         const num = parseInt(match[1], 10);
-        if (!Number.isNaN(num) && num > maxNumber) {
-          maxNumber = num;
-        }
+        if (!Number.isNaN(num) && num > maxNumber) maxNumber = num;
       }
     }
-
     const next = String(maxNumber + 1).padStart(4, "0");
     return `${roleLetter}${next}${deptLetter}`;
   }
@@ -190,25 +194,26 @@ export default function AdminUsersPage() {
     };
   }, []);
 
+  // Build department list dynamically from real data
+  const departments = React.useMemo(() => {
+    const set = new Set(users.map((u) => u.department).filter(Boolean));
+    return Array.from(set).sort();
+  }, [users]);
+
   const filteredUsers = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-
     return users.filter((user) => {
       const matchesSearch =
         query === "" ||
         user.name.toLowerCase().includes(query) ||
         user.email.toLowerCase().includes(query) ||
         user.id.toLowerCase().includes(query);
-
       const matchesRole = roleFilter === "all" || user.role === roleFilter;
       const matchesDepartment =
         departmentFilter === "all" || user.department === departmentFilter;
       const matchesStatus =
         statusFilter === "all" || user.status === statusFilter;
-
-      return (
-        matchesSearch && matchesRole && matchesDepartment && matchesStatus
-      );
+      return matchesSearch && matchesRole && matchesDepartment && matchesStatus;
     });
   }, [users, searchQuery, roleFilter, departmentFilter, statusFilter]);
 
@@ -238,18 +243,26 @@ export default function AdminUsersPage() {
     }
   }
 
-  function handleViewDetails(user: UserItem) {
-    setDetailsUser(user);
-  }
-
-  async function handleUserUpdated(userId: string, updatedFields: Partial<UserItem>) {
+  async function handleUserUpdated(
+    userId: string,
+    updatedFields: Partial<UserItem>
+  ) {
     const updatedUser = await updateUser(userId, updatedFields);
-    setUsers((prev) => prev.map((u) => (u.id === userId ? updatedUser : u)));
-    toast.success("User updated", { description: `${updatedUser.name} has been updated.` });
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? updatedUser : u))
+    );
+    toast.success("User updated", {
+      description: `${updatedUser.name} has been updated.`,
+    });
   }
 
   async function handleDeleteUser(user: UserItem) {
-    if (!confirm(`Delete ${user.name}? This removes their login and profile. This cannot be undone.`)) return;
+    if (
+      !confirm(
+        `Delete ${user.name}? This removes their login and profile. This cannot be undone.`
+      )
+    )
+      return;
     try {
       await deleteUser(user.id);
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
@@ -270,6 +283,7 @@ export default function AdminUsersPage() {
       setAssignedAssets(
         rows.map((a) => ({
           id: a.asset_id,
+          asset_id: a.asset_id,
           name: a.name,
           category: a.category ?? a.asset_type ?? "General",
           location: a.location,
@@ -284,6 +298,11 @@ export default function AdminUsersPage() {
     } finally {
       setAssetsLoading(false);
     }
+  }
+
+  function handleNavigateToAsset(assetId: string) {
+    setAssetsUser(null);
+    router.push(`/admin/assets?assetId=${assetId}`);
   }
 
   if (isLoading) {
@@ -334,7 +353,7 @@ export default function AdminUsersPage() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-35">
+              <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
               <SelectContent>
@@ -348,21 +367,21 @@ export default function AdminUsersPage() {
               value={departmentFilter}
               onValueChange={setDepartmentFilter}
             >
-              <SelectTrigger className="w-45">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Departments" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                <SelectItem value="Administrative">Administrative</SelectItem>
-                <SelectItem value="Mechanical">Mechanical</SelectItem>
-                <SelectItem value="Electrical">Electrical</SelectItem>
-                <SelectItem value="IT">IT</SelectItem>
-                <SelectItem value="Maintenance">Maintenance</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-35">
+              <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
@@ -372,7 +391,10 @@ export default function AdminUsersPage() {
               </SelectContent>
             </Select>
 
-            <Button onClick={() => setIsAddDialogOpen(true)} className="ml-auto">
+            <Button
+              onClick={() => setIsAddDialogOpen(true)}
+              className="ml-auto"
+            >
               <UserPlus className="mr-2 h-4 w-4" />
               Add User
             </Button>
@@ -387,12 +409,12 @@ export default function AdminUsersPage() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="min-w-60 pl-6"><span className="ml-38">User</span></TableHead>
-                  <TableHead className="w-25">Role</TableHead>
-                  <TableHead className="w-40"><span className="ml-8">Department</span></TableHead>
-                  <TableHead className="w-25">Status</TableHead>
-                  <TableHead className="w-35">Assigned Assets</TableHead>
-                  <TableHead className="w-45"><span className="ml-38">Action</span></TableHead>
+                  <TableHead className="min-w-60 pl-6">User</TableHead>
+                  <TableHead className="w-24">Role</TableHead>
+                  <TableHead className="w-40">Department</TableHead>
+                  <TableHead className="w-24">Status</TableHead>
+                  <TableHead className="w-32 text-center">Assets</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -409,6 +431,7 @@ export default function AdminUsersPage() {
                 ) : (
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
+                      {/* User */}
                       <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
                           <UserAvatar name={user.name} />
@@ -423,53 +446,73 @@ export default function AdminUsersPage() {
                         </div>
                       </TableCell>
 
+                      {/* Role */}
                       <TableCell>
                         <RoleBadge role={user.role} />
                       </TableCell>
 
+                      {/* Department */}
                       <TableCell>
-                        <div className="flex items-center gap-2 text-base">
-                          <Building2 className="h-4 w-4 text-muted-foreground" />
-                          {user.department}
+                        <div className="flex items-center gap-2 text-sm">
+                          <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="truncate">{user.department}</span>
                         </div>
                       </TableCell>
 
+                      {/* Status */}
                       <TableCell>
                         <StatusBadge status={user.status} />
                       </TableCell>
 
-                      <TableCell className="text-center text-base">
+                      {/* Assets count */}
+                      <TableCell className="text-center text-base font-medium">
                         {user.assignedAssets}
                       </TableCell>
 
-                      <TableCell className="pr-6">
-                        <div className="flex items-center gap-3">
+                      {/* Actions */}
+                      <TableCell className="pr-4">
+                        <div className="flex items-center gap-2">
+                          {/* View Details */}
                           <button
-                            onClick={() => handleViewDetails(user)}
-                            className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
+                            onClick={() => setDetailsUser(user)}
+                            className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500 whitespace-nowrap"
                           >
                             View Details
                           </button>
+
+                          {/* Edit */}
                           <button
                             onClick={() => setEditUser(user)}
                             className="rounded-full bg-blue-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-500"
                           >
                             Edit
                           </button>
-                          {user.assignedAssets > 0 && (
+
+                          {/* View Assets OR No Assets */}
+                          {user.assignedAssets > 0 ? (
                             <button
                               onClick={() => handleViewAssets(user)}
-                              className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
+                              className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500 whitespace-nowrap"
                             >
                               View Assets
                             </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="rounded-full bg-muted px-3 py-1 text-sm font-medium text-muted-foreground cursor-not-allowed whitespace-nowrap"
+                            >
+                              No Assets
+                            </button>
                           )}
+
+                          {/* Delete — pinned right */}
                           <button
                             onClick={() => handleDeleteUser(user)}
                             title="Delete user"
-                            className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-500"
+                            className="ml-auto inline-flex items-center justify-center rounded-full bg-red-600 p-1.5 text-white shadow-sm transition-colors hover:bg-red-500"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />                          </button>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -502,6 +545,7 @@ export default function AdminUsersPage() {
         }}
       />
 
+      {/* Edit User Dialog */}
       <EditUserDialog
         user={editUser}
         open={editUser !== null}
@@ -520,6 +564,7 @@ export default function AdminUsersPage() {
         onOpenChange={(open) => {
           if (!open) setAssetsUser(null);
         }}
+        onNavigateToAsset={handleNavigateToAsset}
         onBackToDetails={
           assetsUser
             ? () => {

@@ -13,6 +13,7 @@ import AssetsToolbar, { DEFAULT_FILTERS } from "@/components/admin/assets/Assets
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel, { AssetDetailsSkeleton } from "@/components/admin/assets/AssetDetailsPanel";
 import AssetFormDialog from "@/components/admin/assets/AssetFormDialog";
+import AssetReportModal from "@/components/admin/assets/AssetReportModal";
 
 import {
   listAssets,
@@ -46,6 +47,17 @@ export default function AdminAssetsPage() {
   const [detail, setDetail] = React.useState<AssetDetail | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
   const [detailError, setDetailError] = React.useState<string | null>(null);
+
+  // ── Shared report modal state ─────────────────────────────────────────────────
+  const [reportOpen, setReportOpen] = React.useState(false);
+  const [reportAssetId, setReportAssetId] = React.useState<string | null>(null);
+  const [reportAssetName, setReportAssetName] = React.useState<string | undefined>(undefined);
+
+  function openReport(assetId: string, assetName?: string) {
+    setReportAssetId(assetId);
+    setReportAssetName(assetName);
+    setReportOpen(true);
+  }
 
   // ── Create/edit dialog state ──────────────────────────────────────────────────
   const [formOpen, setFormOpen] = React.useState(false);
@@ -288,6 +300,7 @@ export default function AdminAssetsPage() {
               onRefresh={refreshDetail}
               onDelete={handleDelete}
               onEdit={openEdit}
+              onReport={() => openReport(detail.asset.id, detail.asset.asset_name)}
             />
           ) : (
             <div className="card-dynamic flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-card px-6 py-24 text-center transition-all">
@@ -300,6 +313,14 @@ export default function AdminAssetsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Shared Report Modal ── */}
+      <AssetReportModal
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        assetId={reportAssetId}
+        assetName={reportAssetName}
+      />
 
       {/* ── Create / Edit dialog ── */}
       <AssetFormDialog

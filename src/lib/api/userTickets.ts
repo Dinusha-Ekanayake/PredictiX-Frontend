@@ -244,6 +244,13 @@ export async function regenerateMyTicketSummary(
   return request(`/ticket-summaries/by-ticket/${ticketId}`);
 }
 
+/** Generate the AI summary for the ticket's linked asset. */
+export async function regenerateMyAssetSummary(
+  assetId: string
+): Promise<{ summary: string; generated_at: string; model_version: string }> {
+  return request(`/asset-summaries/by-asset/${assetId}`);
+}
+
 export async function updateMyTicket(
   ticketId: string,
   payload: UpdateTicketPayload

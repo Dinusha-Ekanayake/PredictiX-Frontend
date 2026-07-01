@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiGet } from "@/lib/apiClient";
+import { apiGet, apiPost } from "@/lib/apiClient";
 import {
   createTicketViaApi,
   previewTicketAI,
@@ -88,6 +88,8 @@ export default function NewTicketDialog({
   // asset summary
   const [assetSummary, setAssetSummary] = React.useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = React.useState(false);
+  const [ticketSummary, setTicketSummary] = React.useState<string | null>(null);
+  const [ticketSummaryLoading, setTicketSummaryLoading] = React.useState(false);
 
   // AI state
   const [ai, setAi] = React.useState<AiState>({ status: "idle" });
@@ -108,6 +110,32 @@ export default function NewTicketDialog({
       .finally(() => { if (!cancelled) setSummaryLoading(false); });
     return () => { cancelled = true; };
   }, [assetId]);
+
+  // ── ticket summary preview (debounced) ─────────────────────────────────────
+  React.useEffect(() => {
+    const t = title.trim(), d = description.trim();
+    // Wait until the AI has set category AND priority so the summary includes
+    // them instead of hallucinating those slots (e.g. "Priority level Resolved").
+    if (!t || !d || !category || !priority) { setTicketSummary(null); return; }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setTicketSummaryLoading(true);
+      try {
+        const res = await apiPost<AssetSummaryResponse>("/ticket-summaries/generate", {
+          title: t,
+          description: d,
+          category,
+          priority,
+        });
+        if (!cancelled) setTicketSummary(res?.summary ?? null);
+      } catch {
+        if (!cancelled) setTicketSummary(null);
+      } finally {
+        if (!cancelled) setTicketSummaryLoading(false);
+      }
+    }, 900);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [title, description, category, priority]);
 
   // ── debounced AI ──────────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -158,7 +186,7 @@ export default function NewTicketDialog({
     const t = setTimeout(() => {
       setAssetId(""); setTitle(""); setDescription(""); setPriority(""); setCategory("");
       setAssignedTo(""); setIsSubmitting(false); setAssets([]); setUsers([]);
-      setAssetSummary(null); setAi({ status: "idle" }); setFile(null);
+      setAssetSummary(null); setTicketSummary(null); setAi({ status: "idle" }); setFile(null);
     }, 200);
     return () => clearTimeout(t);
   }, [open, presetAssetId]);
@@ -294,6 +322,19 @@ export default function NewTicketDialog({
               disabled={isSubmitting}
             />
           </div>
+
+          {/* AI Ticket Summary */}
+          {(ticketSummaryLoading || ticketSummary) && (
+            <div className="rounded-md border border-violet-200/60 bg-violet-50/50 dark:bg-violet-950/20 dark:border-violet-800/40 px-3 py-2.5">
+              <p className="text-xs font-medium text-violet-600 dark:text-violet-400 flex items-center gap-1.5 mb-1">
+                <Bot className="h-3.5 w-3.5" />AI Ticket Summary
+              </p>
+              {ticketSummaryLoading
+                ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin text-violet-500" />Generating…</div>
+                : <p className="text-sm text-foreground/90 leading-relaxed">{ticketSummary}</p>
+              }
+            </div>
+          )}
 
           {/* Image Upload */}
           <div>

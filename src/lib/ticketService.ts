@@ -13,6 +13,18 @@ export async function previewTicketAI(title: string, description: string): Promi
   return apiPost<TicketAiPreview>("/tickets/preview", { title, description });
 }
 
+// ─── AI summaries (local ONNX Seq2Seq models via FastAPI) ────────────────────
+
+/** (Re)generate the ticket AI summary from the ticket's own fields. */
+export async function generateTicketSummaryById(ticketId: string): Promise<{ summary: string }> {
+  return apiGet<{ summary: string }>(`/ticket-summaries/by-ticket/${ticketId}`);
+}
+
+/** Generate the AI summary for the ticket's linked asset. */
+export async function generateAssetSummaryById(assetId: string): Promise<{ summary: string }> {
+  return apiGet<{ summary: string }>(`/asset-summaries/by-asset/${assetId}`);
+}
+
 // ─── FastAPI-backed admin ticket create (POST /tickets/) ──────────────────────
 
 export interface AdminTicketCreatePayload {
@@ -70,6 +82,8 @@ export type Ticket = {
   priority: TicketPriority;
   predicted_category: string | null;
   final_category: string | null;
+  ticket_summary?: string | null;
+  asset_summary?: string | null;
   created_by: string | null;
   assigned_to: string | null;
   opened_at: string | null;
@@ -109,6 +123,8 @@ function mapRow(row: any): Ticket {
     priority: uiPriority(row.priority),
     predicted_category: row.predicted_category,
     final_category: row.final_category,
+    ticket_summary: row.ticket_summary ?? null,
+    asset_summary: row.asset_summary ?? null,
     created_by: row.created_by,
     assigned_to: row.assigned_to,
     opened_at: row.opened_at,

@@ -34,6 +34,7 @@ interface CriticalAsset {
   code: string; name: string; type: string;
   health_score: number; health: string; failure_prob: string;
   risk: string; days_to_service: number | null; status: string;
+  primary_driver?: string | null;
 }
 interface Ctx {
   warehouse_name?: string; warehouse_city?: string; warehouse_code?: string;
@@ -423,6 +424,10 @@ function ReportStep({
             `Health score: ${asset.health}`,
             `Failure probability: ${asset.failure_prob}`,
             `Risk: ${asset.risk}`,
+            asset.days_to_service != null
+              ? `Service due in: ${asset.days_to_service} day${asset.days_to_service === 1 ? "" : "s"}`
+              : "",
+            asset.primary_driver ? `Primary driver: ${asset.primary_driver}` : "",
           ].filter(Boolean).join(" | ");
           const res = await fetch(`${API_BASE}/asset-summaries/generate`, {
             method: "POST",

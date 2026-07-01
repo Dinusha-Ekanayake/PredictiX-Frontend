@@ -45,6 +45,7 @@ import {
 import {
   addMyTicketComment,
   getMyTicket,
+  regenerateMyTicketSummary,
   updateMyTicket,
   type UserTicketDetail,
 } from "@/lib/api/userTickets";
@@ -103,6 +104,23 @@ export default function UserTicketDetailsDialog({
   const [editPriority, setEditPriority] = React.useState<string>("");
 
   const [fullSizeImage, setFullSizeImage] = React.useState<string | null>(null);
+  const [regenSummary, setRegenSummary] = React.useState(false);
+
+  async function handleRegenerateSummary() {
+    if (!ticket) return;
+    setRegenSummary(true);
+    try {
+      const res = await regenerateMyTicketSummary(ticket.id);
+      setTicket({ ...ticket, ticket_summary: res.summary });
+      toast.success("AI summary generated");
+    } catch (e) {
+      toast.error("Failed to generate summary", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setRegenSummary(false);
+    }
+  }
 
   React.useEffect(() => {
     if (!open || !ticketId) return;
@@ -376,17 +394,37 @@ export default function UserTicketDetailsDialog({
               )}
 
               {/* AI fields */}
-              {(ticket.ticket_summary ||
-                ticket.predicted_priority ||
-                ticket.predicted_category) && (
+              {ticket && (
                 <div className="rounded-md border p-3 bg-violet-50/40 dark:bg-violet-950/20">
-                  <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-violet-500" />
-                    AI insights
-                  </h4>
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-violet-500" />
+                      AI insights
+                    </h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={handleRegenerateSummary}
+                      disabled={regenSummary}
+                    >
+                      {regenSummary ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      )}
+                      <span className="ml-1">
+                        {ticket.ticket_summary ? "Regenerate" : "Generate"}
+                      </span>
+                    </Button>
+                  </div>
                   <div className="mt-2 space-y-2 text-sm">
-                    {ticket.ticket_summary && (
+                    {ticket.ticket_summary ? (
                       <p className="text-sm">{ticket.ticket_summary}</p>
+                    ) : (
+                      <p className="text-sm italic text-muted-foreground">
+                        No AI summary yet — click Generate.
+                      </p>
                     )}
                     <div className="flex flex-wrap gap-2">
                       {ticket.predicted_category && (

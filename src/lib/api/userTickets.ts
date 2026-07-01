@@ -237,6 +237,13 @@ export async function previewMyTicketAI(
   });
 }
 
+/** (Re)generate the AI summary for an existing ticket via the ONNX model. */
+export async function regenerateMyTicketSummary(
+  ticketId: string
+): Promise<{ summary: string; generated_at: string; model_version: string }> {
+  return request(`/ticket-summaries/by-ticket/${ticketId}`);
+}
+
 export async function updateMyTicket(
   ticketId: string,
   payload: UpdateTicketPayload

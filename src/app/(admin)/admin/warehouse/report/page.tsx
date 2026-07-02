@@ -229,8 +229,7 @@ export default function WarehouseReportPage() {
                   </h1>
                   <p className="text-sm text-muted-foreground">
                     {ctx?.warehouse_name || "PredictiX Warehouse"} ·{" "}
-                    {ctx?.report_date || "Generate report to view date"} ·{" "}
-                    Powered by Llama 3 + PostgreSQL
+                    {ctx?.report_date || "Generate report to view date"}
                   </p>
                 </div>
               </div>
@@ -275,15 +274,15 @@ export default function WarehouseReportPage() {
         <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6 lg:px-8">
           <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900 dark:bg-violet-950/30">
             <h3 className="mb-3 text-sm font-semibold text-violet-700 dark:text-violet-300">
-              📊 RAG Data Sources — Live PostgreSQL Context Injected into LLM
+              📊 RAG Data Sources - Live PostgreSQL Context Injected into LLM
             </h3>
             <div className="grid gap-2 text-xs text-violet-800 dark:text-violet-300 sm:grid-cols-2 lg:grid-cols-3">
-              <div>🏭 <strong>assets</strong> — {ctx.total_assets} total records</div>
-              <div>💉 <strong>asset_failure_predictions</strong> — health & risk scores</div>
-              <div>💰 <strong>asset_cost_predictions</strong> — cost estimates</div>
-              <div>🔧 <strong>maintenance_events</strong> — last 3 months events</div>
-              <div>🎫 <strong>tickets</strong> — {ctx.total_tickets} total tickets</div>
-              <div>👤 <strong>profiles</strong> — {ctx.total_users} users</div>
+              <div>🏭 <strong>assets</strong> - {ctx.total_assets} total records</div>
+              <div>💉 <strong>asset_failure_predictions</strong> - health & risk scores</div>
+              <div>💰 <strong>asset_cost_predictions</strong> - cost estimates</div>
+              <div>🔧 <strong>maintenance_events</strong> - last 3 months events</div>
+              <div>🎫 <strong>tickets</strong> - {ctx.total_tickets} total tickets</div>
+              <div>👤 <strong>profiles</strong> - {ctx.total_users} users</div>
             </div>
           </div>
         </div>
@@ -365,15 +364,15 @@ export default function WarehouseReportPage() {
           <>
             {/* Overall KPIs */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              <StatChip label="Total Assets" value={ctx.total_assets ?? "–"} color={PALETTE.violet} />
-              <StatChip label="Fleet Health" value={`${ctx.avg_health_pct ?? "–"}%`} color={PALETTE.emerald} />
-              <StatChip label="Critical Assets" value={ctx.critical_count ?? "–"} color={PALETTE.rose} />
-              <StatChip label="Urgent Service" value={ctx.urgent_maintenance_count ?? "–"} color={PALETTE.amber} />
-              <StatChip label="Open Tickets" value={ctx.open_tickets ?? "–"} color={PALETTE.sky} />
-              <StatChip label="Active Users" value={ctx.active_users ?? "–"} color={PALETTE.indigo} />
+              <StatChip label="Total Assets" value={ctx.total_assets ?? "-"} color={PALETTE.violet} />
+              <StatChip label="Fleet Health" value={`${ctx.avg_health_pct ?? "-"}%`} color={PALETTE.emerald} />
+              <StatChip label="Critical Assets" value={ctx.critical_count ?? "-"} color={PALETTE.rose} />
+              <StatChip label="Urgent Service" value={ctx.urgent_maintenance_count ?? "-"} color={PALETTE.amber} />
+              <StatChip label="Open Tickets" value={ctx.open_tickets ?? "-"} color={PALETTE.sky} />
+              <StatChip label="Active Users" value={ctx.active_users ?? "-"} color={PALETTE.indigo} />
             </div>
 
-            {/* Section 1 — AI Overall Warehouse Summary */}
+            {/* Section 1 - AI Overall Warehouse Summary */}
             <SectionCard
               icon={Brain}
               title="AI Warehouse Insight Summary"
@@ -469,7 +468,7 @@ export default function WarehouseReportPage() {
               </div>
             </SectionCard>
 
-            {/* Section 2 — AI Risk Analysis */}
+            {/* Section 2 - AI Risk Analysis */}
             <SectionCard
               icon={AlertTriangle}
               title="AI-Driven Risk Analysis"
@@ -549,7 +548,7 @@ export default function WarehouseReportPage() {
               </div>
             </SectionCard>
 
-            {/* Section 3 — Maintenance Intelligence */}
+            {/* Section 3 - Maintenance Intelligence */}
             <SectionCard
               icon={Wrench}
               title="Maintenance Insights & Forecast"
@@ -562,7 +561,7 @@ export default function WarehouseReportPage() {
               <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <StatChip
                   label="Urgent (≤7 days)"
-                  value={ctx.urgent_maintenance_count ?? "–"}
+                  value={ctx.urgent_maintenance_count ?? "-"}
                   color={PALETTE.rose}
                 />
                 <StatChip
@@ -583,7 +582,7 @@ export default function WarehouseReportPage() {
               </div>
             </SectionCard>
 
-            {/* Section 4 — Pattern & Trend Detection */}
+            {/* Section 4 - Pattern & Trend Detection */}
             <SectionCard
               icon={TrendingUp}
               title="Pattern & Trend Insights"
@@ -706,7 +705,7 @@ export default function WarehouseReportPage() {
                 Across <strong>{ctx.total_tickets}</strong> tickets,{" "}
                 <strong>{ctx.open_tickets}</strong> remain open and{" "}
                 <strong>{ctx.in_progress_tickets}</strong> are in progress.
-                The workforce includes <strong>{ctx.total_users}</strong> registered users —{" "}
+                The workforce includes <strong>{ctx.total_users}</strong> registered users -{" "}
                 <strong>{ctx.active_users}</strong> active and{" "}
                 <strong>{ctx.admin_users}</strong> with administrative privileges.
               </p>

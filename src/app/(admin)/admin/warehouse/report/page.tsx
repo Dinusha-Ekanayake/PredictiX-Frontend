@@ -484,7 +484,7 @@ export default function WarehouseReportPage() {
                     <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Risk Level Distribution
                     </h4>
-                    <ResponsiveContainer width="100%" height={180}>
+                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={180}>
                       <PieChart>
                         <Pie
                           data={riskData}
@@ -598,7 +598,7 @@ export default function WarehouseReportPage() {
                     <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Monthly Ticket Volume (Last 3 Months)
                     </h4>
-                    <ResponsiveContainer width="100%" height={180}>
+                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={180}>
                       <LineChart data={ticketTrendData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                         <XAxis dataKey="month" tick={{ fontSize: 11 }} />
@@ -622,7 +622,7 @@ export default function WarehouseReportPage() {
                     <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Assets by Type
                     </h4>
-                    <ResponsiveContainer width="100%" height={180}>
+                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={180}>
                       <BarChart data={assetTypeData} layout="vertical">
                         <XAxis type="number" tick={{ fontSize: 10 }} />
                         <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={80} />
@@ -641,7 +641,7 @@ export default function WarehouseReportPage() {
                     <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Ticket Priority Breakdown
                     </h4>
-                    <ResponsiveContainer width="100%" height={150}>
+                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
                       <PieChart>
                         <Pie
                           data={ticketPriorityData}

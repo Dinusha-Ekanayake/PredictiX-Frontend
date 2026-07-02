@@ -137,7 +137,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
     const aiRes = ai.status === "done" ? ai.result : null;
     const cat = categoryOverride || aiRes?.predicted_category || "";
     const pri = aiRes?.predicted_priority || "";
-    if (!t || !d || !cat || !pri) { setTicketSummary(null); return; }
+    if (!t || !d || !cat) { setTicketSummary(null); return; }
     let cancelled = false;
     const timer = setTimeout(async () => {
       setTicketSummaryLoading(true);
@@ -146,7 +146,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
           title: t,
           description: d,
           category: cat,
-          priority: pri,
+          priority: pri || undefined,
         });
         if (!cancelled) setTicketSummary(res?.summary ?? null);
       } catch {

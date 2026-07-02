@@ -743,6 +743,7 @@ export function generateProfessionalHTML(data: ReportData): string {
 
       <!-- Logo / Brand -->
       <div style="margin-bottom:36px;">
+        <img src="${typeof window !== 'undefined' ? window.location.origin : ''}/logo/predictix-icon.svg" alt="PredictiX" style="display:block;height:76px;width:auto;margin:0 auto 16px;" />
         <div style="font-size:52px;font-weight:800;color:${C.navy};letter-spacing:-2px;line-height:1;">Predic<span style="color:${C.teal};">tiX</span></div>
         <div style="width:60px;height:3px;background:${C.teal};margin:12px auto 0;border-radius:2px;"></div>
       </div>

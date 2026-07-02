@@ -308,7 +308,7 @@ export default function AdminDashboardPage() {
               {tab === "health" && (
                 <div style={{ height: 210, minHeight: 210 }}>
                   {healthTrend.length === 0 ? <EmptyRow>No health-trend data.</EmptyRow> : (
-                    <ResponsiveContainer width="100%" height="100%" debounce={200}>
+                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <AreaChart data={healthTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
                         <defs>
                           <linearGradient id="hG" x1="0" y1="0" x2="0" y2="1">
@@ -330,7 +330,7 @@ export default function AdminDashboardPage() {
               {tab === "tickets" && (
                 <div style={{ height: 210, minHeight: 210 }}>
                   {ticketTrend.length === 0 ? <EmptyRow>No ticket-trend data.</EmptyRow> : (
-                    <ResponsiveContainer width="100%" height="100%" debounce={200}>
+                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <BarChart data={ticketTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barGap={3}>
                         <CartesianGrid strokeDasharray="4 4" stroke="hsl(var(--border))" opacity={0.5} />
                         <XAxis dataKey="period" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
@@ -348,7 +348,7 @@ export default function AdminDashboardPage() {
               {tab === "cost" && (
                 <div style={{ height: 210, minHeight: 210 }}>
                   {costTrend.length === 0 ? <EmptyRow>No cost-trend data.</EmptyRow> : (
-                    <ResponsiveContainer width="100%" height="100%" debounce={200}>
+                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <BarChart data={costTrend} margin={{ top: 4, right: 4, left: -10, bottom: 0 }} barGap={4}>
                         <CartesianGrid strokeDasharray="4 4" stroke="hsl(var(--border))" opacity={0.5} />
                         <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
@@ -386,7 +386,7 @@ export default function AdminDashboardPage() {
               {dist.length === 0 ? <EmptyRow>No distribution data.</EmptyRow> : (
                 <div className="flex items-center gap-4 mt-3">
                   <div style={{ height: 110, minHeight: 110, width: 110, flexShrink: 0 }}>
-                    <ResponsiveContainer width="100%" height="100%" debounce={200}>
+                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <PieChart>
                         <Pie data={dist} dataKey="count" innerRadius={34} outerRadius={52} paddingAngle={2} startAngle={90} endAngle={-270}>
                           {dist.map((_, i) => <Cell key={i} fill={DIST_COLORS[i % DIST_COLORS.length]} strokeWidth={0} />)}
@@ -416,7 +416,7 @@ export default function AdminDashboardPage() {
               <SectionSub>Planned vs unplanned hours — this month</SectionSub>
               <div className="mt-3" style={{ height: 110, minHeight: 110 }}>
                 {downtime.length === 0 ? <EmptyRow>No downtime data.</EmptyRow> : (
-                  <ResponsiveContainer width="100%" height="100%" debounce={200}>
+                  <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                     <BarChart data={downtime} layout="vertical" margin={{ top: 0, right: 4, left: 36, bottom: 0 }} barGap={3}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} horizontal={false} />
                       <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />

@@ -378,7 +378,7 @@ export default function WarehouseAIReportPanel({
                   {assetStatusData.length > 0 && (
                     <div>
                       <h4 className="chart-label">Asset Status Distribution</h4>
-                      <ResponsiveContainer width="100%" height={160}>
+                      <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
                         <PieChart>
                           <Pie data={assetStatusData} cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={3} dataKey="value">
                             {assetStatusData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -394,7 +394,7 @@ export default function WarehouseAIReportPanel({
                   {assetTypeData.length > 0 && (
                     <div>
                       <h4 className="chart-label">Assets by Type</h4>
-                      <ResponsiveContainer width="100%" height={200}>
+                      <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={200}>
                         <BarChart data={assetTypeData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                           <XAxis type="number" tick={{ fontSize: 10 }} />
                           <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
@@ -471,7 +471,7 @@ export default function WarehouseAIReportPanel({
                   {riskData.length > 0 && (
                     <div>
                       <h4 className="chart-label">Risk Level Distribution</h4>
-                      <ResponsiveContainer width="100%" height={160}>
+                      <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
                         <PieChart>
                           <Pie data={riskData} cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={3} dataKey="value">
                             {riskData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -487,7 +487,7 @@ export default function WarehouseAIReportPanel({
                   {healthDistData.length > 0 && (
                     <div>
                       <h4 className="chart-label">Health Score Buckets</h4>
-                      <ResponsiveContainer width="100%" height={160}>
+                      <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
                         <BarChart data={healthDistData} margin={{ left: -10 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                           <XAxis dataKey="name" tick={{ fontSize: 9 }} />
@@ -508,7 +508,7 @@ export default function WarehouseAIReportPanel({
                   {shapData.length > 0 && (
                     <div>
                       <h4 className="chart-label">Top AI Failure Drivers (SHAP)</h4>
-                      <ResponsiveContainer width="100%" height={160}>
+                      <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
                         <RadarChart data={shapData} cx="50%" cy="50%" outerRadius={55}>
                           <PolarGrid />
                           <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9 }} />
@@ -627,7 +627,7 @@ export default function WarehouseAIReportPanel({
                   {maintenTrend.length > 0 && (
                     <div>
                       <h4 className="chart-label">Monthly Maintenance (Events & Cost)</h4>
-                      <ResponsiveContainer width="100%" height={140}>
+                      <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={140}>
                         <BarChart data={maintenTrend} margin={{ left: -10 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                           <XAxis dataKey="month" tick={{ fontSize: 9 }} />
@@ -645,7 +645,7 @@ export default function WarehouseAIReportPanel({
                   <>
                     <SectionDivider label="Event Type Breakdown" />
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <ResponsiveContainer width="100%" height={150}>
+                      <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
                         <PieChart>
                           <Pie data={maintenTypeData} cx="50%" cy="50%" outerRadius={55} dataKey="value">
                             {maintenTypeData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -700,7 +700,7 @@ export default function WarehouseAIReportPanel({
                   {ticketTrend.length > 0 && (
                     <div className="lg:col-span-2">
                       <h4 className="chart-label">Monthly Ticket Volume</h4>
-                      <ResponsiveContainer width="100%" height={150}>
+                      <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
                         <LineChart data={ticketTrend} margin={{ left: -10 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                           <XAxis dataKey="month" tick={{ fontSize: 9 }} />
@@ -716,7 +716,7 @@ export default function WarehouseAIReportPanel({
                   {ticketPriData.length > 0 && (
                     <div>
                       <h4 className="chart-label">Ticket Priority</h4>
-                      <ResponsiveContainer width="100%" height={150}>
+                      <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
                         <PieChart>
                           <Pie data={ticketPriData} cx="50%" cy="50%" innerRadius={30} outerRadius={55} paddingAngle={3} dataKey="value">
                             {ticketPriData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -734,7 +734,7 @@ export default function WarehouseAIReportPanel({
                   <>
                     <SectionDivider label="Ticket Category Breakdown" />
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <ResponsiveContainer width="100%" height={160}>
+                      <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
                         <BarChart data={ticketCatData} layout="vertical" margin={{ left: 4 }}>
                           <XAxis type="number" tick={{ fontSize: 10 }} />
                           <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={90} />

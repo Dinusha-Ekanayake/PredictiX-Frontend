@@ -13,7 +13,9 @@ import {
   fetchTicketAttachments,
   deleteTicketAttachment,
   addTicketAttachment,
-  type Ticket, 
+  generateTicketSummaryById,
+  generateAssetSummaryById,
+  type Ticket,
   type TicketStatus, 
   type TicketPriority 
 } from "@/lib/ticketService";
@@ -60,6 +62,42 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
   const [fullSizeImage, setFullSizeImage] = React.useState<string | null>(null);
   const [file, setFile] = React.useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = React.useState(false);
+  const [ticketSummary, setTicketSummary] = React.useState<string | null>(null);
+  const [assetSummary, setAssetSummary] = React.useState<string | null>(null);
+  const [regenTicket, setRegenTicket] = React.useState(false);
+  const [regenAsset, setRegenAsset] = React.useState(false);
+
+  async function handleRegenTicketSummary() {
+    if (!ticket) return;
+    setRegenTicket(true);
+    try {
+      const res = await generateTicketSummaryById(ticket.id);
+      setTicketSummary(res.summary);
+      toast.success("Ticket summary generated");
+    } catch (e) {
+      toast.error("Failed to generate ticket summary", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setRegenTicket(false);
+    }
+  }
+
+  async function handleRegenAssetSummary() {
+    if (!ticket?.asset_id) return;
+    setRegenAsset(true);
+    try {
+      const res = await generateAssetSummaryById(ticket.asset_id);
+      setAssetSummary(res.summary);
+      toast.success("Asset summary generated");
+    } catch (e) {
+      toast.error("Failed to generate asset summary", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setRegenAsset(false);
+    }
+  }
 
   const maintenanceUsers = React.useMemo(() => {
     if (!users) return [];
@@ -72,7 +110,9 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
       setLocalStatus(ticket.status);
       setLocalPriority(ticket.priority);
       setLocalAssignee(ticket.assigned_to || "");
-      
+      setTicketSummary(ticket.ticket_summary ?? null);
+      setAssetSummary(ticket.asset_summary ?? null);
+
       if (ticket.asset_id && open) {
         setAssetLoading(true);
         getAssetDetail(ticket.asset_id)
@@ -522,6 +562,68 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                   </>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* AI Summaries (local ONNX Seq2Seq models) */}
+          {ticket && (
+            <div className="rounded-md border p-3 bg-violet-50/40 dark:bg-violet-950/20">
+              <h4 className="text-sm font-medium text-violet-700 dark:text-violet-400 mb-2 flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                AI Summaries
+              </h4>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">Ticket summary</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={handleRegenTicketSummary}
+                    disabled={regenTicket}
+                  >
+                    {regenTicket ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    <span className="ml-1">{ticketSummary ? "Regenerate" : "Generate"}</span>
+                  </Button>
+                </div>
+                <p className="mt-1 text-sm">
+                  {ticketSummary || (
+                    <span className="italic text-muted-foreground">No ticket summary yet.</span>
+                  )}
+                </p>
+              </div>
+
+              {ticket.asset_id && (
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">Asset summary</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={handleRegenAssetSummary}
+                      disabled={regenAsset}
+                    >
+                      {regenAsset ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" />
+                      )}
+                      <span className="ml-1">{assetSummary ? "Regenerate" : "Generate"}</span>
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-sm">
+                    {assetSummary || (
+                      <span className="italic text-muted-foreground">No asset summary yet.</span>
+                    )}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

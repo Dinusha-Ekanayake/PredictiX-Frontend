@@ -61,7 +61,7 @@ export function TicketPriorityBreakdownCard({ data: externalData }: { data?: any
 
       <CardContent>
         <div className="h-[260px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <PieChart>
               <Pie
                 data={data}
@@ -109,7 +109,7 @@ export function TicketsByCategoryCard({ data: externalData }: { data?: any[] }) 
 
       <CardContent>
         <div className="h-[260px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis dataKey="category" tick={{ fill: axisColor }} />
@@ -143,7 +143,7 @@ export function MonthlyTicketVolumeCard({ data: externalData }: { data?: any[] }
 
       <CardContent>
         <div className="h-[280px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis dataKey="month" tick={{ fill: axisColor }} />

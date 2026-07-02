@@ -75,7 +75,7 @@ interface Ctx {
   ticket_trend_direction?: string;
   total_users?: number; active_users?: number; inactive_users?: number;
   admin_users?: number; standard_users?: number;
-  // Phase B — extended DB fields
+  // Phase B extended DB fields
   fleet_age_distribution?: Record<string, number>;
   warranty_expiring_90d?: number;
   component_health?: { avg_tire?: number; avg_brake?: number; avg_battery?: number; avg_oil?: number; avg_hydraulic?: number };
@@ -197,11 +197,11 @@ function Section({
 
 function ConfirmStep({ onGenerate, onClose }: { onGenerate: () => void; onClose: () => void }) {
   const SECTIONS = [
-    "Executive Insight Summary — Fleet overview, health, costs, users",
-    "Risk & Failure Analysis — SHAP drivers, critical assets, risk distribution",
-    "Maintenance Intelligence — Service urgency, cost forecast, downtime",
-    "Pattern & Trend Analysis — 3-month ticket & maintenance trends",
-    "Warehouse Conclusion — Full RAG-powered summary with recommendations",
+    "Executive Insight Summary Fleet overview, health, costs, users",
+    "Risk & Failure Analysis SHAP drivers, critical assets, risk distribution",
+    "Maintenance Intelligence Service urgency, cost forecast, downtime",
+    "Pattern & Trend Analysis 3-month ticket & maintenance trends",
+    "Warehouse Conclusion Full RAG-powered summary with recommendations",
   ];
   const SOURCES = [
     "assets", "asset_failure_predictions", "asset_cost_predictions",
@@ -520,11 +520,11 @@ function ReportStep({
         actualCost3m: `LKR ${(ctx.actual_cost_3m || 0).toLocaleString()}`,
         maintenanceEvents3m: ctx.total_maintenance_events_3m || 0,
         avgDowntimeHours: ctx.avg_downtime_hours || 0,
-        // Phase A fixes — previously unmapped
+        // Phase A fixes previously unmapped
         preventiveCount: ctx.maintenance_type_breakdown?.['Preventive'] ?? ctx.maintenance_type_breakdown?.['preventive'] ?? 0,
         correctiveCount: ctx.maintenance_type_breakdown?.['Corrective'] ?? ctx.maintenance_type_breakdown?.['corrective'] ?? 0,
         monthlyTrend: ctx.monthly_maintenance_trend ?? [],
-        // Phase A fix — cost range was in Ctx but never sent to PDF
+        // Phase A fix cost range was in Ctx but never sent to PDF
         minCostEstimate: ctx.min_cost_estimate ?? 0,
         maxCostEstimate: ctx.max_cost_estimate ?? 0,
         // Phase B addition
@@ -544,7 +544,7 @@ function ReportStep({
         highPriorityTickets: ctx.high_priority_active_tickets || 0,
         mediumPriorityTickets: ctx.ticket_priority_breakdown?.['Medium'] || 0,
         lowPriorityTickets: ctx.ticket_priority_breakdown?.['Low'] || 0,
-        // Phase A fix — previously unmapped
+        // Phase A fix previously unmapped
         monthlyTrend: ctx.ticket_trend_last_3m ?? [],
         // Phase B additions
         avgResolutionDays: ctx.avg_resolution_days ?? 0,
@@ -558,14 +558,14 @@ function ReportStep({
         standardUsers: ctx.standard_users || 0,
         inactiveUsers: ctx.inactive_users || 0,
       },
-      // Phase B — Component & Operational data
+      // Phase B Component & Operational data
       operationsDetail: {
         componentHealth: ctx.component_health ?? {},
         totalFaultCodes: ctx.total_fault_codes ?? 0,
         avgFaultCodesPerAsset: ctx.avg_fault_codes_per_asset ?? 0,
         monitoredAssets: ctx.monitored_assets ?? 0,
       },
-      // Predictive Maintenance Schedule (from /maintenance-schedule endpoint — warehouse only)
+      // Predictive Maintenance Schedule (from /maintenance-schedule endpoint warehouse only)
       maintenanceSchedule: maintenanceSchedule.slice(0, 20),
       // Chart Sections
       sections: {
@@ -594,7 +594,7 @@ function ReportStep({
         feature: feature.replace(/_/g, " "),
         importance: importance,
       })),
-      // FRSO survival analysis (Weibull AFT) — §4.8 dedicated page
+      // FRSO survival analysis (Weibull AFT) §4.8 dedicated page
       survival: ctx.survival_summary ?? null,
     };
     // const pdfData = {
@@ -739,12 +739,12 @@ function ReportStep({
           <div className="rounded-2xl border border-violet-200 dark:border-violet-900 bg-violet-50 dark:bg-violet-950/20 px-4 py-3">
             <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 mb-2">PostgreSQL Tables Injected into Context</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-violet-700 dark:text-violet-300 sm:grid-cols-3">
-              <span>assets — {ctx.total_assets}</span>
+              <span>assets {ctx.total_assets}</span>
               <span>asset_failure_predictions</span>
               <span>asset_cost_predictions</span>
-              <span>maintenance_events — {ctx.total_maintenance_events_3m} (90d)</span>
-              <span>tickets — {ctx.total_tickets}</span>
-              <span>profiles — {ctx.total_users}</span>
+              <span>maintenance_events {ctx.total_maintenance_events_3m} (90d)</span>
+              <span>tickets {ctx.total_tickets}</span>
+              <span>profiles {ctx.total_users}</span>
             </div>
           </div>
         )}
@@ -1004,7 +1004,7 @@ function ReportStep({
               {/* Tick assets → generate summaries only for the ticked ones */}
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <p className="text-[11px] text-muted-foreground">
-                  Tick the assets you want AI summaries for — summaries appear below and are included in the PDF.
+                  Tick the assets you want AI summaries for summaries appear below and are included in the PDF.
                   {selectedCodes.size > 0 && <span className="ml-1 font-semibold text-violet-600">{selectedCodes.size} selected</span>}
                 </p>
                 <button

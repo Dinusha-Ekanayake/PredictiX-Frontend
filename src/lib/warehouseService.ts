@@ -79,8 +79,7 @@ export async function getSurvivalAnalysis(): Promise<SurvivalSummary | null> {
 export async function getMaintenanceSchedule() {
   try {
     const url = `${API_BASE_URL}/warehouse-dashboard/maintenance-schedule`;
-    console.log('[DEBUG] Fetching maintenance schedule from:', url);
-    
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -95,7 +94,6 @@ export async function getMaintenanceSchedule() {
     }
 
     const data = await response.json();
-    console.log('[DEBUG] Maintenance schedule data received:', data);
     return data;
   } catch (error) {
     // Backend unreachable — expected when server is not running
@@ -110,8 +108,7 @@ export async function getMaintenanceSchedule() {
 export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
   try {
     const url = `${API_BASE_URL}/warehouse-dashboard/summary`;
-    console.log('[DEBUG] Fetching warehouse summary from:', url);
-    
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -126,18 +123,15 @@ export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
     }
 
     const data = await response.json();
-    console.log('[DEBUG] Warehouse summary data received:', data);
-    
+
     // Fetch maintenance schedule separately and include it
     const maintenanceSchedule = await getMaintenanceSchedule();
-    console.log('[DEBUG] Merging maintenance schedule with summary data');
-    
+
     const result = {
       ...data,
       maintenanceSchedule,
     };
-    
-    console.log('[DEBUG] Final warehouse summary with maintenance schedule:', result);
+
     return result;
   } catch (error) {
     console.error('[ERROR] Failed to fetch warehouse summary:', error);

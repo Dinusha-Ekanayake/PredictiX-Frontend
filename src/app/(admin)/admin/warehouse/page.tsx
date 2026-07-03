@@ -12,6 +12,7 @@ import WarehouseComponentHealth from "@/components/admin/warehouse/WarehouseComp
 import WarehouseRecentMaintenance from "@/components/admin/warehouse/WarehouseRecentMaintenance";
 import WarehouseSurvivalAnalysis from "@/components/admin/warehouse/WarehouseSurvivalAnalysis";
 import { getMaintenanceSchedule, getSurvivalAnalysis, type SurvivalSummary } from "@/lib/warehouseService";
+import { getAccessToken } from "@/lib/authService";
 
 // ── Warehouse Report (my section — warehouse components only) ──
 import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
@@ -34,7 +35,10 @@ export default function WarehousePage() {
       const [summaryRes, scheduleData, survivalData] = await Promise.allSettled([
         fetch(`${API_BASE_URL}/warehouse-dashboard/summary`, {
           method: "GET",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
+          },
         }),
         getMaintenanceSchedule(),
         getSurvivalAnalysis(),

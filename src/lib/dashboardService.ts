@@ -110,6 +110,7 @@ export interface AdminDashboardData {
   healthDistribution: HealthDistBucket[];
   costTrend: CostTrendPoint[];
   downtimeByWarehouse: DowntimePoint[];
+  downtimeScope?: "warehouse" | "month";
   topRiskAssets: RiskAsset[];
   recentAlerts: DashboardAlert[];
   latestTickets: DashboardTicket[];

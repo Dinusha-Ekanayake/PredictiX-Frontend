@@ -164,6 +164,7 @@ export default function AdminDashboardPage() {
   const distTotal = dist.reduce((s, d) => s + d.count, 0) || 1;
   const costTrend = data?.costTrend ?? [];
   const downtime = data?.downtimeByWarehouse ?? [];
+  const downtimeByMonth = data?.downtimeScope === "month";
   const risks = data?.topRiskAssets ?? [];
   const alerts = data?.recentAlerts ?? [];
   const tickets = data?.latestTickets ?? [];
@@ -412,8 +413,8 @@ export default function AdminDashboardPage() {
             </Card>
 
             <Card className="p-4">
-              <SectionTitle>Downtime by Warehouse</SectionTitle>
-              <SectionSub>Planned vs unplanned hours — this month</SectionSub>
+              <SectionTitle>{downtimeByMonth ? "Downtime Trend" : "Downtime by Warehouse"}</SectionTitle>
+              <SectionSub>{downtimeByMonth ? "Planned vs unplanned hours — last 6 months" : "Planned vs unplanned hours — this month"}</SectionSub>
               <div className="mt-3" style={{ height: 110, minHeight: 110 }}>
                 {downtime.length === 0 ? <EmptyRow>No downtime data.</EmptyRow> : (
                   <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>

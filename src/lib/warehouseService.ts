@@ -3,7 +3,20 @@
  * Handles all API calls to backend warehouse endpoints
  */
 
+import { getAccessToken } from './authService';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+/**
+ * Build request headers with the auth token attached. The warehouse-dashboard
+ * and survival endpoints require a valid JWT, so every call here must send it.
+ */
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = getAccessToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
 
 export interface WarehouseSummaryData {
   kpiGrid?: any[];
@@ -53,7 +66,7 @@ export async function getSurvivalAnalysis(): Promise<SurvivalSummary | null> {
     const url = `${API_BASE_URL}/warehouse-dashboard/survival`;
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       cache: 'no-store',
     });
 
@@ -82,9 +95,7 @@ export async function getMaintenanceSchedule() {
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: authHeaders(),
       cache: 'no-store',
     });
 
@@ -111,9 +122,7 @@ export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: authHeaders(),
       cache: 'no-store', // Disable caching for fresh data
     });
 
@@ -148,9 +157,7 @@ export async function getCriticalAssets() {
       `${API_BASE_URL}/assets/?status=at_risk`,
       {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: authHeaders(),
         cache: 'no-store',
       }
     );
@@ -175,7 +182,7 @@ export async function getFleetSurvival(maxAssets = 12, horizonDays = 180) {
     const url = `${API_BASE_URL}/survival/warehouse/summary?max_assets=${maxAssets}&horizon_days=${horizonDays}`;
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       cache: 'no-store',
     });
 

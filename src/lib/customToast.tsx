@@ -77,25 +77,27 @@ function CustomToastContent({ title, description, type, onDismiss, link_url }: T
 }
 
 // Wrapper to replace standard Sonner calls
+type ToastOptions = { description?: string; link_url?: string; duration?: number };
+
 export const toast = {
-  success: (title: string, data?: { description?: string, link_url?: string }) => {
+  success: (title: string, data?: ToastOptions) => {
     sonnerToast.custom((t) => (
       <CustomToastContent title={title} description={data?.description} link_url={data?.link_url} type="success" onDismiss={() => sonnerToast.dismiss(t)} />
-    ), { duration: 4000 });
+    ), { duration: data?.duration ?? 4000 });
   },
-  error: (title: string, data?: { description?: string, link_url?: string }) => {
+  error: (title: string, data?: ToastOptions) => {
     sonnerToast.custom((t) => (
       <CustomToastContent title={title} description={data?.description} link_url={data?.link_url} type="error" onDismiss={() => sonnerToast.dismiss(t)} />
-    ), { duration: 5000 });
+    ), { duration: data?.duration ?? 5000 });
   },
-  info: (title: string, data?: { description?: string, link_url?: string }) => {
+  info: (title: string, data?: ToastOptions) => {
     sonnerToast.custom((t) => (
       <CustomToastContent title={title} description={data?.description} link_url={data?.link_url} type="info" onDismiss={() => sonnerToast.dismiss(t)} />
-    ), { duration: 4000 });
+    ), { duration: data?.duration ?? 4000 });
   },
-  warning: (title: string, data?: { description?: string, link_url?: string }) => {
+  warning: (title: string, data?: ToastOptions) => {
     sonnerToast.custom((t) => (
       <CustomToastContent title={title} description={data?.description} link_url={data?.link_url} type="warning" onDismiss={() => sonnerToast.dismiss(t)} />
-    ), { duration: 4000 });
+    ), { duration: data?.duration ?? 4000 });
   }
 };

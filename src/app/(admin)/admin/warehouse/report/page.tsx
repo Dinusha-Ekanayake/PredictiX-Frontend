@@ -10,11 +10,8 @@ import {
   RefreshCw,
   BookOpen,
   Users,
-  Ticket,
-  Package,
   ShieldAlert,
   Activity,
-  DollarSign,
   Loader2,
   CheckCircle,
   XCircle,
@@ -34,8 +31,10 @@ import {
   Line,
   Legend,
 } from "recharts";
+import { apiGet } from "@/lib/apiClient";
 
-const API_BASE = "http://127.0.0.1:8000/warehouse-dashboard";
+// Backend base + auth token are resolved by the shared apiClient (works local
+// and on the deployed EC2 backend via NEXT_PUBLIC_API_URL).
 
 // ── Color palette ─────────────────────────────────────────
 const PALETTE = {
@@ -178,12 +177,9 @@ export default function WarehouseReportPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/generate-report`);
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.detail || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
+      const data = await apiGet<{ ai_sections: AISections; context: ReportContext }>(
+        "/warehouse-dashboard/generate-report"
+      );
       setAiSections(data.ai_sections);
       setCtx(data.context);
     } catch (e: unknown) {

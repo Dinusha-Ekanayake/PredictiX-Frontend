@@ -15,7 +15,7 @@ import {
 import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
-import type { AssetDetail, ComponentSurvivalResponse } from "./types";
+import type { AssetDetail, ComponentRulOut } from "./types";
 // CHANGE 1: removed generateAssetReport from import — report now handled by parent via onReport prop
 import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
 import LogMaintenanceDialog from "./LogMaintenanceDialog";
@@ -226,7 +226,7 @@ type Props = {
 };
 
 export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, onReport, readOnly = false }: Props) {
-  const { asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments } = detail;
+  const { asset, prediction, costPrediction, componentRul, maintenanceEvents, tickets, assignments } = detail;
   const router = useNavRouter();
 
   const [runningPrediction, setRunningPrediction] = React.useState(false);
@@ -799,51 +799,54 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   )}
                 </div>
 
-                {/* ── Row 4: Survival Analysis ── */}
-                {survivalPrediction && (
+                {/* ── Row 4: Component RUL (this asset's own sensor history trend) ── */}
+                {componentRul && (
                   <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-4 mt-3">
                     <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
                       Component Remaining Useful Life (RUL)
                     </div>
-                    {survivalPrediction.components.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No component survival data available.</div>
+                    {componentRul.components.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">No component health data available.</div>
                     ) : (
                       <div className="space-y-4">
-                        {survivalPrediction.components.map((c, i) => {
-                          if ("error" in c) {
+                        {componentRul.components.map((comp: ComponentRulOut, i) => {
+                          if (comp.confidence === "no_data" || comp.current_health_pct == null) {
                             return (
-                              <div key={i} className="flex justify-between items-center text-[11px] text-red-500/80">
-                                <span className="capitalize">{c.component}</span>
-                                <span>{c.error}</span>
+                              <div key={i} className="flex justify-between items-center text-[11px] text-muted-foreground/60">
+                                <span className="capitalize">{comp.component}</span>
+                                <span>No sensor history</span>
                               </div>
                             );
                           }
-                          const comp = c as ComponentSurvivalResponse;
-                          const isCritical = comp.median_days < 30;
+
+                          const isCritical = comp.rul_days != null && comp.rul_days < 30;
+                          const healthPct = Math.max(0, Math.min(100, comp.current_health_pct));
+
                           return (
                             <div key={i} className="space-y-1.5">
                               <div className="flex justify-between text-[11px]">
                                 <span className="capitalize font-medium text-muted-foreground">{comp.component}</span>
                                 <span className={cn("font-bold tabular-nums", isCritical ? "text-red-500" : "text-foreground")}>
-                                  {Math.round(comp.median_days)} days
+                                  {comp.rul_days != null
+                                    ? `${comp.rul_days} days left`
+                                    : comp.degradation_pct_per_day != null && comp.degradation_pct_per_day >= 0
+                                    ? "Improving"
+                                    : "—"}
                                 </span>
                               </div>
                               <div className="relative h-2 rounded-full bg-slate-200/60 dark:bg-white/8">
                                 <div
-                                  className="absolute h-full bg-primary/20 rounded-full"
-                                  style={{
-                                    left: `${Math.min(100, (comp.p10_days / 365) * 100)}%`,
-                                    width: `${Math.min(100, ((comp.p90_days - comp.p10_days) / 365) * 100)}%`
-                                  }}
-                                />
-                                <div
-                                  className={cn("absolute h-3 w-1 -top-0.5 rounded-full", isCritical ? "bg-red-500" : "bg-primary")}
-                                  style={{ left: `${Math.min(100, (comp.median_days / 365) * 100)}%` }}
+                                  className={cn("absolute h-full rounded-full", isCritical ? "bg-red-500" : "bg-primary")}
+                                  style={{ width: `${healthPct}%` }}
                                 />
                               </div>
                               <div className="flex justify-between text-[9px] text-muted-foreground/50 font-mono">
-                                <span>0</span>
-                                <span>1 Year</span>
+                                <span>{healthPct.toFixed(0)}% health</span>
+                                <span>
+                                  {comp.confidence === "single_point"
+                                    ? "Low confidence (1 reading)"
+                                    : `Trend over ${comp.readings_used} readings`}
+                                </span>
                               </div>
                             </div>
                           );

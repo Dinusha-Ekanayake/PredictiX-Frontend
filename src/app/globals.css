@@ -261,6 +261,30 @@ html {
   100% { transform: translateX(120%); opacity: 0; }
 }
 
+/* ===== Minimal loader (PredictiXLoader) ===== */
+
+@keyframes predictix-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.045); opacity: 0.88; }
+}
+
+@keyframes predictix-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+/* soft ambient glow breathing behind the logo */
+@keyframes predictix-glow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.08); }
+}
+
+/* whole loader entrance */
+@keyframes predictix-enter {
+  0% { opacity: 0; transform: translateY(6px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 
 /* ===== Custom Scrollbar Styling ===== */
 .scrollbar-styled::-webkit-scrollbar {

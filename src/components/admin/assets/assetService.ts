@@ -15,7 +15,7 @@ import type {
   Ticket,
   AssetAssignment,
   VehiclePredictionResult,
-  AssetSurvivalResponse,
+  AssetComponentRulResponse,
 } from "./types";
 
 // ─── Create / update payloads ────────────────────────────────────────────────
@@ -119,11 +119,11 @@ export async function getCostPrediction(assetId: string): Promise<CostPrediction
   }
 }
 
-// ─── Survival prediction for an asset ──────────────────────────────────────────
+// ─── Component RUL for an asset (independent of the FRSO report models) ───────
 
-export async function getSurvivalPrediction(assetId: string): Promise<AssetSurvivalResponse | null> {
+export async function getComponentRul(assetId: string): Promise<AssetComponentRulResponse | null> {
   try {
-    return await apiGet<AssetSurvivalResponse>(`/survival/${assetId}`);
+    return await apiGet<AssetComponentRulResponse>(`/assets/${assetId}/component-rul`);
   } catch {
     return null;
   }
@@ -150,18 +150,18 @@ export async function runVehiclePrediction(
 
 export async function getAssetDetail(assetId: string): Promise<AssetDetail> {
   // Run all fetches in parallel for speed
-  const [asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments] =
+  const [asset, prediction, costPrediction, componentRul, maintenanceEvents, tickets, assignments] =
     await Promise.all([
       getAsset(assetId),
       getFailurePrediction(assetId),
       getCostPrediction(assetId),
-      getSurvivalPrediction(assetId),
+      getComponentRul(assetId),
       getMaintenanceEvents(assetId).catch(() => [] as MaintenanceEvent[]),
       getAssetTickets(assetId).catch(() => [] as Ticket[]),
       getAssetAssignments(assetId).catch(() => [] as AssetAssignment[]),
     ]);
 
-  return { asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments };
+  return { asset, prediction, costPrediction, componentRul, maintenanceEvents, tickets, assignments };
 }
 
 // ─── Create asset ────────────────────────────────────────────────────────────

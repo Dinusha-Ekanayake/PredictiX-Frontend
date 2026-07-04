@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Boxes, ChevronRight, Radio, Box, AlertCircle, RefreshCw, Plus } from "lucide-react";
+import { Boxes, ChevronRight, Radio, Box, AlertCircle, RefreshCw } from "lucide-react";
 import { toast } from "@/lib/customToast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import PredictiXLoader from "@/components/loading/PredictiXLoader";
 
 import AssetsSummary from "@/components/admin/assets/AssetsSummary";
 import AssetsAnalytics from "@/components/admin/assets/AssetsAnalytics";
@@ -41,6 +42,9 @@ export default function AdminAssetsPage() {
   const [assets, setAssets] = React.useState<Asset[]>([]);
   const [listLoading, setListLoading] = React.useState(true);
   const [listError, setListError] = React.useState<string | null>(null);
+  // Distinguishes the very first load (full-page loader, same as every other
+  // page in the app) from later filter/refresh loads (per-section skeletons).
+  const [initialLoad, setInitialLoad] = React.useState(true);
 
   // ── Selected asset detail state ───────────────────────────────────────────────
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
@@ -86,7 +90,10 @@ export default function AdminAssetsPage() {
       } catch (e: unknown) {
         if (!cancelled) setListError(e instanceof Error ? e.message : "Failed to load assets");
       } finally {
-        if (!cancelled) setListLoading(false);
+        if (!cancelled) {
+          setListLoading(false);
+          setInitialLoad(false);
+        }
       }
     }, delay);
 
@@ -176,6 +183,14 @@ export default function AdminAssetsPage() {
     () => extractWarehouseOptions(assets),
     [assets],
   );
+
+  if (initialLoad) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <PredictiXLoader label="Loading assets…" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

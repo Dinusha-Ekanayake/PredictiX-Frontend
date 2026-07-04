@@ -163,12 +163,28 @@ export type AssetSurvivalResponse = {
   components: (ComponentSurvivalResponse | ComponentSurvivalError)[];
 };
 
+// ─── Component RUL (asset-section, independent of the FRSO report models) ─────
+export type ComponentRulOut = {
+  component: string;
+  current_health_pct: number | null;
+  degradation_pct_per_day: number | null;
+  rul_days: number | null;
+  estimated_failure_date: string | null;
+  confidence: "trend" | "single_point" | "no_data";
+  readings_used: number;
+};
+
+export type AssetComponentRulResponse = {
+  asset_id: string;
+  components: ComponentRulOut[];
+};
+
 // ─── Combined asset detail view (assembled in the service layer) ───────────────
 export type AssetDetail = {
   asset: Asset;
   prediction: FailurePrediction | null;
   costPrediction: CostPrediction | null;
-  survivalPrediction: AssetSurvivalResponse | null;
+  componentRul: AssetComponentRulResponse | null;
   maintenanceEvents: MaintenanceEvent[];
   tickets: Ticket[];
   assignments: AssetAssignment[];

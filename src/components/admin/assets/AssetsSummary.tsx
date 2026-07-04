@@ -9,7 +9,7 @@ import {
   WifiOff,
   Activity,
 } from "lucide-react";
-import type { Asset } from "./types";
+import type { AssetStats } from "./types";
 
 function SummaryCard({
   label,
@@ -45,38 +45,28 @@ function SummaryCard({
 }
 
 export default function AssetsSummary({
-  assets,
+  stats,
+  loading,
 }: {
-  assets: Asset[];
+  stats: AssetStats | null;
+  loading?: boolean;
 }) {
-  const total = assets.length;
+  const total = stats?.total ?? 0;
+  const operational = stats?.operational ?? 0;
+  const maintenance = stats?.maintenance ?? 0;
+  const critical = stats?.critical ?? 0;
+  const offline = stats?.offline ?? 0;
+  const avgHealth = stats?.avgHealth ?? 0;
 
-  // Status counts — backend uses lowercase strings
-  const operational = assets.filter(
-    (a) => a.status === "active" || a.status === "operational",
-  ).length;
-  const maintenance = assets.filter(
-    (a) => a.status === "maintenance" || a.status === "in_maintenance",
-  ).length;
-  const critical = assets.filter((a) => a.health_band === "critical").length;
-  const offline = assets.filter(
-    (a) => a.status === "inactive" || a.status === "retired" || a.status === "offline",
-  ).length;
-
-  // Average health from health_band mapping (no prediction data here to keep summary fast)
-  const bandScore: Record<string, number> = {
-    excellent: 90, good: 72, moderate: 52, poor: 30, critical: 12,
-  };
-  const avgHealth =
-    total > 0
-      ? Math.round(
-          assets.reduce((s, a) => {
-            const hs =
-              a.health_band ? (bandScore[a.health_band.toLowerCase()] ?? 50) : 50;
-            return s + hs;
-          }, 0) / total,
-        )
-      : 0;
+  if (loading && !stats) {
+    return (
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card p-4 h-[92px] animate-pulse" />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">

@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import type { Asset } from "./types";
+import type { AssetListItem } from "./types";
 
 // ── Status pill ────────────────────────────────────────────────────────────────
 const STATUS_META: Record<string, { label: string; dot: string; bg: string }> = {
@@ -108,7 +108,7 @@ function TableSkeleton() {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 type Props = {
-  assets: Asset[];
+  assets: AssetListItem[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   loading?: boolean;

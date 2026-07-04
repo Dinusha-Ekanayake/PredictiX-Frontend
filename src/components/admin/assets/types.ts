@@ -1,4 +1,48 @@
+// ─── AssetListItem (from AssetListOut — trimmed projection for the list view) ──
+// GET /assets/ returns only these fields (not the full Asset below) so the
+// list page doesn't transfer/parse 34 columns per row for ~1000+ rows.
+export type AssetListItem = {
+  id: string;
+  asset_code: string;
+  asset_name: string;
+  asset_type: string;
+  vehicle_type: string | null;
+  make: string | null;
+  model: string | null;
+  manufacture_year: number | null;
+  status: string;
+  health_band: string | null;
+  warehouse_id: string;
+  meta?: {
+    image_url?: string;
+    images?: string[];
+    [key: string]: any;
+  };
+};
+
+export type AssetStats = {
+  total: number;
+  operational: number;
+  maintenance: number;
+  critical: number;
+  offline: number;
+  avgHealth: number;
+};
+
+export type AssetAnalytics = {
+  statusDistribution: { name: string; value: number }[];
+  healthDistribution: { name: string; value: number }[];
+  vehicleTypeDistribution: { name: string; value: number }[];
+  topAtRisk: {
+    id: string;
+    asset_name: string;
+    asset_code: string;
+    health_band: string | null;
+  }[];
+};
+
 // ─── Asset (from models.py Asset + AssetOut schema) ───────────────────────────
+// Full shape — only returned by GET /assets/{id} (single-asset detail).
 export type Asset = {
   id: string;
   asset_code: string;

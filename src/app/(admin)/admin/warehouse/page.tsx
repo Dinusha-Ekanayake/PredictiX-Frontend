@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, FileText } from "lucide-react";
 
 import PageHero from "@/components/common/PageHero";
+import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import WarehouseOverviewCards from "@/components/admin/warehouse/WarehouseOverviewCards";
 import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsightsSection";
 import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
@@ -29,6 +30,9 @@ export default function WarehousePage() {
   const [data, setData] = React.useState<any>(null);
   const [maintenanceSchedule, setMaintenanceSchedule] = React.useState<any[]>([]);
   const [refreshing, setRefreshing] = React.useState(true);
+  // Distinguishes the very first load (full-page loader, same as every other
+  // page in the app) from a later manual "Refresh" click (lighter skeletons).
+  const [initialLoad, setInitialLoad] = React.useState(true);
 
   // ── Departments overview + ticket load by department ──
   const [departments, setDepartments] = React.useState<DepartmentOverviewRow[]>([]);
@@ -80,6 +84,7 @@ export default function WarehousePage() {
       }
     } finally {
       setRefreshing(false);
+      setInitialLoad(false);
     }
   }
 
@@ -135,6 +140,14 @@ export default function WarehousePage() {
     setReportData(null);
     setReportError(null);
     setGenerating(false);
+  }
+
+  if (initialLoad) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <PredictiXLoader label="Loading warehouse…" />
+      </div>
+    );
   }
 
   return (

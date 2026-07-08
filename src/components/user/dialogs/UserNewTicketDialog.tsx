@@ -68,6 +68,9 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (ticket: UserTicketDetail) => void;
+  /** Pass the parent page's already-loaded user list to skip this dialog's
+   * own GET /users/ fetch. If omitted, the dialog fetches it itself. */
+  users?: UserItem[];
 };
 
 const selectCls =
@@ -87,7 +90,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 // ─── component ────────────────────────────────────────────────────────────────
 
-export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: Props) {
+export default function UserNewTicketDialog({ open, onOpenChange, onCreated, users: usersProp }: Props) {
   // form
   const [assetId, setAssetId] = React.useState("");
   const [assets, setAssets] = React.useState<Asset[]>([]);
@@ -95,8 +98,10 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [assignedTo, setAssignedTo] = React.useState("");
-  const [users, setUsers] = React.useState<UserItem[]>([]);
+  const [fetchedUsers, setFetchedUsers] = React.useState<UserItem[]>([]);
   const [usersLoading, setUsersLoading] = React.useState(false);
+  // Prefer the parent's already-loaded list; fall back to this dialog's own fetch.
+  const users = usersProp ?? fetchedUsers;
   const [file, setFile] = React.useState<File | null>(null);
 
   // asset summary
@@ -197,21 +202,23 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
         .catch(() => {})
         .finally(() => setAssetsLoading(false));
 
-      setUsersLoading(true);
-      listUsers()
-        .then((d) => setUsers(d ?? []))
-        .catch(() => {})
-        .finally(() => setUsersLoading(false));
+      if (!usersProp) {
+        setUsersLoading(true);
+        listUsers()
+          .then((d) => setFetchedUsers(d ?? []))
+          .catch(() => {})
+          .finally(() => setUsersLoading(false));
+      }
       return;
     }
     const t = setTimeout(() => {
       setAssetId(""); setAssets([]); setTitle(""); setDescription("");
-      setAssignedTo(""); setUsers([]); setAssetSummary(null); setTicketSummary(null);
+      setAssignedTo(""); setFetchedUsers([]); setAssetSummary(null); setTicketSummary(null);
       setAi({ status: "idle" }); setCategoryOverride("");
       setIsSubmitting(false); setResult(null); setFile(null);
     }, 200);
     return () => clearTimeout(t);
-  }, [open]);
+  }, [open, usersProp]);
 
   // ── submit ───────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {

@@ -496,7 +496,7 @@ export default function AdminTicketsPage() {
         </div>
       )}
 
-      <NewTicketDialog open={open} onOpenChange={setOpen} onCreated={handleTicketCreated} />
+      <NewTicketDialog open={open} onOpenChange={setOpen} onCreated={handleTicketCreated} users={users} />
       <TicketDetailsDialog
         ticket={selectedTicket}
         open={detailOpen}

@@ -72,7 +72,9 @@ export default function UserAssetsPage() {
 
   // Search across ALL assets (read-only)
   React.useEffect(() => {
-    if (!debounced) { setResults([]); return; }
+    // Require at least 2 characters so a single keystroke doesn't fire a
+    // fleet-wide search request.
+    if (debounced.length < 2) { setResults([]); return; }
     let cancelled = false;
     setSearching(true);
     listAssets({ query: debounced, status: "all", health_band: "all", warehouse_id: "all" })

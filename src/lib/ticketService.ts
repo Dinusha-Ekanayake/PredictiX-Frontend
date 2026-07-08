@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseBrowserClient";
-import { apiPost, apiGet, apiDelete } from "./apiClient";
+import { apiPost, apiGet, apiDelete, apiFetch } from "./apiClient";
 
 // ─── FastAPI-backed ticket preview (calls POST /tickets/preview) ──────────────
 
@@ -123,33 +123,28 @@ export async function fetchTickets(
   status: string,
   priority: string
 ): Promise<{ tickets: Ticket[]; total: number }> {
-  if (!supabase) throw new Error("Supabase not configured");
+  // Build query params for the FastAPI backend endpoint
+  const params = new URLSearchParams();
+  params.set("limit", String(PAGE_SIZE));
+  params.set("offset", String(page * PAGE_SIZE));
+  if (search.trim()) params.set("search", search.trim());
+  if (status && status !== "all") params.set("status", dbStatus(status));
+  if (priority && priority !== "all") params.set("priority", dbPriority(priority));
 
-  const from = page * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
-
-  let query = supabase
-    .from("tickets")
-    .select("*, assets(asset_name)", { count: "exact" })
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: true });
-
-  if (search.trim()) {
-    query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+  // Call FastAPI — this uses the authenticated session and the backend DB connection
+  // which is resilient to Supabase sleeping. Response includes X-Total-Count header.
+  const resp = await apiFetch(`/tickets/paginated?${params.toString()}`);
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => resp.statusText);
+    throw new Error(`Failed to fetch tickets: ${detail}`);
   }
-  if (status && status !== "all") {
-    query = query.eq("status", dbStatus(status));
-  }
-  if (priority && priority !== "all") {
-    query = query.eq("priority", dbPriority(priority));
-  }
-
-  const { data, error, count } = await query.range(from, to);
-  if (error) throw error;
+  const json = await resp.json();
+  const rows: any[] = json.tickets ?? json ?? [];
+  const total: number = json.total ?? rows.length;
 
   return {
-    tickets: (data ?? []).map(mapRow),
-    total: count ?? 0,
+    tickets: rows.map(mapRow),
+    total,
   };
 }
 

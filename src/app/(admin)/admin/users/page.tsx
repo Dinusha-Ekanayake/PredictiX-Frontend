@@ -29,6 +29,7 @@ import type { NewUser } from "@/components/admin/users/AddUserDialog";
 import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
 import EditUserDialog from "@/components/admin/users/EditUserDialog";
+import type { AssetItem } from "@/components/admin/users/ViewAssignedAssetsDialog";
 import { toast } from "@/lib/customToast";
 import { useRouter } from "next/navigation";
 

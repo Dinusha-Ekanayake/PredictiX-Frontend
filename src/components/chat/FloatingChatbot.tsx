@@ -58,6 +58,24 @@ const AUTH_ROUTE_PREFIXES = [
   "/auth",
 ];
 
+function CopyActionButton({ label, textToCopy }: { label: string; textToCopy: string }) {
+  const [copied, setCopied] = React.useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard.writeText(textToCopy);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/60 dark:border-violet-600/60 bg-violet-50 dark:bg-violet-900/40 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-800/60 transition-all duration-200 hover:shadow-sm"
+    >
+      {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+      {copied ? "Copied!" : label}
+    </button>
+  );
+}
+
 // ─── Markdown-to-React renderer ───────────────────────────────────────────────
 // Renders **bold**, and newlines safely without dangerouslySetInnerHTML.
 
@@ -386,20 +404,25 @@ export default function FloatingChatbot() {
                           message.actionButtons &&
                           message.actionButtons.length > 0 && (
                             <div className="mt-2.5 flex flex-wrap gap-2">
-                              {message.actionButtons.map((btn, i) => (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  onClick={() => {
-                                    setIsOpen(false);
-                                    router.push(btn.path);
-                                  }}
-                                  className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/60 dark:border-violet-600/60 bg-violet-50 dark:bg-violet-900/40 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-800/60 transition-all duration-200 hover:shadow-sm"
-                                >
-                                  <ArrowRight className="size-3" />
-                                  {btn.label}
-                                </button>
-                              ))}
+                              {message.actionButtons.map((btn, i) => {
+                                if (btn.path.startsWith("copy:")) {
+                                  return <CopyActionButton key={i} label={btn.label} textToCopy={btn.path.replace("copy:", "")} />;
+                                }
+                                return (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => {
+                                      setIsOpen(false);
+                                      router.push(btn.path);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/60 dark:border-violet-600/60 bg-violet-50 dark:bg-violet-900/40 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-800/60 transition-all duration-200 hover:shadow-sm"
+                                  >
+                                    <ArrowRight className="size-3" />
+                                    {btn.label}
+                                  </button>
+                                );
+                              })}
                             </div>
                           )}
                       </div>

@@ -60,7 +60,7 @@ export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: any
 
       <CardContent>
         <div className="h-[280px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis dataKey="month" tick={{ fill: axisColor }} />
@@ -112,7 +112,7 @@ export function AssetStatusDistributionCard({ data: externalData }: { data?: any
 
       <CardContent>
         <div className="h-[280px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <PieChart>
               <Pie
                 data={data}
@@ -160,7 +160,7 @@ export function HealthScoreDistributionCard({ data: externalData }: { data?: any
 
       <CardContent>
         <div className="h-[260px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis dataKey="bucket" tick={{ fill: axisColor }} />
@@ -194,7 +194,7 @@ export function AssetsByTypeCard({ data: externalData }: { data?: any[] }) {
 
       <CardContent>
         <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <BarChart
               data={data}
               layout="vertical"

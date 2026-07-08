@@ -12,7 +12,7 @@ import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
 import PageHero from "@/components/common/PageHero";
 import { fetchMyAssets, type UserAssetData } from "@/lib/api/userProfileApi";
 import { listAssets } from "@/components/admin/assets/assetService";
-import type { Asset } from "@/components/admin/assets/types";
+import type { AssetListItem } from "@/components/admin/assets/types";
 import UserAssetDetailsDialog from "@/components/user/assets/UserAssetDetailsDialog";
 
 function healthColor(p: number) {
@@ -41,7 +41,7 @@ export default function UserAssetsPage() {
 
   const [query, setQuery] = React.useState("");
   const [debounced, setDebounced] = React.useState("");
-  const [results, setResults] = React.useState<Asset[]>([]);
+  const [results, setResults] = React.useState<AssetListItem[]>([]);
   const [searching, setSearching] = React.useState(false);
 
   const [ticketAsset, setTicketAsset] = React.useState<{ id: string; name: string } | null>(null);
@@ -91,8 +91,8 @@ export default function UserAssetsPage() {
   }));
 
   const searchRows: Row[] = results.map((a) => ({
-    id: a.id, code: a.asset_code, name: a.asset_name, category: a.category,
-    location: null, status: a.status, healthPercent: null, nextServiceDate: a.next_service_date,
+    id: a.id, code: a.asset_code, name: a.asset_name, category: a.vehicle_type,
+    location: null, status: a.status, healthPercent: null, nextServiceDate: null,
     assigned: myIds.has(a.id),
   }));
 

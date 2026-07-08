@@ -5,13 +5,18 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, FileText } from "lucide-react";
 
 import PageHero from "@/components/common/PageHero";
+import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import WarehouseOverviewCards from "@/components/admin/warehouse/WarehouseOverviewCards";
 import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsightsSection";
 import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
-import WarehouseComponentHealth from "@/components/admin/warehouse/WarehouseComponentHealth";
-import WarehouseRecentMaintenance from "@/components/admin/warehouse/WarehouseRecentMaintenance";
-import WarehouseSurvivalAnalysis from "@/components/admin/warehouse/WarehouseSurvivalAnalysis";
-import { getMaintenanceSchedule, getSurvivalAnalysis, type SurvivalSummary } from "@/lib/warehouseService";
+import WarehouseDepartmentsOverview, {
+  type DepartmentOverviewRow,
+} from "@/components/admin/warehouse/WarehouseDepartmentsOverview";
+import WarehouseTicketsByDepartment, {
+  type TicketsByDepartmentRow,
+} from "@/components/admin/warehouse/WarehouseTicketsByDepartment";
+import { getMaintenanceSchedule } from "@/lib/warehouseService";
+import { getAccessToken } from "@/lib/authService";
 
 // ── Warehouse Report (my section — warehouse components only) ──
 import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
@@ -24,20 +29,33 @@ export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
   const [data, setData] = React.useState<any>(null);
   const [maintenanceSchedule, setMaintenanceSchedule] = React.useState<any[]>([]);
-  const [survival, setSurvival] = React.useState<SurvivalSummary | null>(null);
   const [refreshing, setRefreshing] = React.useState(true);
+  // Distinguishes the very first load (full-page loader, same as every other
+  // page in the app) from a later manual "Refresh" click (lighter skeletons).
+  const [initialLoad, setInitialLoad] = React.useState(true);
+
+  // ── Departments overview + ticket load by department ──
+  const [departments, setDepartments] = React.useState<DepartmentOverviewRow[]>([]);
+  const [ticketsByDepartment, setTicketsByDepartment] = React.useState<TicketsByDepartmentRow[]>([]);
+
+  function authedGet(path: string) {
+    return fetch(`${API_BASE_URL}${path}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
+      },
+    });
+  }
 
   async function fetchData() {
     setRefreshing(true);
     try {
-      // Fetch summary, maintenance schedule, and survival analysis in parallel
-      const [summaryRes, scheduleData, survivalData] = await Promise.allSettled([
-        fetch(`${API_BASE_URL}/warehouse-dashboard/summary`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        }),
+      // Fetch summary, maintenance schedule, and departments overview in parallel
+      const [summaryRes, scheduleData, deptRes] = await Promise.allSettled([
+        authedGet("/warehouse-dashboard/summary"),
         getMaintenanceSchedule(),
-        getSurvivalAnalysis(),
+        authedGet("/warehouse-dashboard/departments-overview"),
       ]);
 
       if (summaryRes.status === "fulfilled" && summaryRes.value.ok) {
@@ -53,11 +71,20 @@ export default function WarehousePage() {
         scheduleData.status === "fulfilled" ? scheduleData.value : []
       );
 
-      setSurvival(
-        survivalData.status === "fulfilled" ? survivalData.value : null
-      );
+      if (deptRes.status === "fulfilled" && deptRes.value.ok) {
+        const deptJson = await deptRes.value.json();
+        setDepartments(deptJson.departments ?? []);
+        setTicketsByDepartment(deptJson.ticketsByDepartment ?? []);
+      } else {
+        if (deptRes.status === "rejected") {
+          console.warn("Departments overview unavailable:", deptRes.reason?.message);
+        }
+        setDepartments([]);
+        setTicketsByDepartment([]);
+      }
     } finally {
       setRefreshing(false);
+      setInitialLoad(false);
     }
   }
 
@@ -115,6 +142,14 @@ export default function WarehousePage() {
     setGenerating(false);
   }
 
+  if (initialLoad) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <PredictiXLoader label="Loading warehouse…" />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full space-y-6">
       {/* ── Page header ── */}
@@ -144,25 +179,14 @@ export default function WarehousePage() {
       <WarehouseOverviewCards data={data} isLoading={refreshing && !data} />
       {data && <WarehouseInsightsSection data={data} />}
 
-      {/* ── Component Health Overview (sensor_readings) ── */}
-      <WarehouseComponentHealth
-        componentHealth={data?.componentHealth}
-        totalFaultCodes={data?.totalFaultCodes}
-        assetsWithSensors={data?.assetsWithSensors}
-        isLoading={refreshing && !data}
-      />
-
-      {/* ── FRSO Component Survival Analysis (Weibull AFT) ── */}
-      <WarehouseSurvivalAnalysis data={survival} isLoading={refreshing && !survival} />
-
       {/* ── Predictive Maintenance Schedule Chart ── */}
       <WarehouseMaintenanceSchedule data={maintenanceSchedule} />
 
-      {/* ── Recent Maintenance Events (maintenance_events) ── */}
-      <WarehouseRecentMaintenance
-        events={data?.recentMaintenance}
-        isLoading={refreshing && !data}
-      />
+      {/* ── Departments Overview + Ticket Load by Department ── */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <WarehouseDepartmentsOverview departments={departments} isLoading={refreshing && departments.length === 0} />
+        <WarehouseTicketsByDepartment data={ticketsByDepartment} isLoading={refreshing && ticketsByDepartment.length === 0} />
+      </div>
 
       <div className="h-20" />
 

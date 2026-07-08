@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Bell, Check, Info, AlertTriangle, AlertCircle, Trash2, CheckCircle2 } from "lucide-react";
+import { Bell, Info, AlertTriangle, AlertCircle, Trash2, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   fetchNotifications,
@@ -14,6 +14,7 @@ import { toast } from "@/lib/customToast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/hooks/useAuth";
+import { getAccessToken } from "@/lib/authService";
 
 function timeAgo(dateString: string) {
   const date = new Date(dateString);
@@ -62,8 +63,15 @@ export default function NotificationBell() {
     React.useEffect(() => {
       if (!userId) return;
 
+      // The backend now authenticates the socket: it requires the caller's JWT
+      // (passed as a query param) and checks it belongs to this userId.
+      const token = getAccessToken();
+      if (!token) return;
+
       const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
-      const ws = new WebSocket(`${wsUrl}/ws/notifications/${userId}`);
+      const ws = new WebSocket(
+        `${wsUrl}/ws/notifications/${userId}?token=${encodeURIComponent(token)}`
+      );
 
     ws.onmessage = (event) => {
       try {
@@ -81,7 +89,7 @@ export default function NotificationBell() {
     };
 
     ws.onclose = () => {
-      console.log("WebSocket disconnected.");
+      // socket closed; NotificationBell will re-open on next mount / userId change
     };
 
     return () => {

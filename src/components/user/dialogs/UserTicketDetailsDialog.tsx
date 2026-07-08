@@ -45,6 +45,8 @@ import {
 import {
   addMyTicketComment,
   getMyTicket,
+  regenerateMyTicketSummary,
+  regenerateMyAssetSummary,
   updateMyTicket,
   type UserTicketDetail,
 } from "@/lib/api/userTickets";
@@ -103,6 +105,40 @@ export default function UserTicketDetailsDialog({
   const [editPriority, setEditPriority] = React.useState<string>("");
 
   const [fullSizeImage, setFullSizeImage] = React.useState<string | null>(null);
+  const [regenSummary, setRegenSummary] = React.useState(false);
+  const [regenAsset, setRegenAsset] = React.useState(false);
+
+  async function handleRegenerateSummary() {
+    if (!ticket) return;
+    setRegenSummary(true);
+    try {
+      const res = await regenerateMyTicketSummary(ticket.id);
+      setTicket({ ...ticket, ticket_summary: res.summary });
+      toast.success("AI summary generated");
+    } catch (e) {
+      toast.error("Failed to generate summary", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setRegenSummary(false);
+    }
+  }
+
+  async function handleRegenerateAssetSummary() {
+    if (!ticket?.asset_id) return;
+    setRegenAsset(true);
+    try {
+      const res = await regenerateMyAssetSummary(ticket.asset_id);
+      setTicket({ ...ticket, asset_summary: res.summary });
+      toast.success("Asset summary generated");
+    } catch (e) {
+      toast.error("Failed to generate asset summary", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setRegenAsset(false);
+    }
+  }
 
   React.useEffect(() => {
     if (!open || !ticketId) return;
@@ -376,18 +412,75 @@ export default function UserTicketDetailsDialog({
               )}
 
               {/* AI fields */}
-              {(ticket.ticket_summary ||
-                ticket.predicted_priority ||
-                ticket.predicted_category) && (
+              {ticket && (
                 <div className="rounded-md border p-3 bg-violet-50/40 dark:bg-violet-950/20">
                   <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-violet-500" />
                     AI insights
                   </h4>
-                  <div className="mt-2 space-y-2 text-sm">
-                    {ticket.ticket_summary && (
-                      <p className="text-sm">{ticket.ticket_summary}</p>
+                  <div className="mt-2 space-y-3 text-sm">
+                    {/* Ticket summary */}
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">Ticket summary</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={handleRegenerateSummary}
+                          disabled={regenSummary}
+                        >
+                          {regenSummary ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          )}
+                          <span className="ml-1">
+                            {ticket.ticket_summary ? "Regenerate" : "Generate"}
+                          </span>
+                        </Button>
+                      </div>
+                      <p className="mt-1 text-sm">
+                        {ticket.ticket_summary || (
+                          <span className="italic text-muted-foreground">
+                            No ticket summary yet — click Generate.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Asset summary */}
+                    {ticket.asset_id && (
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">Asset summary</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={handleRegenerateAssetSummary}
+                            disabled={regenAsset}
+                          >
+                            {regenAsset ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            )}
+                            <span className="ml-1">
+                              {ticket.asset_summary ? "Regenerate" : "Generate"}
+                            </span>
+                          </Button>
+                        </div>
+                        <p className="mt-1 text-sm">
+                          {ticket.asset_summary || (
+                            <span className="italic text-muted-foreground">
+                              No asset summary yet — click Generate.
+                            </span>
+                          )}
+                        </p>
+                      </div>
                     )}
+
                     <div className="flex flex-wrap gap-2">
                       {ticket.predicted_category && (
                         <Badge className="bg-sky-100 text-sky-800">

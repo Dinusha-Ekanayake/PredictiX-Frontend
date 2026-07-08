@@ -7,6 +7,9 @@
 import { apiGet, apiFetch, apiPost, apiPut } from "@/lib/apiClient";
 import type {
   Asset,
+  AssetListItem,
+  AssetStats,
+  AssetAnalytics,
   AssetDetail,
   AssetFilters,
   FailurePrediction,
@@ -15,7 +18,7 @@ import type {
   Ticket,
   AssetAssignment,
   VehiclePredictionResult,
-  AssetSurvivalResponse,
+  AssetComponentRulResponse,
 } from "./types";
 
 // ─── Create / update payloads ────────────────────────────────────────────────
@@ -55,23 +58,79 @@ export interface LogMaintenancePayload {
   notes?: string;
 }
 
-// ─── List / filter assets ──────────────────────────────────────────────────────
+// ─── List / filter assets (paginated) ──────────────────────────────────────────
 
-export async function listAssets(filters: AssetFilters): Promise<Asset[]> {
+export const ASSETS_PAGE_SIZE = 50;
+
+function buildAssetListParams(filters: AssetFilters): URLSearchParams {
   const params = new URLSearchParams();
-
   if (filters.query) params.set("search", filters.query);
   if (filters.status && filters.status !== "all") params.set("status", filters.status);
   if (filters.health_band && filters.health_band !== "all")
     params.set("health_band", filters.health_band);
   if (filters.warehouse_id && filters.warehouse_id !== "all")
     params.set("warehouse_id", filters.warehouse_id);
-
-  params.set("limit", "1500");
   params.set("sort_by", "created_at");
   params.set("sort_order", "desc");
+  return params;
+}
 
-  return apiGet<Asset[]>(`/assets/?${params.toString()}`);
+// ─── Short-TTL client-side cache ───────────────────────────────────────────────
+// Paging back and forth (or the filter-effect re-firing after a delete/save
+// refetch) would otherwise re-hit the network for data that's still fresh.
+// A short TTL keeps the list feeling instant for that back-and-forth while
+// staying safe against showing stale data for long.
+const LIST_CACHE_TTL_MS = 15_000;
+const listCache = new Map<string, { data: AssetListItem[]; expires: number }>();
+const countCache = new Map<string, { count: number; expires: number }>();
+
+/** Invalidate cached list/count results (call after any create/update/delete). */
+export function invalidateAssetListCache(): void {
+  listCache.clear();
+  countCache.clear();
+}
+
+/** Fetch one page of the trimmed asset list (AssetListOut on the backend). */
+export async function listAssets(
+  filters: AssetFilters,
+  page = 1,
+  pageSize = ASSETS_PAGE_SIZE,
+): Promise<AssetListItem[]> {
+  const params = buildAssetListParams(filters);
+  params.set("limit", String(pageSize));
+  params.set("offset", String((page - 1) * pageSize));
+  const key = params.toString();
+
+  const cached = listCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.data;
+
+  const data = await apiGet<AssetListItem[]>(`/assets/?${key}`);
+  listCache.set(key, { data, expires: Date.now() + LIST_CACHE_TTL_MS });
+  return data;
+}
+
+/** Total count of assets matching the current filters (for pagination controls). */
+export async function countAssets(filters: AssetFilters): Promise<number> {
+  const params = buildAssetListParams(filters);
+  const key = params.toString();
+
+  const cached = countCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.count;
+
+  const result = await apiGet<{ count: number }>(`/assets/count?${key}`);
+  countCache.set(key, { count: result.count, expires: Date.now() + LIST_CACHE_TTL_MS });
+  return result.count;
+}
+
+/** Fleet-wide summary counts, independent of which page is currently shown. */
+export async function getAssetStats(): Promise<AssetStats> {
+  return apiGet<AssetStats>(`/assets/stats`);
+}
+
+/** Fleet-wide descriptive analytics (status/health/type distributions + top
+ * at-risk assets), independent of which page is currently shown. */
+export async function getAssetAnalytics(): Promise<AssetAnalytics> {
+  return apiGet<AssetAnalytics>(`/assets/analytics`);
 }
 
 // ─── Single asset ──────────────────────────────────────────────────────────────
@@ -119,11 +178,11 @@ export async function getCostPrediction(assetId: string): Promise<CostPrediction
   }
 }
 
-// ─── Survival prediction for an asset ──────────────────────────────────────────
+// ─── Component RUL for an asset (independent of the FRSO report models) ───────
 
-export async function getSurvivalPrediction(assetId: string): Promise<AssetSurvivalResponse | null> {
+export async function getComponentRul(assetId: string): Promise<AssetComponentRulResponse | null> {
   try {
-    return await apiGet<AssetSurvivalResponse>(`/survival/${assetId}`);
+    return await apiGet<AssetComponentRulResponse>(`/assets/${assetId}/component-rul`);
   } catch {
     return null;
   }
@@ -150,18 +209,18 @@ export async function runVehiclePrediction(
 
 export async function getAssetDetail(assetId: string): Promise<AssetDetail> {
   // Run all fetches in parallel for speed
-  const [asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments] =
+  const [asset, prediction, costPrediction, componentRul, maintenanceEvents, tickets, assignments] =
     await Promise.all([
       getAsset(assetId),
       getFailurePrediction(assetId),
       getCostPrediction(assetId),
-      getSurvivalPrediction(assetId),
+      getComponentRul(assetId),
       getMaintenanceEvents(assetId).catch(() => [] as MaintenanceEvent[]),
       getAssetTickets(assetId).catch(() => [] as Ticket[]),
       getAssetAssignments(assetId).catch(() => [] as AssetAssignment[]),
     ]);
 
-  return { asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments };
+  return { asset, prediction, costPrediction, componentRul, maintenanceEvents, tickets, assignments };
 }
 
 // ─── Create asset ────────────────────────────────────────────────────────────

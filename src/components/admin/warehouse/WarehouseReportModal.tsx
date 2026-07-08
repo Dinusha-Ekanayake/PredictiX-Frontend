@@ -34,6 +34,7 @@ interface CriticalAsset {
   code: string; name: string; type: string;
   health_score: number; health: string; failure_prob: string;
   risk: string; days_to_service: number | null; status: string;
+  primary_driver?: string | null;
 }
 interface Ctx {
   warehouse_name?: string; warehouse_city?: string; warehouse_code?: string;
@@ -74,7 +75,7 @@ interface Ctx {
   ticket_trend_direction?: string;
   total_users?: number; active_users?: number; inactive_users?: number;
   admin_users?: number; standard_users?: number;
-  // Phase B — extended DB fields
+  // Phase B extended DB fields
   fleet_age_distribution?: Record<string, number>;
   warranty_expiring_90d?: number;
   component_health?: { avg_tire?: number; avg_brake?: number; avg_battery?: number; avg_oil?: number; avg_hydraulic?: number };
@@ -196,11 +197,11 @@ function Section({
 
 function ConfirmStep({ onGenerate, onClose }: { onGenerate: () => void; onClose: () => void }) {
   const SECTIONS = [
-    "Executive Insight Summary — Fleet overview, health, costs, users",
-    "Risk & Failure Analysis — SHAP drivers, critical assets, risk distribution",
-    "Maintenance Intelligence — Service urgency, cost forecast, downtime",
-    "Pattern & Trend Analysis — 3-month ticket & maintenance trends",
-    "Warehouse Conclusion — Full RAG-powered summary with recommendations",
+    "Executive Insight Summary Fleet overview, health, costs, users",
+    "Risk & Failure Analysis SHAP drivers, critical assets, risk distribution",
+    "Maintenance Intelligence Service urgency, cost forecast, downtime",
+    "Pattern & Trend Analysis 3-month ticket & maintenance trends",
+    "Warehouse Conclusion Full RAG-powered summary with recommendations",
   ];
   const SOURCES = [
     "assets", "asset_failure_predictions", "asset_cost_predictions",
@@ -423,6 +424,10 @@ function ReportStep({
             `Health score: ${asset.health}`,
             `Failure probability: ${asset.failure_prob}`,
             `Risk: ${asset.risk}`,
+            asset.days_to_service != null
+              ? `Service due in: ${asset.days_to_service} day${asset.days_to_service === 1 ? "" : "s"}`
+              : "",
+            asset.primary_driver ? `Primary driver: ${asset.primary_driver}` : "",
           ].filter(Boolean).join(" | ");
           const res = await fetch(`${API_BASE}/asset-summaries/generate`, {
             method: "POST",
@@ -515,11 +520,11 @@ function ReportStep({
         actualCost3m: `LKR ${(ctx.actual_cost_3m || 0).toLocaleString()}`,
         maintenanceEvents3m: ctx.total_maintenance_events_3m || 0,
         avgDowntimeHours: ctx.avg_downtime_hours || 0,
-        // Phase A fixes — previously unmapped
+        // Phase A fixes previously unmapped
         preventiveCount: ctx.maintenance_type_breakdown?.['Preventive'] ?? ctx.maintenance_type_breakdown?.['preventive'] ?? 0,
         correctiveCount: ctx.maintenance_type_breakdown?.['Corrective'] ?? ctx.maintenance_type_breakdown?.['corrective'] ?? 0,
         monthlyTrend: ctx.monthly_maintenance_trend ?? [],
-        // Phase A fix — cost range was in Ctx but never sent to PDF
+        // Phase A fix cost range was in Ctx but never sent to PDF
         minCostEstimate: ctx.min_cost_estimate ?? 0,
         maxCostEstimate: ctx.max_cost_estimate ?? 0,
         // Phase B addition
@@ -539,7 +544,7 @@ function ReportStep({
         highPriorityTickets: ctx.high_priority_active_tickets || 0,
         mediumPriorityTickets: ctx.ticket_priority_breakdown?.['Medium'] || 0,
         lowPriorityTickets: ctx.ticket_priority_breakdown?.['Low'] || 0,
-        // Phase A fix — previously unmapped
+        // Phase A fix previously unmapped
         monthlyTrend: ctx.ticket_trend_last_3m ?? [],
         // Phase B additions
         avgResolutionDays: ctx.avg_resolution_days ?? 0,
@@ -553,14 +558,14 @@ function ReportStep({
         standardUsers: ctx.standard_users || 0,
         inactiveUsers: ctx.inactive_users || 0,
       },
-      // Phase B — Component & Operational data
+      // Phase B Component & Operational data
       operationsDetail: {
         componentHealth: ctx.component_health ?? {},
         totalFaultCodes: ctx.total_fault_codes ?? 0,
         avgFaultCodesPerAsset: ctx.avg_fault_codes_per_asset ?? 0,
         monitoredAssets: ctx.monitored_assets ?? 0,
       },
-      // Predictive Maintenance Schedule (from /maintenance-schedule endpoint — warehouse only)
+      // Predictive Maintenance Schedule (from /maintenance-schedule endpoint warehouse only)
       maintenanceSchedule: maintenanceSchedule.slice(0, 20),
       // Chart Sections
       sections: {
@@ -589,7 +594,7 @@ function ReportStep({
         feature: feature.replace(/_/g, " "),
         importance: importance,
       })),
-      // FRSO survival analysis (Weibull AFT) — §4.8 dedicated page
+      // FRSO survival analysis (Weibull AFT) §4.8 dedicated page
       survival: ctx.survival_summary ?? null,
     };
     // const pdfData = {
@@ -734,12 +739,12 @@ function ReportStep({
           <div className="rounded-2xl border border-violet-200 dark:border-violet-900 bg-violet-50 dark:bg-violet-950/20 px-4 py-3">
             <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 mb-2">PostgreSQL Tables Injected into Context</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-violet-700 dark:text-violet-300 sm:grid-cols-3">
-              <span>assets — {ctx.total_assets}</span>
+              <span>assets {ctx.total_assets}</span>
               <span>asset_failure_predictions</span>
               <span>asset_cost_predictions</span>
-              <span>maintenance_events — {ctx.total_maintenance_events_3m} (90d)</span>
-              <span>tickets — {ctx.total_tickets}</span>
-              <span>profiles — {ctx.total_users}</span>
+              <span>maintenance_events {ctx.total_maintenance_events_3m} (90d)</span>
+              <span>tickets {ctx.total_tickets}</span>
+              <span>profiles {ctx.total_users}</span>
             </div>
           </div>
         )}
@@ -783,7 +788,7 @@ function ReportStep({
                 <CLabel text="Asset Status Distribution" />
                 <div className="flex flex-col xl:flex-row items-center gap-4 mt-2">
                   <div className="w-full xl:w-1/2">
-                    <ResponsiveContainer width="100%" height={160}>
+                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
                       <PieChart>
                         <Pie data={assetStatusData} cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={3} dataKey="value">
                           {assetStatusData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -825,7 +830,7 @@ function ReportStep({
                 <CLabel text="Fleet Composition by Type" />
                 <div className="flex flex-col xl:flex-row items-center gap-4 mt-2">
                   <div className="w-full xl:w-1/2">
-                    <ResponsiveContainer width="100%" height={160}>
+                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
                       <BarChart data={assetTypeData} layout="vertical" margin={{ left: 70, right: 20, top: 10, bottom: 0 }}>
                         <XAxis type="number" tick={{ fontSize: 10 }} hide />
                         <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={65} axisLine={false} tickLine={false} />
@@ -931,7 +936,7 @@ function ReportStep({
             {riskData.length > 0 && (
               <div>
                 <CLabel text="Risk Levels" />
-                <ResponsiveContainer width="100%" height={155}>
+                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={155}>
                   <PieChart>
                     <Pie data={riskData} cx="50%" cy="50%" innerRadius={30} outerRadius={58} paddingAngle={3} dataKey="value">
                       {riskData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -945,7 +950,7 @@ function ReportStep({
             {healthDistData.length > 0 && (
               <div>
                 <CLabel text="Health Score Buckets" />
-                <ResponsiveContainer width="100%" height={155}>
+                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={155}>
                   <BarChart data={healthDistData} margin={{ left: -10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="name" tick={{ fontSize: 9 }} />
@@ -981,7 +986,7 @@ function ReportStep({
             ) : shapData.length > 0 ? (
               <div>
                 <CLabel text="Top SHAP Failure Drivers" />
-                <ResponsiveContainer width="100%" height={200}>
+                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={200}>
                   <BarChart data={shapData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                     <XAxis type="number" tick={{ fontSize: 10 }} />
                     <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
@@ -999,7 +1004,7 @@ function ReportStep({
               {/* Tick assets → generate summaries only for the ticked ones */}
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <p className="text-[11px] text-muted-foreground">
-                  Tick the assets you want AI summaries for — summaries appear below and are included in the PDF.
+                  Tick the assets you want AI summaries for summaries appear below and are included in the PDF.
                   {selectedCodes.size > 0 && <span className="ml-1 font-semibold text-violet-600">{selectedCodes.size} selected</span>}
                 </p>
                 <button
@@ -1147,7 +1152,7 @@ function ReportStep({
             {maintenTypeData.length > 0 && (
               <div>
                 <CLabel text="Event Types" />
-                <ResponsiveContainer width="100%" height={160}>
+                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
                   <PieChart>
                     <Pie data={maintenTypeData} cx="50%" cy="50%" outerRadius={57} dataKey="value">
                       {maintenTypeData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -1162,7 +1167,7 @@ function ReportStep({
           {maintenTrend.length > 0 && (
             <>
               <Divider label="Monthly Events (3 Months)" />
-              <ResponsiveContainer width="100%" height={150}>
+              <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
                 <LineChart data={maintenTrend} margin={{ left: -10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="month" tick={{ fontSize: 9 }} />
@@ -1267,7 +1272,7 @@ function ReportStep({
             {ticketPriData.length > 0 && (
               <div>
                 <CLabel text="Ticket Priority" />
-                <ResponsiveContainer width="100%" height={150}>
+                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
                   <PieChart>
                     <Pie data={ticketPriData} cx="50%" cy="50%" innerRadius={28} outerRadius={55} paddingAngle={3} dataKey="value">
                       {ticketPriData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -1285,7 +1290,7 @@ function ReportStep({
             {ticketTrend.length > 0 && (
               <div className="lg:col-span-2">
                 <CLabel text={`Monthly Ticket Volume (${ctx.ticket_trend_direction ?? "stable"})`} />
-                <ResponsiveContainer width="100%" height={150}>
+                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
                   <LineChart data={ticketTrend} margin={{ left: -10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 9 }} />
@@ -1301,7 +1306,7 @@ function ReportStep({
             <>
               <Divider label="Ticket Categories" />
               <div className="grid gap-4 sm:grid-cols-2">
-                <ResponsiveContainer width="100%" height={200}>
+                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={200}>
                   <BarChart data={ticketCatData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                     <XAxis type="number" tick={{ fontSize: 10 }} />
                     <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />

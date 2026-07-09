@@ -114,9 +114,9 @@ export default function NewTicketDialog({
   // ── ticket summary preview (debounced) ─────────────────────────────────────
   React.useEffect(() => {
     const t = title.trim(), d = description.trim();
-    // Wait until the AI has set category so the summary includes
-    // them instead of hallucinating those slots.
-    if (!t || !d || !category) { setTicketSummary(null); return; }
+    // Generate the summary only once category AND priority are confirmed (set by
+    // the AI or the user), so it reflects those values. Regenerates if changed.
+    if (!t || !d || !category || !priority) { setTicketSummary(null); return; }
     let cancelled = false;
     const timer = setTimeout(async () => {
       setTicketSummaryLoading(true);
@@ -125,7 +125,7 @@ export default function NewTicketDialog({
           title: t,
           description: d,
           category,
-          priority: priority || undefined,
+          priority,
         });
         if (!cancelled) setTicketSummary(res?.summary ?? null);
       } catch {

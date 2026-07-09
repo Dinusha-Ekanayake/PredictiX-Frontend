@@ -107,8 +107,9 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
 
   // AI state
   const [ai, setAi] = React.useState<AiState>({ status: "idle" });
-  // Category the user may have overridden after AI ran
+  // Category / priority the user may have overridden after AI ran
   const [categoryOverride, setCategoryOverride] = React.useState<string>("");
+  const [priorityOverride, setPriorityOverride] = React.useState<string>("");
 
   // submission
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -136,8 +137,10 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
     // includes them instead of hallucinating those slots.
     const aiRes = ai.status === "done" ? ai.result : null;
     const cat = categoryOverride || aiRes?.predicted_category || "";
-    const pri = aiRes?.predicted_priority || "";
-    if (!t || !d || !cat) { setTicketSummary(null); return; }
+    const pri = priorityOverride || aiRes?.predicted_priority || "";
+    // Generate the summary only once category AND priority are confirmed (set by
+    // the AI or the user), so it reflects those values. Regenerates if changed.
+    if (!t || !d || !cat || !pri) { setTicketSummary(null); return; }
     let cancelled = false;
     const timer = setTimeout(async () => {
       setTicketSummaryLoading(true);
@@ -146,7 +149,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
           title: t,
           description: d,
           category: cat,
-          priority: pri || undefined,
+          priority: pri,
         });
         if (!cancelled) setTicketSummary(res?.summary ?? null);
       } catch {
@@ -156,7 +159,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
       }
     }, 900);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [title, description, ai, categoryOverride]);
+  }, [title, description, ai, categoryOverride, priorityOverride]);
 
   // ── debounced AI trigger ─────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -173,13 +176,15 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
 
     setAi({ status: "running" });
     setCategoryOverride("");
+    setPriorityOverride("");
 
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await previewMyTicketAI({ title: trimTitle, description: trimDesc });
         setAi({ status: "done", result: res });
-        // Pre-fill category override with AI suggestion
+        // Pre-fill the editable category + priority with the AI suggestion
         if (res.predicted_category) setCategoryOverride(res.predicted_category);
+        if (res.predicted_priority) setPriorityOverride(res.predicted_priority);
       } catch (err) {
         setAi({ status: "error", message: err instanceof Error ? err.message : "AI failed" });
       }
@@ -207,7 +212,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
     const t = setTimeout(() => {
       setAssetId(""); setAssets([]); setTitle(""); setDescription("");
       setAssignedTo(""); setUsers([]); setAssetSummary(null); setTicketSummary(null);
-      setAi({ status: "idle" }); setCategoryOverride("");
+      setAi({ status: "idle" }); setCategoryOverride(""); setPriorityOverride("");
       setIsSubmitting(false); setResult(null); setFile(null);
     }, 200);
     return () => clearTimeout(t);
@@ -231,7 +236,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
         asset_id: assetId || undefined,
         assigned_to: assignedTo || undefined,
         use_ai_predictions: false,
-        predicted_priority: aiResult?.predicted_priority ?? undefined,
+        predicted_priority: priorityOverride || (aiResult?.predicted_priority ?? undefined),
         predicted_category: categoryOverride || (aiResult?.predicted_category ?? undefined),
         ticket_summary: aiResult?.ticket_summary ?? undefined,
       });
@@ -274,7 +279,6 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
 
   // ── derived ──────────────────────────────────────────────────────────────────
   const aiResult = ai.status === "done" ? ai.result : null;
-  const predictedPriority = aiResult?.predicted_priority ?? null;
   // Create is blocked while AI is still running (but allowed if idle=no text, or error=graceful)
   const aiBlocking = ai.status === "running";
   const canCreate = title.trim().length > 0 && description.trim().length > 0 && !aiBlocking && !isSubmitting;
@@ -321,7 +325,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <Button variant="secondary" onClick={() => {
                   setTitle(""); setDescription(""); setAssetId(""); setAssignedTo("");
-                  setAi({ status: "idle" }); setCategoryOverride(""); setResult(null); setAssetSummary(null); setTicketSummary(null); setFile(null);
+                  setAi({ status: "idle" }); setCategoryOverride(""); setPriorityOverride(""); setResult(null); setAssetSummary(null); setTicketSummary(null); setFile(null);
                 }}>
                   Create another
                 </Button>
@@ -429,7 +433,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
                 )}
               </div>
 
-              {/* AI results: category (editable) + priority (locked) */}
+              {/* AI results: category + priority — both AI-suggested and editable */}
               <div className="grid grid-cols-2 gap-3">
                 {/* Category — user CAN change */}
                 <div>
@@ -452,35 +456,31 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
                       <SelectItem value="software">Software</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">AI-suggested — you can change it</p>
                 </div>
 
-                {/* Priority — locked, AI only */}
+                {/* Priority — user CAN change */}
                 <div>
                   <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
-                    <Lock className="h-3.5 w-3.5 text-muted-foreground/60" />
+                    <Sparkles className="h-3.5 w-3.5 text-violet-500" />
                     Priority
                     {ai.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-violet-400" />}
                   </p>
-                  <div className={`h-9 flex items-center px-3 rounded-md border border-input bg-muted/40 text-sm gap-2 ${!predictedPriority ? "text-muted-foreground" : ""}`}>
-                    {ai.status === "running" ? (
-                      <><Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" /><span className="text-muted-foreground">Analyzing…</span></>
-                    ) : predictedPriority ? (
-                        <>
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${PRIORITY_COLORS[predictedPriority] ?? ""}`}>
-                            {predictedPriority === "high" && <AlertTriangle className="h-3.5 w-3.5" />}
-                            {predictedPriority === "medium" && <AlertCircle className="h-3.5 w-3.5" />}
-                            {predictedPriority === "low" && <CheckCircle2 className="h-3.5 w-3.5" />}
-                            {predictedPriority.charAt(0).toUpperCase() + predictedPriority.slice(1)}
-                          </span>
-                        <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
-                          <Lock className="h-3 w-3" />AI set
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">{ai.status === "error" ? "Unavailable" : "Awaiting input…"}</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Set by AI — cannot be changed</p>
+                  <Select
+                    value={priorityOverride}
+                    onValueChange={setPriorityOverride}
+                    disabled={isSubmitting || ai.status === "running"}
+                  >
+                    <SelectTrigger className="w-full bg-background">
+                      <SelectValue placeholder={ai.status === "running" ? "Analyzing…" : "AI will detect"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">AI-suggested — you can change it</p>
                 </div>
               </div>
 

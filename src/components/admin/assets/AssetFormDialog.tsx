@@ -34,7 +34,7 @@ import {
 } from "./assetService";
 import type { Asset } from "./types";
 
-const STATUS_OPTIONS = ["active", "inactive", "under_maintenance", "critical", "retired"];
+const STATUS_OPTIONS = ["active", "inactive", "under_maintenance", "critical", "decommissioned"];
 const HEALTH_BANDS = ["excellent", "good", "moderate", "poor", "critical"];
 
 type Props = {

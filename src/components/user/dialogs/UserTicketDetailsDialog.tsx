@@ -58,6 +58,9 @@ type Props = {
   ticketId: string | null;
   currentUserId: string | null;
   onUpdated?: (ticket: UserTicketDetail) => void;
+  /** Pass the parent page's already-loaded user list to skip this dialog's
+   * own GET /users/ fetch (used only to resolve id -> name). */
+  users?: UserItem[];
 };
 
 function StatusIcon({ status }: { status: string }) {
@@ -90,6 +93,7 @@ export default function UserTicketDetailsDialog({
   ticketId,
   currentUserId,
   onUpdated,
+  users: usersProp,
 }: Props) {
   const [ticket, setTicket] = React.useState<UserTicketDetail | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -97,7 +101,9 @@ export default function UserTicketDetailsDialog({
   const [savingEdit, setSavingEdit] = React.useState(false);
   const [commentText, setCommentText] = React.useState("");
   const [postingComment, setPostingComment] = React.useState(false);
-  const [users, setUsers] = React.useState<UserItem[]>([]);
+  const [fetchedUsers, setFetchedUsers] = React.useState<UserItem[]>([]);
+  // Prefer the parent's already-loaded list; fall back to this dialog's own fetch.
+  const users = usersProp ?? fetchedUsers;
 
   // Edit form state — local until saved.
   const [editTitle, setEditTitle] = React.useState("");
@@ -164,16 +170,18 @@ export default function UserTicketDetailsDialog({
         if (!cancelled) setLoading(false);
       });
 
-    listUsers()
-      .then((data) => {
-        if (!cancelled) setUsers(data ?? []);
-      })
-      .catch((err) => console.error("Failed to load users:", err));
+    if (!usersProp) {
+      listUsers()
+        .then((data) => {
+          if (!cancelled) setFetchedUsers(data ?? []);
+        })
+        .catch((err) => console.error("Failed to load users:", err));
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [open, ticketId, onOpenChange]);
+  }, [open, ticketId, onOpenChange, usersProp]);
 
   const userMap = React.useMemo(() => {
     const map = new Map<string, string>();

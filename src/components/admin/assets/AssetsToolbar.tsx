@@ -81,9 +81,10 @@ export default function AssetsToolbar({
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
+                <SelectItem value="under_maintenance">Under Maintenance</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="retired">Retired</SelectItem>
+                <SelectItem value="decommissioned">Decommissioned</SelectItem>
               </SelectContent>
             </Select>
 

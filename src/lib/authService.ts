@@ -78,6 +78,21 @@ export async function selectWarehouse(
   return response.json();
 }
 
+/**
+ * Fire-and-forget ping to wake the PredictiX Gradio Space (ticket
+ * categorization + priority) before it's actually needed, so the first real
+ * inference call doesn't pay the ~20-60s cold-start penalty.
+ *
+ * No auth required (there's no session yet when this fires from the login
+ * page) and callers never await the result — a slow/failed ping must never
+ * block or affect the login flow.
+ */
+export function warmupInferenceSpace(): void {
+  fetch(`${API_BASE_URL}/warmup/inference-space`, { method: "POST" }).catch(() => {
+    // Intentionally silent — warmup is best-effort and must never surface an error.
+  });
+}
+
 // ─── Session helpers ──────────────────────────────────────────────────────────
 
 /**

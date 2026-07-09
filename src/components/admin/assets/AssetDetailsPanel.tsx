@@ -485,13 +485,13 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             icon={<CalendarClock className="h-3.5 w-3.5" />}
             label="Next Scheduled Service"
             value={
-              asset.status === "maintenance"
+              asset.status === "under_maintenance"
                 ? "Currently in Maintenance"
                 : asset.next_service_date
                   ? `${fmt(asset.next_service_date)}${daysUntilMaint !== null ? ` (${daysUntilMaint > 0 ? `in ${daysUntilMaint}d` : `${Math.abs(daysUntilMaint)}d overdue`})` : ""}`
                   : "—"
             }
-            valueClass={asset.status !== "maintenance" && daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
+            valueClass={asset.status !== "under_maintenance" && daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
             action={
               <SendServiceReminderButton
                 assetId={asset.id}

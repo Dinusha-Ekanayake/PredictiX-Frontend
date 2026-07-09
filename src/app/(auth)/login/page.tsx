@@ -33,6 +33,7 @@ import {
   login,
   selectWarehouse,
   storeAuthSession,
+  warmupInferenceSpace,
   type LoginResponse,
   type WarehouseOption,
 } from "@/lib/authService";
@@ -148,6 +149,13 @@ export default function LoginPage() {
   const [warehouses, setWarehouses] = React.useState<WarehouseOption[]>([]);
   const [warehouseId, setWarehouseId] = React.useState("");
   const [superAdminName, setSuperAdminName] = React.useState("");
+
+  // Wake the AI inference Space as soon as the login page is visited, so it's
+  // warm by the time the user's first ticket-categorization/priority call
+  // happens post-login. Fire-and-forget — never blocks rendering or login.
+  React.useEffect(() => {
+    warmupInferenceSpace();
+  }, []);
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {

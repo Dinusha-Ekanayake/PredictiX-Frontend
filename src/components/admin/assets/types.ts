@@ -57,7 +57,7 @@ export type Asset = {
   manufacture_year: number | null;
   registration_number: string | null;
   vin: string | null;
-  status: string;                  // "active" | "inactive" | "retired" | "maintenance"
+  status: string;                  // "active" | "inactive" | "under_maintenance" | "critical" | "decommissioned"
   health_band: string | null;      // "excellent" | "good" | "moderate" | "poor" | "critical"
   criticality_score: number | null;
   purchase_date: string | null;

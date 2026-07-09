@@ -15,7 +15,7 @@ import {
 import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
-import type { AssetDetail, ComponentRulOut } from "./types";
+import type { AssetDetail, ComponentRulOut, PredictionTier } from "./types";
 // CHANGE 1: removed generateAssetReport from import — report now handled by parent via onReport prop
 import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
 import LogMaintenanceDialog from "./LogMaintenanceDialog";
@@ -160,6 +160,42 @@ function PriorityPill({ priority }: { priority: string | null }) {
   );
 }
 
+/* ── Prediction tier badge ───────────────────────────────────────────────────────
+   Surfaces the decision layer's reconciled recommendation (classifier +
+   regressor + health score) instead of showing a raw date regardless of
+   whether the classifier thinks action is actually needed. */
+const TIER_META: Record<PredictionTier, { label: string; className: string }> = {
+  urgent: {
+    label: "Urgent",
+    className: "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20",
+  },
+  watch: {
+    label: "Watch",
+    className: "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  },
+  healthy: {
+    label: "Healthy",
+    className: "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
+  },
+  conflict: {
+    label: "Needs Review",
+    className: "bg-violet-50 text-violet-700 ring-violet-200/60 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20",
+  },
+};
+
+function TierBadge({ tier }: { tier: PredictionTier | null | undefined }) {
+  if (!tier || !TIER_META[tier]) return null;
+  const meta = TIER_META[tier];
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset",
+      meta.className,
+    )}>
+      {meta.label}
+    </span>
+  );
+}
+
 /* ── Ticket status pill ───────────────────────────────────────────────────────── */
 const TICKET_STATUS_META: Record<string, string> = {
   open:        "bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20",
@@ -226,7 +262,7 @@ type Props = {
 };
 
 export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, onReport, readOnly = false }: Props) {
-  const { asset, prediction, costPrediction, componentRul, maintenanceEvents, tickets, assignments } = detail;
+  const { asset, prediction, componentRul, maintenanceEvents, tickets, assignments } = detail;
   const router = useNavRouter();
 
   const [runningPrediction, setRunningPrediction] = React.useState(false);
@@ -235,6 +271,12 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
 
   const healthScore = deriveHealthScore(asset, prediction);
   const failureProb = deriveFailureProbability(prediction);
+
+  // Hard dates are only actionable when the decision layer's tier agrees
+  // action is near-term (urgent/watch/conflict); "healthy" demotes the
+  // regressor's date to a soft horizon instead of showing a specific date
+  // for an asset the classifier says doesn't need service.
+  const showHardDate = prediction?.display_mode === "date";
 
   const daysUntilMaint = asset.next_service_date
     ? Math.ceil((new Date(asset.next_service_date).getTime() - Date.now()) / 86_400_000)
@@ -253,9 +295,9 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
       : null;
 
   const costVariance =
-    costPrediction?.estimated_cost && costPrediction?.min_cost
-      ? (Number(costPrediction.estimated_cost) - Number(costPrediction.min_cost)) /
-        (Number(costPrediction.min_cost) || 1)
+    prediction?.estimated_cost_lkr && prediction?.min_cost_lkr
+      ? (Number(prediction.estimated_cost_lkr) - Number(prediction.min_cost_lkr)) /
+        (Number(prediction.min_cost_lkr) || 1)
       : 0;
 
   const CostDeltaIcon =
@@ -376,19 +418,17 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             <HealthRing score={healthScore} />
             <div className="hidden sm:block h-24 w-px bg-slate-200/80 dark:bg-white/6" />
             <div className="flex-1 space-y-3.5 w-full">
-              <RiskGauge probability={failureProb} />
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Bot className="h-3.5 w-3.5" />
-                  Model confidence
-                </span>
-                <span className="font-bold tabular-nums">
-                  {prediction.confidence != null
-                    ? `${Math.round(Number(prediction.confidence) * 100)}%`
-                    : "—"}
-                </span>
+              <div className="flex items-center gap-2">
+                <TierBadge tier={prediction.tier} />
+                {prediction.agreement === false && (
+                  <span className="text-[11px] text-muted-foreground/70 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Signals disagree
+                  </span>
+                )}
               </div>
-              {predDiff !== null && (
+              <RiskGauge probability={failureProb} />
+              {predDiff !== null && showHardDate && (
                 <div className={cn(
                   "flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-medium",
                   predDiff < 0
@@ -504,7 +544,11 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
           <InfoField
             icon={<Bot className="h-3.5 w-3.5" />}
             label="AI-Predicted Maintenance"
-            value={fmt(prediction?.predicted_maintenance_date)}
+            value={
+              showHardDate
+                ? fmt(prediction?.predicted_maintenance_date)
+                : prediction?.horizon_text ?? fmt(prediction?.predicted_maintenance_date)
+            }
           />
           {/* Cost prediction */}
           <div className="h-full rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
@@ -514,12 +558,11 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             <div>
               <div className="text-[11px] text-muted-foreground/80 font-medium">Est. Maintenance Cost</div>
               <div className="text-sm font-semibold mt-0.5">
-                {fmtCost(costPrediction?.estimated_cost, costPrediction?.currency ?? "LKR")}
+                {fmtCost(prediction?.estimated_cost_lkr)}
               </div>
-              {costPrediction && (
+              {prediction && (
                 <div className="text-[11px] text-muted-foreground/60 mt-0.5">
-                  Range: {fmtCost(costPrediction.min_cost, costPrediction.currency ?? "LKR")} –{" "}
-                  {fmtCost(costPrediction.max_cost, costPrediction.currency ?? "LKR")}
+                  Range: {fmtCost(prediction.min_cost_lkr)} – {fmtCost(prediction.max_cost_lkr)}
                 </div>
               )}
             </div>
@@ -597,16 +640,16 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       <HealthRing score={healthScore} />
                       <div className="flex-1 space-y-1.5">
                         {[
-                          { label: "Brake", key: "brake_health_pct" },
-                          { label: "Tire", key: "tire_health_pct" },
-                          { label: "Battery", key: "battery_health_pct" },
-                          { label: "Oil", key: "oil_life_pct" },
-                          { label: "Hydraulic", key: "hydraulic_health_pct" },
+                          { label: "Brake", key: "brake" },
+                          { label: "Tire", key: "tire" },
+                          { label: "Battery", key: "battery" },
+                          { label: "Oil", key: "oil" },
+                          { label: "Hydraulic", key: "hydraulic" },
                         ].map(({ label, key }) => {
-                          const raw = prediction?.top_explanations as Record<string, unknown> | null;
-                          const factors = Array.isArray(raw?.top_factors) ? (raw!.top_factors as Array<{ feature: string; value?: number }>) : [];
-                          const found = factors.find((f) => f.feature === key);
-                          const pct = found?.value != null ? Math.min(100, Math.max(0, Math.round(Number(found.value)))) : null;
+                          const comp = componentRul?.components.find((c) => c.component === key);
+                          const pct = comp?.current_health_pct != null
+                            ? Math.min(100, Math.max(0, Math.round(comp.current_health_pct)))
+                            : null;
                           const color = pct == null ? "bg-slate-200 dark:bg-white/10" : pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
                           return (
                             <div key={key} className="space-y-0.5">
@@ -658,36 +701,33 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                           />
                         </div>
                       </div>
-                      {aiDaysUntilMaint != null && (
+                      {showHardDate && aiDaysUntilMaint != null ? (
                         <div className="flex items-center justify-between text-xs border-t border-slate-200/60 dark:border-white/6 pt-2">
                           <span className="text-muted-foreground">Days until maintenance</span>
                           <span className={`font-bold tabular-nums ${aiDaysUntilMaint < 0 ? "text-red-600 dark:text-red-400" : aiDaysUntilMaint <= 14 ? "text-red-500" : aiDaysUntilMaint <= 30 ? "text-amber-500" : "text-foreground"}`}>
                             {aiDaysUntilMaint < 0 ? `${Math.abs(aiDaysUntilMaint)}d overdue` : `${aiDaysUntilMaint}d`}
                           </span>
                         </div>
-                      )}
-                      {prediction.confidence != null && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground flex items-center gap-1"><Bot className="h-3 w-3" />Confidence</span>
-                          <span className="font-semibold">{Math.round(Number(prediction.confidence) * 100)}%</span>
+                      ) : prediction.horizon_text ? (
+                        <div className="text-xs text-muted-foreground border-t border-slate-200/60 dark:border-white/6 pt-2">
+                          {prediction.horizon_text}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </div>
 
                 {/* ── Row 2: SHAP Top Feature Importance ── */}
                 {(() => {
-                  const raw = prediction?.top_explanations as Record<string, unknown> | null;
-                  const topFactors = Array.isArray(raw?.top_factors) ? (raw!.top_factors as Array<{ feature: string; value?: number; impact?: number }>) : [];
+                  const topFactors = prediction?.top_explanations ?? [];
                   if (topFactors.length === 0) return null;
-                  const maxVal = Math.max(...topFactors.map((f) => Math.abs(Number(f.impact ?? f.value ?? 0))), 1);
+                  const maxVal = Math.max(...topFactors.map((f) => Math.abs(f.impact ?? 0)), 1);
                   return (
                     <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                       <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Top Risk Factors (SHAP)</div>
                       <div className="space-y-2">
                         {topFactors.map((f, i) => {
-                          const impact = Math.abs(Number(f.impact ?? f.value ?? 0));
+                          const impact = Math.abs(f.impact ?? 0);
                           const pct = Math.round((impact / maxVal) * 100);
                           const label = f.feature.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
                           return (
@@ -695,7 +735,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                               <div className="flex justify-between text-[11px]">
                                 <span className="text-muted-foreground font-medium truncate">{label}</span>
                                 <span className="text-xs font-mono text-muted-foreground/70 shrink-0 ml-2">
-                                  {f.value != null ? String(Number(f.value).toFixed(1)) : "—"}
+                                  {f.impact != null ? f.impact.toFixed(2) : "—"}
                                 </span>
                               </div>
                               <div className="h-2 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
@@ -714,13 +754,19 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                     <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">AI Recommendations</div>
                     <div className="space-y-2.5">
-                      {predDiff !== null && predDiff < 0 && (
+                      {prediction.tier === "conflict" && (
+                        <div className="flex items-start gap-2.5 text-sm text-violet-600 dark:text-violet-400">
+                          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>Classifier and health score disagree — <strong>flagged for manual review</strong>.</span>
+                        </div>
+                      )}
+                      {showHardDate && predDiff !== null && predDiff < 0 && (
                         <div className="flex items-start gap-2.5 text-sm text-red-600 dark:text-red-400">
                           <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                           <span>AI predicts failure <strong>{Math.abs(predDiff)} days earlier</strong> than scheduled service.</span>
                         </div>
                       )}
-                      {predDiff !== null && predDiff > 0 && (
+                      {showHardDate && predDiff !== null && predDiff > 0 && (
                         <div className="flex items-start gap-2.5 text-sm text-amber-600 dark:text-amber-400">
                           <Zap className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                           <span>Asset may last <strong>{predDiff} more days</strong> beyond scheduled service.</span>
@@ -738,10 +784,10 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                           <span>Elevated failure risk — <strong>inspect within the next 2 weeks</strong>.</span>
                         </div>
                       )}
-                      {healthScore >= 80 && (
+                      {prediction.tier === "healthy" && (
                         <div className="flex items-start gap-2.5 text-sm text-emerald-600 dark:text-emerald-400">
                           <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <span>Asset health is excellent — no immediate action required.</span>
+                          <span>Asset health is good — no immediate action required.</span>
                         </div>
                       )}
                       {asset.lifetime_breakdown_count != null && asset.lifetime_breakdown_count > 0 && (
@@ -752,34 +798,38 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       )}
                       <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
                         <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                        <span>
-                          {aiDaysUntilMaint !== null && aiDaysUntilMaint < 0 ? "Maintenance was due on:" : "Predicted maintenance date:"}
-                          <strong> {prediction.predicted_maintenance_date ? new Date(prediction.predicted_maintenance_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</strong>
-                        </span>
+                        {showHardDate ? (
+                          <span>
+                            {aiDaysUntilMaint !== null && aiDaysUntilMaint < 0 ? "Maintenance was due on:" : "Predicted maintenance date:"}
+                            <strong> {prediction.predicted_maintenance_date ? new Date(prediction.predicted_maintenance_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</strong>
+                          </span>
+                        ) : (
+                          <span>{prediction.horizon_text ?? prediction.recommended_action ?? "—"}</span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {costPrediction && (
+                  {(prediction.estimated_cost_lkr != null) && (
                     <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                       <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Maintenance Cost Estimate</div>
                       <div className="space-y-3">
                         <div className="text-3xl font-bold tabular-nums">
-                          {fmtCost(costPrediction.estimated_cost, costPrediction.currency ?? "LKR")}
+                          {fmtCost(prediction.estimated_cost_lkr)}
                         </div>
                         <div className="space-y-2">
                           {[
-                            { label: "Minimum", value: costPrediction.min_cost, color: "bg-emerald-500" },
-                            { label: "Estimated", value: costPrediction.estimated_cost, color: "bg-violet-500" },
-                            { label: "Maximum", value: costPrediction.max_cost, color: "bg-red-500" },
+                            { label: "Minimum", value: prediction.min_cost_lkr, color: "bg-emerald-500" },
+                            { label: "Estimated", value: prediction.estimated_cost_lkr, color: "bg-violet-500" },
+                            { label: "Maximum", value: prediction.max_cost_lkr, color: "bg-red-500" },
                           ].map(({ label, value, color }) => {
-                            const max = Number(costPrediction.max_cost) || 1;
+                            const max = Number(prediction.max_cost_lkr) || 1;
                             const pct = Math.min(100, Math.round((Number(value) / max) * 100));
                             return (
                               <div key={label} className="space-y-0.5">
                                 <div className="flex justify-between text-[11px] text-muted-foreground/70">
                                   <span>{label}</span>
-                                  <span className="font-mono font-medium">{fmtCost(value, costPrediction.currency ?? "LKR")}</span>
+                                  <span className="font-mono font-medium">{fmtCost(value)}</span>
                                 </div>
                                 <div className="h-1.5 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
                                   <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
@@ -788,12 +838,6 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                             );
                           })}
                         </div>
-                        {costPrediction.confidence_score != null && (
-                          <div className="flex items-center justify-between text-xs border-t border-slate-200/60 dark:border-white/6 pt-2">
-                            <span className="text-muted-foreground">Cost model confidence</span>
-                            <span className="font-semibold">{Math.round(Number(costPrediction.confidence_score) * 100)}%</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}

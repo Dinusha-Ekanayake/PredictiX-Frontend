@@ -82,30 +82,42 @@ export type Asset = {
   updated_at: string;
 };
 
-// ─── Failure Prediction (from AssetFailurePredictionOut) ───────────────────────
-export type FailurePrediction = {
-  id: string;
-  run_id: string;
-  asset_id: string;
-  health_score: number | null;
-  failure_probability: number | null;
-  confidence: number | null;
-  risk_level: string | null;
-  predicted_maintenance_date: string | null;
-  days_until_maintenance: number | null;
-  top_explanations: Record<string, unknown> | null;
-};
+// ─── PDM Batch Prediction (from GET /batch-predictions/{asset_id}) ─────────────
+// Single source of truth for an asset's PdM state: classifier + regressor +
+// health score + cost estimate + the decision layer that reconciles them
+// into one tier. Populated by the daily scheduler and by "Refresh now"
+// (POST /batch-predictions/run/{asset_id}) — both write the same row, so
+// there is exactly one place the UI reads predictions from.
+export type PredictionTier = "urgent" | "watch" | "healthy" | "conflict";
+export type PredictionDisplayMode = "date" | "soft_estimate" | "horizon";
 
-// ─── Cost Prediction (from AssetCostPredictionOut) ─────────────────────────────
-export type CostPrediction = {
+export type BatchPrediction = {
   id: string;
-  run_id: string;
   asset_id: string;
-  estimated_cost: number | null;
-  min_cost: number | null;
-  max_cost: number | null;
-  currency: string | null;
-  confidence_score: number | null;
+  failure_probability: number | null;
+  maintenance_required: boolean | null;
+  risk_level: string | null;
+  predicted_days_until_maintenance: number | null;
+  predicted_maintenance_date: string | null;
+  health_score: number | null;
+  health_status: string | null;
+  contributing_factors: { feature: string; impact: number }[];
+  estimated_cost_lkr: number | null;
+  min_cost_lkr: number | null;
+  max_cost_lkr: number | null;
+  top_explanations: { feature: string; impact: number }[];
+  predicted_at: string | null;
+  run_duration_ms: number | null;
+  status: string;
+  error_message: string | null;
+  // Decision layer (app.ai.services.pdm_decision_service.build_decision)
+  model_version: string | null;
+  tier: PredictionTier | null;
+  agreement: boolean | null;
+  display_mode: PredictionDisplayMode | null;
+  horizon_text: string | null;
+  recommended_action: string | null;
+  horizon_saturated: boolean | null;
 };
 
 // ─── Maintenance Event (from MaintenanceEventOut) ──────────────────────────────
@@ -159,25 +171,6 @@ export type AssetAssignment = {
   notes: string | null;
 };
 
-// ─── Vehicle Prediction (full stored result) ───────────────────────────────────
-export type VehiclePredictionResult = {
-  run_id: string;
-  asset_id: string;
-  predicted_class: number;
-  predicted_label: string;
-  failure_probability: number;
-  confidence: number;
-  predicted_days_until_maintenance: number;
-  predicted_maintenance_date: string;
-  health_score: number;
-  health_band: string;
-  risk_level: string;
-  estimated_cost_lkr: number;
-  min_cost_lkr: number;
-  max_cost_lkr: number;
-  features_used: Record<string, unknown>;
-};
-
 // ─── Survival Prediction (FRSO) ────────────────────────────────────────────────
 export type SurvivalCurvePoint = {
   day: number;
@@ -226,8 +219,7 @@ export type AssetComponentRulResponse = {
 // ─── Combined asset detail view (assembled in the service layer) ───────────────
 export type AssetDetail = {
   asset: Asset;
-  prediction: FailurePrediction | null;
-  costPrediction: CostPrediction | null;
+  prediction: BatchPrediction | null;
   componentRul: AssetComponentRulResponse | null;
   maintenanceEvents: MaintenanceEvent[];
   tickets: Ticket[];

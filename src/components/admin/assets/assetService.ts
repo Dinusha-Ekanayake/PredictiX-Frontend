@@ -12,12 +12,10 @@ import type {
   AssetAnalytics,
   AssetDetail,
   AssetFilters,
-  FailurePrediction,
-  CostPrediction,
+  BatchPrediction,
   MaintenanceEvent,
   Ticket,
   AssetAssignment,
-  VehiclePredictionResult,
   AssetComponentRulResponse,
 } from "./types";
 
@@ -158,23 +156,18 @@ export async function getAssetAssignments(assetId: string): Promise<AssetAssignm
   return apiGet<AssetAssignment[]>(`/asset-assignments/?asset_id=${assetId}`);
 }
 
-// ─── Latest failure prediction for an asset ───────────────────────────────────
+// ─── Latest PDM batch prediction for an asset ──────────────────────────────────
+// Single source of truth for classifier + regressor + health-score + cost
+// estimate + the decision layer (tier/agreement/horizon). Populated by the
+// daily scheduler and by the manual "Refresh now" trigger — both write the
+// same row via app.ai.services.batch_prediction_service, so this always
+// reflects whichever run happened most recently, scheduled or manual.
 
-export async function getFailurePrediction(assetId: string): Promise<FailurePrediction | null> {
+export async function getBatchPrediction(assetId: string): Promise<BatchPrediction | null> {
   try {
-    return await apiGet<FailurePrediction>(`/predictions/failure/${assetId}`);
+    return await apiGet<BatchPrediction>(`/batch-predictions/${assetId}`);
   } catch {
     return null; // 404 means no prediction yet — not an error
-  }
-}
-
-// ─── Latest cost prediction for an asset ──────────────────────────────────────
-
-export async function getCostPrediction(assetId: string): Promise<CostPrediction | null> {
-  try {
-    return await apiGet<CostPrediction>(`/predictions/cost/${assetId}`);
-  } catch {
-    return null;
   }
 }
 
@@ -188,39 +181,37 @@ export async function getComponentRul(assetId: string): Promise<AssetComponentRu
   }
 }
 
-// ─── Run new prediction for an asset (POST to vehicle-predictions) ─────────────
+// ─── Run a fresh prediction for an asset now ───────────────────────────────────
+// Triggers the same pipeline the daily scheduler runs (v7 models + decision
+// layer) for just this asset and upserts pdm_batch_predictions, so the
+// result is immediately visible via getBatchPrediction() afterward.
 
-export async function runVehiclePrediction(
-  assetId: string,
-  requestedBy?: string,
-): Promise<VehiclePredictionResult> {
-  const params = requestedBy ? `?requested_by=${requestedBy}` : "";
-  const response = await apiFetch(`/vehicle-predictions/${assetId}${params}`, {
+export async function runVehiclePrediction(assetId: string): Promise<BatchPrediction> {
+  const response = await apiFetch(`/batch-predictions/run/${assetId}`, {
     method: "POST",
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: "Prediction failed" }));
     throw new Error(err.detail || "Prediction failed");
   }
-  return response.json() as Promise<VehiclePredictionResult>;
+  return response.json() as Promise<BatchPrediction>;
 }
 
 // ─── Load full asset detail (asset + predictions + maintenance + tickets + assignments) ──
 
 export async function getAssetDetail(assetId: string): Promise<AssetDetail> {
   // Run all fetches in parallel for speed
-  const [asset, prediction, costPrediction, componentRul, maintenanceEvents, tickets, assignments] =
+  const [asset, prediction, componentRul, maintenanceEvents, tickets, assignments] =
     await Promise.all([
       getAsset(assetId),
-      getFailurePrediction(assetId),
-      getCostPrediction(assetId),
+      getBatchPrediction(assetId),
       getComponentRul(assetId),
       getMaintenanceEvents(assetId).catch(() => [] as MaintenanceEvent[]),
       getAssetTickets(assetId).catch(() => [] as Ticket[]),
       getAssetAssignments(assetId).catch(() => [] as AssetAssignment[]),
     ]);
 
-  return { asset, prediction, costPrediction, componentRul, maintenanceEvents, tickets, assignments };
+  return { asset, prediction, componentRul, maintenanceEvents, tickets, assignments };
 }
 
 // ─── Create asset ────────────────────────────────────────────────────────────
@@ -322,7 +313,7 @@ export async function deleteAsset(assetId: string): Promise<void> {
 // ─── Derive health score (0–100) from health_band or criticality_score ─────────
 // The real health_score comes from the prediction; fall back to band mapping.
 
-export function deriveHealthScore(asset: Asset, prediction: FailurePrediction | null): number {
+export function deriveHealthScore(asset: Asset, prediction: BatchPrediction | null): number {
   if (prediction?.health_score != null) return Math.round(Number(prediction.health_score));
 
   const bandMap: Record<string, number> = {
@@ -342,7 +333,7 @@ export function deriveHealthScore(asset: Asset, prediction: FailurePrediction | 
 
 // ─── Derive failure probability ────────────────────────────────────────────────
 
-export function deriveFailureProbability(prediction: FailurePrediction | null): number {
+export function deriveFailureProbability(prediction: BatchPrediction | null): number {
   if (prediction?.failure_probability != null) return Number(prediction.failure_probability);
   return 0;
 }

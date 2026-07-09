@@ -526,40 +526,32 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
           )}
 
           {/* Predictive Insights Section */}
-          {ticket?.asset_id && assetDetail && (assetDetail.prediction || assetDetail.costPrediction) && (
+          {ticket?.asset_id && assetDetail && assetDetail.prediction && (
             <div className="rounded-md border p-3 bg-indigo-50/50 dark:bg-indigo-950/20">
               <h4 className="text-sm font-medium text-indigo-700 dark:text-indigo-400 mb-3 flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
                 Predictive Insights
               </h4>
               <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-                {assetDetail.prediction && (
-                  <>
-                    <div>
-                      <span className="text-muted-foreground">Failure Probability:</span>{" "}
-                      <span className="font-medium">
-                        {assetDetail.prediction.failure_probability !== null 
-                          ? `${(Number(assetDetail.prediction.failure_probability) * 100).toFixed(1)}%` 
-                          : "—"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Risk Level:</span>{" "}
-                      <Badge variant="outline" className="ml-1 capitalize">{assetDetail.prediction.risk_level || "—"}</Badge>
-                    </div>
-                  </>
-                )}
-                {assetDetail.costPrediction && (
-                  <>
-                    <div>
-                      <span className="text-muted-foreground">Est. Cost:</span>{" "}
-                      <span className="font-medium">
-                        {assetDetail.costPrediction.estimated_cost !== null 
-                          ? `$${Number(assetDetail.costPrediction.estimated_cost).toFixed(2)}` 
-                          : "—"}
-                      </span>
-                    </div>
-                  </>
+                <div>
+                  <span className="text-muted-foreground">Failure Probability:</span>{" "}
+                  <span className="font-medium">
+                    {assetDetail.prediction.failure_probability !== null
+                      ? `${(Number(assetDetail.prediction.failure_probability) * 100).toFixed(1)}%`
+                      : "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Risk Level:</span>{" "}
+                  <Badge variant="outline" className="ml-1 capitalize">{assetDetail.prediction.risk_level || "—"}</Badge>
+                </div>
+                {assetDetail.prediction.estimated_cost_lkr !== null && (
+                  <div>
+                    <span className="text-muted-foreground">Est. Cost:</span>{" "}
+                    <span className="font-medium">
+                      LKR {Number(assetDetail.prediction.estimated_cost_lkr).toLocaleString()}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>

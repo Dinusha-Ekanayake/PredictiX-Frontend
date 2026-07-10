@@ -885,7 +885,21 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       <div className="text-sm text-muted-foreground">No component health data available.</div>
                     ) : (
                       <div className="space-y-4">
-                        {componentRul.components.map((comp: ComponentRulOut, i) => {
+                        {[...componentRul.components]
+                          // Soonest-to-fail first — the row that actually needs
+                          // attention should never be buried under 4 "fine" ones.
+                          // No-data / capped-at-cap rows sort to the bottom since
+                          // they carry the least actionable signal.
+                          .sort((a, b) => {
+                            const rank = (c: ComponentRulOut) =>
+                              c.confidence === "no_data" || c.current_health_pct == null
+                                ? Infinity
+                                : c.rul_days == null
+                                ? Infinity - 1
+                                : c.rul_days;
+                            return rank(a) - rank(b);
+                          })
+                          .map((comp: ComponentRulOut, i) => {
                           if (comp.confidence === "no_data" || comp.current_health_pct == null) {
                             return (
                               <div key={i} className="flex justify-between items-center text-[11px] text-muted-foreground/60">
@@ -895,7 +909,27 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                             );
                           }
 
-                          const isCritical = comp.rul_days != null && comp.rul_days < 30;
+                          // Three-tier urgency: red (<30d, matches the decision
+                          // layer's "urgent" cutoff), amber (30-90d, "watch"),
+                          // neutral otherwise — including capped (730+) rows,
+                          // which are de-emphasized rather than colored as if
+                          // they were a confident "all clear".
+                          const urgency: "critical" | "watch" | "safe" =
+                            comp.rul_days != null && comp.rul_days < 30
+                              ? "critical"
+                              : comp.rul_days != null && comp.rul_days < 90
+                              ? "watch"
+                              : "safe";
+                          const barColor =
+                            urgency === "critical" ? "bg-red-500"
+                            : urgency === "watch" ? "bg-amber-500"
+                            : comp.horizon_capped ? "bg-slate-300 dark:bg-white/15"
+                            : "bg-primary";
+                          const textColor =
+                            urgency === "critical" ? "text-red-500"
+                            : urgency === "watch" ? "text-amber-600 dark:text-amber-400"
+                            : comp.horizon_capped ? "text-muted-foreground/60"
+                            : "text-foreground";
                           const healthPct = Math.max(0, Math.min(100, comp.current_health_pct));
                           const hasRange = comp.rul_days_low != null && comp.rul_days_high != null && comp.rul_days_high > comp.rul_days_low;
 
@@ -923,7 +957,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                                   )}
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <span className={cn("font-bold tabular-nums block", isCritical ? "text-red-500" : "text-foreground")}>
+                                  <span className={cn("font-bold tabular-nums block", textColor)}>
                                     {comp.rul_days != null
                                       ? `${comp.rul_days}${comp.horizon_capped ? "+" : ""} days left`
                                       : comp.degradation_pct_per_day != null && comp.degradation_pct_per_day >= 0
@@ -939,16 +973,23 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                               </div>
                               <div className="relative h-2 rounded-full bg-slate-200/60 dark:bg-white/8">
                                 <div
-                                  className={cn("absolute h-full rounded-full", isCritical ? "bg-red-500" : "bg-primary")}
+                                  className={cn("absolute h-full rounded-full", barColor)}
                                   style={{ width: `${healthPct}%` }}
                                 />
                               </div>
                               <div className="flex justify-between text-[9px] text-muted-foreground/50 font-mono">
                                 <span>{healthPct.toFixed(0)}% health</span>
-                                <span>
-                                  {comp.confidence === "single_point"
-                                    ? "Low confidence (1 reading)"
-                                    : `Trend over ${comp.readings_used} readings`}
+                                <span className="flex items-center gap-1.5">
+                                  {comp.model_days_ceiling != null && (
+                                    <span title="The AI model's own overall predicted days-until-maintenance for this asset">
+                                      AI: {comp.model_days_ceiling}d
+                                    </span>
+                                  )}
+                                  <span>
+                                    {comp.confidence === "single_point"
+                                      ? "Low confidence (1 reading)"
+                                      : `Trend over ${comp.readings_used} readings`}
+                                  </span>
                                 </span>
                               </div>
                             </div>

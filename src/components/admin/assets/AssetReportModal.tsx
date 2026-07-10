@@ -111,14 +111,17 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const fleet = await safeJson(fleetRes) ?? {};
 
         // ── Step 2: all asset-level data in parallel ───────────
+        // Prediction data comes solely from /batch-predictions/{id} — the
+        // single source of truth populated by the daily scheduler and the
+        // "Run AI" trigger (app.ai.services.batch_prediction_service). The
+        // old on-demand /predictions/failure|cost endpoints are no longer
+        // the asset detail page's data source and are not queried here.
         const [
-          predRes, batchPredRes, costPredRes,
+          batchPredRes,
           maintRes, ticketRes, sensorRes,
           warehouseRes, deptRes, assetListRes,
         ] = await Promise.all([
-          authFetch(`${API_URL}/predictions/failure/${assetId}`).catch(() => null),
           authFetch(`${API_URL}/batch-predictions/${assetId}`).catch(() => null),
-          authFetch(`${API_URL}/predictions/cost/${assetId}`).catch(() => null),
           authFetch(`${API_URL}/maintenance?asset_id=${assetId}&limit=50`).catch(() => null),
           authFetch(`${API_URL}/tickets?asset_id=${assetId}&limit=20`).catch(() => null),
           authFetch(`${API_URL}/sensor-readings?asset_id=${assetId}&limit=1`).catch(() => null),
@@ -133,9 +136,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         ]);
 
         // ── Step 3: parse all responses ────────────────────────
-        const predRaw     = await safeJson(predRes);
         const batchPred   = await safeJson(batchPredRes);
-        const costPredRaw = await safeJson(costPredRes);
         const maintList   = await safeJson(maintRes) ?? [];
         const ticketList  = await safeJson(ticketRes) ?? [];
         const sensorList  = await safeJson(sensorRes) ?? [];
@@ -143,15 +144,8 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const dept        = await safeJson(deptRes);
         const allAssets   = await safeJson(assetListRes) ?? [];
 
-        // ── Step 4: resolve prediction — try multiple sources ──
-        // Priority: batch predictions > individual predictions > null
-        const latestPred =
-          (Array.isArray(batchPred) ? batchPred[0] : batchPred) ??
-          (Array.isArray(predRaw)   ? predRaw[0]   : predRaw)   ??
-          null;
-
-        const latestCost =
-          (Array.isArray(costPredRaw) ? costPredRaw[0] : costPredRaw) ?? null;
+        // ── Step 4: resolve prediction ──────────────────────────
+        const latestPred = (Array.isArray(batchPred) ? batchPred[0] : batchPred) ?? null;
 
         const sensor = Array.isArray(sensorList) ? sensorList[0] : sensorList ?? null;
         const mArr   = Array.isArray(maintList)  ? maintList      : [];
@@ -187,13 +181,11 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const health_score     = latestPred?.health_score     != null ? Math.round(Number(latestPred.health_score) * 10) / 10     : undefined;
         const failure_prob     = latestPred?.failure_probability != null ? Math.round(Number(latestPred.failure_probability) * 100 * 10) / 10 : undefined;
         const risk_level       = latestPred?.risk_level       ?? undefined;
-        const days_until_maint = latestPred?.days_until_maintenance ?? null;
+        const days_until_maint = latestPred?.predicted_days_until_maintenance ?? null;
         const pred_maint_date  = latestPred?.predicted_maintenance_date ?? null;
-        const top_explanations = latestPred?.top_explanations ?? latestPred?.shap_values ?? undefined;
+        const top_explanations = latestPred?.top_explanations ?? undefined;
 
-        const est_cost = latestCost?.estimated_cost ?? latestPred?.estimated_cost ?? undefined;
-        const min_cost = latestCost?.min_cost ?? undefined;
-        const max_cost = latestCost?.max_cost ?? undefined;
+        const est_cost = latestPred?.estimated_cost_lkr ?? undefined;
 
         // ── Step 8: fleet data ─────────────────────────────────
         const kpis      = fleet.kpis ?? {};

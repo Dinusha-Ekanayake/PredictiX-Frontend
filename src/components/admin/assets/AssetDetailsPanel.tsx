@@ -15,7 +15,7 @@ import {
 import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
-import type { AssetDetail, ComponentRulOut } from "./types";
+import type { AssetDetail, ComponentRulOut, PredictionTier } from "./types";
 // CHANGE 1: removed generateAssetReport from import — report now handled by parent via onReport prop
 import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
 import LogMaintenanceDialog from "./LogMaintenanceDialog";
@@ -63,6 +63,15 @@ function StatusPill({ status }: { status: string }) {
 }
 
 /* ── Health Ring ─────────────────────────────────────────────────────────────── */
+// Unlike the failure-probability/days-until-maintenance numbers on this
+// page — outputs of the trained, cross-validated v7 classifier/regressor —
+// the health score is a hand-weighted composite of the 5 component
+// readings plus a penalty term. It has not been validated against real
+// outcomes (no historical maintenance_events ground truth currently exists
+// to check it against — see PdmPredictionHistory, which now logs
+// predictions going forward so this can be checked later). Labelled here
+// so it doesn't read with the same evidentiary weight as the model outputs
+// beside it.
 function HealthRing({ score }: { score: number }) {
   const r = 38;
   const circ = 2 * Math.PI * r;
@@ -87,6 +96,12 @@ function HealthRing({ score }: { score: number }) {
         </div>
       </div>
       <span className="text-[11px] font-semibold" style={{ color }}>{label}</span>
+      <span
+        className="text-[9px] text-muted-foreground/50 cursor-help underline decoration-dotted underline-offset-2"
+        title="Composite indicator (weighted formula), not a validated prediction — unlike the failure risk and maintenance date, which come from the trained AI model."
+      >
+        Composite indicator
+      </span>
     </div>
   );
 }
@@ -160,6 +175,42 @@ function PriorityPill({ priority }: { priority: string | null }) {
   );
 }
 
+/* ── Prediction tier badge ───────────────────────────────────────────────────────
+   Surfaces the decision layer's reconciled recommendation (classifier +
+   regressor + health score) instead of showing a raw date regardless of
+   whether the classifier thinks action is actually needed. */
+const TIER_META: Record<PredictionTier, { label: string; className: string }> = {
+  urgent: {
+    label: "Urgent",
+    className: "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20",
+  },
+  watch: {
+    label: "Watch",
+    className: "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  },
+  healthy: {
+    label: "Healthy",
+    className: "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
+  },
+  conflict: {
+    label: "Needs Review",
+    className: "bg-violet-50 text-violet-700 ring-violet-200/60 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20",
+  },
+};
+
+function TierBadge({ tier }: { tier: PredictionTier | null | undefined }) {
+  if (!tier || !TIER_META[tier]) return null;
+  const meta = TIER_META[tier];
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset",
+      meta.className,
+    )}>
+      {meta.label}
+    </span>
+  );
+}
+
 /* ── Ticket status pill ───────────────────────────────────────────────────────── */
 const TICKET_STATUS_META: Record<string, string> = {
   open:        "bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20",
@@ -226,7 +277,7 @@ type Props = {
 };
 
 export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, onReport, readOnly = false }: Props) {
-  const { asset, prediction, costPrediction, componentRul, maintenanceEvents, tickets, assignments } = detail;
+  const { asset, prediction, componentRul, maintenanceEvents, tickets, assignments } = detail;
   const router = useNavRouter();
 
   const [runningPrediction, setRunningPrediction] = React.useState(false);
@@ -235,6 +286,12 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
 
   const healthScore = deriveHealthScore(asset, prediction);
   const failureProb = deriveFailureProbability(prediction);
+
+  // Hard dates are only actionable when the decision layer's tier agrees
+  // action is near-term (urgent/watch/conflict); "healthy" demotes the
+  // regressor's date to a soft horizon instead of showing a specific date
+  // for an asset the classifier says doesn't need service.
+  const showHardDate = prediction?.display_mode === "date";
 
   const daysUntilMaint = asset.next_service_date
     ? Math.ceil((new Date(asset.next_service_date).getTime() - Date.now()) / 86_400_000)
@@ -253,9 +310,9 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
       : null;
 
   const costVariance =
-    costPrediction?.estimated_cost && costPrediction?.min_cost
-      ? (Number(costPrediction.estimated_cost) - Number(costPrediction.min_cost)) /
-        (Number(costPrediction.min_cost) || 1)
+    prediction?.estimated_cost_lkr && prediction?.min_cost_lkr
+      ? (Number(prediction.estimated_cost_lkr) - Number(prediction.min_cost_lkr)) /
+        (Number(prediction.min_cost_lkr) || 1)
       : 0;
 
   const CostDeltaIcon =
@@ -287,11 +344,16 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
 
   return (
     <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden transition-all">
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/40 dark:bg-white/2">
+      {/* ── Header ──
+           Stacked (title row, then actions) instead of side-by-side — this
+           panel is often narrow (docked next to a list), and cramming a full
+           name + status + code + badges on the same row as 5 action buttons
+           left almost no room for the name itself, truncating it to a few
+           characters. */}
+      <div className="flex flex-col gap-3 px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/40 dark:bg-white/2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-bold truncate">{asset.asset_name}</h2>
+            <h2 className="text-base font-bold break-words">{asset.asset_name}</h2>
             <StatusPill status={asset.status} />
             <span className="text-[11px] font-mono text-muted-foreground/70 bg-slate-100 dark:bg-white/6 px-2 py-0.5 rounded-full">
               {asset.asset_code}
@@ -308,7 +370,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
           {!readOnly && (
             <>
               <Button
@@ -376,19 +438,17 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             <HealthRing score={healthScore} />
             <div className="hidden sm:block h-24 w-px bg-slate-200/80 dark:bg-white/6" />
             <div className="flex-1 space-y-3.5 w-full">
-              <RiskGauge probability={failureProb} />
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Bot className="h-3.5 w-3.5" />
-                  Model confidence
-                </span>
-                <span className="font-bold tabular-nums">
-                  {prediction.confidence != null
-                    ? `${Math.round(Number(prediction.confidence) * 100)}%`
-                    : "—"}
-                </span>
+              <div className="flex items-center gap-2">
+                <TierBadge tier={prediction.tier} />
+                {prediction.agreement === false && (
+                  <span className="text-[11px] text-muted-foreground/70 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Signals disagree
+                  </span>
+                )}
               </div>
-              {predDiff !== null && (
+              <RiskGauge probability={failureProb} />
+              {predDiff !== null && showHardDate && (
                 <div className={cn(
                   "flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-medium",
                   predDiff < 0
@@ -504,7 +564,11 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
           <InfoField
             icon={<Bot className="h-3.5 w-3.5" />}
             label="AI-Predicted Maintenance"
-            value={fmt(prediction?.predicted_maintenance_date)}
+            value={
+              showHardDate
+                ? fmt(prediction?.predicted_maintenance_date)
+                : prediction?.horizon_text ?? fmt(prediction?.predicted_maintenance_date)
+            }
           />
           {/* Cost prediction */}
           <div className="h-full rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
@@ -514,12 +578,11 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             <div>
               <div className="text-[11px] text-muted-foreground/80 font-medium">Est. Maintenance Cost</div>
               <div className="text-sm font-semibold mt-0.5">
-                {fmtCost(costPrediction?.estimated_cost, costPrediction?.currency ?? "LKR")}
+                {fmtCost(prediction?.estimated_cost_lkr)}
               </div>
-              {costPrediction && (
+              {prediction && (
                 <div className="text-[11px] text-muted-foreground/60 mt-0.5">
-                  Range: {fmtCost(costPrediction.min_cost, costPrediction.currency ?? "LKR")} –{" "}
-                  {fmtCost(costPrediction.max_cost, costPrediction.currency ?? "LKR")}
+                  Range: {fmtCost(prediction.min_cost_lkr)} – {fmtCost(prediction.max_cost_lkr)}
                 </div>
               )}
             </div>
@@ -597,16 +660,16 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       <HealthRing score={healthScore} />
                       <div className="flex-1 space-y-1.5">
                         {[
-                          { label: "Brake", key: "brake_health_pct" },
-                          { label: "Tire", key: "tire_health_pct" },
-                          { label: "Battery", key: "battery_health_pct" },
-                          { label: "Oil", key: "oil_life_pct" },
-                          { label: "Hydraulic", key: "hydraulic_health_pct" },
+                          { label: "Brake", key: "brake" },
+                          { label: "Tire", key: "tire" },
+                          { label: "Battery", key: "battery" },
+                          { label: "Oil", key: "oil" },
+                          { label: "Hydraulic", key: "hydraulic" },
                         ].map(({ label, key }) => {
-                          const raw = prediction?.top_explanations as Record<string, unknown> | null;
-                          const factors = Array.isArray(raw?.top_factors) ? (raw!.top_factors as Array<{ feature: string; value?: number }>) : [];
-                          const found = factors.find((f) => f.feature === key);
-                          const pct = found?.value != null ? Math.min(100, Math.max(0, Math.round(Number(found.value)))) : null;
+                          const comp = componentRul?.components.find((c) => c.component === key);
+                          const pct = comp?.current_health_pct != null
+                            ? Math.min(100, Math.max(0, Math.round(comp.current_health_pct)))
+                            : null;
                           const color = pct == null ? "bg-slate-200 dark:bg-white/10" : pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
                           return (
                             <div key={key} className="space-y-0.5">
@@ -658,48 +721,66 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                           />
                         </div>
                       </div>
-                      {aiDaysUntilMaint != null && (
+                      {showHardDate && aiDaysUntilMaint != null ? (
                         <div className="flex items-center justify-between text-xs border-t border-slate-200/60 dark:border-white/6 pt-2">
                           <span className="text-muted-foreground">Days until maintenance</span>
                           <span className={`font-bold tabular-nums ${aiDaysUntilMaint < 0 ? "text-red-600 dark:text-red-400" : aiDaysUntilMaint <= 14 ? "text-red-500" : aiDaysUntilMaint <= 30 ? "text-amber-500" : "text-foreground"}`}>
                             {aiDaysUntilMaint < 0 ? `${Math.abs(aiDaysUntilMaint)}d overdue` : `${aiDaysUntilMaint}d`}
                           </span>
                         </div>
-                      )}
-                      {prediction.confidence != null && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground flex items-center gap-1"><Bot className="h-3 w-3" />Confidence</span>
-                          <span className="font-semibold">{Math.round(Number(prediction.confidence) * 100)}%</span>
+                      ) : prediction.horizon_text ? (
+                        <div className="text-xs text-muted-foreground border-t border-slate-200/60 dark:border-white/6 pt-2">
+                          {prediction.horizon_text}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </div>
 
-                {/* ── Row 2: SHAP Top Feature Importance ── */}
+                {/* ── Row 2: SHAP Top Feature Importance ──
+                     SHAP impact is signed in days against the regressor's
+                     predicted_days_until_maintenance: negative pulls the date
+                     closer (more urgent), positive pushes it further out
+                     (less urgent). Colored + directional so that reads at a
+                     glance instead of requiring the reader to parse a sign. */}
                 {(() => {
-                  const raw = prediction?.top_explanations as Record<string, unknown> | null;
-                  const topFactors = Array.isArray(raw?.top_factors) ? (raw!.top_factors as Array<{ feature: string; value?: number; impact?: number }>) : [];
+                  const topFactors = prediction?.top_explanations ?? [];
                   if (topFactors.length === 0) return null;
-                  const maxVal = Math.max(...topFactors.map((f) => Math.abs(Number(f.impact ?? f.value ?? 0))), 1);
+                  const maxVal = Math.max(...topFactors.map((f) => Math.abs(f.impact ?? 0)), 1);
                   return (
                     <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
-                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Top Risk Factors (SHAP)</div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Top Risk Factors (SHAP)</div>
+                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground/60">
+                          <span className="flex items-center gap-1">
+                            <TrendingDown className="h-3 w-3 text-red-500" /> Sooner
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3 text-emerald-500" /> Later
+                          </span>
+                        </div>
+                      </div>
                       <div className="space-y-2">
                         {topFactors.map((f, i) => {
-                          const impact = Math.abs(Number(f.impact ?? f.value ?? 0));
+                          const raw = f.impact ?? 0;
+                          const impact = Math.abs(raw);
                           const pct = Math.round((impact / maxVal) * 100);
                           const label = f.feature.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                          const isUrgent = raw < 0;
+                          const barColor = isUrgent ? "bg-red-500/80" : "bg-emerald-500/80";
+                          const textColor = isUrgent ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400";
+                          const DirIcon = isUrgent ? TrendingDown : TrendingUp;
                           return (
                             <div key={i} className="space-y-0.5">
-                              <div className="flex justify-between text-[11px]">
+                              <div className="flex justify-between items-center text-[11px]">
                                 <span className="text-muted-foreground font-medium truncate">{label}</span>
-                                <span className="text-xs font-mono text-muted-foreground/70 shrink-0 ml-2">
-                                  {f.value != null ? String(Number(f.value).toFixed(1)) : "—"}
+                                <span className={cn("flex items-center gap-1 text-xs font-mono shrink-0 ml-2", textColor)}>
+                                  <DirIcon className="h-3 w-3" />
+                                  {f.impact != null ? `${raw > 0 ? "+" : ""}${raw.toFixed(2)}d` : "—"}
                                 </span>
                               </div>
                               <div className="h-2 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
-                                <div className="h-full rounded-full transition-all duration-700 bg-violet-500/80" style={{ width: `${pct}%` }} />
+                                <div className={cn("h-full rounded-full transition-all duration-700", barColor)} style={{ width: `${pct}%` }} />
                               </div>
                             </div>
                           );
@@ -714,13 +795,19 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                     <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">AI Recommendations</div>
                     <div className="space-y-2.5">
-                      {predDiff !== null && predDiff < 0 && (
+                      {prediction.tier === "conflict" && (
+                        <div className="flex items-start gap-2.5 text-sm text-violet-600 dark:text-violet-400">
+                          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>Classifier and health score disagree — <strong>flagged for manual review</strong>.</span>
+                        </div>
+                      )}
+                      {showHardDate && predDiff !== null && predDiff < 0 && (
                         <div className="flex items-start gap-2.5 text-sm text-red-600 dark:text-red-400">
                           <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                           <span>AI predicts failure <strong>{Math.abs(predDiff)} days earlier</strong> than scheduled service.</span>
                         </div>
                       )}
-                      {predDiff !== null && predDiff > 0 && (
+                      {showHardDate && predDiff !== null && predDiff > 0 && (
                         <div className="flex items-start gap-2.5 text-sm text-amber-600 dark:text-amber-400">
                           <Zap className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                           <span>Asset may last <strong>{predDiff} more days</strong> beyond scheduled service.</span>
@@ -738,10 +825,10 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                           <span>Elevated failure risk — <strong>inspect within the next 2 weeks</strong>.</span>
                         </div>
                       )}
-                      {healthScore >= 80 && (
+                      {prediction.tier === "healthy" && (
                         <div className="flex items-start gap-2.5 text-sm text-emerald-600 dark:text-emerald-400">
                           <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <span>Asset health is excellent — no immediate action required.</span>
+                          <span>Asset health is good — no immediate action required.</span>
                         </div>
                       )}
                       {asset.lifetime_breakdown_count != null && asset.lifetime_breakdown_count > 0 && (
@@ -752,34 +839,38 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       )}
                       <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
                         <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                        <span>
-                          {aiDaysUntilMaint !== null && aiDaysUntilMaint < 0 ? "Maintenance was due on:" : "Predicted maintenance date:"}
-                          <strong> {prediction.predicted_maintenance_date ? new Date(prediction.predicted_maintenance_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</strong>
-                        </span>
+                        {showHardDate ? (
+                          <span>
+                            {aiDaysUntilMaint !== null && aiDaysUntilMaint < 0 ? "Maintenance was due on:" : "Predicted maintenance date:"}
+                            <strong> {prediction.predicted_maintenance_date ? new Date(prediction.predicted_maintenance_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</strong>
+                          </span>
+                        ) : (
+                          <span>{prediction.horizon_text ?? prediction.recommended_action ?? "—"}</span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {costPrediction && (
+                  {(prediction.estimated_cost_lkr != null) && (
                     <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                       <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Maintenance Cost Estimate</div>
                       <div className="space-y-3">
                         <div className="text-3xl font-bold tabular-nums">
-                          {fmtCost(costPrediction.estimated_cost, costPrediction.currency ?? "LKR")}
+                          {fmtCost(prediction.estimated_cost_lkr)}
                         </div>
                         <div className="space-y-2">
                           {[
-                            { label: "Minimum", value: costPrediction.min_cost, color: "bg-emerald-500" },
-                            { label: "Estimated", value: costPrediction.estimated_cost, color: "bg-violet-500" },
-                            { label: "Maximum", value: costPrediction.max_cost, color: "bg-red-500" },
+                            { label: "Minimum", value: prediction.min_cost_lkr, color: "bg-emerald-500" },
+                            { label: "Estimated", value: prediction.estimated_cost_lkr, color: "bg-violet-500" },
+                            { label: "Maximum", value: prediction.max_cost_lkr, color: "bg-red-500" },
                           ].map(({ label, value, color }) => {
-                            const max = Number(costPrediction.max_cost) || 1;
+                            const max = Number(prediction.max_cost_lkr) || 1;
                             const pct = Math.min(100, Math.round((Number(value) / max) * 100));
                             return (
                               <div key={label} className="space-y-0.5">
                                 <div className="flex justify-between text-[11px] text-muted-foreground/70">
                                   <span>{label}</span>
-                                  <span className="font-mono font-medium">{fmtCost(value, costPrediction.currency ?? "LKR")}</span>
+                                  <span className="font-mono font-medium">{fmtCost(value)}</span>
                                 </div>
                                 <div className="h-1.5 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
                                   <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
@@ -788,28 +879,47 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                             );
                           })}
                         </div>
-                        {costPrediction.confidence_score != null && (
-                          <div className="flex items-center justify-between text-xs border-t border-slate-200/60 dark:border-white/6 pt-2">
-                            <span className="text-muted-foreground">Cost model confidence</span>
-                            <span className="font-semibold">{Math.round(Number(costPrediction.confidence_score) * 100)}%</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* ── Row 4: Component RUL (this asset's own sensor history trend) ── */}
+                {/* ── Row 4: Component RUL (this asset's own sensor history trend,
+                     cross-checked against the v7 regressor's whole-asset
+                     prediction — see ComponentRulOut.model_corroborated /
+                     disagrees_with_model / horizon_capped) ── */}
                 {componentRul && (
                   <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-4 mt-3">
-                    <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
-                      Component Remaining Useful Life (RUL)
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
+                        Component Remaining Useful Life (RUL)
+                      </div>
+                      <span
+                        className="text-[10px] text-muted-foreground/50 cursor-help"
+                        title="Estimated from this asset's own last 4 sensor readings per component — directional, not precise. Cross-checked against the AI model's overall maintenance prediction."
+                      >
+                        What is this?
+                      </span>
                     </div>
                     {componentRul.components.length === 0 ? (
                       <div className="text-sm text-muted-foreground">No component health data available.</div>
                     ) : (
                       <div className="space-y-4">
-                        {componentRul.components.map((comp: ComponentRulOut, i) => {
+                        {[...componentRul.components]
+                          // Soonest-to-fail first — the row that actually needs
+                          // attention should never be buried under 4 "fine" ones.
+                          // No-data / capped-at-cap rows sort to the bottom since
+                          // they carry the least actionable signal.
+                          .sort((a, b) => {
+                            const rank = (c: ComponentRulOut) =>
+                              c.confidence === "no_data" || c.current_health_pct == null
+                                ? Infinity
+                                : c.rul_days == null
+                                ? Infinity - 1
+                                : c.rul_days;
+                            return rank(a) - rank(b);
+                          })
+                          .map((comp: ComponentRulOut, i) => {
                           if (comp.confidence === "no_data" || comp.current_health_pct == null) {
                             return (
                               <div key={i} className="flex justify-between items-center text-[11px] text-muted-foreground/60">
@@ -819,33 +929,107 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                             );
                           }
 
-                          const isCritical = comp.rul_days != null && comp.rul_days < 30;
+                          // Three-tier urgency: red (<30d, matches the decision
+                          // layer's "urgent" cutoff), amber (30-90d, "watch"),
+                          // neutral otherwise — including capped (730+) rows,
+                          // which are de-emphasized rather than colored as if
+                          // they were a confident "all clear".
+                          const urgency: "critical" | "watch" | "safe" =
+                            comp.rul_days != null && comp.rul_days < 30
+                              ? "critical"
+                              : comp.rul_days != null && comp.rul_days < 90
+                              ? "watch"
+                              : "safe";
+                          const barColor =
+                            urgency === "critical" ? "bg-red-500"
+                            : urgency === "watch" ? "bg-amber-500"
+                            : comp.horizon_capped ? "bg-slate-300 dark:bg-white/15"
+                            : "bg-primary";
+                          const textColor =
+                            urgency === "critical" ? "text-red-500"
+                            : urgency === "watch" ? "text-amber-600 dark:text-amber-400"
+                            : comp.horizon_capped ? "text-muted-foreground/60"
+                            : "text-foreground";
                           const healthPct = Math.max(0, Math.min(100, comp.current_health_pct));
+                          const hasRange = comp.rul_days_low != null && comp.rul_days_high != null && comp.rul_days_high > comp.rul_days_low;
 
                           return (
                             <div key={i} className="space-y-1.5">
-                              <div className="flex justify-between text-[11px]">
-                                <span className="capitalize font-medium text-muted-foreground">{comp.component}</span>
-                                <span className={cn("font-bold tabular-nums", isCritical ? "text-red-500" : "text-foreground")}>
-                                  {comp.rul_days != null
-                                    ? `${comp.rul_days} days left`
-                                    : comp.degradation_pct_per_day != null && comp.degradation_pct_per_day >= 0
-                                    ? "Improving"
-                                    : "—"}
-                                </span>
+                              <div className="flex justify-between items-start text-[11px] gap-2">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="capitalize font-medium text-muted-foreground">{comp.component}</span>
+                                  {comp.post_service && (
+                                    <span
+                                      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200/60 dark:bg-sky-500/10 dark:text-sky-400 dark:ring-sky-500/20"
+                                      title="A service-event jump was detected in this component's history — this estimate uses only the readings since then, not the stale pre-service trend"
+                                    >
+                                      Since service
+                                    </span>
+                                  )}
+                                  {comp.model_corroborated && (
+                                    <span
+                                      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200/60 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20"
+                                      title="This component is among the AI model's top factors for this asset's maintenance prediction"
+                                    >
+                                      Model-confirmed
+                                    </span>
+                                  )}
+                                  {comp.disagrees_with_model && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20"
+                                      title={`This component's own trend looks fine, but the AI model predicts maintenance is needed sooner (~${comp.model_days_ceiling}d) for this asset overall — treat this component's estimate with caution`}
+                                    >
+                                      <AlertTriangle className="h-2.5 w-2.5" />
+                                      Check model
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <span className={cn("font-bold tabular-nums block", (comp.confidence === "insufficient_trend" || comp.confidence === "recently_serviced") ? "text-muted-foreground/60" : textColor)}>
+                                    {comp.rul_days != null
+                                      ? `${comp.rul_days}${comp.horizon_capped ? "+" : ""} days left`
+                                      : comp.confidence === "insufficient_trend"
+                                      ? "Not enough data"
+                                      : comp.confidence === "recently_serviced"
+                                      ? "Recently serviced"
+                                      : comp.degradation_pct_per_day != null && comp.degradation_pct_per_day >= 0
+                                      ? "Improving"
+                                      : "—"}
+                                  </span>
+                                  {hasRange && (
+                                    <span className="text-[9px] text-muted-foreground/50 font-mono">
+                                      range {comp.rul_days_low}–{comp.rul_days_high}d
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               <div className="relative h-2 rounded-full bg-slate-200/60 dark:bg-white/8">
                                 <div
-                                  className={cn("absolute h-full rounded-full", isCritical ? "bg-red-500" : "bg-primary")}
+                                  className={cn("absolute h-full rounded-full", barColor)}
                                   style={{ width: `${healthPct}%` }}
                                 />
                               </div>
                               <div className="flex justify-between text-[9px] text-muted-foreground/50 font-mono">
                                 <span>{healthPct.toFixed(0)}% health</span>
-                                <span>
-                                  {comp.confidence === "single_point"
-                                    ? "Low confidence (1 reading)"
-                                    : `Trend over ${comp.readings_used} readings`}
+                                <span className="flex items-center gap-1.5">
+                                  {comp.model_days_ceiling != null && (
+                                    <span title="The AI model's own overall predicted days-until-maintenance for this asset">
+                                      AI: {comp.model_days_ceiling}d
+                                    </span>
+                                  )}
+                                  <span>
+                                    {comp.confidence === "single_point"
+                                      ? "Low confidence (1 reading)"
+                                      : comp.confidence === "recently_serviced"
+                                      ? "Jump detected — only 1 reading since"
+                                      : comp.confidence === "insufficient_trend"
+                                      ? comp.post_service
+                                        ? "Flat within noise since service"
+                                        : `Flat within noise over ${comp.readings_used} readings`
+                                      : comp.post_service
+                                      ? `Trend over ${comp.readings_used} readings since service`
+                                      : `Trend over ${comp.readings_used} readings`}
+                                  </span>
                                 </span>
                               </div>
                             </div>

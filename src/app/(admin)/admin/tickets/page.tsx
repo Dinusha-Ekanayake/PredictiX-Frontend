@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
 import TicketDetailsDialog from "@/components/admin/dialogs/TicketDetailsDialog";
+import TicketDashboardCharts from "@/components/admin/tickets/TicketDashboardCharts";
 import {
   Select,
   SelectTrigger,
@@ -62,6 +63,7 @@ export default function AdminTicketsPage() {
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(0);
   const [loadingMore, setLoadingMore] = React.useState(false);
+  const [chartRefreshTrigger, setChartRefreshTrigger] = React.useState(0);
 
   const [statusCounts, setStatusCounts] = React.useState<Record<string, number>>({ open: 0, "in-progress": 0, resolved: 0, closed: 0 });
 
@@ -126,11 +128,7 @@ export default function AdminTicketsPage() {
         selectedPriority
       );
       setTotal(t);
-      setTickets((prev) => {
-        const next = reset ? rows : [...prev, ...rows];
-        const unique = new Map(next.map(t => [t.id, t]));
-        return Array.from(unique.values());
-      });
+      setTickets(rows);
       setPage(pageNum);
     } catch (err) {
       toast.error("Failed to load tickets", {
@@ -142,20 +140,26 @@ export default function AdminTicketsPage() {
     }
   }
 
-  function handleLoadMore() {
+  function handleNextPage() {
     loadPage(page + 1, false);
+  }
+
+  function handlePrevPage() {
+    if (page > 0) loadPage(page - 1, false);
   }
 
   function handleTicketCreated(ticket: Ticket) {
     setTickets((prev) => [ticket, ...prev]);
     setTotal((t) => t + 1);
     refreshStatusCounts();
+    setChartRefreshTrigger((c) => c + 1);
   }
 
   function handleTicketUpdated(updated: Ticket) {
     setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
     if (selectedTicket?.id === updated.id) setSelectedTicket(updated);
     refreshStatusCounts();
+    setChartRefreshTrigger((c) => c + 1);
   }
 
   async function handleDeleteTicket(id: string) {
@@ -167,6 +171,7 @@ export default function AdminTicketsPage() {
       setDetailOpen(false);
       toast.success("Ticket deleted");
       refreshStatusCounts();
+      setChartRefreshTrigger((c) => c + 1);
     } catch (err) {
       toast.error("Failed to delete ticket", {
         description: err instanceof Error ? err.message : undefined,
@@ -183,7 +188,9 @@ export default function AdminTicketsPage() {
     }
   };
 
-  const hasMore = tickets.length < total;
+  const PAGE_SIZE = 10;
+  const hasMore = (page + 1) * PAGE_SIZE < total;
+  const hasPrev = page > 0;
 
   if (isLoading) {
     return (
@@ -367,13 +374,19 @@ export default function AdminTicketsPage() {
         })}
       </div>
 
+      {/* ══ Charts ═══════════════════════════════════════════════════════════ */}
+      <div className="pt-2">
+        <TicketDashboardCharts refreshTrigger={chartRefreshTrigger} />
+      </div>
+
       {/* Total count */}
       <p className="text-sm text-muted-foreground">
         Showing {tickets.length} of {total} ticket{total !== 1 ? "s" : ""}
       </p>
 
       {/* ══ Ticket list ══════════════════════════════════════════════════════ */}
-      <div className="flex flex-col gap-3">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5">
+        <div className="flex flex-col gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
         {tickets.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card p-10 text-center">
             <div className="rounded-full bg-violet-100 dark:bg-violet-500/15 p-3">
@@ -407,7 +420,7 @@ export default function AdminTicketsPage() {
               <div
                 key={t.id}
                 className={cn(
-                  "group relative overflow-hidden rounded-xl border bg-card p-4 pl-5 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
+                  "group relative shrink-0 overflow-hidden rounded-xl border bg-card p-4 pl-5 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
                   statusBorder
                 )}
                 onClick={() => { setSelectedTicket(t); setDetailOpen(true); }}
@@ -476,21 +489,33 @@ export default function AdminTicketsPage() {
             );
           })
         )}
+        </div>
       </div>
 
-      {/* Load more */}
-      {hasMore && (
-        <div className="flex justify-center pt-2">
+      {/* Pagination */}
+      {(hasMore || hasPrev) && (
+        <div className="flex justify-between items-center pt-2">
           <Button
             variant="outline"
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            className="min-w-40"
+            onClick={handlePrevPage}
+            disabled={loadingMore || !hasPrev}
+            className="min-w-32"
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {page + 1}
+          </span>
+          <Button
+            variant="outline"
+            onClick={handleNextPage}
+            disabled={loadingMore || !hasMore}
+            className="min-w-32"
           >
             {loadingMore ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading…</>
             ) : (
-              `Load More (${total - tickets.length} remaining)`
+              "Next"
             )}
           </Button>
         </div>

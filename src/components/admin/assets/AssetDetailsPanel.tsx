@@ -63,6 +63,15 @@ function StatusPill({ status }: { status: string }) {
 }
 
 /* ── Health Ring ─────────────────────────────────────────────────────────────── */
+// Unlike the failure-probability/days-until-maintenance numbers on this
+// page — outputs of the trained, cross-validated v7 classifier/regressor —
+// the health score is a hand-weighted composite of the 5 component
+// readings plus a penalty term. It has not been validated against real
+// outcomes (no historical maintenance_events ground truth currently exists
+// to check it against — see PdmPredictionHistory, which now logs
+// predictions going forward so this can be checked later). Labelled here
+// so it doesn't read with the same evidentiary weight as the model outputs
+// beside it.
 function HealthRing({ score }: { score: number }) {
   const r = 38;
   const circ = 2 * Math.PI * r;
@@ -87,6 +96,12 @@ function HealthRing({ score }: { score: number }) {
         </div>
       </div>
       <span className="text-[11px] font-semibold" style={{ color }}>{label}</span>
+      <span
+        className="text-[9px] text-muted-foreground/50 cursor-help underline decoration-dotted underline-offset-2"
+        title="Composite indicator (weighted formula), not a validated prediction — unlike the failure risk and maintenance date, which come from the trained AI model."
+      >
+        Composite indicator
+      </span>
     </div>
   );
 }

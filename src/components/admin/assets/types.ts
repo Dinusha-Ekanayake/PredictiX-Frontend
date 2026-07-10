@@ -211,12 +211,15 @@ export type ComponentRulOut = {
   rul_days_low: number | null;
   rul_days_high: number | null;
   estimated_failure_date: string | null;
-  confidence: "trend" | "insufficient_trend" | "single_point" | "no_data";
+  confidence: "trend" | "insufficient_trend" | "single_point" | "no_data" | "recently_serviced";
   readings_used: number;
   horizon_capped: boolean;
   model_corroborated: boolean;
   model_days_ceiling: number | null;
   disagrees_with_model: boolean;
+  // True when a service-event jump was detected and this trend/RUL was
+  // refit on only the readings since that jump.
+  post_service: boolean;
 };
 
 export type AssetComponentRulResponse = {

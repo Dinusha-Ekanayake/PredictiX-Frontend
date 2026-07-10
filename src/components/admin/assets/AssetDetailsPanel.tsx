@@ -943,6 +943,14 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                               <div className="flex justify-between items-start text-[11px] gap-2">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className="capitalize font-medium text-muted-foreground">{comp.component}</span>
+                                  {comp.post_service && (
+                                    <span
+                                      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200/60 dark:bg-sky-500/10 dark:text-sky-400 dark:ring-sky-500/20"
+                                      title="A service-event jump was detected in this component's history — this estimate uses only the readings since then, not the stale pre-service trend"
+                                    >
+                                      Since service
+                                    </span>
+                                  )}
                                   {comp.model_corroborated && (
                                     <span
                                       className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200/60 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20"
@@ -962,11 +970,13 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                                   )}
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <span className={cn("font-bold tabular-nums block", comp.confidence === "insufficient_trend" ? "text-muted-foreground/60" : textColor)}>
+                                  <span className={cn("font-bold tabular-nums block", (comp.confidence === "insufficient_trend" || comp.confidence === "recently_serviced") ? "text-muted-foreground/60" : textColor)}>
                                     {comp.rul_days != null
                                       ? `${comp.rul_days}${comp.horizon_capped ? "+" : ""} days left`
                                       : comp.confidence === "insufficient_trend"
                                       ? "Not enough data"
+                                      : comp.confidence === "recently_serviced"
+                                      ? "Recently serviced"
                                       : comp.degradation_pct_per_day != null && comp.degradation_pct_per_day >= 0
                                       ? "Improving"
                                       : "—"}
@@ -995,8 +1005,14 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                                   <span>
                                     {comp.confidence === "single_point"
                                       ? "Low confidence (1 reading)"
+                                      : comp.confidence === "recently_serviced"
+                                      ? "Jump detected — only 1 reading since"
                                       : comp.confidence === "insufficient_trend"
-                                      ? `Flat within noise over ${comp.readings_used} readings`
+                                      ? comp.post_service
+                                        ? "Flat within noise since service"
+                                        : `Flat within noise over ${comp.readings_used} readings`
+                                      : comp.post_service
+                                      ? `Trend over ${comp.readings_used} readings since service`
                                       : `Trend over ${comp.readings_used} readings`}
                                   </span>
                                 </span>

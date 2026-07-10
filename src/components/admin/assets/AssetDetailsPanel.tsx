@@ -717,29 +717,50 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   </div>
                 </div>
 
-                {/* ── Row 2: SHAP Top Feature Importance ── */}
+                {/* ── Row 2: SHAP Top Feature Importance ──
+                     SHAP impact is signed in days against the regressor's
+                     predicted_days_until_maintenance: negative pulls the date
+                     closer (more urgent), positive pushes it further out
+                     (less urgent). Colored + directional so that reads at a
+                     glance instead of requiring the reader to parse a sign. */}
                 {(() => {
                   const topFactors = prediction?.top_explanations ?? [];
                   if (topFactors.length === 0) return null;
                   const maxVal = Math.max(...topFactors.map((f) => Math.abs(f.impact ?? 0)), 1);
                   return (
                     <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
-                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Top Risk Factors (SHAP)</div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Top Risk Factors (SHAP)</div>
+                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground/60">
+                          <span className="flex items-center gap-1">
+                            <TrendingDown className="h-3 w-3 text-red-500" /> Sooner
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3 text-emerald-500" /> Later
+                          </span>
+                        </div>
+                      </div>
                       <div className="space-y-2">
                         {topFactors.map((f, i) => {
-                          const impact = Math.abs(f.impact ?? 0);
+                          const raw = f.impact ?? 0;
+                          const impact = Math.abs(raw);
                           const pct = Math.round((impact / maxVal) * 100);
                           const label = f.feature.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                          const isUrgent = raw < 0;
+                          const barColor = isUrgent ? "bg-red-500/80" : "bg-emerald-500/80";
+                          const textColor = isUrgent ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400";
+                          const DirIcon = isUrgent ? TrendingDown : TrendingUp;
                           return (
                             <div key={i} className="space-y-0.5">
-                              <div className="flex justify-between text-[11px]">
+                              <div className="flex justify-between items-center text-[11px]">
                                 <span className="text-muted-foreground font-medium truncate">{label}</span>
-                                <span className="text-xs font-mono text-muted-foreground/70 shrink-0 ml-2">
-                                  {f.impact != null ? f.impact.toFixed(2) : "—"}
+                                <span className={cn("flex items-center gap-1 text-xs font-mono shrink-0 ml-2", textColor)}>
+                                  <DirIcon className="h-3 w-3" />
+                                  {f.impact != null ? `${raw > 0 ? "+" : ""}${raw.toFixed(2)}d` : "—"}
                                 </span>
                               </div>
                               <div className="h-2 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
-                                <div className="h-full rounded-full transition-all duration-700 bg-violet-500/80" style={{ width: `${pct}%` }} />
+                                <div className={cn("h-full rounded-full transition-all duration-700", barColor)} style={{ width: `${pct}%` }} />
                               </div>
                             </div>
                           );
@@ -843,11 +864,22 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   )}
                 </div>
 
-                {/* ── Row 4: Component RUL (this asset's own sensor history trend) ── */}
+                {/* ── Row 4: Component RUL (this asset's own sensor history trend,
+                     cross-checked against the v7 regressor's whole-asset
+                     prediction — see ComponentRulOut.model_corroborated /
+                     disagrees_with_model / horizon_capped) ── */}
                 {componentRul && (
                   <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-4 mt-3">
-                    <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
-                      Component Remaining Useful Life (RUL)
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
+                        Component Remaining Useful Life (RUL)
+                      </div>
+                      <span
+                        className="text-[10px] text-muted-foreground/50 cursor-help"
+                        title="Estimated from this asset's own last 4 sensor readings per component — directional, not precise. Cross-checked against the AI model's overall maintenance prediction."
+                      >
+                        What is this?
+                      </span>
                     </div>
                     {componentRul.components.length === 0 ? (
                       <div className="text-sm text-muted-foreground">No component health data available.</div>
@@ -865,18 +897,45 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
 
                           const isCritical = comp.rul_days != null && comp.rul_days < 30;
                           const healthPct = Math.max(0, Math.min(100, comp.current_health_pct));
+                          const hasRange = comp.rul_days_low != null && comp.rul_days_high != null && comp.rul_days_high > comp.rul_days_low;
 
                           return (
                             <div key={i} className="space-y-1.5">
-                              <div className="flex justify-between text-[11px]">
-                                <span className="capitalize font-medium text-muted-foreground">{comp.component}</span>
-                                <span className={cn("font-bold tabular-nums", isCritical ? "text-red-500" : "text-foreground")}>
-                                  {comp.rul_days != null
-                                    ? `${comp.rul_days} days left`
-                                    : comp.degradation_pct_per_day != null && comp.degradation_pct_per_day >= 0
-                                    ? "Improving"
-                                    : "—"}
-                                </span>
+                              <div className="flex justify-between items-start text-[11px] gap-2">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="capitalize font-medium text-muted-foreground">{comp.component}</span>
+                                  {comp.model_corroborated && (
+                                    <span
+                                      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200/60 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20"
+                                      title="This component is among the AI model's top factors for this asset's maintenance prediction"
+                                    >
+                                      Model-confirmed
+                                    </span>
+                                  )}
+                                  {comp.disagrees_with_model && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20"
+                                      title={`This component's own trend looks fine, but the AI model predicts maintenance is needed sooner (~${comp.model_days_ceiling}d) for this asset overall — treat this component's estimate with caution`}
+                                    >
+                                      <AlertTriangle className="h-2.5 w-2.5" />
+                                      Check model
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <span className={cn("font-bold tabular-nums block", isCritical ? "text-red-500" : "text-foreground")}>
+                                    {comp.rul_days != null
+                                      ? `${comp.rul_days}${comp.horizon_capped ? "+" : ""} days left`
+                                      : comp.degradation_pct_per_day != null && comp.degradation_pct_per_day >= 0
+                                      ? "Improving"
+                                      : "—"}
+                                  </span>
+                                  {hasRange && (
+                                    <span className="text-[9px] text-muted-foreground/50 font-mono">
+                                      range {comp.rul_days_low}–{comp.rul_days_high}d
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               <div className="relative h-2 rounded-full bg-slate-200/60 dark:bg-white/8">
                                 <div

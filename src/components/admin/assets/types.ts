@@ -201,14 +201,22 @@ export type AssetSurvivalResponse = {
 };
 
 // ─── Component RUL (asset-section, independent of the FRSO report models) ─────
+// Grounded against the v7 regressor's whole-asset prediction — see
+// app.ai.services.asset_component_rul_service._apply_model_grounding.
 export type ComponentRulOut = {
   component: string;
   current_health_pct: number | null;
   degradation_pct_per_day: number | null;
   rul_days: number | null;
+  rul_days_low: number | null;
+  rul_days_high: number | null;
   estimated_failure_date: string | null;
   confidence: "trend" | "single_point" | "no_data";
   readings_used: number;
+  horizon_capped: boolean;
+  model_corroborated: boolean;
+  model_days_ceiling: number | null;
+  disagrees_with_model: boolean;
 };
 
 export type AssetComponentRulResponse = {

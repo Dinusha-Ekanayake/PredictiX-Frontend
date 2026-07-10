@@ -962,9 +962,11 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                                   )}
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <span className={cn("font-bold tabular-nums block", textColor)}>
+                                  <span className={cn("font-bold tabular-nums block", comp.confidence === "insufficient_trend" ? "text-muted-foreground/60" : textColor)}>
                                     {comp.rul_days != null
                                       ? `${comp.rul_days}${comp.horizon_capped ? "+" : ""} days left`
+                                      : comp.confidence === "insufficient_trend"
+                                      ? "Not enough data"
                                       : comp.degradation_pct_per_day != null && comp.degradation_pct_per_day >= 0
                                       ? "Improving"
                                       : "—"}
@@ -993,6 +995,8 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                                   <span>
                                     {comp.confidence === "single_point"
                                       ? "Low confidence (1 reading)"
+                                      : comp.confidence === "insufficient_trend"
+                                      ? `Flat within noise over ${comp.readings_used} readings`
                                       : `Trend over ${comp.readings_used} readings`}
                                   </span>
                                 </span>

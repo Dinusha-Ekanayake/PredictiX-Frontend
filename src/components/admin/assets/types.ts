@@ -211,7 +211,7 @@ export type ComponentRulOut = {
   rul_days_low: number | null;
   rul_days_high: number | null;
   estimated_failure_date: string | null;
-  confidence: "trend" | "single_point" | "no_data";
+  confidence: "trend" | "insufficient_trend" | "single_point" | "no_data";
   readings_used: number;
   horizon_capped: boolean;
   model_corroborated: boolean;

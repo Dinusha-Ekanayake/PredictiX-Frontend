@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, RotateCcw, Plus, SlidersHorizontal } from "lucide-react";
+import { Search, RotateCcw, Plus, SlidersHorizontal, ArrowUp, ArrowDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { AssetFilters } from "./types";
+import type { AssetFilters, AssetSortBy } from "./types";
 
 type WarehouseOption = { value: string; label: string };
 
@@ -31,7 +31,23 @@ export const DEFAULT_FILTERS: AssetFilters = {
   status: "all",
   health_band: "all",
   warehouse_id: "all",
+  sort_by: "created_at",
+  sort_order: "desc",
 };
+
+const SORT_OPTIONS: { value: AssetSortBy; label: string }[] = [
+  { value: "created_at", label: "Date Added" },
+  { value: "updated_at", label: "Last Updated" },
+  { value: "asset_name", label: "Name" },
+  { value: "asset_code", label: "Asset Code" },
+  { value: "status", label: "Status" },
+  { value: "vehicle_type", label: "Vehicle Type" },
+  { value: "make", label: "Make" },
+  { value: "manufacture_year", label: "Manufacture Year" },
+  { value: "current_mileage", label: "Mileage" },
+  { value: "criticality_score", label: "Criticality Score" },
+  { value: "payload_capacity_kg", label: "Payload Capacity" },
+];
 
 export default function AssetsToolbar({
   filters,
@@ -47,7 +63,9 @@ export default function AssetsToolbar({
     filters.query !== "" ||
     filters.status !== "all" ||
     filters.health_band !== "all" ||
-    filters.warehouse_id !== "all";
+    filters.warehouse_id !== "all" ||
+    filters.sort_by !== DEFAULT_FILTERS.sort_by ||
+    filters.sort_order !== DEFAULT_FILTERS.sort_order;
 
   return (
     <>
@@ -127,6 +145,43 @@ export default function AssetsToolbar({
                 ))}
               </SelectContent>
             </Select>
+
+            {/* Sort */}
+            <Select
+              value={filters.sort_by}
+              onValueChange={(v) =>
+                setFilters((prev) => ({ ...prev, sort_by: v as AssetSortBy }))
+              }
+            >
+              <SelectTrigger className="h-9 w-44 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                {SORT_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-xl shrink-0 border-slate-200 dark:border-slate-700"
+              title={filters.sort_order === "asc" ? "Ascending" : "Descending"}
+              onClick={() =>
+                setFilters((prev) => ({
+                  ...prev,
+                  sort_order: prev.sort_order === "asc" ? "desc" : "asc",
+                }))
+              }
+            >
+              {filters.sort_order === "asc" ? (
+                <ArrowUp className="h-3.5 w-3.5" />
+              ) : (
+                <ArrowDown className="h-3.5 w-3.5" />
+              )}
+            </Button>
 
             {/* Count pill */}
             <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-muted/40 dark:bg-white/4 px-3 py-1 text-xs font-medium text-muted-foreground">

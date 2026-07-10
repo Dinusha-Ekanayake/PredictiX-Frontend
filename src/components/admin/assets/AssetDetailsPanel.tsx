@@ -329,11 +329,16 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
 
   return (
     <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden transition-all">
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/40 dark:bg-white/2">
+      {/* ── Header ──
+           Stacked (title row, then actions) instead of side-by-side — this
+           panel is often narrow (docked next to a list), and cramming a full
+           name + status + code + badges on the same row as 5 action buttons
+           left almost no room for the name itself, truncating it to a few
+           characters. */}
+      <div className="flex flex-col gap-3 px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/40 dark:bg-white/2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-bold truncate">{asset.asset_name}</h2>
+            <h2 className="text-base font-bold break-words">{asset.asset_name}</h2>
             <StatusPill status={asset.status} />
             <span className="text-[11px] font-mono text-muted-foreground/70 bg-slate-100 dark:bg-white/6 px-2 py-0.5 rounded-full">
               {asset.asset_code}
@@ -350,7 +355,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
           {!readOnly && (
             <>
               <Button

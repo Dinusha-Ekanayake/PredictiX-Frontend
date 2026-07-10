@@ -235,9 +235,26 @@ export type AssetDetail = {
 };
 
 // ─── Filter state used by the toolbar ─────────────────────────────────────────
+// sort_by matches GET /assets/'s sort_column_map exactly (app/routers/assets.py).
+export type AssetSortBy =
+  | "created_at"
+  | "updated_at"
+  | "asset_name"
+  | "asset_code"
+  | "status"
+  | "vehicle_type"
+  | "make"
+  | "model"
+  | "manufacture_year"
+  | "current_mileage"
+  | "criticality_score"
+  | "payload_capacity_kg";
+
 export type AssetFilters = {
   query: string;
   status: string;        // "all" | actual status values
   health_band: string;   // "all" | "excellent" | "good" | "moderate" | "poor" | "critical"
   warehouse_id: string;  // "all" | warehouse UUID
+  sort_by: AssetSortBy;
+  sort_order: "asc" | "desc";
 };

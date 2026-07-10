@@ -68,8 +68,8 @@ function buildAssetListParams(filters: AssetFilters): URLSearchParams {
     params.set("health_band", filters.health_band);
   if (filters.warehouse_id && filters.warehouse_id !== "all")
     params.set("warehouse_id", filters.warehouse_id);
-  params.set("sort_by", "created_at");
-  params.set("sort_order", "desc");
+  params.set("sort_by", filters.sort_by);
+  params.set("sort_order", filters.sort_order);
   return params;
 }
 

@@ -12,6 +12,7 @@ import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
 import PageHero from "@/components/common/PageHero";
 import { fetchMyAssets, type UserAssetData } from "@/lib/api/userProfileApi";
 import { listAssets } from "@/components/admin/assets/assetService";
+import { DEFAULT_FILTERS } from "@/components/admin/assets/AssetsToolbar";
 import type { AssetListItem } from "@/components/admin/assets/types";
 import UserAssetDetailsDialog from "@/components/user/assets/UserAssetDetailsDialog";
 
@@ -77,7 +78,7 @@ export default function UserAssetsPage() {
     if (debounced.length < 2) { setResults([]); return; }
     let cancelled = false;
     setSearching(true);
-    listAssets({ query: debounced, status: "all", health_band: "all", warehouse_id: "all" })
+    listAssets({ ...DEFAULT_FILTERS, query: debounced })
       .then((data) => { if (!cancelled) setResults(data); })
       .catch((err) => { if (!cancelled) toast.error("Search failed", { description: err instanceof Error ? err.message : undefined }); })
       .finally(() => { if (!cancelled) setSearching(false); });

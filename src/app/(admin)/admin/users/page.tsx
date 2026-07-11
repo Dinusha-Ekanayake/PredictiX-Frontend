@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,6 @@ import type { NewUser } from "@/components/admin/users/AddUserDialog";
 import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
 import EditUserDialog from "@/components/admin/users/EditUserDialog";
-import type { AssetItem } from "@/components/admin/users/ViewAssignedAssetsDialog";
 import { toast } from "@/lib/customToast";
 import { useRouter } from "next/navigation";
 
@@ -38,10 +38,10 @@ import {
   createUser,
   updateUser,
   getUserAssets,
-  deleteUser,
   type UserItem,
   type UserRole,
   type UserStatus,
+  type CreateUserPayload,
 } from "@/lib/userService";
 
 import {
@@ -52,7 +52,6 @@ import {
   UserPlus,
   Search,
   Building2,
-  Trash2,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -77,7 +76,6 @@ function computeKpis(users: UserItem[]) {
   const active = users.filter((u) => u.status === "active").length;
   const admins = users.filter((u) => u.role === "admin").length;
   const regular = users.filter((u) => u.role === "user").length;
-
   return [
     { label: "Total Users", value: total, icon: Users },
     { label: "Active", value: active, icon: UserCheck },
@@ -129,11 +127,77 @@ function UserAvatar({ name }: { name: string }) {
       .join("")
       .toUpperCase()
       .slice(0, 2) || "?";
-
   return (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
       {initials}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Donut Chart (recharts)
+// ---------------------------------------------------------------------------
+
+type ChartEntry = { label: string; value: number; color: string };
+
+function DonutChart({ data, title }: { data: ChartEntry[]; title: string }) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex items-center gap-6">
+        <div className="h-[120px] w-[120px] shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data.map((d) => ({ name: d.label, value: d.value }))}
+                cx="50%"
+                cy="50%"
+                innerRadius={35}
+                outerRadius={55}
+                dataKey="value"
+                strokeWidth={0}
+              >
+                {data.map((entry, index) => (
+                  <Cell key={index} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(value: number, name: string) => [value, name]}
+                contentStyle={{
+                  background: "var(--background)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+          {data.map((d) => (
+            <div key={d.label} className="flex items-center gap-2 text-xs">
+              <span
+                className="h-2.5 w-2.5 rounded-sm shrink-0"
+                style={{ background: d.color }}
+              />
+              <span className="truncate text-muted-foreground">{d.label}</span>
+              <span className="ml-auto font-medium tabular-nums">
+                {d.value}
+                <span className="text-muted-foreground font-normal ml-1">
+                  ({total > 0 ? Math.round((d.value / total) * 100) : 0}%)
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -190,15 +254,42 @@ export default function AdminUsersPage() {
         if (!cancelled) setIsLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  // Build department list dynamically from real data
+  // Dynamic department list from real data
   const departments = React.useMemo(() => {
     const set = new Set(users.map((u) => u.department).filter(Boolean));
     return Array.from(set).sort();
+  }, [users]);
+
+  // Department chart data
+  const deptChartData = React.useMemo((): ChartEntry[] => {
+    const COLORS = [
+      "#2a78d6", "#1baf7a", "#eda100", "#4a3aa7",
+      "#e34948", "#e87ba4", "#eb6834", "#888780",
+    ];
+    const map: Record<string, number> = {};
+    users.forEach((u) => {
+      if (u.department) map[u.department] = (map[u.department] || 0) + 1;
+    });
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value], i) => ({
+        label,
+        value,
+        color: COLORS[i % COLORS.length],
+      }));
+  }, [users]);
+
+  // Role chart data
+  const roleChartData = React.useMemo((): ChartEntry[] => {
+    const adminCount = users.filter((u) => u.role === "admin").length;
+    const userCount = users.filter((u) => u.role === "user").length;
+    return [
+      { label: "Regular users", value: userCount, color: "#2a78d6" },
+      { label: "Admins", value: adminCount, color: "#1baf7a" },
+    ].filter((d) => d.value > 0);
   }, [users]);
 
   const filteredUsers = React.useMemo(() => {
@@ -246,32 +337,21 @@ export default function AdminUsersPage() {
 
   async function handleUserUpdated(
     userId: string,
-    updatedFields: Partial<UserItem>
+    updatedFields: Partial<CreateUserPayload>
   ) {
-    const updatedUser = await updateUser(userId, updatedFields);
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? updatedUser : u))
-    );
-    toast.success("User updated", {
-      description: `${updatedUser.name} has been updated.`,
-    });
-  }
-
-  async function handleDeleteUser(user: UserItem) {
-    if (
-      !confirm(
-        `Delete ${user.name}? This removes their login and profile. This cannot be undone.`
-      )
-    )
-      return;
     try {
-      await deleteUser(user.id);
-      setUsers((prev) => prev.filter((u) => u.id !== user.id));
-      toast.success("User deleted", { description: user.name });
+      const updatedUser = await updateUser(userId, updatedFields);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? updatedUser : u))
+      );
+      toast.success("User updated", {
+        description: `${updatedUser.name} has been updated.`,
+      });
     } catch (err) {
-      toast.error("Failed to delete user", {
+      toast.error("Failed to update user", {
         description: err instanceof Error ? err.message : undefined,
       });
+      throw err;
     }
   }
 
@@ -339,6 +419,14 @@ export default function AdminUsersPage() {
         ))}
       </div>
 
+      {/* Department & Role distribution charts */}
+      {users.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DonutChart data={deptChartData} title="Department distribution" />
+          <DonutChart data={roleChartData} title="Role distribution" />
+        </div>
+      )}
+
       {/* Search + filter bar */}
       <Card className="rounded-2xl">
         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -364,19 +452,14 @@ export default function AdminUsersPage() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={departmentFilter}
-              onValueChange={setDepartmentFilter}
-            >
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Departments" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
                 {departments.map((d) => (
-                  <SelectItem key={d} value={d}>
-                    {d}
-                  </SelectItem>
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -403,7 +486,7 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      {/* Users table */}
+      {/* Users table — click row to open View Details */}
       <Card className="rounded-2xl">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -415,7 +498,6 @@ export default function AdminUsersPage() {
                   <TableHead className="w-40">Department</TableHead>
                   <TableHead className="w-24">Status</TableHead>
                   <TableHead className="w-32 text-center">Assets</TableHead>
-                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -423,7 +505,7 @@ export default function AdminUsersPage() {
                 {filteredUsers.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={5}
                       className="h-24 text-center text-muted-foreground"
                     >
                       No users found.
@@ -431,8 +513,11 @@ export default function AdminUsersPage() {
                   </TableRow>
                 ) : (
                   filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      {/* User */}
+                    <TableRow
+                      key={user.id}
+                      className="cursor-pointer"
+                      onClick={() => setDetailsUser(user)}
+                    >
                       <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
                           <UserAvatar name={user.name} />
@@ -447,12 +532,10 @@ export default function AdminUsersPage() {
                         </div>
                       </TableCell>
 
-                      {/* Role */}
                       <TableCell>
                         <RoleBadge role={user.role} />
                       </TableCell>
 
-                      {/* Department */}
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
                           <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -460,61 +543,20 @@ export default function AdminUsersPage() {
                         </div>
                       </TableCell>
 
-                      {/* Status */}
                       <TableCell>
                         <StatusBadge status={user.status} />
                       </TableCell>
 
-                      {/* Assets count */}
-                      <TableCell className="text-center text-base font-medium">
-                        {user.assignedAssets}
-                      </TableCell>
-
-                      {/* Actions */}
-                      <TableCell className="pr-4">
-                        <div className="flex items-center gap-2">
-                          {/* View Details */}
-                          <button
-                            onClick={() => setDetailsUser(user)}
-                            className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500 whitespace-nowrap"
-                          >
-                            View Details
-                          </button>
-
-                          {/* Edit */}
-                          <button
-                            onClick={() => setEditUser(user)}
-                            className="rounded-full bg-blue-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-500"
-                          >
-                            Edit
-                          </button>
-
-                          {/* View Assets OR No Assets */}
-                          {user.assignedAssets > 0 ? (
-                            <button
-                              onClick={() => handleViewAssets(user)}
-                              className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500 whitespace-nowrap"
-                            >
-                              View Assets
-                            </button>
-                          ) : (
-                            <button
-                              disabled
-                              className="rounded-full bg-muted px-3 py-1 text-sm font-medium text-muted-foreground cursor-not-allowed whitespace-nowrap"
-                            >
-                              No Assets
-                            </button>
-                          )}
-
-                          {/* Delete — pinned right */}
-                          <button
-                            onClick={() => handleDeleteUser(user)}
-                            title="Delete user"
-                            className="ml-auto inline-flex items-center justify-center rounded-full bg-red-600 p-1.5 text-white shadow-sm transition-colors hover:bg-red-500"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                      <TableCell className="text-center">
+                        {user.assignedAssets > 0 ? (
+                          <span className="text-base font-medium">
+                            {user.assignedAssets}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            No assets
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -537,12 +579,26 @@ export default function AdminUsersPage() {
       <ViewUserDetailsDialog
         user={detailsUser}
         open={detailsUser !== null}
-        onOpenChange={(open) => {
-          if (!open) setDetailsUser(null);
+        onOpenChange={(open) => { if (!open) setDetailsUser(null); }}
+        onEditUser={(user) => {
+          setDetailsUser(null);
+          setEditUser(user as UserItem);
         }}
         onViewAssets={(user) => {
           setDetailsUser(null);
-          handleViewAssets(user);
+          handleViewAssets(user as UserItem);
+        }}
+        onUserUpdated={(updatedUser) => {
+          setUsers((prev) =>
+            prev.map((u) =>
+              u.id === updatedUser.id ? { ...u, ...updatedUser } : u
+            )
+          );
+          setDetailsUser(null);
+        }}
+        onUserDeleted={(userId) => {
+          setUsers((prev) => prev.filter((u) => u.id !== userId));
+          setDetailsUser(null);
         }}
       />
 
@@ -550,9 +606,7 @@ export default function AdminUsersPage() {
       <EditUserDialog
         user={editUser}
         open={editUser !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditUser(null);
-        }}
+        onOpenChange={(open) => { if (!open) setEditUser(null); }}
         onUserUpdated={handleUserUpdated}
       />
 
@@ -562,9 +616,7 @@ export default function AdminUsersPage() {
         assets={assignedAssets}
         loading={assetsLoading}
         open={assetsUser !== null}
-        onOpenChange={(open) => {
-          if (!open) setAssetsUser(null);
-        }}
+        onOpenChange={(open) => { if (!open) setAssetsUser(null); }}
         onNavigateToAsset={handleNavigateToAsset}
         onBackToDetails={
           assetsUser

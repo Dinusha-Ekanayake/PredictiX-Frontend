@@ -159,35 +159,39 @@ export default function AdminAssetsPage() {
   }, [filters, page]);
 
   // ── Load detail when selection changes ────────────────────────────────────────
+  const loadDetail = React.useCallback(async (id: string, signal?: { cancelled: boolean }) => {
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const d = await getAssetDetail(id);
+      if (!signal?.cancelled) setDetail(d);
+    } catch (e: unknown) {
+      if (!signal?.cancelled)
+        setDetailError(e instanceof Error ? e.message : "Failed to load asset details");
+    } finally {
+      if (!signal?.cancelled) setDetailLoading(false);
+    }
+  }, []);
+
   React.useEffect(() => {
     if (!selectedId) {
       setDetail(null);
       return;
     }
-    let cancelled = false;
-
-    async function load() {
-      setDetailLoading(true);
-      setDetailError(null);
-      try {
-        const d = await getAssetDetail(selectedId!);
-        if (!cancelled) setDetail(d);
-      } catch (e: unknown) {
-        if (!cancelled)
-          setDetailError(e instanceof Error ? e.message : "Failed to load asset details");
-      } finally {
-        if (!cancelled) setDetailLoading(false);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, [selectedId]);
+    const signal = { cancelled: false };
+    loadDetail(selectedId, signal);
+    return () => { signal.cancelled = true; };
+  }, [selectedId, loadDetail]);
 
   // ── Refresh detail ────────────────────────────────────────────────────────────
+  // Re-fetches the currently selected asset's detail directly rather than
+  // toggling selectedId (setSelectedId(id => id) is a no-op in React since
+  // the value is unchanged — that silently never re-triggered the load
+  // effect, so "Run AI" / Log Maintenance / Retry all showed a "success"
+  // toast while the panel kept displaying pre-action stale data).
   function refreshDetail() {
     if (!selectedId) return;
-    setSelectedId((id) => id);
+    loadDetail(selectedId);
   }
 
   // ── Delete handler ────────────────────────────────────────────────────────────
@@ -382,7 +386,7 @@ export default function AdminAssetsPage() {
                 variant="ghost"
                 size="sm"
                 className="mt-3 gap-1.5 text-xs"
-                onClick={() => setSelectedId((id) => id)}
+                onClick={refreshDetail}
               >
                 <RefreshCw className="h-3 w-3" />
                 Retry

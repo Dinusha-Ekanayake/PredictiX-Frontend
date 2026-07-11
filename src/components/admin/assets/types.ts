@@ -26,7 +26,11 @@ export type AssetStats = {
   maintenance: number;
   critical: number;
   offline: number;
-  avgHealth: number;
+  // null when no asset in scope has a completed PdM prediction yet — real
+  // "no data" state, not a fabricated 0%/estimate.
+  avgHealth: number | null;
+  // How many of `total` assets avgHealth is actually averaged over.
+  avgHealthScoredCount: number;
 };
 
 export type AssetAnalytics = {

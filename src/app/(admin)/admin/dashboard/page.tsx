@@ -151,19 +151,36 @@ export default function AdminDashboardPage() {
   const date = now ? now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) : "";
 
   const k = data?.kpis;
+  // "Fleet Health"/"Predicted Failures" show a distinct empty state instead
+  // of a false "0%"/"0" when no PdM predictions have run yet (brand-new
+  // warehouse) — previously indistinguishable from a genuine alarming 0%.
+  const hasPredictions = k?.hasPredictionData ?? false;
   const kpiCards = [
     { label: "Total Assets", value: k ? String(k.totalAssets) : "—", sub: "Fleet-wide", icon: Package, iconBg: "bg-violet-100 dark:bg-violet-500/15", iconColor: "text-violet-600 dark:text-violet-400", accent: "text-violet-600 dark:text-violet-400" },
     { label: "Critical Alerts", value: k ? String(k.criticalAlerts) : "—", sub: "Require action now", icon: Flame, iconBg: "bg-rose-100 dark:bg-rose-500/15", iconColor: "text-rose-600 dark:text-rose-400", accent: "text-rose-600 dark:text-rose-400" },
     { label: "Open Tickets", value: k ? String(k.openTickets) : "—", sub: k ? `${k.highPriorityTickets} high priority` : "", icon: Ticket, iconBg: "bg-amber-100 dark:bg-amber-500/15", iconColor: "text-amber-600 dark:text-amber-400", accent: "text-amber-600 dark:text-amber-400" },
-    { label: "Fleet Health", value: k ? `${Math.round(k.fleetHealth)}%` : "—", sub: "Fleet-wide average", icon: Activity, iconBg: "bg-emerald-100 dark:bg-emerald-500/15", iconColor: "text-emerald-600 dark:text-emerald-400", accent: "text-emerald-600 dark:text-emerald-400" },
-    { label: "Predicted Failures", value: k ? String(k.predictedFailures) : "—", sub: "Next 8 weeks", icon: Brain, iconBg: "bg-sky-100 dark:bg-sky-500/15", iconColor: "text-sky-600 dark:text-sky-400", accent: "text-sky-600 dark:text-sky-400" },
-    { label: "Est. Maint. Cost", value: k ? fmtCompact(k.estMaintenanceCost) : "—", sub: "LKR · 30 days", icon: Wrench, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", accent: "text-slate-600 dark:text-slate-400" },
+    { label: "Fleet Health", value: k ? (hasPredictions ? `${Math.round(k.fleetHealth)}%` : "—") : "—", sub: hasPredictions ? "Fleet-wide average" : "No predictions yet", icon: Activity, iconBg: "bg-emerald-100 dark:bg-emerald-500/15", iconColor: "text-emerald-600 dark:text-emerald-400", accent: "text-emerald-600 dark:text-emerald-400" },
+    // "Predicted Failures" counts every asset with failure_probability >=
+    // 50% currently on record — not filtered to any specific time horizon,
+    // so the sub-label no longer claims an "8 weeks" window the query
+    // doesn't actually enforce.
+    { label: "Predicted Failures", value: k ? (hasPredictions ? String(k.predictedFailures) : "—") : "—", sub: hasPredictions ? "≥ 50% failure probability" : "No predictions yet", icon: Brain, iconBg: "bg-sky-100 dark:bg-sky-500/15", iconColor: "text-sky-600 dark:text-sky-400", accent: "text-sky-600 dark:text-sky-400" },
+    // Sum of the current per-asset cost estimate across the fleet — not a
+    // rolling 30-day figure (pdm_batch_predictions holds one current
+    // estimate per asset, not a time-bounded window), so the label no
+    // longer claims "30 days".
+    { label: "Est. Maint. Cost", value: k ? fmtCompact(k.estMaintenanceCost) : "—", sub: "LKR · current estimate", icon: Wrench, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", accent: "text-slate-600 dark:text-slate-400" },
   ];
 
   const healthTrend = data?.healthTrend ?? [];
   const ticketTrend = data?.ticketTrend ?? [];
   const dist = data?.healthDistribution ?? [];
-  const distTotal = dist.reduce((s, d) => s + d.count, 0) || 1;
+  // The backend always returns the 5 fixed bands (Excellent..Critical) even
+  // with zero predictions, each at count: 0 — so dist.length is never 0 for
+  // a brand-new warehouse. distTotalRaw (before the `|| 1` div-by-zero
+  // guard) is what actually distinguishes "no data" from "data, all zero".
+  const distTotalRaw = dist.reduce((s, d) => s + d.count, 0);
+  const distTotal = distTotalRaw || 1;
   const costTrend = data?.costTrend ?? [];
   const downtime = data?.downtimeByWarehouse ?? [];
   const downtimeByMonth = data?.downtimeScope === "month";
@@ -386,7 +403,7 @@ export default function AdminDashboardPage() {
             <Card className="p-4 flex-1">
               <SectionTitle>Health Distribution</SectionTitle>
               <SectionSub>{distTotal > 1 ? `${distTotal} assets by condition band` : "By condition band"}</SectionSub>
-              {dist.length === 0 ? <EmptyRow>No distribution data.</EmptyRow> : (
+              {dist.length === 0 || distTotalRaw === 0 ? <EmptyRow>No distribution data.</EmptyRow> : (
                 <div className="flex items-center gap-4 mt-3">
                   <div style={{ height: 110, minHeight: 110, width: 110, flexShrink: 0 }}>
                     <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
@@ -521,7 +538,11 @@ export default function AdminDashboardPage() {
                 ))}
               </div>
               {tickets.length === 0 ? <EmptyRow>No tickets found.</EmptyRow> : tickets.map((t) => (
-                <div key={t.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] border-b border-slate-200 dark:border-slate-700 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer">
+                <div
+                  key={t.id}
+                  onClick={() => router.push(`/admin/tickets?ticket_id=${t.ticketId}`)}
+                  className="grid grid-cols-[1fr_auto_auto_auto_auto] border-b border-slate-200 dark:border-slate-700 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer"
+                >
                   <div className="px-4 py-3">
                     <p className="text-[12px] font-semibold">{t.title}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">{t.id}</p>
@@ -548,12 +569,20 @@ export default function AdminDashboardPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-2">
                   <p className="text-[13px] font-semibold">AI Operational Summary</p>
-                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-violet-100 text-violet-700 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/25">
-                    <Zap className="h-2.5 w-2.5" /> XGBoost · BERT · RAG
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/25">
-                    <CheckCircle2 className="h-2.5 w-2.5" /> High confidence
-                  </span>
+                  {data.aiSummaryIsGenerated ? (
+                    <>
+                      <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-violet-100 text-violet-700 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/25">
+                        <Zap className="h-2.5 w-2.5" /> XGBoost · BERT · RAG
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/25">
+                        <CheckCircle2 className="h-2.5 w-2.5" /> High confidence
+                      </span>
+                    </>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-slate-100 text-slate-600 ring-slate-200 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10">
+                      Data summary
+                    </span>
+                  )}
                 </div>
                 <p className="text-[12px] text-muted-foreground leading-relaxed">{data.aiSummary}</p>
               </div>

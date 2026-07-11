@@ -15,7 +15,7 @@ const STATUS_COLOR: Record<string, string> = {
   critical: "#ef4444",
   under_maintenance: "#f59e0b",
   inactive: "#6b7280",
-  retired: "#94a3b8",
+  decommissioned: "#94a3b8",
 };
 
 const HEALTH_COLOR: Record<string, string> = {

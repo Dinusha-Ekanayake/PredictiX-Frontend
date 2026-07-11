@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { Search, Filter, AlertTriangle, CheckCircle, AlertCircle, RefreshCw, XCircle, Loader2, Ticket as TicketIcon, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import {
   fetchTickets,
+  fetchTicketById,
   fetchTicketStatusCounts,
   deleteTicket,
   type Ticket,
@@ -76,6 +78,28 @@ export default function AdminTicketsPage() {
   const [selectedStatus, setSelectedStatus] = React.useState("all");
   const [selectedPriority, setSelectedPriority] = React.useState("all");
   const [users, setUsers] = React.useState<UserItem[]>([]);
+
+  // ── Deep-link support: ?ticket_id=<uuid> (e.g. from the dashboard's
+  // Latest Tickets list, or AssetDetailsPanel's Tickets tab) opens that
+  // ticket's detail dialog directly. Fetched once on mount, independent
+  // of whatever page/filter the paginated list is currently showing.
+  const searchParams = useSearchParams();
+  const deepLinkTicketId = React.useRef(searchParams.get("ticket_id")).current;
+
+  React.useEffect(() => {
+    if (!deepLinkTicketId) return;
+    fetchTicketById(deepLinkTicketId)
+      .then((t) => {
+        setSelectedTicket(t);
+        setDetailOpen(true);
+      })
+      .catch((err) => {
+        toast.error("Couldn't open ticket", {
+          description: err instanceof Error ? err.message : "Ticket not found or not accessible.",
+        });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkTicketId]);
 
   React.useEffect(() => {
     const role = window.localStorage.getItem("predictix.user.role");

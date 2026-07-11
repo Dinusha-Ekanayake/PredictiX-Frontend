@@ -58,7 +58,8 @@ export interface DowntimePoint {
 }
 
 export interface RiskAsset {
-  id: string;
+  id: string; // real asset UUID — use for navigation, not display
+  code: string | null; // human-readable asset code (e.g. "SLW1288")
   name: string;
   location: string;
   healthScore: number; // 0–100

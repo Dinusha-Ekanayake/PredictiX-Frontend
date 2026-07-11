@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
+import { useNavRouter } from "@/components/navigation/useNavRouter";
 import {
   getAdminDashboard,
   type AdminDashboardData,
@@ -113,6 +114,7 @@ function EmptyRow({ children }: { children: React.ReactNode }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminDashboardPage() {
+  const router = useNavRouter();
   const [data, setData] = React.useState<AdminDashboardData | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -439,11 +441,18 @@ export default function AdminDashboardPage() {
           <Card>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-700">
               <div><SectionTitle>Top Risk Assets</SectionTitle><SectionSub>Ranked by AI predicted failure probability</SectionSub></div>
-              <button className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground font-medium">View all<ChevronRight className="h-3.5 w-3.5" /></button>
+              <button
+                onClick={() => router.push("/admin/assets")}
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground font-medium"
+              >View all<ChevronRight className="h-3.5 w-3.5" /></button>
             </div>
             <div>
               {risks.length === 0 ? <EmptyRow>No at-risk assets.</EmptyRow> : risks.map((a, i) => (
-                <div key={a.id} className="flex items-center gap-3 px-5 py-3 border-b border-slate-200 dark:border-slate-700 last:border-0 transition-colors hover:bg-muted/20 cursor-pointer">
+                <div
+                  key={a.id}
+                  onClick={() => router.push(`/admin/assets?asset_id=${a.id}`)}
+                  className="flex items-center gap-3 px-5 py-3 border-b border-slate-200 dark:border-slate-700 last:border-0 transition-colors hover:bg-muted/20 cursor-pointer"
+                >
                   <div className={cn(
                     "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold",
                     i === 0 ? "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400" :

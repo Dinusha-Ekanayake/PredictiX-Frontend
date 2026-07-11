@@ -120,10 +120,13 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
           open && "bg-slate-100/70 dark:bg-white/5"
         )}
       >
-        {/* Name + role text */}
-        <div className="text-right flex flex-col justify-center gap-0.5">
-          <div className="text-sm font-semibold tracking-tight leading-none">{user.name}</div>
-          <div className="text-[11px] text-muted-foreground font-medium leading-none pb-0.5">
+        {/* Name + role text — capped width with ellipsis so long names never
+            wrap and stretch the navbar (full name is visible in the panel) */}
+        <div className="text-right flex flex-col justify-center gap-0.5 min-w-0 max-w-[180px]">
+          <div className="text-sm font-semibold tracking-tight leading-none truncate" title={user.name}>
+            {user.name}
+          </div>
+          <div className="text-[11px] text-muted-foreground font-medium leading-none pb-0.5 truncate">
             {user.role === "SUPER_ADMIN" ? "Super Admin" : user.role === "ADMIN" ? "Administrator" : "User"}
           </div>
         </div>

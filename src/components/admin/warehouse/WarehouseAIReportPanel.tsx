@@ -37,7 +37,7 @@ import {
  * -----------------------
  * Full-report panel rendered inline on the warehouse page.
  * 5 AI sections + comprehensive charts from live PostgreSQL data.
- * No format options — always Full Report.
+ * No format options - always Full Report.
  */
 
 // ── Palette ─────────────────────────────────────────────
@@ -244,7 +244,7 @@ export default function WarehouseAIReportPanel({
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold tracking-tight">AI Warehouse Full Report</h2>
               <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[9px] font-bold text-white uppercase tracking-wide">
-                Llama 3 · RAG
+                AI Analysis
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -291,16 +291,16 @@ export default function WarehouseAIReportPanel({
       {sourcesOpen && ctx.total_assets !== undefined && (
         <div className="rounded-2xl border border-violet-200 dark:border-violet-900 bg-violet-50 dark:bg-violet-950/20 px-5 py-4">
           <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">
-            📊 PostgreSQL Tables Injected into Llama 3 Context
+            📊 Live Data Injected into AI Context
           </h4>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-violet-700 dark:text-violet-300 sm:grid-cols-3">
-            <span>🏭 <strong>assets</strong> — {ctx.total_assets} records</span>
-            <span>📉 <strong>asset_failure_predictions</strong> — health, risk, SHAP</span>
-            <span>💰 <strong>asset_cost_predictions</strong> — cost estimates</span>
-            <span>🔧 <strong>maintenance_events</strong> — {ctx.total_maintenance_events_3m} (90d)</span>
-            <span>🎫 <strong>tickets</strong> — {ctx.total_tickets} records</span>
-            <span>👤 <strong>profiles</strong> — {ctx.total_users} users</span>
-            <span>🧠 <strong>prediction_explanations</strong> — SHAP features</span>
+            <span>🏭 <strong>assets</strong> - {ctx.total_assets} records</span>
+            <span>📉 <strong>asset_failure_predictions</strong> - health, risk, SHAP</span>
+            <span>💰 <strong>asset_cost_predictions</strong> - cost estimates</span>
+            <span>🔧 <strong>maintenance_events</strong> - {ctx.total_maintenance_events_3m} (90d)</span>
+            <span>🎫 <strong>tickets</strong> - {ctx.total_tickets} records</span>
+            <span>👤 <strong>profiles</strong> - {ctx.total_users} users</span>
+            <span>🧠 <strong>prediction_explanations</strong> - SHAP features</span>
             <span>🏢 <strong>warehouses</strong> + <strong>departments</strong></span>
           </div>
         </div>
@@ -315,7 +315,7 @@ export default function WarehouseAIReportPanel({
           </div>
           <p className="mt-4 text-sm font-semibold">Generating AI Report…</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            PostgreSQL → RAG Context Injection → Llama 3 (Meta AI) → Structured Report
+            Live Data → AI Analysis → Structured Report
           </p>
         </div>
       )}
@@ -360,7 +360,7 @@ export default function WarehouseAIReportPanel({
           </div>
 
           {/* ─────────────────────────────── */}
-          {/* SECTION 1 — Executive Summary   */}
+          {/* SECTION 1 - Executive Summary   */}
           {/* ─────────────────────────────── */}
           <div className={SECTION_STYLE}>
             <SectionHeader
@@ -453,7 +453,7 @@ export default function WarehouseAIReportPanel({
           </div>
 
           {/* ─────────────────────────────── */}
-          {/* SECTION 2 — Risk Analysis       */}
+          {/* SECTION 2 - Risk Analysis       */}
           {/* ─────────────────────────────── */}
           <div className={SECTION_STYLE}>
             <SectionHeader
@@ -582,7 +582,7 @@ export default function WarehouseAIReportPanel({
           </div>
 
           {/* ─────────────────────────────────────── */}
-          {/* SECTION 3 — Maintenance Intelligence   */}
+          {/* SECTION 3 - Maintenance Intelligence   */}
           {/* ─────────────────────────────────────── */}
           <div className={SECTION_STYLE}>
             <SectionHeader
@@ -673,7 +673,7 @@ export default function WarehouseAIReportPanel({
           </div>
 
           {/* ─────────────────────────────────────── */}
-          {/* SECTION 4 — Pattern & Trend Analysis   */}
+          {/* SECTION 4 - Pattern & Trend Analysis   */}
           {/* ─────────────────────────────────────── */}
           <div className={SECTION_STYLE}>
             <SectionHeader
@@ -761,13 +761,13 @@ export default function WarehouseAIReportPanel({
           </div>
 
           {/* ─────────────────────────────────────── */}
-          {/* SECTION 5 — 3-Month Conclusion (RAG)   */}
+          {/* SECTION 5 - 3-Month Conclusion (RAG)   */}
           {/* ─────────────────────────────────────── */}
           <div className={`${SECTION_STYLE} border-violet-200 dark:border-violet-800`}>
             <SectionHeader
               icon={FileText} accent={P.indigo} collapsed={s5Collapsed} onToggle={toggleS5}
               title="5. Overall Warehouse Conclusion (Last 3 Months)"
-              subtitle="AI-generated executive summary with top recommendations — powered by full RAG context"
+              subtitle="AI-generated executive summary with top recommendations - powered by full RAG context"
             />
             {!s5Collapsed && (
               <div className="px-6 py-5 space-y-5">

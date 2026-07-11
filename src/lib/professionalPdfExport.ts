@@ -807,7 +807,7 @@ export function generateProfessionalHTML(data: ReportData): string {
     ${kpiGrid4(
       kpiCard('Total Fleet Assets', fmtN(totalAssets), `${fmtN(activeA)} active`, C.teal),
       kpiCard('Fleet Health Score', `${healthFleet}%`, `${healthyPct}% assets ≥80%`, healthFleet >= 70 ? C.green : C.orange),
-      kpiCard('Avg Failure Prob.', `${failProb}%`, 'CatBoost ML model', C.orange),
+      kpiCard('Avg Failure Prob.', `${failProb}%`, 'AI model', C.orange),
       kpiCard('Critical Assets', fmtN(critCount), `${Math.round(critCount / Math.max(totalAssets, 1) * 100)}% of fleet`, C.red),
     )}
     ${kpiGrid4(

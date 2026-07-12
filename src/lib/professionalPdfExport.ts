@@ -701,8 +701,8 @@ export function generateProfessionalHTML(data: ReportData): string {
   // the total so nothing is dropped. Using only the 'corrective' bucket previously
   // hid repair events from the ratio and the KPI card (e.g. 360:1 instead of 360:5).
   const nonPrevCount = Math.max(totalEvents - prevCount, 0);
-  const pmPct        = totalEvents > 0 ? (prevCount / totalEvents * 100) : 99.0;
-  const corrPct      = totalEvents > 0 ? (nonPrevCount / totalEvents * 100) : (100 - pmPct);
+  const pmPct        = totalEvents > 0 ? (prevCount / totalEvents * 100) : 0.0;
+  const corrPct      = totalEvents > 0 ? (nonPrevCount / totalEvents * 100) : 0.0;
   const pmRatio      = nonPrevCount > 0 ? Math.round(prevCount / nonPrevCount) : prevCount;
 
   const openT  = fmt(td.openTickets);
@@ -998,138 +998,37 @@ export function generateProfessionalHTML(data: ReportData): string {
       chartBox('', svgDonut(riskData, 240, 210, 110, 90, 74, 36), 'Figure 3.2 - Risk level distribution')
     )}
     <p style="font-size:8px;color:${C.textLight};font-style:italic;margin:6px 2px 0;">Model risk_level over all ${fmtN(riskTotal)} assets; "Unknown" = not yet risk-scored. This categorical "Critical" is distinct from the health-band Critical (&lt;50%) in §3.1.</p>
+
+    ${ai.risk_analysis ? narrativePara(ai.risk_analysis) : ''}
   </div>`;
   })();
 
-  const section3b = `
+  const section3b = shapSource.length > 0 ? `
   <div class="page">
     ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis (cont.)')}
+    ${subHeader('3.4 SHAP Failure Prediction Drivers')}
+    ${chartBox(
+      'Relative SHAP Feature Importance',
+      svgHBar(
+        shapSource.map(f => ({ name: f.feature, value: f.impact_pct, label: `${f.impact_pct}%` })),
+        640, 28
+      ),
+      'Figure 3.3 - Relative global SHAP importance (mean |SHAP| per feature, normalised to 100%). Shows each driver\'s share of the model\'s output, not a probability decomposition of real-world failure.'
+    )}
+    ${darkTable(
+      ['SHAP Feature', 'Relative Importance', 'Threshold Reference', 'Recommended Action'],
+      shapSource.map(f => [
+        f.feature, `${f.impact_pct}%`, f.kb_threshold, f.action,
+      ])
+    )}
+  </div>` : '';
 
-    ${ai.risk_analysis ? narrativePara(ai.risk_analysis) : ''}
-
-    ${shapSource.length > 0 ? `
-      ${subHeader('3.4 SHAP Failure Prediction Drivers')}
-      ${chartBox(
-        'Relative SHAP Feature Importance',
-        svgHBar(
-          shapSource.map(f => ({ name: f.feature, value: f.impact_pct, label: `${f.impact_pct}%` })),
-          640, 28
-        ),
-        'Figure 3.3 - Relative global SHAP importance (mean |SHAP| per feature, normalised to 100%). Shows each driver\'s share of the model\'s output, not a probability decomposition of real-world failure.'
-      )}
-      ${darkTable(
-        ['SHAP Feature', 'Relative Importance', 'Threshold Reference', 'Recommended Action'],
-        shapSource.map(f => [
-          f.feature, `${f.impact_pct}%`, f.kb_threshold, f.action,
-        ])
-      )}
-    ` : ''}
-  </div>`;
-
-  const section3c = `
-  <div class="page">
-    ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis (cont.)')}
-
-    ${criticalAssets.length > 0 ? `
-      ${subHeader(`3.5 Critical Asset Watch - Top ${criticalAssets.length} by Severity`, C.red)}
-      <p style="font-size:10px;color:${C.textMuted};margin-bottom:8px;">Showing the ${criticalAssets.length} lowest-health assets${critCount > criticalAssets.length ? ` of ${fmtN(critCount)} critical` : ''}, prioritised for immediate intervention:</p>
-      <table style="width:100%;border-collapse:collapse;font-size:9.5px;">
-        <thead>
-          <tr style="background:${C.navy};color:white;">
-            <th style="padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap;">Asset ID</th>
-            <th style="padding:8px 10px;text-align:left;font-weight:700;">Vehicle / Type</th>
-            <th style="padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap;">Health Score</th>
-            <th style="padding:8px 10px;text-align:left;font-weight:700;">Priority</th>
-            <th style="padding:8px 10px;text-align:left;font-weight:700;">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${criticalAssets.map((a, i) => `
-            <tr style="background:${i % 2 === 0 ? C.white : C.offWhite};border-bottom:1px solid ${C.border};">
-              <td style="padding:8px 10px;"><strong style="font-family:monospace;color:${C.red};">${a.id}</strong></td>
-              <td style="padding:8px 10px;">${a.vehicle} <span style="color:${C.textMuted};font-size:8.5px;">· ${a.component}</span></td>
-              <td style="padding:8px 10px;">${healthBadge(a.health)}</td>
-              <td style="padding:8px 10px;"><span style="font-weight:600;color:${a.priority === 'High' ? C.red : C.orange};">${a.priority}</span></td>
-              <td style="padding:8px 10px;">${a.status || '-'}</td>
-            </tr>
-            ${a.summary ? `
-            <tr style="background:${C.violetLight};border-bottom:2px solid ${C.border};">
-              <td colspan="5" style="padding:7px 12px 8px 28px;">
-                <div style="display:flex;align-items:flex-start;gap:6px;">
-                  <span style="color:${C.violet};font-size:9px;font-weight:700;white-space:nowrap;margin-top:1px;">✦ AI Summary</span>
-                  <span style="font-size:9px;color:${C.navyMed};line-height:1.5;">${a.summary}</span>
-                </div>
-              </td>
-            </tr>` : ''}
-          `).join('')}
-        </tbody>
-      </table>
-    ` : ''}
-
-    ${(() => {
-      const ch = od.componentHealth || {};
-      const components = [
-        { label: 'Tire Health',     value: ch.avg_tire     || 0, icon: '⬤' },
-        { label: 'Brake Health',    value: ch.avg_brake    || 0, icon: '⬤' },
-        { label: 'Battery Health',  value: ch.avg_battery  || 0, icon: '⬤' },
-        { label: 'Oil Life',        value: ch.avg_oil      || 0, icon: '⬤' },
-        { label: 'Hydraulic Health',value: ch.avg_hydraulic|| 0, icon: '⬤' },
-      ];
-      const hasData = components.some(c => c.value > 0);
-      if (!hasData) return '';
-      return `
-        ${subHeader('3.6 Component Health Matrix', C.teal)}
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:10px 0;">
-          ${components.map(c => {
-            const color = c.value >= 80 ? C.green : c.value >= 60 ? C.orange : C.red;
-            const barW = Math.round(c.value);
-            return `
-            <div style="background:${C.offWhite};border:1px solid ${C.border};border-radius:8px;padding:12px 10px;text-align:center;">
-              <div style="font-size:7px;font-weight:700;color:${C.textMuted};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">${c.label}</div>
-              <div style="font-size:22px;font-weight:800;color:${color};">${c.value.toFixed(1)}%</div>
-              <div style="margin-top:6px;background:${C.border};border-radius:4px;height:5px;overflow:hidden;">
-                <div style="width:${barW}%;background:${color};height:100%;border-radius:4px;"></div>
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
-        ${(od.totalFaultCodes || 0) > 0 ? `
-        <div style="background:${C.offWhite};border:1px solid ${C.border};border-radius:6px;padding:10px 14px;display:flex;gap:24px;font-size:9px;color:${C.textMuted};">
-          <span><strong style="color:${C.navy};">Fleet Active Fault Codes:</strong> ${od.totalFaultCodes}</span>
-          <span><strong style="color:${C.navy};">Avg per Monitored Asset:</strong> ${od.avgFaultCodesPerAsset}</span>
-          ${(od.monitoredAssets || 0) > 0 ? `<span style="color:${C.textLight};">(component &amp; fault averages over ${fmtN(od.monitoredAssets)} assets with sensor data)</span>` : ''}
-        </div>` : ''}
-      `;
-    })()}
-  </div>`;
+  const section3c = '';
 
   // ── §3 (cont.): FMEA CRITICALITY + CLIMATE RISK ───────────────
   const fmeaRank = kb.fmea_criticality || [];
   const climateRisk = kb.climate_risk || [];
-  const section3d = (fmeaRank.length || climateRisk.length) ? `
-  <div class="page">
-    ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis (cont.)')}
-
-    ${fmeaRank.length ? `
-      ${subHeader('3.7 FMEA Criticality Ranking - Severity × Occurrence', C.red)}
-      <p style="font-size:10px;color:${C.textMuted};margin-bottom:8px;">FMECA-style prioritisation (ABS FMEA Guidance, 2015): criticality = consequence <strong>severity</strong> (1-10, weighted by asset type) × failure <strong>occurrence</strong> (1-10, from the predictive failure signal). The highest scores head the remediation queue - this orders the critical assets above by true risk, not health alone.</p>
-      ${darkTable(
-        ['Asset ID', 'Type', 'Health', 'Severity', 'Occurrence', 'Criticality', 'Action Band'],
-        fmeaRank.map(f => [
-          f.code, f.type, f.health, `${f.severity}/10`, `${f.occurrence}/10`, `${f.criticality}/100`, f.band,
-        ])
-      )}
-    ` : ''}
-
-    ${climateRisk.length ? `
-      ${subHeader('3.8 Colombo Climate Risk Flags', C.blue)}
-      <p style="font-size:10px;color:${C.textMuted};margin-bottom:8px;">Mapped from the Colombo Port (WCT-1) Climate Vulnerability &amp; Adaptation Plan (March 2023) onto live fleet component health - Colombo's rising heat, humidity and rainfall elevate these failure drivers above a temperate baseline.</p>
-      ${lightTable(
-        ['Climate Driver', 'Live Metric', 'Recommended Adaptation'],
-        climateRisk.map(c => [c.driver, c.metric, c.action])
-      )}
-    ` : ''}
-  </div>` : '';
+  const section3d = '';
 
   // ── §4: MAINTENANCE INTELLIGENCE ──────────────────────────────
   const section4a = `
@@ -1144,22 +1043,15 @@ export function generateProfessionalHTML(data: ReportData): string {
       kpiCard('PM : Repair Ratio', `${pmRatio}:1`, 'target >9:1', C.teal),
     )}
 
-    ${subHeader('4.1 Maintenance Type Breakdown')}
-    <div style="background:${C.white};border:1px solid ${C.border};border-radius:8px;padding:18px;margin:10px 0;">
-      ${progressBar('Preventive Maintenance', prevCount, totalEvents, C.green, pmPct)}
-      ${progressBar('Corrective / Repair', nonPrevCount, totalEvents, C.orange, corrPct)}
-      <div style="font-size:8.5px;color:${C.textLight};font-style:italic;text-align:center;margin-top:8px;">Figure 4.1 - PM vs corrective event breakdown for reporting period</div>
-    </div>
-
     ${maintenanceTypes.length > 0 ? `
-      ${subHeader('4.2 Events by Maintenance Type')}
+      ${subHeader('4.1 Events by Maintenance Type')}
       ${lightTable(
         ['Maintenance Type', 'Event Count', '% Total'],
         maintenanceTypes.map(m => [m.name, fmtN(m.value), fmtPct((m.value / Math.max(totalEvents, 1)) * 100)])
       )}
     ` : ''}
 
-    ${subHeader('4.3 Cost & Operational Metrics')}
+    ${subHeader('4.2 Cost & Operational Metrics')}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:12px 0;">
       ${[
         { label: 'Estimated Maintenance Cost',    value: md.estimatedCost || data.summary.maintenanceCost, color: C.teal },
@@ -1188,10 +1080,14 @@ export function generateProfessionalHTML(data: ReportData): string {
     })()}
   </div>`;
 
-  const section4a2 = mainTrend.length > 0 ? `
+  const section4a2 = '';
+
+  const section4b = `
   <div class="page">
     ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
-    ${subHeader(`4.4 Monthly Maintenance Trend${md.reportingPeriod ? ` (${md.reportingPeriod})` : ''}`)}
+
+    ${mainTrend.length > 0 ? `
+    ${subHeader(`4.3 Monthly Maintenance Trend${md.reportingPeriod ? ` (${md.reportingPeriod})` : ''}`)}
 
     ${md.dataConcentrated ? alertBox(
       `<strong>Demonstration-data notice:</strong> the maintenance history is concentrated in a single month, so the month-over-month change below is a <strong>data-loading artifact, not an operational trend</strong> - it must not be read as a change in workload or efficiency. With production data spread across the period this chart will reflect a genuine trend. Monthly figures sum exactly to the §4 headline total.`,
@@ -1202,12 +1098,12 @@ export function generateProfessionalHTML(data: ReportData): string {
       chartBox(
         'Maintenance Event Volume',
         svgLine(mainTrend.map(m => ({ label: m.month.substring(0, 3), value: m.events })), 300, 170, C.teal),
-        'Figure 4.2 - Events per calendar month'
+        'Figure 4.1 - Events per calendar month'
       ),
       chartBox(
         'Maintenance Cost (LKR)',
         svgLine(mainTrend.map(m => ({ label: m.month.substring(0, 3), value: m.cost })), 300, 170, C.violet),
-        'Figure 4.3 - Recorded cost per calendar month'
+        'Figure 4.2 - Recorded cost per calendar month'
       )
     )}
 
@@ -1220,14 +1116,10 @@ export function generateProfessionalHTML(data: ReportData): string {
       `Across the period, maintenance event volume is <strong>${md.eventTrendDirection ?? 'n/a'}</strong> and recorded maintenance cost is <strong>${md.costTrendDirection ?? 'n/a'}</strong>. Maintenance events and support tickets are <em>separate</em> series - ticket volume is reported in §5 and is not interchangeable with event counts.`,
       'benchmark'
     ) : ''}
-  </div>` : '';
-
-  const section4b = `
-  <div class="page">
-    ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
+    ` : ''}
 
     ${(md.vendorBreakdown || []).length > 0 ? `
-      ${subHeader('4.5 Vendor & Service Provider Analysis')}
+      ${subHeader('4.4 Vendor & Service Provider Analysis')}
       ${lightTable(
         ['Service Provider', 'Events', 'Total Cost (LKR)', '% Events'],
         (() => {
@@ -1235,7 +1127,6 @@ export function generateProfessionalHTML(data: ReportData): string {
           const totalEvt = vd.reduce((sum, v) => sum + v.events, 0);
           return vd.map(v => {
             const pctVal = totalEvt > 0 ? (v.events / totalEvt * 100) : 0;
-            // Don't round a genuine entry down to "0.0%" - show "<0.1%" instead.
             const pctStr = pctVal > 0 && pctVal < 0.05 ? '<0.1%' : fmtPct(pctVal);
             return [v.vendor, fmtN(v.events), v.cost.toLocaleString(), pctStr];
           });
@@ -1254,7 +1145,7 @@ export function generateProfessionalHTML(data: ReportData): string {
   ${msch.length > 0 ? `
     <div class="page">
       ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
-      ${subHeader('4.6 Predictive Maintenance Schedule')}
+      ${subHeader('4.5 Predictive Maintenance Schedule')}
       <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 10px;">
         Predicted (ML model) vs Scheduled (fleet avg interval) weeks to next service.
         Assets sorted by urgency gap - negative gap means maintenance is overdue relative to schedule.
@@ -1283,7 +1174,7 @@ export function generateProfessionalHTML(data: ReportData): string {
   const section4c = statutory.length ? `
   <div class="page">
     ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
-    ${subHeader('4.7 Maintenance Compliance Framework')}
+    ${subHeader('4.6 Maintenance Compliance Framework')}
     <p style="font-size:10.5px;color:${C.textMuted};margin-bottom:6px;">Every asset must satisfy three stacked layers - the <strong>strictest applicable trigger binds</strong>: statutory law, then OEM schedules, then ISO 55000/55001 + SMRP predictive standards.</p>
 
     ${subHeader('Layer 1 · Statutory Inspection - Sri Lanka Factories Ordinance No. 45 of 1942', C.red)}
@@ -1315,7 +1206,7 @@ export function generateProfessionalHTML(data: ReportData): string {
   const section4e = (surv && surv.component_summary && surv.component_summary.length) ? `
   <div class="page">
     ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
-    ${subHeader('4.8 FRSO Component Survival Analysis')}
+    ${subHeader('4.7 FRSO Component Survival Analysis')}
     <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 10px;">
       Weibull Accelerated Failure Time (AFT) survival models, scored per component across the
       ${fmtN(surv.assets_analyzed)} highest-risk assets. The bars show each component's average
@@ -1330,7 +1221,8 @@ export function generateProfessionalHTML(data: ReportData): string {
     </div>
     ${(() => {
       const COL: Record<string, string> = { Brake: '#ef4444', Tire: '#f59e0b', Battery: '#10b981', Oil: '#0ea5e9', Hydraulic: '#8b5cf6' };
-      const comps = [...surv.component_summary].sort((a, b) => (b.avg_fail_prob_30d ?? 0) - (a.avg_fail_prob_30d ?? 0));
+      const order = ['tire', 'battery', 'hydraulic', 'oil', 'brake'];
+      const comps = [...surv.component_summary].sort((a, b) => order.indexOf(a.component.toLowerCase()) - order.indexOf(b.component.toLowerCase()));
       const maxP = Math.max(0.05, ...comps.map(c => c.avg_fail_prob_30d ?? 0));
       return `<div style="padding:2px 2px 4px;">${comps.map(c => {
         const p30 = c.avg_fail_prob_30d ?? 0, p7 = c.avg_fail_prob_7d ?? 0;
@@ -1343,22 +1235,42 @@ export function generateProfessionalHTML(data: ReportData): string {
             <div style="position:absolute;top:0;left:0;width:${w7}%;background:${col};height:100%;border-radius:4px;"></div>
           </div>
           <div style="width:172px;font-size:8px;color:${C.textMuted};text-align:right;">
-            30d <b style="color:#0f172a;">${(p30 * 100).toFixed(1)}%</b> · 7d ${(p7 * 100).toFixed(1)}% · ~${c.expected_failures_30d ?? 0} in 30d
+            30d <b style="color:#0f172a;">${(p30 * 100).toFixed(1)}%</b> · 7d ${(p7 * 100).toFixed(1)}%
           </div>
         </div>`;
       }).join('')}
-      <div style="font-size:7.5px;color:${C.textMuted};margin-top:6px;">Solid = 7-day risk, shaded = 30-day risk. "~n in 30d" = expected number of failures across the scored assets.</div>
+      <div style="font-size:7.5px;color:${C.textMuted};margin-top:6px;">Solid = 7-day risk, shaded = 30-day risk.</div>
+      </div>
+      
+      <div style="margin-top:20px;margin-bottom:6px;">
+        <div style="font-size:10px;font-weight:700;color:${C.navy};text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;border-bottom:1px solid ${C.border};padding-bottom:4px;">At-Risk Component Counts</div>
+        ${lightTable(
+          ['Component', 'Failing in 7 Days', 'Failing in 30 Days'],
+          comps.map(c => [
+            `<span style="font-weight:600;color:${COL[c.component] || '#333'};">${c.component}</span>`, 
+            String(c.at_risk_7d ?? 0), 
+            String(c.at_risk_30d ?? 0)
+          ])
+        )}
       </div>`;
     })()}
     ${(surv.watchlist && surv.watchlist.length) ? `
-      ${subHeader('Soonest-Failing Watchlist', C.red)}
+      ${subHeader('Soonest-Failing Watchlist (1-10)', C.red)}
       <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 8px;">
         Each asset's soonest-failing component, sorted by predicted median RUL - prioritise these for inspection.
       </p>
       ${lightTable(
         ['Asset', 'Component', 'Median RUL (days)', 'Risk'],
-        surv.watchlist.map(w => [w.asset, w.component, w.rul_days == null ? '-' : w.rul_days.toLocaleString(), w.risk])
+        surv.watchlist.slice(0, 10).map(w => [w.asset, w.component, w.rul_days == null ? '-' : w.rul_days.toLocaleString(), w.risk])
       )}
+  </div>
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
+    ${subHeader('Soonest-Failing Watchlist (11+)', C.red)}
+    ${lightTable(
+      ['Asset', 'Component', 'Median RUL (days)', 'Risk'],
+      surv.watchlist.slice(10).map(w => [w.asset, w.component, w.rul_days == null ? '-' : w.rul_days.toLocaleString(), w.risk])
+    )}
     ` : ''}
     ${alertBox(
       `FRSO survival modelling flags component-level degradation ahead of scheduled service. Where median RUL is below the statutory/OEM service interval, bring the inspection forward - survival-driven scheduling is the recommended override over fixed-interval PM.`,

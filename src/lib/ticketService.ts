@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseBrowserClient";
-import { apiPost, apiGet, apiDelete, apiFetch } from "./apiClient";
+import { apiPost, apiGet, apiPut, apiDelete, apiFetch } from "./apiClient";
 
 // ─── FastAPI-backed ticket preview (calls POST /tickets/preview) ──────────────
 
@@ -195,47 +195,39 @@ export async function createTicket(payload: {
   return mapRow(data);
 }
 
+export async function fetchTicketById(id: string): Promise<Ticket> {
+  const row = await apiGet<any>(`/tickets/${id}`);
+  return mapRow(row);
+}
+
 export async function fetchTicketStatusCounts(): Promise<Record<string, number>> {
   return apiGet<Record<string, number>>("/tickets/status-counts");
 }
 
+// These four previously wrote/deleted directly via the Supabase client,
+// relying on RLS to enforce that only an admin can change/delete a ticket
+// that isn't theirs. The real tickets_update_creator_assignee_or_admin and
+// tickets_delete policies both have qual = 'true' (no actual restriction),
+// so that path let ANY authenticated user update or delete ANY ticket in
+// the system. Routed through the backend's PUT/DELETE /tickets/{id}
+// instead, which correctly enforces is_admin_role()/require_admin
+// server-side and also logs the status-transition history the direct
+// Supabase path silently skipped.
+
 export async function updateTicketStatus(id: string, status: TicketStatus): Promise<void> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const updates: Record<string, string> = {
-    status: dbStatus(status),
-    updated_at: new Date().toISOString(),
-  };
-  if (status === "resolved") updates.resolved_at = new Date().toISOString();
-  if (status === "closed") updates.closed_at = new Date().toISOString();
-  if (status === "in-progress") updates.reviewed_at = new Date().toISOString();
-
-  const { error } = await supabase.from("tickets").update(updates).eq("id", id);
-  if (error) throw error;
+  await apiPut(`/tickets/${id}`, { status: dbStatus(status) });
 }
 
 export async function updateTicketPriority(id: string, priority: TicketPriority): Promise<void> {
-  if (!supabase) throw new Error("Supabase not configured");
-  const { error } = await supabase
-    .from("tickets")
-    .update({ priority: dbPriority(priority), updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
+  await apiPut(`/tickets/${id}`, { priority: dbPriority(priority) });
 }
 
 export async function updateTicketAssignee(id: string, assignedTo: string | null): Promise<void> {
-  if (!supabase) throw new Error("Supabase not configured");
-  const { error } = await supabase
-    .from("tickets")
-    .update({ assigned_to: assignedTo, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
+  await apiPut(`/tickets/${id}`, { assigned_to: assignedTo });
 }
 
 export async function deleteTicket(id: string): Promise<void> {
-  if (!supabase) throw new Error("Supabase not configured");
-  const { error } = await supabase.from("tickets").delete().eq("id", id);
-  if (error) throw error;
+  await apiDelete(`/tickets/${id}`);
 }
 
 export async function addTicketAttachment(

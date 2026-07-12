@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/apiClient";
 
 type Props = {
   assetId: string;
@@ -50,25 +51,10 @@ export default function SendServiceReminderButton({
   async function handleSend() {
     setLoading(true);
     try {
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("access_token") ?? localStorage.getItem("token")
-          : null;
-
-      const baseUrl =
-        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-      const res = await fetch(
-        `${baseUrl}/assets/${assetId}/send-service-reminder`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ note: note.trim() || null }),
-        }
-      );
+      const res = await apiFetch(`/assets/${assetId}/send-service-reminder`, {
+        method: "POST",
+        body: JSON.stringify({ note: note.trim() || null }),
+      });
 
       const body = await res.json().catch(() => ({}));
 

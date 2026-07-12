@@ -37,16 +37,20 @@ function fmtCost(n: number | null | undefined, currency = "LKR"): string {
 }
 
 /* ── Status pill ─────────────────────────────────────────────────────────────── */
+// Real asset_status enum: active | inactive | under_maintenance | critical |
+// decommissioned. "maintenance"/"in_maintenance"/"retired" are not real
+// values — those keys never matched, so under_maintenance/critical/
+// decommissioned assets fell through to the generic gray fallback.
 const STATUS_BG: Record<string, string> = {
-  active:       "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
-  maintenance:  "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
-  in_maintenance:"bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
-  inactive:     "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
-  retired:      "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
+  active:            "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
+  under_maintenance: "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  critical:          "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20",
+  inactive:          "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
+  decommissioned:    "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
 };
 const STATUS_DOT: Record<string, string> = {
-  active: "bg-emerald-500", maintenance: "bg-amber-500",
-  in_maintenance: "bg-amber-500", inactive: "bg-slate-400", retired: "bg-slate-400",
+  active: "bg-emerald-500", under_maintenance: "bg-amber-500", critical: "bg-red-500",
+  inactive: "bg-slate-400", decommissioned: "bg-slate-400",
 };
 
 function StatusPill({ status }: { status: string }) {

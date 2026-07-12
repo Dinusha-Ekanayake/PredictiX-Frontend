@@ -14,7 +14,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { supabase } from "@/lib/supabaseBrowserClient";
+import { apiGet } from "@/lib/apiClient";
 import { BarChart3, PieChart as PieChartIcon } from "lucide-react";
 
 type TicketData = {
@@ -42,23 +42,18 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   useEffect(() => {
     async function fetchAllWarehouseTickets() {
       try {
-        if (!supabase) return;
-        // Fetch all tickets. RLS policies on the database should filter this
-        // down to only tickets the admin is allowed to see (their warehouse).
-        const { data: tickets, error } = await supabase
-          .from("tickets")
-          .select("id, priority, final_category, predicted_category");
-
-        if (error) {
-          console.error("Failed to fetch tickets for charts:", error);
-          return;
-        }
-
-        if (tickets) {
-          setData(tickets);
-        }
+        // Goes through the backend's GET /tickets/, which is warehouse- and
+        // role-scoped server-side (admins see their warehouse, regular
+        // users see only their own tickets) — a prior direct Supabase
+        // client call here relied on RLS to enforce that scoping, but the
+        // real tickets_select_authenticated policy grants read access to
+        // EVERY authenticated user for EVERY ticket (qual = true, no
+        // warehouse/ownership filter), so it was silently fleet-wide,
+        // cross-warehouse for every admin viewing this dashboard.
+        const tickets = await apiGet<TicketData[]>("/tickets/?limit=500");
+        setData(tickets ?? []);
       } catch (err) {
-        console.error("Error in fetchAllWarehouseTickets:", err);
+        console.error("Error fetching tickets for charts:", err);
       } finally {
         setLoading(false);
       }

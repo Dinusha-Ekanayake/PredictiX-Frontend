@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-
 import {
   Loader2,
   UserCheck,
@@ -29,9 +28,15 @@ import {
   Shield,
   Building2,
   ShieldCheck,
-  UserPen,
+  UserCog,
 } from "lucide-react";
-import type { UserItem, UserRole, UserStatus } from "@/lib/userService";
+
+import type {
+  UserItem,
+  UserRole,
+  UserStatus,
+  CreateUserPayload,
+} from "@/lib/userService";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,9 +45,6 @@ import type { UserItem, UserRole, UserStatus } from "@/lib/userService";
 type FormErrors = {
   firstName?: string;
   lastName?: string;
-  address?: string;
-  contactNumber?: string;
-  warehouse?: string;
   email?: string;
   role?: string;
   department?: string;
@@ -53,20 +55,11 @@ type Props = {
   user: UserItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUserUpdated: (userId: string, updatedFields: Partial<UserItem>) => Promise<void>;
+  onUserUpdated: (
+    userId: string,
+    updatedFields: Partial<CreateUserPayload>
+  ) => Promise<void>;
 };
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const DEPARTMENTS = [
-  "Administrative",
-  "Mechanical",
-  "Electrical",
-  "IT",
-  "Maintenance",
-] as const;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,10 +68,6 @@ const DEPARTMENTS = [
 function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
-
-// ---------------------------------------------------------------------------
-// Sub-component: form field inside a styled card
-// ---------------------------------------------------------------------------
 
 function FieldCard({
   icon: Icon,
@@ -97,14 +86,15 @@ function FieldCard({
     <div className="rounded-xl bg-muted/50 px-4 py-3.5">
       <div className="flex items-center gap-3 pb-2">
         <Icon className="h-5 w-5 shrink-0 text-muted-foreground" />
-        <Label htmlFor={htmlFor} className="text-sm font-normal text-muted-foreground">
+        <Label
+          htmlFor={htmlFor}
+          className="text-sm font-normal text-muted-foreground"
+        >
           {label}
         </Label>
       </div>
       {children}
-      {error && (
-        <p className="mt-1.5 text-xs text-destructive">{error}</p>
-      )}
+      {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
     </div>
   );
 }
@@ -131,6 +121,7 @@ export default function EditUserDialog({
   const [errors, setErrors] = React.useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  // Populate fields when dialog opens
   React.useEffect(() => {
     if (open && user) {
       setFirstName(user.firstName || "");
@@ -152,10 +143,8 @@ export default function EditUserDialog({
     if (!firstName.trim()) errs.firstName = "First name is required.";
     if (!lastName.trim()) errs.lastName = "Last name is required.";
     if (!email.trim()) errs.email = "Email is required.";
-    else if (!validateEmail(email.trim())) errs.email = "Please enter a valid email address.";
-    if (!address.trim()) errs.address = "Residence address is required.";
-    if (!contactNumber.trim()) errs.contactNumber = "Contact number is required.";
-    if (!warehouse) errs.warehouse = "Please select a warehouse.";
+    else if (!validateEmail(email.trim()))
+      errs.email = "Please enter a valid email address.";
     if (!role) errs.role = "Please select a role.";
     if (!department) errs.department = "Please select a department.";
     if (!status) errs.status = "Please select a status.";
@@ -165,26 +154,24 @@ export default function EditUserDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
-    
+
     const formErrors = validate();
     setErrors(formErrors);
-
     if (Object.keys(formErrors).length > 0) {
       toast.error("Please fix the errors in the form.");
       return;
     }
 
     setIsSubmitting(true);
-
     try {
       await onUserUpdated(user.id, {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         name: `${firstName.trim()} ${lastName.trim()}`,
+        email: email.trim().toLowerCase(),
         address: address.trim(),
         contactNumber: contactNumber.trim(),
         warehouse,
-        email: email.trim().toLowerCase(),
         role: role as UserRole,
         department,
         status: status as UserStatus,
@@ -192,7 +179,8 @@ export default function EditUserDialog({
       onOpenChange(false);
     } catch (err) {
       toast.error("Failed to update user", {
-        description: err instanceof Error ? err.message : "Unknown error occurred",
+        description:
+          err instanceof Error ? err.message : "Unknown error occurred",
       });
     } finally {
       setIsSubmitting(false);
@@ -204,24 +192,34 @@ export default function EditUserDialog({
       <DialogContent className="sm:max-w-[480px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <UserPen className="h-5 w-5" />
-            Edit User
+            <UserCog className="h-5 w-5" />
+            Edit user
           </DialogTitle>
           <DialogDescription>
-            Update the details for this user below.
+            Update the details for{" "}
+            {user
+              ? `${user.firstName} ${user.lastName}`.trim() || user.email
+              : "this user"}{" "}
+            below.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid gap-3 pt-1">
           {/* First Name */}
-          <FieldCard icon={User} label="First Name" htmlFor="edit-user-first-name" error={errors.firstName}>
+          <FieldCard
+            icon={User}
+            label="First Name"
+            htmlFor="edit-first-name"
+            error={errors.firstName}
+          >
             <Input
-              id="edit-user-first-name"
+              id="edit-first-name"
               placeholder="e.g. Jane"
               value={firstName}
               onChange={(e) => {
                 setFirstName(e.target.value);
-                if (errors.firstName) setErrors((p) => ({ ...p, firstName: undefined }));
+                if (errors.firstName)
+                  setErrors((p) => ({ ...p, firstName: undefined }));
               }}
               aria-invalid={!!errors.firstName}
               className="bg-background"
@@ -229,14 +227,20 @@ export default function EditUserDialog({
           </FieldCard>
 
           {/* Last Name */}
-          <FieldCard icon={User} label="Last Name" htmlFor="edit-user-last-name" error={errors.lastName}>
+          <FieldCard
+            icon={User}
+            label="Last Name"
+            htmlFor="edit-last-name"
+            error={errors.lastName}
+          >
             <Input
-              id="edit-user-last-name"
+              id="edit-last-name"
               placeholder="e.g. Cooper"
               value={lastName}
               onChange={(e) => {
                 setLastName(e.target.value);
-                if (errors.lastName) setErrors((p) => ({ ...p, lastName: undefined }));
+                if (errors.lastName)
+                  setErrors((p) => ({ ...p, lastName: undefined }));
               }}
               aria-invalid={!!errors.lastName}
               className="bg-background"
@@ -244,32 +248,48 @@ export default function EditUserDialog({
           </FieldCard>
 
           {/* Email */}
-          <FieldCard icon={Mail} label="Email Address" htmlFor="edit-user-email" error={errors.email}>
+          <FieldCard
+            icon={Mail}
+            label="Email Address"
+            htmlFor="edit-email"
+            error={errors.email}
+          >
             <Input
-              id="edit-user-email"
+              id="edit-email"
               type="email"
               placeholder="e.g. jane.cooper@warehouse.com"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
-                if (errors.email) setErrors((p) => ({ ...p, email: undefined }));
+                if (errors.email)
+                  setErrors((p) => ({ ...p, email: undefined }));
               }}
               aria-invalid={!!errors.email}
               className="bg-background"
             />
           </FieldCard>
 
-          {/* Role & Status side by side */}
+          {/* Role & Status */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <FieldCard icon={Shield} label="Role" htmlFor="edit-user-role" error={errors.role}>
+            <FieldCard
+              icon={Shield}
+              label="Role"
+              htmlFor="edit-role"
+              error={errors.role}
+            >
               <Select
                 value={role}
                 onValueChange={(v) => {
                   setRole(v as UserRole);
-                  if (errors.role) setErrors((p) => ({ ...p, role: undefined }));
+                  if (errors.role)
+                    setErrors((p) => ({ ...p, role: undefined }));
                 }}
               >
-                <SelectTrigger id="edit-user-role" aria-invalid={!!errors.role} className="w-full bg-background">
+                <SelectTrigger
+                  id="edit-role"
+                  aria-invalid={!!errors.role}
+                  className="w-full bg-background"
+                >
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -279,15 +299,25 @@ export default function EditUserDialog({
               </Select>
             </FieldCard>
 
-            <FieldCard icon={ShieldCheck} label="Status" htmlFor="edit-user-status" error={errors.status}>
+            <FieldCard
+              icon={ShieldCheck}
+              label="Status"
+              htmlFor="edit-status"
+              error={errors.status}
+            >
               <Select
                 value={status}
                 onValueChange={(v) => {
                   setStatus(v as UserStatus);
-                  if (errors.status) setErrors((p) => ({ ...p, status: undefined }));
+                  if (errors.status)
+                    setErrors((p) => ({ ...p, status: undefined }));
                 }}
               >
-                <SelectTrigger id="edit-user-status" aria-invalid={!!errors.status} className="w-full bg-background">
+                <SelectTrigger
+                  id="edit-status"
+                  aria-invalid={!!errors.status}
+                  className="w-full bg-background"
+                >
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -299,79 +329,107 @@ export default function EditUserDialog({
           </div>
 
           {/* Department */}
-          <FieldCard icon={Building2} label="Department" htmlFor="edit-user-department" error={errors.department}>
+          <FieldCard
+            icon={Building2}
+            label="Department"
+            htmlFor="edit-department"
+            error={errors.department}
+          >
             <Select
               value={department}
               onValueChange={(v) => {
                 setDepartment(v);
-                if (errors.department) setErrors((p) => ({ ...p, department: undefined }));
+                if (errors.department)
+                  setErrors((p) => ({ ...p, department: undefined }));
               }}
             >
-              <SelectTrigger id="edit-user-department" aria-invalid={!!errors.department} className="w-full bg-background">
+              <SelectTrigger
+                id="edit-department"
+                aria-invalid={!!errors.department}
+                className="w-full bg-background"
+              >
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
-                {DEPARTMENTS.map((d) => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
-                ))}
+                <SelectItem value="Transportation">Transportation</SelectItem>
+                <SelectItem value="Electrical">Electrical</SelectItem>
+                <SelectItem value="Mechanical">Mechanical</SelectItem>
+                <SelectItem value="Software">Software</SelectItem>
+                <SelectItem value="Admin">Admin</SelectItem>
+                <SelectItem value="Administrative">Administrative</SelectItem>
+                <SelectItem value="IT">IT</SelectItem>
+                <SelectItem value="Maintenance">Maintenance</SelectItem>
               </SelectContent>
             </Select>
           </FieldCard>
 
           {/* Residence Address */}
-          <FieldCard icon={Building2} label="Residence Address" htmlFor="edit-user-address" error={errors.address}>
+          <FieldCard
+            icon={Building2}
+            label="Residence Address"
+            htmlFor="edit-address"
+          >
             <Input
-              id="edit-user-address"
+              id="edit-address"
               placeholder="e.g. No. 10, Example Road, Colombo"
               value={address}
-              onChange={(e) => {
-                setAddress(e.target.value);
-                if (errors.address) setErrors((p) => ({ ...p, address: undefined }));
-              }}
-              aria-invalid={!!errors.address}
+              onChange={(e) => setAddress(e.target.value)}
               className="bg-background"
             />
           </FieldCard>
 
           {/* Contact Number */}
-          <FieldCard icon={ShieldCheck} label="Contact Number" htmlFor="edit-user-contact" error={errors.contactNumber}>
+          <FieldCard
+            icon={ShieldCheck}
+            label="Contact Number"
+            htmlFor="edit-contact"
+          >
             <Input
-              id="edit-user-contact"
+              id="edit-contact"
               type="tel"
               placeholder="e.g. 0712345678"
               value={contactNumber}
-              onChange={(e) => {
-                setContactNumber(e.target.value);
-                if (errors.contactNumber)
-                  setErrors((p) => ({ ...p, contactNumber: undefined }));
-              }}
-              aria-invalid={!!errors.contactNumber}
+              onChange={(e) => setContactNumber(e.target.value)}
               className="bg-background"
             />
           </FieldCard>
 
-          {/* Warehouse Name */}
-          <FieldCard icon={Building2} label="Warehouse" htmlFor="edit-user-warehouse" error={errors.warehouse}>
+          {/* Warehouse */}
+          <FieldCard
+            icon={Building2}
+            label="Warehouse"
+            htmlFor="edit-warehouse"
+          >
             <Select
               value={warehouse}
-              onValueChange={(v) => {
-                setWarehouse(v);
-                if (errors.warehouse) setErrors((p) => ({ ...p, warehouse: undefined }));
-              }}
+              onValueChange={(v) => setWarehouse(v)}
             >
-              <SelectTrigger id="edit-user-warehouse" aria-invalid={!!errors.warehouse} className="w-full bg-background">
+              <SelectTrigger
+                id="edit-warehouse"
+                className="w-full bg-background"
+              >
                 <SelectValue placeholder="Select warehouse" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Main Branch - Colombo">Main Branch - Colombo</SelectItem>
+                <SelectItem value="LankaLogix - Colombo">
+                  LankaLogix - Colombo
+                </SelectItem>
+                <SelectItem value="Main Branch - Colombo">
+                  Main Branch - Colombo
+                </SelectItem>
                 <SelectItem value="Galle">Galle</SelectItem>
+                <SelectItem value="Not assigned">Not assigned</SelectItem>
               </SelectContent>
             </Select>
           </FieldCard>
 
-          {/* Action buttons */}
+          {/* Buttons */}
           <div className="grid grid-cols-2 gap-3 pt-1">
-            <Button type="submit" disabled={isSubmitting} className="w-full">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full"
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -380,7 +438,7 @@ export default function EditUserDialog({
               ) : (
                 <>
                   <UserCheck className="mr-2 h-4 w-4" />
-                  Save Changes
+                  Save changes
                 </>
               )}
             </Button>

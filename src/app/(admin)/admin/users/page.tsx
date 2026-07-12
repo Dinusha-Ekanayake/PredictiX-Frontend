@@ -152,7 +152,7 @@ function DonutChart({ data, title }: { data: ChartEntry[]; title: string }) {
       </CardHeader>
       <CardContent className="flex items-center gap-6">
         <div className="h-[120px] w-[120px] shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <PieChart>
               <Pie
                 data={data.map((d) => ({ name: d.label, value: d.value }))}
@@ -168,7 +168,7 @@ function DonutChart({ data, title }: { data: ChartEntry[]; title: string }) {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number, name: string) => [value, name]}
+                formatter={(value: any, name: any) => [value, name]}
                 contentStyle={{
                   background: "var(--background)",
                   border: "1px solid var(--border)",

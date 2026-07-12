@@ -117,11 +117,14 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         // old on-demand /predictions/failure|cost endpoints are no longer
         // the asset detail page's data source and are not queried here.
         const [
-          batchPredRes,
+          batchPredRes, costPredRes,
           maintRes, ticketRes, sensorRes,
           warehouseRes, deptRes, assetListRes,
         ] = await Promise.all([
           authFetch(`${API_URL}/batch-predictions/${assetId}`).catch(() => null),
+          // breakdown-cost-v4.0 — separate endpoint, flat response shape
+          // (top_drivers with relative_impact/direction — see Step 7b below)
+          authFetch(`${API_URL}/predictions/cost/${assetId}`).catch(() => null),
           authFetch(`${API_URL}/maintenance?asset_id=${assetId}&limit=50`).catch(() => null),
           authFetch(`${API_URL}/tickets?asset_id=${assetId}&limit=20`).catch(() => null),
           authFetch(`${API_URL}/sensor-readings?asset_id=${assetId}&limit=1`).catch(() => null),
@@ -137,6 +140,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
 
         // ── Step 3: parse all responses ────────────────────────
         const batchPred   = await safeJson(batchPredRes);
+        const costPred    = await safeJson(costPredRes);
         const maintList   = await safeJson(maintRes) ?? [];
         const ticketList  = await safeJson(ticketRes) ?? [];
         const sensorList  = await safeJson(sensorRes) ?? [];
@@ -183,9 +187,55 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const risk_level       = latestPred?.risk_level       ?? undefined;
         const days_until_maint = latestPred?.predicted_days_until_maintenance ?? null;
         const pred_maint_date  = latestPred?.predicted_maintenance_date ?? null;
-        const top_explanations = latestPred?.top_explanations ?? undefined;
+        // top_explanations comes from reg_model.shap_top_factors() in
+        // batch_prediction_service.py. That function's exact return shape
+        // wasn't available to confirm, so this normalizes defensively:
+        // it may arrive as a flat {feature: value} map (old assumption) or —
+        // more likely, matching the list-of-dicts pattern used elsewhere in
+        // that file (e.g. contributing_factors: [{feature, impact}]) — as an
+        // array of objects. Common magnitude key names are all checked.
+        const rawTopExpl = latestPred?.top_explanations;
+        let top_explanations: Record<string, number> | undefined;
+        if (Array.isArray(rawTopExpl)) {
+          top_explanations = rawTopExpl.reduce((acc: Record<string, number>, item: any) => {
+            const name = item?.feature ?? item?.name;
+            const mag = item?.shap_value ?? item?.impact ?? item?.importance ?? item?.contribution ?? item?.value;
+            if (name != null && mag != null && !isNaN(Number(mag))) acc[String(name)] = Number(mag);
+            return acc;
+          }, {});
+          if (Object.keys(top_explanations).length === 0) top_explanations = undefined;
+        } else if (rawTopExpl && typeof rawTopExpl === "object") {
+          top_explanations = rawTopExpl as Record<string, number>;
+        }
 
         const est_cost = latestPred?.estimated_cost_lkr ?? undefined;
+        // /batch-predictions/{id} already carries these — unused until now,
+        // used as the fallback for cost_lower/cost_upper below.
+        const batch_min_cost = latestPred?.min_cost_lkr != null ? Number(latestPred.min_cost_lkr) : undefined;
+        const batch_max_cost = latestPred?.max_cost_lkr != null ? Number(latestPred.max_cost_lkr) : undefined;
+
+        // ── Step 7b: breakdown-cost-v4.0 — GET /predictions/cost/{asset_id} ──
+        // Response shape is FLAT — matches predict_breakdown_cost()'s actual
+        // return dict (app/ai/models/cost_estimation_model/breakdown_cost_model.py)
+        // exactly. There is NO extra_data wrapper and NO confidence_lower/upper —
+        // those only existed in the v4 docs' aspirational sample response, not
+        // in the real code. top_drivers carries relative_impact (0-100%, share
+        // of total |SHAP|) + direction — never a raw LKR shap value, and sv_log
+        // is log1p-space and intentionally not returned for display.
+        const cost_estimate      = costPred?.predicted_cost_lkr != null ? Number(costPred.predicted_cost_lkr) : est_cost;
+        const cost_lower         = costPred?.pi_80_lower_lkr    != null ? Number(costPred.pi_80_lower_lkr)    : batch_min_cost;
+        const cost_upper         = costPred?.pi_80_upper_lkr    != null ? Number(costPred.pi_80_upper_lkr)    : batch_max_cost;
+        const cost_model_version = costPred?.model_version ?? undefined;
+        const fleet_avg_cost     = costPred?.fleet_mean_lkr     != null ? Number(costPred.fleet_mean_lkr)     : undefined;
+        const cost_net_shap      = costPred?.vs_fleet_mean_lkr  != null ? Number(costPred.vs_fleet_mean_lkr)  : undefined;
+        const cost_drivers = Array.isArray(costPred?.top_drivers)
+          ? costPred.top_drivers.map((d: any) => ({
+              feature: String(d.feature ?? "—"),
+              value: String(d.value ?? "—"),
+              relative_impact: Number(d.relative_impact ?? 0),
+              direction: d.direction === "increases" ? "increases" as const : "decreases" as const,
+            }))
+          : [];
 
         // ── Step 8: fleet data ─────────────────────────────────
         const kpis      = fleet.kpis ?? {};
@@ -195,7 +245,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         // ── Step 9: AI insights from prediction ────────────────
         const hasPred = latestPred != null;
         const executiveSummary = hasPred
-          ? `${asset.asset_name} shows a health score of ${health_score ?? "—"}% with a failure probability of ${failure_prob ?? "—"}%. Risk level is classified as ${risk_level ?? "unknown"}. ${days_until_maint != null ? `Maintenance is predicted in ${days_until_maint} days.` : ""} ${est_cost ? `Estimated maintenance cost: LKR ${Number(est_cost).toLocaleString()}.` : ""}`
+          ? `${asset.asset_name} shows a health score of ${health_score ?? "—"}% with a failure probability of ${failure_prob ?? "—"}%. Risk level is classified as ${risk_level ?? "unknown"}. ${days_until_maint != null ? `Maintenance is predicted in ${days_until_maint} days.` : ""} ${cost_estimate ? `Estimated maintenance cost: LKR ${Number(cost_estimate).toLocaleString()}.` : ""}`
           : `${asset.asset_name} (${asset.asset_code}) is currently ${asset.status ?? "active"} with a health band of ${asset.health_band ?? "unknown"}. No AI prediction has been run for this asset yet. Use the Run AI feature to generate predictive maintenance insights.`;
 
         const criticalRecs: string[] = [];
@@ -215,7 +265,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         if (highPri.length > 0)      criticalRecs.push(`${highPri.length} high-priority ticket(s) require immediate attention.`);
 
         const conclusion = hasPred
-          ? `${asset.asset_name} ${(health_score ?? 100) < 60 ? "requires urgent maintenance intervention" : (health_score ?? 100) < 80 ? "should be scheduled for preventive maintenance" : "is within acceptable operating parameters"}. ${pred_maint_date ? `Next maintenance predicted: ${pred_maint_date.slice(0,10)}.` : ""} ${est_cost ? `Estimated cost: LKR ${Number(est_cost).toLocaleString()}.` : ""} Regular monitoring and timely maintenance will help maximise asset lifespan and minimise downtime.`
+          ? `${asset.asset_name} ${(health_score ?? 100) < 60 ? "requires urgent maintenance intervention" : (health_score ?? 100) < 80 ? "should be scheduled for preventive maintenance" : "is within acceptable operating parameters"}. ${pred_maint_date ? `Next maintenance predicted: ${pred_maint_date.slice(0,10)}.` : ""} ${cost_estimate ? `Estimated cost: LKR ${Number(cost_estimate).toLocaleString()}.` : ""} Regular monitoring and timely maintenance will help maximise asset lifespan and minimise downtime.`
           : `Run the AI Prediction engine on this asset to generate comprehensive health scores, failure probabilities, and maintenance cost estimates. Regular monitoring and logging of maintenance events will improve prediction accuracy.`;
 
         // ── Step 10: build final report data ──────────────────
@@ -234,7 +284,13 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
           risk_level,
           days_until_maintenance: days_until_maint,
           predicted_maintenance_date: pred_maint_date,
-          estimated_cost: est_cost ? Number(est_cost) : undefined,
+          estimated_cost: cost_estimate != null ? Number(cost_estimate) : undefined,
+          cost_lower,
+          cost_upper,
+          cost_net_shap,
+          fleet_avg_cost,
+          cost_model_version,
+          cost_drivers,
           currency: "LKR",
           top_explanations,
           sensor: sensor ?? undefined,
@@ -294,7 +350,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
     setGenerating(true);
     try {
       downloadAssetPDF(reportData, `Asset_Report_${reportData.assetCode}.pdf`);
-      toast.success("Report opened — choose 'Save as PDF' in the print dialog");
+      toast.success("Report opened — choose 'Save as PDF', and turn off 'Headers and footers' in More settings for a clean export");
     } catch (e: any) {
       toast.error("Failed to generate report", { description: e.message });
     } finally {

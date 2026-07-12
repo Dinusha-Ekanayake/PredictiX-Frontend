@@ -78,7 +78,7 @@ const COMPONENT_ICON: Record<string, React.ComponentType<{ className?: string }>
 };
 
 // Fixed component order + colour for the risk bar charts.
-const COMPONENTS = ["brake", "tire", "battery", "oil", "hydraulic"] as const;
+const COMPONENTS = ["tire", "battery", "hydraulic", "oil", "brake"] as const;
 const COMPONENT_COLOR: Record<string, string> = {
   Brake: "#ef4444",
   Tire: "#f59e0b",
@@ -230,9 +230,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
   const riskBand = riskIndex >= 60 ? rulBand(20) : riskIndex >= 30 ? rulBand(60) : rulBand(120);
 
   const stats = [
-    { label: "Assets Analyzed", value: assets_analyzed, sub: `over ${horizon_days}-day horizon`, icon: Activity, tint: "text-sky-500" },
     { label: "Critical (<30d)", value: totalAtRisk30, sub: "component RULs expiring", icon: AlertTriangle, tint: "text-rose-500" },
-    { label: "High-Risk Assets", value: highRiskCount, sub: "on the watchlist", icon: ShieldAlert, tint: "text-amber-500" },
     { label: "Most Urgent", value: mostUrgent?.component ?? "—", sub: mostUrgent ? `avg ${fmtRul(mostUrgent.avg_rul_days)} RUL` : "no data", icon: TrendingDown, tint: "text-fuchsia-500" },
   ];
 
@@ -265,7 +263,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
 
       <CardContent className="space-y-6 pt-6">
         {/* ── Headline stat tiles ── */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
           {stats.map(({ label, value, sub, icon: Icon, tint }) => (
             <div
               key={label}
@@ -279,25 +277,6 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
               <div className="text-[11px] text-muted-foreground mt-0.5">{sub}</div>
             </div>
           ))}
-        </div>
-
-        {/* ── Fleet Risk Index gauge bar ── */}
-        <div className="rounded-xl border border-slate-100 dark:border-slate-800 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-teal-500" /> Fleet Survival Risk Index
-            </span>
-            <span className="text-sm font-bold" style={{ color: riskBand.text }}>{riskIndex}%</span>
-          </div>
-          <div className="h-2.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${riskIndex}%`, backgroundColor: riskBand.bar }}
-            />
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Share of scored components with median RUL under 30 days. Higher means more of the fleet needs near-term intervention.
-          </p>
         </div>
 
         {/* ── Failure-risk bar-chart carousel (7-day / 30-day) ── */}
@@ -352,7 +331,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
 
           {/* Average failure probability per component */}
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
               <BarChart data={active.data} margin={{ top: 20, right: 8, left: -12, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.25)" />
                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
@@ -393,103 +372,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
           </p>
         </div>
 
-        {/* ── Component RUL cards ── */}
-        <div>
-          <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-teal-500" /> Component RUL Summary
-          </h4>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {component_summary.map((c: SurvivalComponentSummary) => {
-              const band = rulBand(c.avg_rul_days);
-              const Icon = COMPONENT_ICON[c.component] ?? Activity;
-              return (
-                <div
-                  key={c.component}
-                  className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30 p-4 flex flex-col gap-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Icon className="h-3.5 w-3.5" /> {c.component}
-                    </span>
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${band.chip}`}>{band.label}</span>
-                  </div>
-                  <div>
-                    <span className="text-xl font-bold" style={{ color: band.text }}>{fmtRul(c.avg_rul_days)}</span>
-                    <span className="text-[11px] text-muted-foreground ml-1">avg RUL</span>
-                  </div>
-                  <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${rulWidth(c.avg_rul_days)}%`, backgroundColor: band.bar }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                    <span className="text-rose-600 dark:text-rose-400 font-medium">{c.at_risk_7d} &lt;7d</span>
-                    <span className="text-amber-600 dark:text-amber-400 font-medium">{c.at_risk_30d} &lt;30d</span>
-                    <span>{c.assets_scored} scored</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* ── Soonest-failing watchlist ── */}
-        {watchlist.length > 0 && (
-          <div>
-            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-rose-500" /> Soonest-Failing Watchlist
-              <span className="text-xs font-normal text-muted-foreground">— prioritise these for inspection</span>
-            </h4>
-            <div className="space-y-2">
-              {watchlist.slice(0, 10).map((w: SurvivalWatchlistItem, i) => {
-                const band = rulBand(w.rul_days);
-                return (
-                  <div
-                    key={`${w.asset}-${w.component}-${i}`}
-                    className="flex items-center gap-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30 px-3 py-2.5"
-                  >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200/70 dark:bg-slate-700/70 text-xs font-bold text-slate-600 dark:text-slate-300">
-                      {i + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold truncate">{w.asset}</span>
-                        <span className="text-xs text-muted-foreground">· {w.component}</span>
-                      </div>
-                      <div className="mt-1 h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${rulWidth(w.rul_days)}%`, backgroundColor: band.bar }}
-                        />
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-sm font-bold" style={{ color: band.text }}>{fmtRul(w.rul_days)}</div>
-                      <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${riskChip(w.risk)}`}>
-                        {w.risk}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ── Insight footer ── */}
-        <div className="rounded-xl border border-teal-100 dark:border-teal-900/40 bg-teal-50/40 dark:bg-teal-950/10 px-4 py-3">
-          <p className="text-sm text-teal-800 dark:text-teal-300">
-            <span className="font-semibold">Survival-driven scheduling:</span>{" "}
-            where a component&apos;s median RUL falls below its statutory/OEM service interval, bring the inspection
-            forward. {mostUrgent && (
-              <>
-                <span className="font-semibold">{mostUrgent.component}</span> is the fleet&apos;s most urgent system
-                (avg {fmtRul(mostUrgent.avg_rul_days)} RUL){highRiskCount > 0 && <> with <span className="font-semibold">{highRiskCount}</span> high-risk asset{highRiskCount !== 1 ? "s" : ""}</>} — act first.
-              </>
-            )}
-          </p>
-        </div>
       </CardContent>
     </Card>
   );

@@ -21,6 +21,39 @@ import { Button } from "@/components/ui/button";
 
 type SortBy = "urgent" | "alphabetical";
 
+// Custom Tooltip for professional look
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-xl border border-slate-200/20 dark:border-white/10 bg-white/80 dark:bg-black/40 backdrop-blur-md p-4 shadow-2xl">
+        <p className="font-semibold text-sm mb-3 text-slate-900 dark:text-white">{label}</p>
+        <div className="space-y-2">
+          {payload.map((entry: any, index: number) => {
+            const isPredicted = entry.dataKey === "predicted";
+            return (
+              <div key={index} className="flex items-center justify-between gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="h-2.5 w-2.5 rounded-full shadow-sm" 
+                    style={{ backgroundColor: isPredicted ? "#f43f5e" : "#10b981" }} 
+                  />
+                  <span className="text-slate-600 dark:text-slate-300 font-medium">
+                    {isPredicted ? "Predicted RUL" : "Scheduled Service"}
+                  </span>
+                </div>
+                <span className="font-bold text-slate-900 dark:text-white font-mono">
+                  {entry.value} wks
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function WarehouseMaintenanceSchedule({ data: propsData }: { data?: any[] } = {}) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -185,40 +218,62 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
       <CardContent>
         {/* Scrollable Chart Container */}
         <div
-          className="border rounded-lg bg-muted/20 overflow-y-auto"
+          className="border rounded-2xl bg-slate-50/50 dark:bg-slate-950/20 overflow-y-auto"
           style={{ maxHeight: "600px", minHeight: "400px" }}
         >
-          <div style={{ height: Math.max(500, displayData.length * 50) }} className="w-full">
+          <div style={{ height: Math.max(500, displayData.length * 60) }} className="w-full pt-4">
             <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
-              <BarChart
-                data={displayData}
-                layout="vertical"
-                margin={{ top: 10, right: 30, left: 200, bottom: 10 }}
-                barCategoryGap={12}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                <XAxis type="number" tick={{ fill: axisColor, fontSize: 12 }} />
-                <YAxis
-                  type="category"
-                  dataKey="asset"
-                  tick={{ fill: axisColor, fontSize: 12 }}
-                  width={195}
+                <BarChart
+                  data={displayData}
+                  layout="vertical"
+                  margin={{ top: 10, right: 20, left: 120, bottom: 20 }}
+                  barCategoryGap={20}
+                >
+                  <defs>
+                    <linearGradient id="colorPredicted" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#fb923c" stopOpacity={0.9} />
+                    </linearGradient>
+                    <linearGradient id="colorScheduled" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#0d9488" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.9} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridColor} />
+                  <XAxis 
+                    type="number" 
+                    tick={{ fill: axisColor, fontSize: 11, fontWeight: 500 }} 
+                    axisLine={false} 
+                    tickLine={false} 
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="asset"
+                    tick={{ fill: axisColor, fontSize: 11, fontWeight: 500 }}
+                    width={110}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }} />
+                <Legend 
+                  wrapperStyle={{ paddingTop: "20px", fontSize: "13px", fontWeight: 500, color: axisColor }} 
+                  iconType="circle"
                 />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend wrapperStyle={{ color: axisColor, paddingTop: "10px" }} />
                 <Bar
                   dataKey="predicted"
-                  name="🔴 Predicted (weeks)"
-                  fill="#ef4444"
-                  radius={[0, 8, 8, 0]}
-                  barSize={32}
+                  name="Predicted RUL"
+                  fill="url(#colorPredicted)"
+                  radius={[0, 6, 6, 0]}
+                  barSize={16}
+                  animationDuration={1500}
                 />
                 <Bar
                   dataKey="scheduled"
-                  name="🟢 Scheduled (weeks)"
-                  fill="#10b981"
-                  radius={[0, 8, 8, 0]}
-                  barSize={32}
+                  name="Scheduled Service"
+                  fill="url(#colorScheduled)"
+                  radius={[0, 6, 6, 0]}
+                  barSize={16}
+                  animationDuration={1500}
                 />
               </BarChart>
             </ResponsiveContainer>

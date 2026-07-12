@@ -9,6 +9,7 @@ import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import WarehouseOverviewCards from "@/components/admin/warehouse/WarehouseOverviewCards";
 import WarehouseInsightsSection from "@/components/admin/warehouse/WarehouseInsightsSection";
 import WarehouseMaintenanceSchedule from "@/components/admin/warehouse/WarehouseMaintenanceSchedule";
+import { MonthlyTicketVolumeCard } from "@/components/admin/warehouse/WarehouseTicketInsights";
 import WarehouseDepartmentsOverview, {
   type DepartmentOverviewRow,
 } from "@/components/admin/warehouse/WarehouseDepartmentsOverview";
@@ -20,6 +21,8 @@ import { getAccessToken } from "@/lib/authService";
 
 // ── Warehouse Report (my section — warehouse components only) ──
 import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
+import WarehouseSurvivalAnalysis from "@/components/admin/warehouse/WarehouseSurvivalAnalysis";
+import { getSurvivalAnalysis, type SurvivalSummary } from "@/lib/warehouseService";
 
 // Use the same env-driven base URL as warehouseService rather than a hardcoded host.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -28,6 +31,7 @@ const REPORT_API = `${API_BASE_URL}/warehouse-dashboard/generate-report`;
 export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
   const [data, setData] = React.useState<any>(null);
+  const [survivalData, setSurvivalData] = React.useState<SurvivalSummary | null>(null);
   const [maintenanceSchedule, setMaintenanceSchedule] = React.useState<any[]>([]);
   const [refreshing, setRefreshing] = React.useState(true);
   // Distinguishes the very first load (full-page loader, same as every other
@@ -52,10 +56,11 @@ export default function WarehousePage() {
     setRefreshing(true);
     try {
       // Fetch summary, maintenance schedule, and departments overview in parallel
-      const [summaryRes, scheduleData, deptRes] = await Promise.allSettled([
+      const [summaryRes, scheduleData, deptRes, survivalRes] = await Promise.allSettled([
         authedGet("/warehouse-dashboard/summary"),
         getMaintenanceSchedule(),
         authedGet("/warehouse-dashboard/departments-overview"),
+        getSurvivalAnalysis(),
       ]);
 
       if (summaryRes.status === "fulfilled" && summaryRes.value.ok) {
@@ -66,6 +71,8 @@ export default function WarehousePage() {
         }
         setData(null);
       }
+
+      setSurvivalData(survivalRes.status === "fulfilled" ? survivalRes.value : null);
 
       setMaintenanceSchedule(
         scheduleData.status === "fulfilled" ? scheduleData.value : []
@@ -185,8 +192,14 @@ export default function WarehousePage() {
       <WarehouseOverviewCards data={data} isLoading={refreshing && !data} />
       {data && <WarehouseInsightsSection data={data} />}
 
-      {/* ── Predictive Maintenance Schedule Chart ── */}
-      <WarehouseMaintenanceSchedule data={maintenanceSchedule} />
+      {/* ── Monthly Ticket Volume (Full Width) ── */}
+      <MonthlyTicketVolumeCard data={data?.monthlyTicketVolume} />
+
+      {/* ── Component Survival Risk & Maintenance Schedule ── */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <WarehouseSurvivalAnalysis data={survivalData} isLoading={refreshing && !survivalData} />
+        <WarehouseMaintenanceSchedule data={maintenanceSchedule} />
+      </div>
 
       {/* ── Departments Overview + Ticket Load by Department ── */}
       <div className="grid gap-4 lg:grid-cols-2">

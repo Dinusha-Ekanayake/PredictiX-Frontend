@@ -48,7 +48,7 @@ import {
   type TicketPreviewResponse,
   type UserTicketDetail,
 } from "@/lib/api/userTickets";
-import { listUsers, type UserItem } from "@/lib/userService";
+
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { addMyTicketAttachment } from "@/lib/api/userTickets";
 import { supabase } from "@/lib/supabaseBrowserClient";
@@ -68,9 +68,6 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (ticket: UserTicketDetail) => void;
-  /** Pass the parent page's already-loaded user list to skip this dialog's
-   * own GET /users/ fetch. If omitted, the dialog fetches it itself. */
-  users?: UserItem[];
 };
 
 const selectCls =
@@ -90,18 +87,15 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 // ─── component ────────────────────────────────────────────────────────────────
 
-export default function UserNewTicketDialog({ open, onOpenChange, onCreated, users: usersProp }: Props) {
+export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: Props) {
   // form
   const [assetId, setAssetId] = React.useState("");
   const [assets, setAssets] = React.useState<Asset[]>([]);
   const [assetsLoading, setAssetsLoading] = React.useState(false);
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [assignedTo, setAssignedTo] = React.useState("");
-  const [fetchedUsers, setFetchedUsers] = React.useState<UserItem[]>([]);
-  const [usersLoading, setUsersLoading] = React.useState(false);
-  // Prefer the parent's already-loaded list; fall back to this dialog's own fetch.
-  const users = usersProp ?? fetchedUsers;
+
+
   const [file, setFile] = React.useState<File | null>(null);
 
   // asset summary
@@ -206,24 +200,16 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated, use
         .then((d) => setAssets(d ?? []))
         .catch(() => {})
         .finally(() => setAssetsLoading(false));
-
-      if (!usersProp) {
-        setUsersLoading(true);
-        listUsers()
-          .then((d) => setFetchedUsers(d ?? []))
-          .catch(() => {})
-          .finally(() => setUsersLoading(false));
-      }
       return;
     }
     const t = setTimeout(() => {
       setAssetId(""); setAssets([]); setTitle(""); setDescription("");
-      setAssignedTo(""); setFetchedUsers([]); setAssetSummary(null); setTicketSummary(null);
+      setAssetSummary(null); setTicketSummary(null);
       setAi({ status: "idle" }); setCategoryOverride(""); setPriorityOverride("");
       setIsSubmitting(false); setResult(null); setFile(null);
     }, 200);
     return () => clearTimeout(t);
-  }, [open, usersProp]);
+  }, [open]);
 
   // ── submit ───────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
@@ -241,7 +227,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated, use
         title: title.trim(),
         description: description.trim(),
         asset_id: assetId || undefined,
-        assigned_to: assignedTo || undefined,
+
         use_ai_predictions: false,
         predicted_priority: priorityOverride || (aiResult?.predicted_priority ?? undefined),
         predicted_category: categoryOverride || (aiResult?.predicted_category ?? undefined),
@@ -331,7 +317,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated, use
               )}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <Button variant="secondary" onClick={() => {
-                  setTitle(""); setDescription(""); setAssetId(""); setAssignedTo("");
+                  setTitle(""); setDescription(""); setAssetId("");
                   setAi({ status: "idle" }); setCategoryOverride(""); setPriorityOverride(""); setResult(null); setAssetSummary(null); setTicketSummary(null); setFile(null);
                 }}>
                   Create another
@@ -499,26 +485,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated, use
                 </div>
               )}
 
-              {/* Assigned User */}
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Assign to (optional)</p>
-                {usersLoading ? (
-                  <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input text-sm text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />Loading users…
-                  </div>
-                ) : (
-                  <Select value={assignedTo} onValueChange={setAssignedTo} disabled={isSubmitting}>
-                    <SelectTrigger className="w-full bg-background">
-                      <SelectValue placeholder="Select a user (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>{u.name} ({u.role})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
+
 
               {/* Actions */}
               <div className="grid grid-cols-2 gap-3 pt-1">

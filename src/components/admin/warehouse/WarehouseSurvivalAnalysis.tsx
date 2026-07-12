@@ -12,7 +12,22 @@ import {
   TrendingDown,
   Timer,
   Inbox,
+  Wallet,
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  LabelList,
+  ResponsiveContainer,
+} from "recharts";
 import type {
   SurvivalSummary,
   SurvivalComponentSummary,
@@ -62,7 +77,49 @@ const COMPONENT_ICON: Record<string, React.ComponentType<{ className?: string }>
   Hydraulic: HeartPulse,
 };
 
+// Fixed component order + colour for the risk bar charts.
+const COMPONENTS = ["brake", "tire", "battery", "oil", "hydraulic"] as const;
+const COMPONENT_COLOR: Record<string, string> = {
+  Brake: "#ef4444",
+  Tire: "#f59e0b",
+  Battery: "#10b981",
+  Oil: "#0ea5e9",
+  Hydraulic: "#8b5cf6",
+};
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function fmtMoney(n?: number | null) {
+  if (n == null) return "—";
+  return `LKR ${Math.round(n).toLocaleString()}`;
+}
+
+interface RiskTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { name: string; avgPct: number; count: number } }>;
+  window?: "7d" | "30d";
+}
+
+function RiskTooltip({ active, payload, window }: RiskTooltipProps) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload;
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 shadow-md text-xs">
+      <div className="font-semibold" style={{ color: COMPONENT_COLOR[p.name] }}>{p.name}</div>
+      <div className="text-muted-foreground">
+        Avg P(fail) ≤{window}: <span className="font-semibold text-foreground">{p.avgPct}%</span>
+      </div>
+      <div className="text-muted-foreground">
+        {p.count} asset{p.count === 1 ? "" : "s"} at risk
+      </div>
+    </div>
+  );
+}
+
 export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
+  // Risk bar-chart carousel: 0 = next 7 days, 1 = next 30 days. Declared before
+  // any early return so the hook order stays stable.
+  const [slide, setSlide] = React.useState<0 | 1>(0);
+
   if (isLoading) {
     return (
       <Card className="rounded-2xl">
@@ -108,7 +165,44 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
     );
   }
 
-  const { assets_analyzed, horizon_days, component_summary, watchlist, generated_at } = data;
+  const {
+    assets_analyzed, horizon_days, component_summary, watchlist, generated_at,
+    assets = [], expected_spend_7d, expected_spend_30d,
+  } = data;
+
+  // ── Risk bar-chart data: average P(fail) per component + at-risk count ──
+  // Average failure probability is taken across the scored critical assets;
+  // the count is how many of them have that component failing within the window.
+  const buildChart = (window: "7d" | "30d") => {
+    const probKey = window === "7d" ? "fail_prob_7d" : "fail_prob_30d";
+    return COMPONENTS.map((c) => {
+      const name = cap(c);
+      const vals = assets
+        .map((a) => a.components?.[c]?.[probKey])
+        .filter((v): v is number => typeof v === "number");
+      const avg = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+      const cs = component_summary.find((x) => x.component.toLowerCase() === c);
+      const count = window === "7d" ? cs?.at_risk_7d ?? 0 : cs?.at_risk_30d ?? 0;
+      return { name, avgPct: +(avg * 100).toFixed(1), count };
+    });
+  };
+
+  const slides = [
+    {
+      key: "7d" as const,
+      label: "Next 7 days",
+      totalCost: expected_spend_7d,
+      data: buildChart("7d"),
+    },
+    {
+      key: "30d" as const,
+      label: "Next 30 days (one month)",
+      totalCost: expected_spend_30d,
+      data: buildChart("30d"),
+    },
+  ];
+  const active = slides[slide];
+  const totalFailures = active.data.reduce((s, d) => s + d.count, 0);
 
   // Human-friendly "last analyzed" label from the backend timestamp.
   const lastAnalyzed = (() => {
@@ -206,6 +300,99 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
           </p>
         </div>
 
+        {/* ── Failure-risk bar-chart carousel (7-day / 30-day) ── */}
+        <div className="rounded-xl border border-slate-100 dark:border-slate-800 p-4">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-sm font-semibold flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-teal-500" /> Component Failure Risk — {active.label}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setSlide((s) => (s === 0 ? 1 : 0))}
+                aria-label="Previous chart"
+                className="rounded-lg border border-slate-200 dark:border-slate-700 p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="flex items-center gap-1">
+                {slides.map((s, i) => (
+                  <span
+                    key={s.key}
+                    className={`h-1.5 rounded-full transition-all ${i === slide ? "w-5 bg-teal-500" : "w-1.5 bg-slate-300 dark:bg-slate-600"}`}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSlide((s) => (s === 0 ? 1 : 0))}
+                aria-label="Next chart"
+                className="rounded-lg border border-slate-200 dark:border-slate-700 p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Headline values for this window: total cost + total failures */}
+          <div className="flex flex-wrap items-end gap-x-8 gap-y-2 mb-4">
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Wallet className="h-3 w-3" /> Est. replacement spend
+              </div>
+              <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">{fmtMoney(active.totalCost)}</div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" /> Component failures ({active.key})
+              </div>
+              <div className="text-2xl font-bold">{totalFailures}</div>
+            </div>
+          </div>
+
+          {/* Average failure probability per component */}
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={active.data} margin={{ top: 20, right: 8, left: -12, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.25)" />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} width={44} />
+                <Tooltip content={<RiskTooltip window={active.key} />} cursor={{ fill: "rgba(148,163,184,0.12)" }} />
+                <Bar dataKey="avgPct" radius={[6, 6, 0, 0]} maxBarSize={64} isAnimationActive>
+                  {active.data.map((d) => (
+                    <Cell key={d.name} fill={COMPONENT_COLOR[d.name]} />
+                  ))}
+                  <LabelList dataKey="avgPct" position="top" formatter={(value) => `${value}%`} fill="#64748b" fontSize={11} fontWeight={600} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Descriptive per-component failure counts */}
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {active.data.map((d) => (
+              <div
+                key={d.name}
+                className="rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30 px-2.5 py-2 text-center"
+              >
+                <div className="flex items-center justify-center gap-1.5 text-[11px] font-semibold" style={{ color: COMPONENT_COLOR[d.name] }}>
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COMPONENT_COLOR[d.name] }} /> {d.name}
+                </div>
+                <div className="text-lg font-bold leading-tight mt-0.5">{d.count}</div>
+                <div className="text-[10px] text-muted-foreground">
+                  {d.count === 1 ? "asset" : "assets"} at risk ≤{active.key}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[11px] text-muted-foreground mt-3">
+            Bars show the average failure probability across the {assets_analyzed} scored critical assets;
+            the tiles count how many have each component failing within {active.key === "7d" ? "7 days" : "30 days"}.
+            Replacement spend comes from the cost-estimation model. Use the arrows to switch between the 7-day and 30-day view.
+          </p>
+        </div>
+
         {/* ── Component RUL cards ── */}
         <div>
           <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -237,8 +424,8 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
                     />
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                    <span className="text-rose-600 dark:text-rose-400 font-medium">{c.at_risk_30d} &lt;30d</span>
-                    <span className="text-amber-600 dark:text-amber-400 font-medium">{c.at_risk_90d} &lt;90d</span>
+                    <span className="text-rose-600 dark:text-rose-400 font-medium">{c.at_risk_7d} &lt;7d</span>
+                    <span className="text-amber-600 dark:text-amber-400 font-medium">{c.at_risk_30d} &lt;30d</span>
                     <span>{c.assets_scored} scored</span>
                   </div>
                 </div>

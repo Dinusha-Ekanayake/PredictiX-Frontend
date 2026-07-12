@@ -22,6 +22,7 @@ import {
   DollarSign,
   Ticket,
   Clock,
+  HeartPulse,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell,
@@ -31,6 +32,7 @@ import {
   LineChart, Line, Legend,
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
 } from "recharts";
+import WarehouseSurvivalAnalysis from "./WarehouseSurvivalAnalysis";
 
 /**
  * WarehouseAIReportPanel
@@ -103,6 +105,7 @@ interface Ctx {
   ticket_trend_direction?: string;
   total_users?: number; active_users?: number; inactive_users?: number;
   admin_users?: number; standard_users?: number;
+  survival_summary?: any;
 }
 
 export interface ReportData {
@@ -211,6 +214,7 @@ export default function WarehouseAIReportPanel({
   const [s3Collapsed, toggleS3] = useToggle(false);
   const [s4Collapsed, toggleS4] = useToggle(false);
   const [s5Collapsed, toggleS5] = useToggle(false);
+  const [s6Collapsed, toggleS6] = useToggle(false);
 
   const ctx = data?.context ?? {} as Ctx;
   const ai  = data?.ai_sections ?? {} as AISections;
@@ -838,6 +842,23 @@ export default function WarehouseAIReportPanel({
               </div>
             )}
           </div>
+          {/* ─────────────────────────────────────── */}
+          {/* SECTION 6 - Component Survival Analysis */}
+          {/* ─────────────────────────────────────── */}
+          {ctx.survival_summary && (
+            <div className={SECTION_STYLE}>
+              <SectionHeader
+                icon={HeartPulse} accent={P.teal} collapsed={s6Collapsed} onToggle={toggleS6}
+                title="6. FRSO Component Survival Analysis"
+                subtitle="Weibull Accelerated Failure Time (AFT) · predicted Remaining Useful Life"
+              />
+              {!s6Collapsed && (
+                <div className="px-6 py-5 space-y-5">
+                  <WarehouseSurvivalAnalysis data={ctx.survival_summary} isLoading={false} />
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 

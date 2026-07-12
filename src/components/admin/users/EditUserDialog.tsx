@@ -29,6 +29,9 @@ import {
   Building2,
   ShieldCheck,
   UserCog,
+  KeyRound,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 import type {
@@ -46,6 +49,7 @@ type FormErrors = {
   firstName?: string;
   lastName?: string;
   email?: string;
+  password?: string;
   role?: string;
   department?: string;
   status?: string;
@@ -112,6 +116,8 @@ export default function EditUserDialog({
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
   const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
   const [address, setAddress] = React.useState("");
   const [contactNumber, setContactNumber] = React.useState("");
   const [warehouse, setWarehouse] = React.useState("");
@@ -121,12 +127,13 @@ export default function EditUserDialog({
   const [errors, setErrors] = React.useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // Populate fields when dialog opens
   React.useEffect(() => {
     if (open && user) {
       setFirstName(user.firstName || "");
       setLastName(user.lastName || "");
       setEmail(user.email || "");
+      setPassword("");
+      setShowPassword(false);
       setAddress(user.address || "");
       setContactNumber(user.contactNumber || "");
       setWarehouse(user.warehouse || "");
@@ -145,6 +152,8 @@ export default function EditUserDialog({
     if (!email.trim()) errs.email = "Email is required.";
     else if (!validateEmail(email.trim()))
       errs.email = "Please enter a valid email address.";
+    if (password && password.length < 8)
+      errs.password = "Password must be at least 8 characters.";
     if (!role) errs.role = "Please select a role.";
     if (!department) errs.department = "Please select a department.";
     if (!status) errs.status = "Please select a status.";
@@ -164,7 +173,7 @@ export default function EditUserDialog({
 
     setIsSubmitting(true);
     try {
-      await onUserUpdated(user.id, {
+      const payload: Partial<CreateUserPayload> = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         name: `${firstName.trim()} ${lastName.trim()}`,
@@ -175,7 +184,14 @@ export default function EditUserDialog({
         role: role as UserRole,
         department,
         status: status as UserStatus,
-      });
+      };
+
+      // Only send password if admin filled it in
+      if (password.trim()) {
+        payload.password = password.trim();
+      }
+
+      await onUserUpdated(user.id, payload);
       onOpenChange(false);
     } catch (err) {
       toast.error("Failed to update user", {
@@ -221,7 +237,6 @@ export default function EditUserDialog({
                 if (errors.firstName)
                   setErrors((p) => ({ ...p, firstName: undefined }));
               }}
-              aria-invalid={!!errors.firstName}
               className="bg-background"
             />
           </FieldCard>
@@ -242,7 +257,6 @@ export default function EditUserDialog({
                 if (errors.lastName)
                   setErrors((p) => ({ ...p, lastName: undefined }));
               }}
-              aria-invalid={!!errors.lastName}
               className="bg-background"
             />
           </FieldCard>
@@ -257,16 +271,50 @@ export default function EditUserDialog({
             <Input
               id="edit-email"
               type="email"
-              placeholder="e.g. jane.cooper@warehouse.com"
+              placeholder="e.g. jane.cooper@lankalogix.lk"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
                 if (errors.email)
                   setErrors((p) => ({ ...p, email: undefined }));
               }}
-              aria-invalid={!!errors.email}
               className="bg-background"
             />
+          </FieldCard>
+
+          {/* Password reset — optional */}
+          <FieldCard
+            icon={KeyRound}
+            label="Reset Password (optional)"
+            htmlFor="edit-password"
+            error={errors.password}
+          >
+            <div className="relative">
+              <Input
+                id="edit-password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Leave blank to keep current password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password)
+                    setErrors((p) => ({ ...p, password: undefined }));
+                }}
+                className="bg-background pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </FieldCard>
 
           {/* Role & Status */}
@@ -287,7 +335,6 @@ export default function EditUserDialog({
               >
                 <SelectTrigger
                   id="edit-role"
-                  aria-invalid={!!errors.role}
                   className="w-full bg-background"
                 >
                   <SelectValue placeholder="Select role" />
@@ -315,7 +362,6 @@ export default function EditUserDialog({
               >
                 <SelectTrigger
                   id="edit-status"
-                  aria-invalid={!!errors.status}
                   className="w-full bg-background"
                 >
                   <SelectValue placeholder="Select status" />
@@ -345,7 +391,6 @@ export default function EditUserDialog({
             >
               <SelectTrigger
                 id="edit-department"
-                aria-invalid={!!errors.department}
                 className="w-full bg-background"
               >
                 <SelectValue placeholder="Select department" />
@@ -425,11 +470,7 @@ export default function EditUserDialog({
 
           {/* Buttons */}
           <div className="grid grid-cols-2 gap-3 pt-1">
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full"
-            >
+            <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

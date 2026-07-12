@@ -107,9 +107,15 @@ export default function WarehousePage() {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          // The endpoint is guarded by require_user — attach the JWT like every
+          // other warehouse-dashboard call, otherwise it 401s "Not authenticated".
+          ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
         },
       });
-      
+
+      if (res.status === 401) {
+        throw new Error("Your session has expired. Please log out and log back in, then try again.");
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
         throw new Error(err.detail || `HTTP ${res.status}`);

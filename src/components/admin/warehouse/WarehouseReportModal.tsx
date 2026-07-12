@@ -90,8 +90,11 @@ interface Ctx {
   survival_summary?: {
     assets_analyzed: number;
     horizon_days: number;
-    component_summary: { component: string; avg_rul_days: number | null; at_risk_30d: number; at_risk_90d: number; assets_scored: number }[];
-    watchlist: { asset: string; component: string; rul_days: number; risk: string }[];
+    currency?: string;
+    expected_spend_7d?: number;
+    expected_spend_30d?: number;
+    component_summary: { component: string; avg_rul_days: number | null; avg_fail_prob_7d?: number; avg_fail_prob_30d?: number; expected_failures_7d?: number; expected_failures_30d?: number; at_risk_7d: number; at_risk_30d: number; assets_scored: number }[];
+    watchlist: { asset: string; component: string; rul_days: number | null; risk: string }[];
   } | null;
 }
 

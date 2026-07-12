@@ -183,8 +183,16 @@ interface ReportData {
   survival?: {
     assets_analyzed: number;
     horizon_days: number;
-    component_summary: Array<{ component: string; avg_rul_days: number | null; at_risk_30d: number; at_risk_90d: number; assets_scored: number }>;
-    watchlist: Array<{ asset: string; component: string; rul_days: number; risk: string }>;
+    currency?: string;
+    expected_spend_7d?: number;
+    expected_spend_30d?: number;
+    component_summary: Array<{
+      component: string; avg_rul_days: number | null;
+      avg_fail_prob_7d?: number; avg_fail_prob_30d?: number;
+      expected_failures_7d?: number; expected_failures_30d?: number;
+      at_risk_7d: number; at_risk_30d: number; assets_scored: number;
+    }>;
+    watchlist: Array<{ asset: string; component: string; rul_days: number | null; risk: string }>;
   } | null;
 }
 
@@ -1309,21 +1317,39 @@ export function generateProfessionalHTML(data: ReportData): string {
     ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
     ${subHeader('4.8 FRSO Component Survival Analysis')}
     <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 10px;">
-      Weibull Accelerated Failure Time (AFT) survival models - predicted Remaining Useful Life (RUL)
-      per component, aggregated across the ${fmtN(surv.assets_analyzed)} highest-risk assets over a
-      ${surv.horizon_days}-day horizon. "At Risk" counts assets whose median RUL falls within the window.
+      Weibull Accelerated Failure Time (AFT) survival models, scored per component across the
+      ${fmtN(surv.assets_analyzed)} highest-risk assets. The bars show each component's average
+      probability of failing within 7 and 30 days; the replacement spend is the expected cost of the
+      failures likely to occur in each window (from the cost-estimation model).
     </p>
-    ${subHeader('Component RUL Summary', C.teal)}
-    ${lightTable(
-      ['Component', 'Avg Median RUL (days)', 'At Risk <30d', 'At Risk <90d', 'Assets Scored'],
-      surv.component_summary.map(r => [
-        r.component,
-        r.avg_rul_days == null ? '-' : r.avg_rul_days.toLocaleString(),
-        fmtN(r.at_risk_30d),
-        fmtN(r.at_risk_90d),
-        fmtN(r.assets_scored),
-      ])
-    )}
+    ${subHeader('Component Failure Risk - 7 & 30 days', C.teal)}
+    <div style="font-size:9px;color:#0f766e;margin:0 0 10px;padding:9px 12px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:6px;">
+      Expected replacement spend:
+      <b>LKR ${fmtN(Math.round(surv.expected_spend_30d || 0))}</b> within 30 days
+      &nbsp;·&nbsp; <b>LKR ${fmtN(Math.round(surv.expected_spend_7d || 0))}</b> within 7 days.
+    </div>
+    ${(() => {
+      const COL: Record<string, string> = { Brake: '#ef4444', Tire: '#f59e0b', Battery: '#10b981', Oil: '#0ea5e9', Hydraulic: '#8b5cf6' };
+      const comps = [...surv.component_summary].sort((a, b) => (b.avg_fail_prob_30d ?? 0) - (a.avg_fail_prob_30d ?? 0));
+      const maxP = Math.max(0.05, ...comps.map(c => c.avg_fail_prob_30d ?? 0));
+      return `<div style="padding:2px 2px 4px;">${comps.map(c => {
+        const p30 = c.avg_fail_prob_30d ?? 0, p7 = c.avg_fail_prob_7d ?? 0;
+        const w7 = Math.max(1, (p7 / maxP) * 100), w30 = Math.max(2, (p30 / maxP) * 100);
+        const col = COL[c.component] || '#0ea5e9';
+        return `<div style="display:flex;align-items:center;gap:8px;margin:6px 0;">
+          <div style="width:62px;font-size:9px;font-weight:700;color:${col};">${c.component}</div>
+          <div style="flex:1;background:#f1f5f9;border-radius:4px;height:16px;position:relative;">
+            <div style="position:absolute;top:0;left:0;width:${w30}%;background:${col};opacity:0.35;height:100%;border-radius:4px;"></div>
+            <div style="position:absolute;top:0;left:0;width:${w7}%;background:${col};height:100%;border-radius:4px;"></div>
+          </div>
+          <div style="width:172px;font-size:8px;color:${C.textMuted};text-align:right;">
+            30d <b style="color:#0f172a;">${(p30 * 100).toFixed(1)}%</b> · 7d ${(p7 * 100).toFixed(1)}% · ~${c.expected_failures_30d ?? 0} in 30d
+          </div>
+        </div>`;
+      }).join('')}
+      <div style="font-size:7.5px;color:${C.textMuted};margin-top:6px;">Solid = 7-day risk, shaded = 30-day risk. "~n in 30d" = expected number of failures across the scored assets.</div>
+      </div>`;
+    })()}
     ${(surv.watchlist && surv.watchlist.length) ? `
       ${subHeader('Soonest-Failing Watchlist', C.red)}
       <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 8px;">
@@ -1331,7 +1357,7 @@ export function generateProfessionalHTML(data: ReportData): string {
       </p>
       ${lightTable(
         ['Asset', 'Component', 'Median RUL (days)', 'Risk'],
-        surv.watchlist.map(w => [w.asset, w.component, w.rul_days.toLocaleString(), w.risk])
+        surv.watchlist.map(w => [w.asset, w.component, w.rul_days == null ? '-' : w.rul_days.toLocaleString(), w.risk])
       )}
     ` : ''}
     ${alertBox(

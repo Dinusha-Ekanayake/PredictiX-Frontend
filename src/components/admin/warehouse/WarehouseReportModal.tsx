@@ -207,7 +207,7 @@ function ConfirmStep({ onGenerate, onClose }: { onGenerate: () => void; onClose:
     "Maintenance Intelligence Service urgency, cost forecast, downtime",
     "Pattern & Trend Analysis 3-month ticket & maintenance trends",
     "Warehouse Conclusion Full RAG-powered summary with recommendations",
-    "FRSO Component Survival Analysis Weibull AFT predictions & remaining useful life",
+    "Asset component survival analysis predictions & remaining useful life",
   ];
   const SOURCES = [
     "assets", "asset_failure_predictions", "asset_cost_predictions",
@@ -1283,102 +1283,85 @@ function ReportStep({
           )}
         </Section>
 
-        {/* ── S6: FRSO Component Survival Analysis ── */}
-        <Section icon={HeartPulse} accent={P.teal} title="6. FRSO Component Survival Analysis" subtitle="Weibull AFT predictions · Remaining useful life">
+        {/* ── S6: Asset component survival analysis ── */}
+        <Section icon={HeartPulse} accent={P.teal} title="6. Asset component survival analysis" subtitle="">
           {ctx.survival_summary && (
             <WarehouseSurvivalAnalysis data={ctx.survival_summary} isLoading={false} />
           )}
           
-          <Divider label="Critical Assets (Lowest Health)" />
-          {(ctx.critical_assets?.length ?? 0) > 0 ? (
+          <Divider label="Soonest-Failing Watchlist" />
+          {(ctx.survival_summary?.watchlist?.length ?? 0) > 0 ? (
             <>
-              {/* Tick assets → generate summaries only for the ticked ones */}
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <p className="text-[11px] text-muted-foreground">
-                  Tick the assets you want AI summaries for summaries appear below and are included in the PDF.
-                  {selectedCodes.size > 0 && <span className="ml-1 font-semibold text-violet-600">{selectedCodes.size} selected</span>}
-                </p>
-                <button
-                  type="button"
-                  onClick={generateSummaries}
-                  disabled={selectedCodes.size === 0 || summarizing}
-                  className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {summarizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
-                  {summarizing ? "Summarising…" : "Summarise ticked assets"}
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="pb-2 pr-3 text-left">
+              Tick the assets you want AI summaries for summaries appear below and are included in the PDF.
+              {selectedCodes.size > 0 && <span className="ml-1 font-semibold text-violet-600">{selectedCodes.size} selected</span>}
+            </p>
+            <button
+              type="button"
+              onClick={generateSummaries}
+              disabled={selectedCodes.size === 0 || summarizing}
+              className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {summarizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
+              {summarizing ? "Summarising…" : "Summarise ticked assets"}
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-800">
+                  <th className="pb-2 pr-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      className="h-3.5 w-3.5 cursor-pointer accent-violet-600"
+                      title="Select all"
+                    />
+                  </th>
+                  {["Asset", "Component", "Median RUL (days)", "Risk"].map((h) => (
+                    <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(ctx.survival_summary?.watchlist || []).map((w) => (
+                  <React.Fragment key={w.asset}>
+                    <tr className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                      <td className="py-2 pr-3">
                         <input
                           type="checkbox"
-                          checked={allSelected}
-                          onChange={toggleAll}
+                          checked={selectedCodes.has(w.asset)}
+                          onChange={() => toggleAsset(w.asset)}
                           className="h-3.5 w-3.5 cursor-pointer accent-violet-600"
-                          title="Select all"
                         />
-                      </th>
-                      {["Code", "Name / Type", "Health", "Fail Prob", "Risk", "Days to Svc", "Status"].map((h) => (
-                        <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
-                      ))}
+                      </td>
+                      <td className="py-2 pr-3 font-mono font-bold text-rose-600">{w.asset}</td>
+                      <td className="py-2 pr-3 font-medium">{w.component}</td>
+                      <td className="py-2 pr-3 font-semibold">{w.rul_days == null ? '-' : w.rul_days.toLocaleString()}</td>
+                      <td className="py-2 pr-3">
+                        <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${P.rose}20`, color: P.rose }}>
+                          {w.risk}
+                        </span>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {ctx.critical_assets!.map((a) => (
-                      <React.Fragment key={a.code}>
-                        <tr className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                          <td className="py-2 pr-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedCodes.has(a.code)}
-                              onChange={() => toggleAsset(a.code)}
-                              className="h-3.5 w-3.5 cursor-pointer accent-violet-600"
-                            />
-                          </td>
-                          <td className="py-2 pr-3 font-mono font-bold text-rose-600">{a.code}</td>
-                          <td className="py-2 pr-3"><div className="font-medium">{a.name}</div><div className="text-muted-foreground">{a.type}</div></td>
-                          <td className="py-2 pr-3">
-                            <div className="flex items-center gap-1.5">
-                              <div className="h-1.5 w-14 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                                <div className="h-full rounded-full" style={{
-                                  width: `${a.health_score}%`,
-                                  backgroundColor: a.health_score < 50 ? P.rose : a.health_score < 70 ? P.amber : P.emerald,
-                                }} />
-                              </div>
-                              <span className="font-semibold">{a.health}</span>
-                            </div>
-                          </td>
-                          <td className="py-2 pr-3 font-semibold" style={{ color: P.rose }}>{a.failure_prob}</td>
-                          <td className="py-2 pr-3">
-                            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${P.rose}20`, color: P.rose }}>{a.risk}</span>
-                          </td>
-                          <td className="py-2 pr-3 font-semibold" style={{
-                            color: a.days_to_service != null && a.days_to_service <= 7 ? P.rose
-                              : a.days_to_service != null && a.days_to_service <= 30 ? P.amber : P.slate,
-                          }}>
-                            {a.days_to_service != null ? `${a.days_to_service}d` : "N/A"}
-                          </td>
-                          <td className="py-2 capitalize text-muted-foreground">{a.status}</td>
-                        </tr>
-                        {summaries[a.code] && (
-                          <tr className="border-b border-slate-50 dark:border-slate-800/50 bg-violet-50/40 dark:bg-violet-950/10">
-                            <td />
-                            <td colSpan={7} className="py-2 pr-3">
-                              <div className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
-                                <Brain className="h-3.5 w-3.5 shrink-0 mt-0.5 text-violet-500" />
-                                <span><span className="font-semibold text-violet-600">AI Summary:</span> {summaries[a.code]}</span>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    {summaries[w.asset] && (
+                      <tr className="border-b border-slate-50 dark:border-slate-800/50 bg-violet-50/40 dark:bg-violet-950/10">
+                        <td />
+                        <td colSpan={4} className="py-2 pr-3">
+                          <div className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
+                            <Brain className="h-3.5 w-3.5 shrink-0 mt-0.5 text-violet-500" />
+                            <span><span className="font-semibold text-violet-600">AI Summary:</span> {summaries[w.asset]}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
             </>
           ) : <p className="text-sm text-muted-foreground italic text-center py-3">No critical assets found.</p>}
         </Section>

@@ -1201,14 +1201,42 @@ export function generateProfessionalHTML(data: ReportData): string {
     `).join('')}
   </div>` : '';
 
-  // ── §4 (cont.): FRSO COMPONENT SURVIVAL ANALYSIS ──────────────
+  // ── §4 (cont.): ASSET COMPONENT SURVIVAL ANALYSIS ──────────────
   const surv = data.survival;
+  const buildWatchlistTable = (items: any[]) => {
+    if (!items.length) return '';
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:8.5px;margin-bottom:10px;">';
+    html += '<tr style="border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7px;text-transform:uppercase;">';
+    html += '<th style="text-align:left;padding:6px 4px;">Asset</th>';
+    html += '<th style="text-align:left;padding:6px 4px;">Component</th>';
+    html += '<th style="text-align:left;padding:6px 4px;">Median RUL (days)</th>';
+    html += '<th style="text-align:left;padding:6px 4px;">Risk</th>';
+    html += '</tr>';
+    items.forEach(w => {
+      html += '<tr style="border-bottom:1px solid #f1f5f9;">';
+      html += `<td style="padding:6px 4px;font-weight:700;color:${C.red};font-family:monospace;">${w.asset}</td>`;
+      html += `<td style="padding:6px 4px;">${w.component}</td>`;
+      html += `<td style="padding:6px 4px;font-weight:600;">${w.rul_days == null ? '-' : w.rul_days.toLocaleString()}</td>`;
+      html += `<td style="padding:6px 4px;">${w.risk}</td>`;
+      html += '</tr>';
+      const summary = criticalAssets.find(c => c.id === w.asset)?.summary;
+      if (summary) {
+        html += '<tr style="border-bottom:1px solid #e2e8f0;background-color:#f8fafc;">';
+        html += `<td colspan="4" style="padding:8px;font-size:8px;color:#334155;line-height:1.4;">`;
+        html += `<span style="font-weight:700;color:#6366f1;">AI Summary:</span> ${summary}`;
+        html += `</td></tr>`;
+      }
+    });
+    html += '</table>';
+    return html;
+  };
+
   const section4e = (surv && surv.component_summary && surv.component_summary.length) ? `
   <div class="page">
     ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
-    ${subHeader('4.7 FRSO Component Survival Analysis')}
+    ${subHeader('4.7 Asset component survival analysis')}
     <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 10px;">
-      Weibull Accelerated Failure Time (AFT) survival models, scored per component across the
+      Survival models, scored per component across the
       ${fmtN(surv.assets_analyzed)} highest-risk assets. The bars show each component's average
       probability of failing within 7 and 30 days; the replacement spend is the expected cost of the
       failures likely to occur in each window (from the cost-estimation model).
@@ -1223,26 +1251,65 @@ export function generateProfessionalHTML(data: ReportData): string {
       const COL: Record<string, string> = { Brake: '#ef4444', Tire: '#f59e0b', Battery: '#10b981', Oil: '#0ea5e9', Hydraulic: '#8b5cf6' };
       const order = ['tire', 'battery', 'hydraulic', 'oil', 'brake'];
       const comps = [...surv.component_summary].sort((a, b) => order.indexOf(a.component.toLowerCase()) - order.indexOf(b.component.toLowerCase()));
-      const maxP = Math.max(0.05, ...comps.map(c => c.avg_fail_prob_30d ?? 0));
-      return `<div style="padding:2px 2px 4px;">${comps.map(c => {
-        const p30 = c.avg_fail_prob_30d ?? 0, p7 = c.avg_fail_prob_7d ?? 0;
-        const w7 = Math.max(1, (p7 / maxP) * 100), w30 = Math.max(2, (p30 / maxP) * 100);
-        const col = COL[c.component] || '#0ea5e9';
-        return `<div style="display:flex;align-items:center;gap:8px;margin:6px 0;">
-          <div style="width:62px;font-size:9px;font-weight:700;color:${col};">${c.component}</div>
-          <div style="flex:1;background:#f1f5f9;border-radius:4px;height:16px;position:relative;">
-            <div style="position:absolute;top:0;left:0;width:${w30}%;background:${col};opacity:0.35;height:100%;border-radius:4px;"></div>
-            <div style="position:absolute;top:0;left:0;width:${w7}%;background:${col};height:100%;border-radius:4px;"></div>
-          </div>
-          <div style="width:172px;font-size:8px;color:${C.textMuted};text-align:right;">
-            30d <b style="color:#0f172a;">${(p30 * 100).toFixed(1)}%</b> · 7d ${(p7 * 100).toFixed(1)}%
-          </div>
-        </div>`;
-      }).join('')}
-      <div style="font-size:7.5px;color:${C.textMuted};margin-top:6px;">Solid = 7-day risk, shaded = 30-day risk.</div>
-      </div>
       
-      <div style="margin-top:20px;margin-bottom:6px;">
+      const w = 540;
+      const h = 220;
+      const chartH = h - 60;
+      const gap = Math.floor((w - 70) / comps.length);
+      const bw = 24; // Width of each bar
+      
+      // Calculate max probability to scale Y axis (round up to nearest 10%)
+      const maxP = Math.max(0.1, ...comps.map(c => Math.max(c.avg_fail_prob_30d ?? 0, c.avg_fail_prob_7d ?? 0)));
+      const step = 0.2; // 20% steps
+      const maxVal = Math.ceil(maxP / step) * step;
+      
+      const ticks = [];
+      for (let v = step; v <= maxVal + 0.001; v += step) ticks.push(v);
+
+      const gridLines = ticks.map(v => {
+        const y = 20 + chartH - chartH * (v / maxVal);
+        return `<line x1="44" y1="${y}" x2="${w - 10}" y2="${y}" stroke="${C.borderLight}" stroke-width="1" stroke-dasharray="3 3"/>
+                <text x="40" y="${y + 3}" text-anchor="end" font-size="8" fill="${C.textLight}">${(v * 100).toFixed(0)}%</text>`;
+      }).join('');
+
+      const rects = comps.map((c, i) => {
+        const p30 = c.avg_fail_prob_30d ?? 0;
+        const p7 = c.avg_fail_prob_7d ?? 0;
+        const bh30 = Math.max((p30 / maxVal) * chartH, 2);
+        const bh7 = Math.max((p7 / maxVal) * chartH, 2);
+        const cx = 50 + i * gap + gap / 2;
+        const x30 = cx - bw - 2;
+        const x7 = cx + 2;
+        const col = COL[c.component] || '#0ea5e9';
+        
+        return `
+          <!-- 30-day bar (shaded) -->
+          <rect x="${x30}" y="${20 + chartH - bh30}" width="${bw}" height="${bh30}" fill="${col}" rx="2" opacity="0.4"/>
+          <text x="${x30 + bw/2}" y="${20 + chartH - bh30 - 6}" text-anchor="middle" font-size="7.5" fill="${C.textMuted}" font-weight="600">${(p30 * 100).toFixed(1)}%</text>
+          
+          <!-- 7-day bar (solid) -->
+          <rect x="${x7}" y="${20 + chartH - bh7}" width="${bw}" height="${bh7}" fill="${col}" rx="2" opacity="0.9"/>
+          <text x="${x7 + bw/2}" y="${20 + chartH - bh7 - 6}" text-anchor="middle" font-size="7.5" fill="${col}" font-weight="700">${(p7 * 100).toFixed(1)}%</text>
+          
+          <!-- X-axis label -->
+          <text x="${cx}" y="${20 + chartH + 16}" text-anchor="middle" font-size="9" fill="${C.text}" font-weight="600">${c.component}</text>
+        `;
+      }).join('');
+
+      const svgBlock = `<div style="margin-top:10px;margin-bottom:20px;">
+        <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+          <line x1="44" y1="20" x2="44" y2="${20 + chartH}" stroke="${C.border}" stroke-width="1.5"/>
+          <line x1="44" y1="${20 + chartH}" x2="${w - 10}" y2="${20 + chartH}" stroke="${C.border}" stroke-width="1.5"/>
+          ${gridLines}${rects}
+          <!-- Legend -->
+          <rect x="${w/2 - 50}" y="${h - 12}" width="8" height="8" fill="#94a3b8" opacity="0.4" rx="1"/>
+          <text x="${w/2 - 38}" y="${h - 5}" font-size="8" fill="${C.textMuted}">30-day risk</text>
+          <rect x="${w/2 + 10}" y="${h - 12}" width="8" height="8" fill="#94a3b8" opacity="0.9" rx="1"/>
+          <text x="${w/2 + 22}" y="${h - 5}" font-size="8" fill="${C.textMuted}">7-day risk</text>
+        </svg>
+      </div>`;
+      
+      return svgBlock + `<div style="margin-top:20px;margin-bottom:6px;">
         <div style="font-size:10px;font-weight:700;color:${C.navy};text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;border-bottom:1px solid ${C.border};padding-bottom:4px;">At-Risk Component Counts</div>
         ${lightTable(
           ['Component', 'Failing in 7 Days', 'Failing in 30 Days'],
@@ -1259,18 +1326,12 @@ export function generateProfessionalHTML(data: ReportData): string {
       <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 8px;">
         Each asset's soonest-failing component, sorted by predicted median RUL - prioritise these for inspection.
       </p>
-      ${lightTable(
-        ['Asset', 'Component', 'Median RUL (days)', 'Risk'],
-        surv.watchlist.slice(0, 10).map(w => [w.asset, w.component, w.rul_days == null ? '-' : w.rul_days.toLocaleString(), w.risk])
-      )}
-  </div>
+      ${buildWatchlistTable(surv.watchlist.slice(0, 10))}
+    </div>
   <div class="page">
     ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
     ${subHeader('Soonest-Failing Watchlist (11+)', C.red)}
-    ${lightTable(
-      ['Asset', 'Component', 'Median RUL (days)', 'Risk'],
-      surv.watchlist.slice(10).map(w => [w.asset, w.component, w.rul_days == null ? '-' : w.rul_days.toLocaleString(), w.risk])
-    )}
+    ${buildWatchlistTable(surv.watchlist.slice(10))}
     ` : ''}
     ${alertBox(
       `FRSO survival modelling flags component-level degradation ahead of scheduled service. Where median RUL is below the statutory/OEM service interval, bring the inspection forward - survival-driven scheduling is the recommended override over fixed-interval PM.`,

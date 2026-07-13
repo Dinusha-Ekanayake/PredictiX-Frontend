@@ -522,65 +522,8 @@ export default function WarehouseAIReportPanel({
                     </div>
                   )}
                 </div>
-
-                <SectionDivider label="Critical Assets (Lowest Health Scores)" />
-                {(ctx.critical_assets?.length ?? 0) > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-100 dark:border-slate-800">
-                          {["Asset Code", "Name / Type", "Health", "Fail Prob", "Risk Level", "Days to Service", "Status"].map((h) => (
-                            <th key={h} className="pb-2 pr-4 text-left font-semibold text-[11px] text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {ctx.critical_assets!.map((a) => (
-                          <tr key={a.code} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                            <td className="py-2 pr-4 font-mono font-semibold text-rose-600">{a.code}</td>
-                            <td className="py-2 pr-4">
-                              <div className="font-medium">{a.name}</div>
-                              <div className="text-muted-foreground">{a.type}</div>
-                            </td>
-                            <td className="py-2 pr-4">
-                              <div className="flex items-center gap-1.5">
-                                <div className="h-1.5 w-16 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full"
-                                    style={{
-                                      width: `${a.health_score}%`,
-                                      backgroundColor: a.health_score < 50 ? P.rose : a.health_score < 70 ? P.amber : P.emerald,
-                                    }}
-                                  />
-                                </div>
-                                <span className="font-semibold">{a.health}</span>
-                              </div>
-                            </td>
-                            <td className="py-2 pr-4 font-medium" style={{ color: P.rose }}>{a.failure_prob}</td>
-                            <td className="py-2 pr-4">
-                              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${P.rose}20`, color: P.rose }}>
-                                {a.risk}
-                              </span>
-                            </td>
-                            <td className="py-2 pr-4 font-medium">
-                              {a.days_to_service !== null
-                                ? <span style={{ color: a.days_to_service! <= 7 ? P.rose : a.days_to_service! <= 30 ? P.amber : P.slate }}>
-                                    {a.days_to_service}d
-                                  </span>
-                                : "N/A"
-                              }
-                            </td>
-                            <td className="py-2">
-                              <span className="capitalize text-muted-foreground">{a.status}</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic text-center py-4">No critical assets found.</p>
-                )}
+                <SectionDivider label="AI Component & Failure Summary" />
+                <AIBlock text={ai.critical_assets_summary} />
               </div>
             )}
           </div>
@@ -849,12 +792,53 @@ export default function WarehouseAIReportPanel({
             <div className={SECTION_STYLE}>
               <SectionHeader
                 icon={HeartPulse} accent={P.teal} collapsed={s6Collapsed} onToggle={toggleS6}
-                title="6. FRSO Component Survival Analysis"
-                subtitle="Weibull Accelerated Failure Time (AFT) · predicted Remaining Useful Life"
+                title="6. Asset component survival analysis"
               />
               {!s6Collapsed && (
                 <div className="px-6 py-5 space-y-5">
                   <WarehouseSurvivalAnalysis data={ctx.survival_summary} isLoading={false} />
+
+                  <SectionDivider label="Soonest-Failing Watchlist" />
+                  {(ctx.survival_summary?.watchlist?.length ?? 0) > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-100 dark:border-slate-800">
+                            {["Asset", "Component", "Median RUL (days)", "Risk"].map((h) => (
+                              <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ctx.survival_summary!.watchlist!.map((w) => (
+                            <React.Fragment key={w.asset}>
+                              <tr className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                                <td className="py-2 pr-3 font-mono font-bold text-rose-600">{w.asset}</td>
+                                <td className="py-2 pr-3 font-medium">{w.component}</td>
+                                <td className="py-2 pr-3 font-semibold">{w.rul_days == null ? '-' : w.rul_days.toLocaleString()}</td>
+                                <td className="py-2 pr-3">
+                                  <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${P.rose}20`, color: P.rose }}>
+                                    {w.risk}
+                                  </span>
+                                </td>
+                              </tr>
+                              {/* Inject AI Summary if available in data.ai_sections.asset_summaries, though currently the report builder generates them dynamically */}
+                              {data.ai_sections?.asset_summaries?.[w.asset] && (
+                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/20">
+                                  <td colSpan={4} className="px-3 py-3 text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
+                                    <span className="font-bold text-violet-600 dark:text-violet-400 mr-1">AI Summary:</span>
+                                    {data.ai_sections.asset_summaries[w.asset]}
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic text-center py-3">No watchlist available.</p>
+                  )}
                 </div>
               )}
             </div>

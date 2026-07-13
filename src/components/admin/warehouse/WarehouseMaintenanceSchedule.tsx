@@ -165,19 +165,25 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
   }
 
   return (
-    <Card className="rounded-2xl">
-      <CardHeader className="space-y-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarClock className="h-4 w-4 text-muted-foreground" />
-              Predictive Maintenance Schedule
-            </CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Showing {displayData.length} of {allData.length} assets | Predicted vs Scheduled maintenance
-            </p>
+    <Card className="rounded-2xl overflow-hidden border-teal-100/60 dark:border-teal-900/30 h-full flex flex-col">
+      {/* Gradient header strip */}
+      <div className="bg-gradient-to-r from-teal-500/10 via-cyan-500/5 to-transparent px-6 py-4 border-b border-teal-100/50 dark:border-teal-900/30 shrink-0">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="rounded-xl bg-teal-500/15 p-2">
+              <CalendarClock className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold leading-tight">Predictive Maintenance Schedule</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Showing {displayData.length} of {allData.length} assets | Predicted vs Scheduled maintenance
+              </p>
+            </div>
           </div>
         </div>
+      </div>
+
+      <CardContent className="space-y-4 pt-6 flex-1 flex flex-col">
 
         {/* Controls */}
         <div className="flex flex-wrap gap-2">
@@ -213,9 +219,7 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
             ))}
           </div>
         </div>
-      </CardHeader>
 
-      <CardContent>
         {/* Scrollable Chart Container */}
         <div
           className="border rounded-2xl bg-slate-50/50 dark:bg-slate-950/20 overflow-y-auto"

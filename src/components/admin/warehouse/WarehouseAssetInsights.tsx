@@ -29,18 +29,22 @@ const STATUS_COLORS: Record<string, string> = {
   decommissioned: "#94a3b8",
 };
 
-export function CustomTooltip({ active, payload, label }: any) {
+export function CustomTooltip({ active, payload, label, total }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-slate-200/20 dark:border-white/10 bg-white/80 dark:bg-black/40 backdrop-blur-md px-3 py-2 text-xs shadow-xl">
-      {label && <p className="mb-2 font-semibold text-slate-900 dark:text-white">{label}</p>}
-      {payload.map((p: any) => (
-        <div key={p.name} className="flex items-center gap-3 text-slate-600 dark:text-slate-300">
-          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: p.color || p.payload?.fill || "#cbd5e1" }} />
-          <span className="flex-1 font-medium capitalize">{p.name.replace(/_/g, ' ')}</span>
-          <span className="font-bold text-slate-900 dark:text-white tabular-nums">{p.value}</span>
-        </div>
-      ))}
+    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2 text-xs shadow-md">
+      {label && <p className="mb-2 font-semibold text-foreground">{label}</p>}
+      {payload.map((p: any) => {
+        const pct = total ? Math.round((p.value / total) * 100) : 0;
+        return (
+          <div key={p.name} className="flex items-center gap-3 text-muted-foreground">
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: p.color || p.payload?.fill || "#cbd5e1" }} />
+            <span className="flex-1 font-medium capitalize">{p.name.replace(/_/g, ' ')}</span>
+            <span className="font-bold text-foreground tabular-nums">{p.value}</span>
+            {total ? <span className="font-semibold text-muted-foreground opacity-80 tabular-nums ml-1">({pct}%)</span> : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -131,8 +135,16 @@ export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: any
 
 export function AssetStatusDistributionCard({ data: externalData }: { data?: any[] }) {
   const data = externalData || [];
-  const total = data.reduce((sum, item) => sum + (item.value || 0), 0) || 1;
-  const statusData = data.map(d => ({
+  const ALL_STATUSES = ["active", "critical", "under_maintenance", "inactive", "decommissioned"];
+  
+  // Merge to ensure all categories show up, even if 0
+  const mergedData = ALL_STATUSES.map(name => {
+    const existing = data.find(d => d.name.toLowerCase() === name);
+    return existing || { name, value: 0 };
+  });
+
+  const total = mergedData.reduce((sum, item) => sum + (item.value || 0), 0) || 1;
+  const statusData = mergedData.map(d => ({
     ...d,
     color: STATUS_COLORS[d.name.toLowerCase()] || STATUS_COLORS[d.name] || "#64748b"
   })).sort((a, b) => b.value - a.value);
@@ -164,7 +176,7 @@ export function AssetStatusDistributionCard({ data: externalData }: { data?: any
                     <Cell key={i} fill={d.color} />
                   ))}
                 </Pie>
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomTooltip total={total} />} />
               </PieChart>
             </ResponsiveContainer>
           </div>

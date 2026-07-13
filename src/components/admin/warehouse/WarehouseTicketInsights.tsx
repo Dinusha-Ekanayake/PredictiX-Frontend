@@ -75,7 +75,7 @@ export function TicketPriorityBreakdownCard({ data: externalData }: { data?: any
                     <Cell key={i} fill={d.color} />
                   ))}
                 </Pie>
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomTooltip total={total} />} />
               </PieChart>
             </ResponsiveContainer>
           </div>

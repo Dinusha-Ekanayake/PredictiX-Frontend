@@ -61,6 +61,7 @@ function AnimatedCounter({ value }: { value: number }) {
 export default function AdminTicketsPage() {
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [hasError, setHasError] = React.useState(false);
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(0);
@@ -118,7 +119,14 @@ export default function AdminTicketsPage() {
   }, [users]);
 
   const refreshStatusCounts = React.useCallback(() => {
-    fetchTicketStatusCounts().then(setStatusCounts).catch(() => {});
+    fetchTicketStatusCounts()
+      .then((data) => {
+        setStatusCounts(data);
+        setHasError(false);
+      })
+      .catch(() => {
+        setHasError(true);
+      });
   }, []);
 
   // Load global status counts (not affected by filters)
@@ -154,7 +162,9 @@ export default function AdminTicketsPage() {
       setTotal(t);
       setTickets(rows);
       setPage(pageNum);
+      setHasError(false);
     } catch (err) {
+      setHasError(true);
       toast.error("Failed to load tickets", {
         description: err instanceof Error ? err.message : undefined,
       });
@@ -254,10 +264,17 @@ export default function AdminTicketsPage() {
               <p className="text-[12px] text-muted-foreground leading-tight max-w-sm">
                 Track, assign and resolve customer-reported issues and AI-flagged alerts.
               </p>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 shrink-0">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live
-              </span>
+              {hasError ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 dark:bg-red-500/15 border border-red-200 dark:border-red-500/25 px-2.5 py-0.5 text-[10px] font-semibold text-red-700 dark:text-red-300 shrink-0">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                  Offline
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 shrink-0">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live
+                </span>
+              )}
             </div>
           </div>
 
@@ -278,6 +295,54 @@ export default function AdminTicketsPage() {
             </div>
           </div>
         </div>
+      </div>
+
+
+      {/* ══ Status stat tiles ════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { key: "open", label: "Open", value: statusCounts.open || 0, icon: AlertCircle, iconBg: "bg-rose-100 dark:bg-rose-500/15", iconColor: "text-rose-600 dark:text-rose-400", ring: "ring-rose-400", accent: "text-rose-600 dark:text-rose-400" },
+          { key: "in-progress", label: "In Progress", value: statusCounts["in-progress"] || 0, icon: RefreshCw, iconBg: "bg-amber-100 dark:bg-amber-500/15", iconColor: "text-amber-600 dark:text-amber-400", ring: "ring-amber-400", accent: "text-amber-600 dark:text-amber-400" },
+          { key: "resolved", label: "Resolved", value: statusCounts.resolved || 0, icon: CheckCircle, iconBg: "bg-emerald-100 dark:bg-emerald-500/15", iconColor: "text-emerald-600 dark:text-emerald-400", ring: "ring-emerald-400", accent: "text-emerald-600 dark:text-emerald-400" },
+          { key: "closed", label: "Closed", value: statusCounts.closed || 0, icon: XCircle, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", ring: "ring-slate-400", accent: "text-slate-600 dark:text-slate-400" },
+        ].map((s) => {
+          const Icon = s.icon;
+          const active = selectedStatus === s.key;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setSelectedStatus(active ? "all" : s.key)}
+              className={cn(
+                "group rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm p-4 text-left transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
+                active && `ring-2 ${s.ring} border-transparent`
+              )}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", s.iconBg)}>
+                  <Icon className={cn("h-4 w-4", s.iconColor)} />
+                </div>
+                {active && (
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-400">
+                    Filtered
+                  </span>
+                )}
+              </div>
+              <p className={cn("text-[22px] font-semibold tracking-tight leading-none", s.accent)}>
+                <AnimatedCounter value={s.value} />
+              </p>
+              <p className="mt-1.5 text-[12px] font-medium text-foreground">{s.label}</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                {totalAll > 0 ? `${Math.round((s.value / totalAll) * 100)}% of total` : "—"}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ══ Charts ═══════════════════════════════════════════════════════════ */}
+      <div className="pt-2">
+        <TicketDashboardCharts refreshTrigger={chartRefreshTrigger} />
       </div>
 
       {/* ══ Search + filters ═════════════════════════════════════════════════ */}
@@ -354,53 +419,6 @@ export default function AdminTicketsPage() {
             )}
           </div>
         </div>
-      </div>
-
-      {/* ══ Status stat tiles ════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { key: "open", label: "Open", value: statusCounts.open || 0, icon: AlertCircle, iconBg: "bg-rose-100 dark:bg-rose-500/15", iconColor: "text-rose-600 dark:text-rose-400", ring: "ring-rose-400", accent: "text-rose-600 dark:text-rose-400" },
-          { key: "in-progress", label: "In Progress", value: statusCounts["in-progress"] || 0, icon: RefreshCw, iconBg: "bg-amber-100 dark:bg-amber-500/15", iconColor: "text-amber-600 dark:text-amber-400", ring: "ring-amber-400", accent: "text-amber-600 dark:text-amber-400" },
-          { key: "resolved", label: "Resolved", value: statusCounts.resolved || 0, icon: CheckCircle, iconBg: "bg-emerald-100 dark:bg-emerald-500/15", iconColor: "text-emerald-600 dark:text-emerald-400", ring: "ring-emerald-400", accent: "text-emerald-600 dark:text-emerald-400" },
-          { key: "closed", label: "Closed", value: statusCounts.closed || 0, icon: XCircle, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", ring: "ring-slate-400", accent: "text-slate-600 dark:text-slate-400" },
-        ].map((s) => {
-          const Icon = s.icon;
-          const active = selectedStatus === s.key;
-          return (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => setSelectedStatus(active ? "all" : s.key)}
-              className={cn(
-                "group rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm p-4 text-left transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
-                active && `ring-2 ${s.ring} border-transparent`
-              )}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", s.iconBg)}>
-                  <Icon className={cn("h-4 w-4", s.iconColor)} />
-                </div>
-                {active && (
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-400">
-                    Filtered
-                  </span>
-                )}
-              </div>
-              <p className={cn("text-[22px] font-semibold tracking-tight leading-none", s.accent)}>
-                <AnimatedCounter value={s.value} />
-              </p>
-              <p className="mt-1.5 text-[12px] font-medium text-foreground">{s.label}</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                {totalAll > 0 ? `${Math.round((s.value / totalAll) * 100)}% of total` : "—"}
-              </p>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ══ Charts ═══════════════════════════════════════════════════════════ */}
-      <div className="pt-2">
-        <TicketDashboardCharts refreshTrigger={chartRefreshTrigger} />
       </div>
 
       {/* Total count */}
@@ -501,11 +519,13 @@ export default function AdminTicketsPage() {
                   </div>
 
                   <div className="ml-2 shrink-0 flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap">
-                    <span className="text-[10px] uppercase tracking-wide">Assigned</span>
                     {t.assigned_to ? (
-                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300 font-medium">{userMap.get(t.assigned_to) ?? t.assigned_to.slice(0, 8)}</Badge>
+                      <>
+                        <span className="text-[10px] uppercase tracking-wide">Assigned</span>
+                        <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300 font-medium">{userMap.get(t.assigned_to) ?? t.assigned_to.slice(0, 8)}</Badge>
+                      </>
                     ) : (
-                      <span className="italic">Unassigned</span>
+                      <span className="italic mt-1 text-slate-500 dark:text-slate-500">Unassigned</span>
                     )}
                   </div>
                 </div>

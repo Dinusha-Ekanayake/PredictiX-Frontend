@@ -140,6 +140,13 @@ export default function FloatingChatbot() {
     return () => observer.disconnect();
   }, [isMounted]);
 
+  // Clear chat history when returning to auth routes (e.g. logging out)
+  React.useEffect(() => {
+    if (isHiddenRoute) {
+      setMessages([]);
+    }
+  }, [isHiddenRoute]);
+
   // Escape key to close
   React.useEffect(() => {
     if (!isOpen) return;
@@ -275,7 +282,7 @@ export default function FloatingChatbot() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    PredictiX Assistant
+                    Sidekick
                     <Sparkles className="size-3 text-violet-500" />
                   </p>
                   <p className="text-[10px] text-muted-foreground flex items-center gap-1">
@@ -285,15 +292,6 @@ export default function FloatingChatbot() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setMessages([])}
-                  aria-label="Clear conversation"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -310,8 +308,8 @@ export default function FloatingChatbot() {
             <div className="flex-1 overflow-y-auto px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-violet-500/20 hover:[&::-webkit-scrollbar-thumb]:bg-violet-500/40 [&::-webkit-scrollbar-thumb]:rounded-full">
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center pb-12">
-                  <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-4">
-                    <Sparkles className="size-7 text-violet-500" />
+                  <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3.5">
+                    <img src="/logo/predictix-icon.svg" alt="PredictiX" className="size-8 object-contain drop-shadow-md" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">How can I help you?</p>
@@ -498,7 +496,7 @@ export default function FloatingChatbot() {
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label={isOpen ? "Close chatbot" : "Open chatbot"}
       >
-        <span className="sr-only">PredictiX Assistant</span>
+        <span className="sr-only">Sidekick</span>
         <span className="pointer-events-none absolute inset-0 rounded-full bg-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-violet-400/40 to-sky-400/40 blur-md opacity-60" />
         {isOpen ? (

@@ -166,7 +166,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
   const brakeRisk = component_summary.find(c => c.component.toLowerCase() === "brake")?.at_risk_7d || 0;
 
   return (
-    <Card className="rounded-2xl overflow-hidden border-teal-100/60 dark:border-teal-900/30 h-full flex flex-col bg-transparent !border-0 !shadow-none">
+    <Card className="rounded-2xl overflow-hidden border-teal-100/60 dark:border-teal-900/30 h-full flex flex-col">
       <CardHeader className="pb-3 bg-gradient-to-r from-teal-500/10 via-cyan-500/5 to-transparent border-b border-teal-100/50 dark:border-teal-900/30 rounded-t-2xl">
         <CardTitle className="text-base flex items-center gap-2">
           <HeartPulse className="h-4 w-4 text-teal-500" /> Asset component survival analysis

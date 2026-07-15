@@ -155,7 +155,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
   // Calculate totals for the KPIs
   const totalFailures30d = component_summary.reduce((s, c) => s + (c.at_risk_30d || 0), 0);
   const totalFailures7d = component_summary.reduce((s, c) => s + (c.at_risk_7d || 0), 0);
-  const highestMaintenanceComp = [...component_summary].sort((a, b) => (b.at_risk_7d || 0) - (a.at_risk_7d || 0))[0];
+  const highestRiskComp = [...active.data].sort((a, b) => b.avgPct - a.avgPct)[0];
 
   const tireRisk = component_summary.find(c => c.component.toLowerCase() === "tire")?.at_risk_7d || 0;
   const batteryRisk = component_summary.find(c => c.component.toLowerCase() === "battery")?.at_risk_7d || 0;
@@ -280,7 +280,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
                   <TableCell className="text-right text-lg font-bold text-teal-500 dark:text-teal-400">{fmtMoney(expected_spend_7d)}</TableCell>
                 </TableRow>
 
-                {/* Highest maintenance component */}
+                {/* Highest Risk Component */}
                 <TableRow className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-100/50 dark:hover:bg-slate-800/50">
                   <TableCell className="py-2.5">
                     <div className="flex items-center gap-3">
@@ -288,12 +288,12 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
                         <TrendingDown className="h-4 w-4 text-fuchsia-500" />
                       </div>
                       <div>
-                        <div className="font-semibold text-slate-900 dark:text-slate-100">Highest number of maintenance components</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">component with most assets at risk</div>
+                        <div className="font-semibold text-slate-900 dark:text-slate-100">Highest Risk Component</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">component with highest average failure probability</div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right text-lg font-bold text-slate-900 dark:text-slate-100">{cap(highestMaintenanceComp?.component ?? "—")}</TableCell>
+                  <TableCell className="text-right text-lg font-bold text-slate-900 dark:text-slate-100">{highestRiskComp?.name ?? "—"}</TableCell>
                 </TableRow>
 
                 {/* Tire Component Risk */}

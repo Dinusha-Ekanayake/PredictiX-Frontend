@@ -16,6 +16,8 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
+  Droplets,
+  Octagon,
 } from "lucide-react";
 import {
   BarChart,
@@ -329,7 +331,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
                 </TableRow>
                 
                 {/* Hydraulic Component Risk */}
-                <TableRow className="hover:bg-slate-100/50 dark:hover:bg-slate-800/50">
+                <TableRow className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-100/50 dark:hover:bg-slate-800/50">
                   <TableCell className="py-2.5">
                     <div className="flex items-center gap-3">
                       <div className="rounded-lg p-1.5 bg-indigo-500/10">
@@ -342,6 +344,38 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
                     </div>
                   </TableCell>
                   <TableCell className="text-right text-lg font-bold text-slate-900 dark:text-slate-100">{hydraulicRisk}</TableCell>
+                </TableRow>
+
+                {/* Oil Component Risk */}
+                <TableRow className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-100/50 dark:hover:bg-slate-800/50">
+                  <TableCell className="py-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-lg p-1.5 bg-sky-500/10">
+                        <Droplets className="h-4 w-4 text-sky-500" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-slate-900 dark:text-slate-100">Oil Component Risk</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤7d</div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right text-lg font-bold text-slate-900 dark:text-slate-100">{oilRisk}</TableCell>
+                </TableRow>
+
+                {/* Brake Component Risk */}
+                <TableRow className="hover:bg-slate-100/50 dark:hover:bg-slate-800/50">
+                  <TableCell className="py-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-lg p-1.5 bg-rose-500/10">
+                        <Octagon className="h-4 w-4 text-rose-500" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-slate-900 dark:text-slate-100">Brake Component Risk</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤7d</div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right text-lg font-bold text-slate-900 dark:text-slate-100">{brakeRisk}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>

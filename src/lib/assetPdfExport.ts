@@ -21,10 +21,19 @@ export interface AssetReportData {
   cost_net_shap?: number;
   /** Fleet mean cost from the cost model's extra_data.fleet_mean_lkr — no longer hardcoded */
   fleet_avg_cost?: number;
-  /** breakdown-cost-v4.0 label, e.g. "XGBoost v4.0" — shown instead of a hardcoded model name */
+  /** breakdown-cost label, e.g. "CatBoost v5.0" — shown instead of a hardcoded model name */
   cost_model_version?: string;
-  /** v4 cost model returns relative_impact (0-100%) + direction, NOT a raw LKR shap value.
-   *  Per the v4 docs: "Never display sv_log directly — it is in log1p space." */
+  /** Bundle-level accuracy stats for whichever cost model is currently loaded —
+   *  real numbers from the model bundle, never hardcoded, so they never go
+   *  stale when the model is retrained/replaced. */
+  cost_test_r2?: number; cost_test_mae?: number; cost_test_medae?: number; cost_picp_80?: number;
+  /** If the cost prediction endpoint failed, the real reason (HTTP status +
+   *  backend error detail) — shown in place of a generic empty-state message
+   *  so a failure is diagnosable directly from the report, without needing
+   *  the browser Network tab or backend logs. */
+  cost_error?: string;
+  /** Cost model returns relative_impact (0-100%) + direction, NOT a raw LKR shap value.
+   *  Per the model docs: "Never display sv_log directly — it is in log-ratio space." */
   cost_drivers?: Array<{feature:string;value:string;relative_impact:number;direction:"increases"|"decreases"}>;
   currency?: string; top_explanations?: Record<string,number>;
   ai_narrative?: string;
@@ -223,26 +232,25 @@ function subH(title:string):string{
 }
 
 // ── Page wrapper: header + content + footer (no browser chrome) ───────────────
-function page(content:string,warehouse:string,section:string,pageNum:number,total:number,origin=""):string{
+function page(content:string,warehouse:string,section:string,origin=""):string{
   return`<div class="page">
     <!-- inner border frame -->
-    <div style="border:1.5px solid ${C.teal};border-radius:4px;min-height:calc(100% - 0px);display:flex;flex-direction:column;overflow:hidden">
+    <div style="border:1.5px solid ${C.teal};border-radius:4px;min-height:calc(100% - 0px);display:flex;flex-direction:column">
       <!-- page header -->
       <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;background:${C.tealLight};border-bottom:1px solid ${C.tealBorder};flex-shrink:0">
         <div style="display:flex;align-items:center;gap:7px">
           <img src="${origin}/logo/predictix-icon.svg" width="18" height="18" style="display:block;opacity:0.85" onerror="this.style.display='none'" alt=""/>
-          <span style="font-size:8.5px;font-weight:700;color:${C.teal};letter-spacing:.7px;text-transform:uppercase">${warehouse}</span>
+          <span style="font-size:8.5px;font-weight:700;color:${C.teal};letter-spacing:.7px;text-transform:uppercase">PREDICTIX</span>
         </div>
         <span style="font-size:8.5px;color:${C.textLight}">${section}</span>
       </div>
-      <!-- page body -->
+      <!-- page body — footer removed here; a repeating footer (with a live,
+           correct page count that includes any overflow pages) is now
+           rendered by Playwright itself, once per physical PDF page, via
+           reports.py's footer_template. See downloadAssetPDFServer. -->
       <div style="padding:14px 18px;flex:1">${content}</div>
-      <!-- page footer -->
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 16px;background:${C.tealLight};border-top:1px solid ${C.tealBorder};flex-shrink:0">
-        <span style="font-size:7.5px;color:${C.textLight}">PredictiX AI Platform &nbsp;·&nbsp; Asset Performance Report &nbsp;·&nbsp; Confidential &nbsp;·&nbsp; © 2026 LankaLogix</span>
-        <span style="font-size:7.5px;color:${C.textLight}">Page ${pageNum} of ${total}</span>
+    
       </div>
-    </div>
   </div>`;
 }
 
@@ -274,8 +282,11 @@ const CSS=`
   .page {
     page-break-after: always;
     background: white;
-    height: calc(297mm - 27mm);
-    overflow: hidden;
+    /* No fixed height/overflow here anymore — a topic's content can now
+       naturally overflow onto additional physical pages instead of being
+       silently clipped once it grows past one sheet's worth of content
+       (e.g. once real cost-model data fills out Health/Risk/Cost). */
+    min-height: calc(297mm - 27mm);
   }
   .page:last-child { page-break-after: auto; }
   .no-break { break-inside: avoid; page-break-inside: avoid; }
@@ -300,10 +311,11 @@ function generateHTML(data:AssetReportData, origin=""):string{
   const rCol=rColors[rl]??C.slate;
   const recs=insights.recommendations||{critical:[],high:[],medium:[]};
   const wLbl=data.warehouseName.toUpperCase().replace(/[^A-Z0-9 \-]/g,"");
-  const TOTAL=6;
+  // Page numbering is now handled entirely by Playwright's footer template
+  // (see reports.py) using its own live pageNumber/totalPages — no longer
+  // tracked here, since a topic can now span a variable number of physical
+  // pages depending on content length.
 
-  const HCOLS=["#059669","#3b82f6","#d97706","#f97316","#e11d48"];
-  const PCOLS=[C.teal,C.sky,C.emerald,C.amber,C.rose,C.violet,C.slate,"#06b6d4"];
   const shapCols=[C.teal,"#3b82f6",C.amber,C.violet,C.orange,"#db2777",C.emerald,C.rose];
 
   // ── PAGE 1: COVER ──────────────────────────────────────────────────────────
@@ -337,61 +349,13 @@ function generateHTML(data:AssetReportData, origin=""):string{
         &nbsp;·&nbsp; Make / Model: <strong style="color:${C.textDark}">${[asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"—"}</strong>
       </div>
       <div style="display:inline-block;border:1px solid ${C.amber};color:${C.amber};font-size:8.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;padding:3px 14px;border-radius:3px">Confidential</div>
-
-      <!-- 6-cell KPI strip on cover -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:26px;width:100%;max-width:420px">
-        ${[
-          ["Health Score",        hs!=null?`${hs}%`:"—",    hCol],
-          ["Failure Probability", fp!=null?`${fp}%`:"—",    C.rose],
-          ["Risk Level",          rl,                         rCol],
-          ["Days to Maintenance", data.days_until_maintenance!=null?`${data.days_until_maintenance}d`:"—", C.teal],
-          ["Est. Cost",           data.estimated_cost?`LKR ${(data.estimated_cost/1000).toFixed(0)}K`:"—", C.violet],
-          ["Open Tickets",        String(ticketMetrics.open_tickets), C.amber],
-        ].map(([l,v,c])=>`<div style="border:1px solid ${C.border};border-left:4px solid ${c};border-radius:0 5px 5px 0;padding:9px 12px;background:white;text-align:left">
-          <div style="font-size:7px;color:${C.textLight};text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">${l}</div>
-          <div style="font-size:15px;font-weight:800;color:${c};line-height:1">${v}</div>
-        </div>`).join("")}
-      </div>
     </div>
 
     <!-- bottom teal stripe -->
     <div style="background:${C.teal};height:6px;flex-shrink:0"></div>
   </div>`;
 
-  // ── PAGE 2: FLEET OVERVIEW ──────────────────────────────────────────────────
-  const topRiskRows=fleet.top_risk_assets.slice(0,5).map(r=>[
-    r.name,r.location,
-    `<span style="color:${r.healthScore<30?C.rose:C.amber};font-weight:700">${r.healthScore}%</span>`,
-    `${(r.failureProbability*100).toFixed(1)}%`,
-    r.daysToMaintenance!=null?`${r.daysToMaintenance}d`:"—",
-  ]);
-
-  const p2=page(`
-    ${secH("1","Fleet Overview","Fleet health and composition")}
-    ${kpiRow([
-      {label:"Total Assets",   value:String(fleet.total_assets),                              color:C.teal},
-      {label:"Fleet Health",   value:`${fleet.fleet_health}%`,                               color:fleet.fleet_health>=70?C.emerald:C.rose},
-      {label:"Critical Alerts",value:String(fleet.critical_alerts),                          color:C.rose},
-      {label:"Open Tickets",   value:String(fleet.open_tickets),                             color:C.amber},
-      {label:"Pred. Failures", value:String(fleet.predicted_failures),                       color:C.rose},
-      {label:"Est. Cost LKR",  value:`${(fleet.est_maintenance_cost/1_000_000).toFixed(1)}M`,color:C.violet},
-    ])}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-      ${chartBox("HEALTH BAND DISTRIBUTION",
-        fleet.health_distribution.length?svgDonut(fleet.health_distribution,HCOLS,100):`<p style="color:${C.textLight};font-size:10px">No data</p>`,
-        "Figure 1.1 — Fleet health bands")}
-      ${chartBox("ASSET STATUS DISTRIBUTION",
-        fleet.status_distribution.length?svgDonut(fleet.status_distribution,PCOLS,100):`<p style="color:${C.textLight};font-size:10px">No data</p>`,
-        "Figure 1.2 — Asset status breakdown")}
-    </div>
-    ${fleet.vehicle_distribution.length?chartBox("FLEET COMPOSITION BY VEHICLE TYPE",
-      svgVBar(fleet.vehicle_distribution.slice(0,8),PCOLS,440,150),
-      "Figure 1.3 — Asset count by vehicle type"):""}
-    ${fleet.top_risk_assets.length?`${subH("1.1 Top At-Risk Assets")}
-      ${dataTbl(["Asset","Location","Health Score","Fail. Prob.","Days to Maint."],topRiskRows,"Figure 1.4 — Top 5 highest-risk assets by failure probability")}`:""}
-  `,wLbl,"Fleet Overview",2,TOTAL,origin);
-
-  // ── PAGE 3: ASSET OVERVIEW ──────────────────────────────────────────────────
+  // ── PAGE 1 (content): ASSET OVERVIEW ─────────────────────────────────────────
   const healthGauge=hs!=null?`
     <div style="display:flex;align-items:center;gap:18px;padding:8px 0">
       <div style="position:relative;width:80px;height:80px;flex-shrink:0">
@@ -435,15 +399,15 @@ function generateHTML(data:AssetReportData, origin=""):string{
   ];
 
   const p3=page(`
-    ${secH("2","Asset Overview","Asset details and prediction summary")}
+    ${secH("1","Asset Overview","Asset details and prediction summary")}
 
-    ${subH("2.1 Prediction Summary")}
+    ${subH("1.1 Prediction Summary")}
     ${chartBox("ASSET HEALTH & PREDICTION",`
       <div style="display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start">
         <div>${healthGauge}</div>
         <table style="width:100%;border-collapse:collapse">
           ${([
-            ["Est. Cost (v4)",           data.estimated_cost?fmtCost(data.estimated_cost,cur):"Run AI prediction"],
+            ["Est. Cost (v5)",           data.estimated_cost?fmtCost(data.estimated_cost,cur):"Run AI prediction"],
             ["80% Confidence Lower",     data.cost_lower?fmtCost(data.cost_lower,cur):"—"],
             ["80% Confidence Upper",     data.cost_upper?fmtCost(data.cost_upper,cur):"—"],
             ["Days Until Maintenance",   data.days_until_maintenance!=null?`${data.days_until_maintenance} days`:"—"],
@@ -454,13 +418,13 @@ function generateHTML(data:AssetReportData, origin=""):string{
           </tr>`).join("")}
         </table>
       </div>
-    `,"Figure 2.1 — Health score and cost prediction summary")}
+    `,"Figure 1.1 — Health score and cost prediction summary")}
 
-    ${subH("2.2 Asset Details")}
+    ${subH("1.2 Asset Details")}
     ${infoTbl(assetRows)}
-  `,wLbl,"Asset Overview",3,TOTAL,origin);
+  `,wLbl,"Asset Overview",origin);
 
-  // ── PAGE 4: HEALTH, RISK & COST SHAP ───────────────────────────────────────
+  // ── PAGE 2: HEALTH, RISK & COST ESTIMATION ───────────────────────────────────────
   // Build SHAP data — normalise to 0-100% regardless of input format
   const shapData=(()=>{
     const raw=data.top_explanations;
@@ -491,25 +455,34 @@ function generateHTML(data:AssetReportData, origin=""):string{
     items.length?`<div class="no-break" style="break-inside:avoid;page-break-inside:avoid">${hlBox(level+" PRIORITY",items.map(r=>`• ${r}`).join("<br/>"),col)}</div>`:"";
 
   const p4=page(`
-    ${secH("3","Health, Risk Analysis & Cost Estimation",`Key factors · ${data.cost_model_version||"XGBoost v4.0"}`)}
+    ${secH("2","Health, Risk Analysis & Cost Estimation",`Key factors · ${data.cost_model_version||"AI Cost Model"}`)}
 
-    ${subH("3.1 Failure Prediction — Key Risk Factors")}
+    ${subH("2.1 Failure Prediction — Key Risk Factors")}
     ${shapData.length
-      ?`${chartBox("KEY FACTORS DRIVING FAILURE RISK",svgHBar(shapData,shapCols,430),"Figure 3.1 — Relative importance of each factor, normalised to 100%")}
+      ?`${chartBox("KEY FACTORS DRIVING FAILURE RISK",svgHBar(shapData,shapCols,430),"Figure 2.1 — Relative importance of each factor, normalised to 100%")}
         ${dataTbl(["Factor","Relative Importance"],shapData.map(d=>[d.name,`${d.pct}%`]),
-          "Figure 3.2 — Factors ranked by influence on failure risk")}`
+          "Figure 2.2 — Factors ranked by influence on failure risk")}`
       :hlBox("RISK FACTOR DATA NOT AVAILABLE","Run the AI prediction engine to generate risk factor scores.",C.amber)}
 
-    ${subH("3.2 Explanation of Your Estimated Cost")}
+    ${subH("2.2 Explanation of Your Estimated Cost")}
     ${costDrivers.length?`
-      ${hlBox("HOW TO READ THIS",
-        `These are the factors that influenced this cost estimate the most, shown as their share of total impact (0–100%) rather than a direct LKR amount.<br/>
-         Red bars = factors that push cost above the fleet average &nbsp;|&nbsp; Green bars = factors that pull cost below the fleet average.<br/>
-         Model: ${data.cost_model_version||"XGBoost v4.0"} · Target: cost in the next 30 days given current health · Test MAE: LKR 15,459 · R² = 0.64 · MedAE: LKR 5,216 · 80% PI coverage: 79.2%`,
-        C.amber)}
+      ${(()=>{
+        const statParts=[
+          data.cost_test_mae!=null?`Test MAE: ${fmtCost(data.cost_test_mae,cur)}`:null,
+          data.cost_test_r2!=null?`R² = ${data.cost_test_r2.toFixed(2)}`:null,
+          data.cost_test_medae!=null?`MedAE: ${fmtCost(data.cost_test_medae,cur)}`:null,
+          data.cost_picp_80!=null?`80% PI coverage: ${data.cost_picp_80.toFixed(1)}%`:null,
+        ].filter(Boolean);
+        const statSuffix=statParts.length?` · ${statParts.join(" · ")}`:"";
+        return hlBox("HOW TO READ THIS",
+          `These are the factors that influenced this cost estimate the most, shown as their share of total impact (0–100%) rather than a direct LKR amount.<br/>
+           Red bars = factors that push cost above the fleet average &nbsp;|&nbsp; Green bars = factors that pull cost below the fleet average.<br/>
+           Model: ${data.cost_model_version||"AI Cost Model"} · Target: cost in the next 30 days given current health${statSuffix}`,
+          C.amber);
+      })()}
       ${chartBox("COST DRIVERS — RELATIVE IMPORTANCE",
         svgCostBars(costDrivers,430),
-        `Figure 3.3 — ${data.cost_model_version||"XGBoost v4.0"} relative importance of each cost factor · red = increases estimate · green = decreases estimate`)}
+        `Figure 2.3 — ${data.cost_model_version||"AI Cost Model"} relative importance of each cost factor · red = increases estimate · green = decreases estimate`)}
       ${dataTbl(
         ["Feature","Current Value","Relative Impact","Effect"],
         costDrivers.map(d=>{
@@ -522,7 +495,7 @@ function generateHTML(data:AssetReportData, origin=""):string{
             `<span style="color:${col}">${isUp?"▲ Increases cost":"▼ Decreases cost"}</span>`,
           ];
         }),
-        `Figure 3.4 — Top cost factors ranked by relative importance (${data.cost_model_version||"XGBoost v4.0"})`
+        `Figure 2.4 — Top cost factors ranked by relative importance (${data.cost_model_version||"AI Cost Model"})`
       )}
       <div class="no-break" style="border:1px solid ${C.border};border-radius:5px;overflow:hidden;margin-bottom:12px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr">
@@ -542,23 +515,27 @@ function generateHTML(data:AssetReportData, origin=""):string{
           </strong>
         </div>
       </div>
-    `:hlBox("COST MODEL DATA NOT AVAILABLE","Run the cost prediction model to generate a cost breakdown.",C.amber)}
+    `:hlBox("COST MODEL DATA NOT AVAILABLE",
+        data.cost_error
+          ? `The cost prediction request failed: <strong>${data.cost_error}</strong>. Contact your system administrator with this message.`
+          : "Run the cost prediction model to generate a cost breakdown.",
+        C.amber)}
 
-    ${insights.executive_summary?`${subH("3.3 AI Executive Summary")}${hlBox("AI ANALYSIS",
+    ${insights.executive_summary?`${subH("2.3 AI Executive Summary")}${hlBox("AI ANALYSIS",
       String(insights.executive_summary).slice(0,350)+(String(insights.executive_summary).length>350?"…":""),
       C.teal)}`:""}
     ${insights.ai_narrative&&insights.ai_narrative!==insights.executive_summary&&insights.ai_narrative.length>5?
       hlBox("AI NARRATIVE",String(insights.ai_narrative).slice(0,250),C.sky):""}
 
-    ${subH("3.4 Recommendations")}
+    ${subH("2.4 Recommendations")}
     ${recBlock("Critical",recs.critical,C.rose)}
     ${recBlock("High",recs.high,C.amber)}
     ${recBlock("Medium",recs.medium,C.sky)}
     ${!recs.critical.length&&!recs.high.length&&!recs.medium.length
       ?hlBox("RECOMMENDATIONS","No specific recommendations. Run AI prediction for asset-specific guidance.",C.slate):""}
-  `,wLbl,"Health, Risk & Cost Estimation",4,TOTAL,origin);
+  `,wLbl,"Health, Risk & Cost Estimation",origin);
 
-  // ── PAGE 5: SENSOR + MAINTENANCE + TICKETS ──────────────────────────────────
+  // ── PAGE 3: SENSOR + MAINTENANCE ──────────────────────────────────
   const sRows:[string,string][]=sensor?[
     ["Recorded At",               fmt(sensor.recorded_at)],
     ["Tire Health",               sensor.tire_health_pct!=null?`${sensor.tire_health_pct}%`:"—"],
@@ -605,15 +582,15 @@ function generateHTML(data:AssetReportData, origin=""):string{
     ?svgDonut([{name:"Open",count:ticketMetrics.open_tickets},{name:"High Pri.",count:ticketMetrics.high_priority_tickets},{name:"Closed",count:ticketMetrics.closed_tickets}],[C.rose,C.amber,C.emerald],90):"";
 
   const p5=page(`
-    ${secH("4","Sensor Data & Maintenance","Latest readings and maintenance history")}
+    ${secH("3","Sensor Data & Maintenance","Latest readings and maintenance history")}
 
-    ${subH("4.1 Latest Sensor Snapshot")}
+    ${subH("3.1 Latest Sensor Snapshot")}
     ${sRows.length?infoTbl(sRows)
       :hlBox("SENSOR STATUS","No sensor readings available. Connect asset to the PredictiX monitoring system.",C.slate)}
 
-    ${sensorHealthFields.length?`${subH("4.2 Component Health Levels")}${chartBox("COMPONENT HEALTH",sensorBars(sensorHealthFields,430),"Figure 4.1 — Component health as percentage")}` :""}
+    ${sensorHealthFields.length?`${subH("3.2 Component Health Levels")}${chartBox("COMPONENT HEALTH",sensorBars(sensorHealthFields,430),"Figure 3.1 — Component health as percentage")}` :""}
 
-    ${subH("4.3 Maintenance Summary")}
+    ${subH("3.3 Maintenance Summary")}
     ${infoTbl([
       ["Total Events",       String(maintenanceMetrics.total_events)],
       ["Preventive Events",  String(maintenanceMetrics.preventive_count)],
@@ -622,28 +599,28 @@ function generateHTML(data:AssetReportData, origin=""):string{
       ["Total Downtime",     `${maintenanceMetrics.total_downtime_hours} hours`],
       ["Avg Cost / Event",   maintenanceMetrics.total_events?fmtCost(Math.round(maintenanceMetrics.total_cost/maintenanceMetrics.total_events),cur):"—"],
     ])}
-    ${maintDonut?chartBox("MAINTENANCE TYPE BREAKDOWN",maintDonut,"Figure 4.2 — Preventive vs corrective events"):""}
-    ${maintenance.length?`${subH("4.4 Recent Maintenance Events")}${dataTbl(["Date","Type","Description",`Cost (${cur})`,"Downtime"],maintRows,"Figure 4.3 — Most recent maintenance events")}`
+    ${maintDonut?chartBox("MAINTENANCE TYPE BREAKDOWN",maintDonut,"Figure 3.2 — Preventive vs corrective events"):""}
+    ${maintenance.length?`${subH("3.4 Recent Maintenance Events")}${dataTbl(["Date","Type","Description",`Cost (${cur})`,"Downtime"],maintRows,"Figure 3.3 — Most recent maintenance events")}`
       :hlBox("MAINTENANCE HISTORY","No maintenance events recorded.",C.slate)}
-  `,wLbl,"Sensor & Maintenance",5,TOTAL,origin);
+  `,wLbl,"Sensor & Maintenance",origin);
 
-  // ── PAGE 6: TICKETS + INSIGHTS ────────────────────────────────────────────
+  // ── PAGE 4: TICKETS + INSIGHTS ────────────────────────────────────────────
   const p6=page(`
-    ${secH("5","Ticket Management & Insights","Support tickets · Conclusion")}
+    ${secH("4","Ticket Management & Insights","Support tickets · Conclusion")}
 
-    ${subH("5.1 Ticket Summary")}
+    ${subH("4.1 Ticket Summary")}
     ${infoTbl([
       ["Total Tickets",  String(ticketMetrics.total_tickets)],
       ["Open Tickets",   String(ticketMetrics.open_tickets)],
       ["High Priority",  String(ticketMetrics.high_priority_tickets)],
       ["Closed Tickets", String(ticketMetrics.closed_tickets)],
     ])}
-    ${ticketDonut?chartBox("TICKET DISTRIBUTION",ticketDonut,"Figure 5.1 — Ticket status distribution"):""}
-    ${tickets.length?`${subH("5.2 Recent Tickets")}${dataTbl(["Ticket ID","Title","Priority","Status","Created"],ticketRows,"Figure 5.2 — Most recent support tickets")}`
+    ${ticketDonut?chartBox("TICKET DISTRIBUTION",ticketDonut,"Figure 4.1 — Ticket status distribution"):""}
+    ${tickets.length?`${subH("4.2 Recent Tickets")}${dataTbl(["Ticket ID","Title","Priority","Status","Created"],ticketRows,"Figure 4.2 — Most recent support tickets")}`
       :hlBox("TICKET HISTORY","No tickets raised for this asset.",C.slate)}
 
-    ${insights.conclusion?`${subH("5.3 Conclusion")}${hlBox("EXECUTIVE CONCLUSION",insights.conclusion,C.teal)}`:""}
-  `,wLbl,"Tickets & Insights",6,TOTAL,origin);
+    ${insights.conclusion?`${subH("4.3 Conclusion")}${hlBox("EXECUTIVE CONCLUSION",insights.conclusion,C.teal)}`:""}
+  `,wLbl,"Tickets & Insights",origin);
 
   return`<!DOCTYPE html>
 <html lang="en">
@@ -653,11 +630,57 @@ function generateHTML(data:AssetReportData, origin=""):string{
   <title>Asset Report — ${data.assetName}</title>
   <style>${CSS}</style>
 </head>
-<body>${cover}${p2}${p3}${p4}${p5}${p6}</body>
+<body>${cover}${p3}${p4}${p5}${p6}</body>
 </html>`;
 }
 
 // ── Export functions ──────────────────────────────────────────────────────────
+
+/** Exposes the HTML this module generates, so callers (e.g. AssetReportModal)
+ *  can POST it to a server-side PDF renderer instead of using window.print(). */
+export function generateAssetReportHtml(data:AssetReportData, origin=""):string{
+  const o = origin || (typeof window !== "undefined" ? window.location.origin : "");
+  return generateHTML(data, o);
+}
+
+/**
+ * Renders the report to a real PDF via the backend (/reports/render-pdf,
+ * headless Chromium) and downloads it directly — no browser print dialog,
+ * so no browser-injected URL/date header or footer ever appears; only this
+ * module's own "Page X of Y" footer shows.
+ *
+ * apiUrl should be the same base URL used elsewhere (e.g. NEXT_PUBLIC_API_URL).
+ * authHeaders lets the caller pass an Authorization header since this module
+ * has no access to the app's auth token itself.
+ */
+export async function downloadAssetPDFServer(
+  data: AssetReportData,
+  filename = "asset-report.pdf",
+  apiUrl: string,
+  authHeaders: Record<string,string> = {},
+): Promise<void> {
+  const html = generateAssetReportHtml(data);
+  const res = await fetch(`${apiUrl}/reports/render-pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders },
+    body: JSON.stringify({ html, filename }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`PDF render failed (${res.status})${detail ? `: ${detail}` : ""}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/** Fallback path: opens the browser's native print dialog (shows the
+ *  browser's own header/footer unless the person manually disables it there).
+ *  Kept as a degraded-mode fallback if the server-side renderer is
+ *  unavailable — see downloadAssetPDFServer for the primary path. */
 export function downloadAssetPDF(data:AssetReportData,filename="asset-report.pdf"):void{
   try{
     const origin = typeof window !== "undefined" ? window.location.origin : "";

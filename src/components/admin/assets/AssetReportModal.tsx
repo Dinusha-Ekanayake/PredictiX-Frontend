@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
-import { downloadAssetPDF, type AssetReportData } from "@/lib/assetPdfExport";
+import { downloadAssetPDF, downloadAssetPDFServer, type AssetReportData } from "@/lib/assetPdfExport";
 import { getAccessToken } from "@/lib/authService";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -87,6 +87,29 @@ async function safeJson(res: Response | null): Promise<any> {
   try { return await res.json(); } catch { return null; }
 }
 
+/** Like safeJson, but also returns *why* it failed (status + response body)
+ *  instead of silently discarding that information — used for the cost
+ *  endpoint specifically, since its failures have been repeatedly invisible
+ *  without manually checking the Network tab or backend logs. */
+async function safeJsonWithError(res: Response | null): Promise<{ data: any; error?: string }> {
+  if (!res) return { data: null, error: "Request failed to reach the server (network error)." };
+  if (!res.ok) {
+    let bodyText = "";
+    try { bodyText = await res.text(); } catch { /* ignore */ }
+    let detail = bodyText;
+    try {
+      const parsed = JSON.parse(bodyText);
+      detail = parsed?.detail ?? bodyText;
+    } catch { /* bodyText wasn't JSON, use as-is */ }
+    return { data: null, error: `HTTP ${res.status}${detail ? `: ${String(detail).slice(0, 300)}` : ""}` };
+  }
+  try {
+    return { data: await res.json() };
+  } catch {
+    return { data: null, error: "Server returned an invalid response (not JSON)." };
+  }
+}
+
 export default function AssetReportModal({ isOpen, onClose, assetId, assetName }: Props) {
   const [loading, setLoading]       = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
@@ -140,7 +163,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
 
         // ── Step 3: parse all responses ────────────────────────
         const batchPred   = await safeJson(batchPredRes);
-        const costPred    = await safeJson(costPredRes);
+        const { data: costPred, error: costError } = await safeJsonWithError(costPredRes);
         const maintList   = await safeJson(maintRes) ?? [];
         const ticketList  = await safeJson(ticketRes) ?? [];
         const sensorList  = await safeJson(sensorRes) ?? [];
@@ -236,6 +259,12 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
               direction: d.direction === "increases" ? "increases" as const : "decreases" as const,
             }))
           : [];
+        // Bundle-level accuracy stats — real numbers for whichever model
+        // version is actually loaded, never a hardcoded guess.
+        const cost_test_r2      = costPred?.test_r2       != null ? Number(costPred.test_r2)       : undefined;
+        const cost_test_mae     = costPred?.test_mae_lkr  != null ? Number(costPred.test_mae_lkr)  : undefined;
+        const cost_test_medae   = costPred?.test_medae_lkr!= null ? Number(costPred.test_medae_lkr): undefined;
+        const cost_picp_80      = costPred?.picp_80_pct   != null ? Number(costPred.picp_80_pct)   : undefined;
 
         // ── Step 8: fleet data ─────────────────────────────────
         const kpis      = fleet.kpis ?? {};
@@ -273,7 +302,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
           assetName:    asset.asset_name ?? assetName ?? "Asset Report",
           assetCode:    asset.asset_code ?? "—",
           warehouseName:warehouse?.name ?? dept?.name ?? asset.warehouse_id?.slice(0,8) ?? "LankaLogix",
-          reportDate:   new Date().toLocaleDateString("en-GB", { day:"2-digit", month:"long", year:"numeric" }),
+          reportDate:   new Date().toLocaleString("en-GB", { day:"2-digit", month:"long", year:"numeric", hour:"2-digit", minute:"2-digit", hour12:true }),
           asset: {
             ...asset,
             // add department name if available
@@ -290,7 +319,12 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
           cost_net_shap,
           fleet_avg_cost,
           cost_model_version,
+          cost_test_r2,
+          cost_test_mae,
+          cost_test_medae,
+          cost_picp_80,
           cost_drivers,
+          cost_error: costError,
           currency: "LKR",
           top_explanations,
           sensor: sensor ?? undefined,
@@ -348,11 +382,52 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
   const handleDownloadPDF = async () => {
     if (!reportData) return;
     setGenerating(true);
+    const filename = `Asset_Report_${reportData.assetCode}.pdf`;
+
+    const attemptServerRender = async (): Promise<void> => {
+      // Re-read the token fresh at call time rather than relying on a value
+      // captured earlier — if it was stale/expired when the modal opened,
+      // a fresh read (or a refreshed token if the auth layer rotates it in
+      // the background) may succeed without the person doing anything.
+      const token = getAccessToken();
+      await downloadAssetPDFServer(
+        reportData,
+        filename,
+        API_URL,
+        token ? { Authorization: `Bearer ${token}` } : {},
+      );
+    };
+
     try {
-      downloadAssetPDF(reportData, `Asset_Report_${reportData.assetCode}.pdf`);
-      toast.success("Report opened — choose 'Save as PDF', and turn off 'Headers and footers' in More settings for a clean export");
-    } catch (e: any) {
-      toast.error("Failed to generate report", { description: e.message });
+      await attemptServerRender();
+      toast.success("Report downloaded");
+    } catch (serverErr: any) {
+      const msg = String(serverErr?.message ?? "");
+      const isAuthFailure = msg.includes("401") || msg.includes("403");
+
+      if (isAuthFailure) {
+        // Don't silently degrade to the print fallback here — that produces
+        // a worse PDF (browser header/footer, no pagination) AND masks the
+        // real problem (an expired/missing session), which is exactly what
+        // made this failure mode hard to diagnose. Tell the person plainly
+        // what's wrong and what to do instead.
+        toast.error("Your session has expired", {
+          description: "Please refresh the page and sign in again, then retry Download PDF.",
+        });
+        setGenerating(false);
+        return;
+      }
+
+      // Non-auth failure (e.g. playwright not installed on the server yet,
+      // network error, server 500) — the print-dialog fallback still makes
+      // sense here since it's unrelated to auth and can still produce a
+      // usable (if less polished) PDF.
+      try {
+        downloadAssetPDF(reportData, filename);
+        toast.success("Report opened — choose 'Save as PDF', and turn off 'Headers and footers' in More settings for a clean export");
+      } catch (fallbackErr: any) {
+        toast.error("Failed to generate report", { description: fallbackErr.message ?? serverErr.message });
+      }
     } finally {
       setGenerating(false);
     }

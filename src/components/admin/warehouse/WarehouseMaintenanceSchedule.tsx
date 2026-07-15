@@ -165,7 +165,7 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
   }
 
   return (
-    <Card className="rounded-2xl overflow-hidden border-teal-100/60 dark:border-teal-900/30 h-full flex flex-col">
+    <Card className="rounded-2xl overflow-hidden border-teal-100/60 dark:border-teal-900/30 h-full flex flex-col p-0 gap-0">
       {/* Gradient header strip */}
       <div className="bg-gradient-to-r from-teal-500/10 via-cyan-500/5 to-transparent px-6 py-4 border-b border-teal-100/50 dark:border-teal-900/30 shrink-0">
         <div className="flex items-center justify-between flex-wrap gap-2">

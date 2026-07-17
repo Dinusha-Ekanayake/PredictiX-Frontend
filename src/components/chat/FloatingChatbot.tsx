@@ -112,11 +112,13 @@ export default function FloatingChatbot() {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSending, setIsSending] = React.useState(false);
   const [draft, setDraft] = React.useState("");
+  const [interimDraft, setInterimDraft] = React.useState("");
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
 
   // Speech Recognition
   const [isListening, setIsListening] = React.useState(false);
+  const isListeningRef = React.useRef(false);
   const [speechSupported, setSpeechSupported] = React.useState(true);
   const recognitionRef = React.useRef<any>(null);
 
@@ -171,21 +173,46 @@ export default function FloatingChatbot() {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
+        recognition.continuous = true;
+        recognition.interimResults = true;
         
         recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setDraft((prev) => (prev ? prev + " " + transcript : transcript));
+          let finalTranscript = "";
+          let interimTranscript = "";
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+          if (finalTranscript) {
+            setDraft((prev) => (prev ? prev + " " + finalTranscript.trim() : finalTranscript.trim()));
+          }
+          setInterimDraft(interimTranscript);
         };
 
         recognition.onerror = (event: any) => {
-          console.error("Speech recognition error", event.error);
-          setIsListening(false);
+          if (event.error !== "no-speech") {
+            console.error("Speech recognition error", event.error);
+            setIsListening(false);
+            isListeningRef.current = false;
+          }
         };
 
         recognition.onend = () => {
-          setIsListening(false);
+          if (isListeningRef.current) {
+            try {
+              recognition.start();
+            } catch (e) {
+              console.error("Failed to restart speech recognition", e);
+              setIsListening(false);
+              isListeningRef.current = false;
+            }
+          } else {
+            setIsListening(false);
+            setInterimDraft("");
+          }
         };
 
         recognitionRef.current = recognition;
@@ -197,11 +224,17 @@ export default function FloatingChatbot() {
 
   const toggleListening = () => {
     if (!recognitionRef.current) return;
-    if (isListening) {
+    if (isListeningRef.current) {
+      isListeningRef.current = false;
       recognitionRef.current.stop();
       setIsListening(false);
     } else {
-      recognitionRef.current.start();
+      isListeningRef.current = true;
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        console.warn("Already started");
+      }
       setIsListening(true);
     }
   };
@@ -502,8 +535,11 @@ export default function FloatingChatbot() {
               <div className="flex items-center gap-2">
                 <Input
                   ref={inputRef}
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
+                  value={draft + (draft && interimDraft ? " " : "") + interimDraft}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    setInterimDraft("");
+                  }}
                   placeholder="Ask a question..."
                   aria-label="Chatbot message input"
                   className="h-10 text-sm"
@@ -520,11 +556,23 @@ export default function FloatingChatbot() {
                     onClick={toggleListening}
                     disabled={isSending}
                     className={cn(
-                      "shrink-0 transition-colors",
-                      isListening ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400" : ""
+                      "shrink-0 transition-all duration-300 relative h-10 w-10",
+                      isListening ? "border-violet-500 bg-violet-50 text-violet-600 w-[72px] hover:bg-violet-100 dark:bg-violet-900/30 dark:text-violet-400" : ""
                     )}
                   >
-                    {isListening ? <Mic className="size-4 animate-pulse" /> : <MicOff className="size-4 text-muted-foreground" />}
+                    {isListening ? (
+                      <div className="flex items-center gap-1.5 w-full justify-center">
+                        <Mic className="size-5" />
+                        <div className="flex items-center gap-0.5 h-4">
+                          <span className="w-0.5 h-full bg-current animate-[pulse_0.75s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '0ms' }} />
+                          <span className="w-0.5 h-2/3 bg-current animate-[pulse_0.6s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '150ms' }} />
+                          <span className="w-0.5 h-full bg-current animate-[pulse_0.9s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '300ms' }} />
+                          <span className="w-0.5 h-1/2 bg-current animate-[pulse_0.5s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '450ms' }} />
+                        </div>
+                      </div>
+                    ) : (
+                      <MicOff className="size-5 text-muted-foreground" />
+                    )}
                   </Button>
                 )}
 

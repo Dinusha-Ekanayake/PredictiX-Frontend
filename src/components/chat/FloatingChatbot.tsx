@@ -9,6 +9,8 @@ import {
   ExternalLink,
   Loader2,
   MessageCircle,
+  Mic,
+  MicOff,
   SendHorizontal,
   Sparkles,
   Trash2,
@@ -113,6 +115,11 @@ export default function FloatingChatbot() {
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
 
+  // Speech Recognition
+  const [isListening, setIsListening] = React.useState(false);
+  const [speechSupported, setSpeechSupported] = React.useState(true);
+  const recognitionRef = React.useRef<any>(null);
+
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const messageEndRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -157,6 +164,47 @@ export default function FloatingChatbot() {
     window.addEventListener("keydown", onEscape);
     return () => window.removeEventListener("keydown", onEscape);
   }, [isOpen]);
+
+  // Speech Recognition Setup
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        
+        recognition.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setDraft((prev) => (prev ? prev + " " + transcript : transcript));
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error("Speech recognition error", event.error);
+          setIsListening(false);
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+      } else {
+        setSpeechSupported(false);
+      }
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) return;
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
 
   // Auto-scroll on new messages
   React.useEffect(() => {
@@ -462,6 +510,24 @@ export default function FloatingChatbot() {
                   disabled={isSending}
                   maxLength={500}
                 />
+                
+                {speechSupported && (
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="outline"
+                    aria-label="Toggle voice input"
+                    onClick={toggleListening}
+                    disabled={isSending}
+                    className={cn(
+                      "shrink-0 transition-colors",
+                      isListening ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400" : ""
+                    )}
+                  >
+                    {isListening ? <Mic className="size-4 animate-pulse" /> : <MicOff className="size-4 text-muted-foreground" />}
+                  </Button>
+                )}
+
                 <Button
                   type="submit"
                   size="icon-sm"

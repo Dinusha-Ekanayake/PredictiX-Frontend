@@ -82,6 +82,12 @@ export default function NotificationBell() {
           toast.info(payload.title, {
             description: payload.message,
           });
+          
+          // Trigger Proactive Alert if critical
+          if (payload.is_critical || (payload.title || "").toLowerCase().includes("critical") || payload.type === "critical") {
+            const customEvent = new CustomEvent("proactive_alert", { detail: payload });
+            window.dispatchEvent(customEvent);
+          }
         }
       } catch (err) {
         console.error("Failed to parse websocket message", err);

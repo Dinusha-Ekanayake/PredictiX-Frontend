@@ -111,6 +111,56 @@ function AssetHealthWidget({ data }: { data: any }) {
   );
 }
 
+function RecordSummaryWidget({ payload }: { payload: any }) {
+  if (!payload || !payload.data) return null;
+  const { type, data } = payload;
+  
+  // Title mapping
+  let title = "Record Details";
+  if (type === "ticket") title = data.title || data.id;
+  if (type === "asset") title = data.asset_name || data.asset_code || data.id;
+  if (type === "user") title = data.full_name || data.email || data.id;
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm">
+      <h4 className="font-semibold text-sm text-foreground mb-3 pb-2 border-b border-border/50">{title}</h4>
+      <div className="space-y-2 text-xs">
+        {Object.entries(data).map(([key, value]) => {
+          // Skip internal or empty fields
+          if (!value || key === "id" || key.endsWith("_id")) return null;
+          
+          const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          let displayValue = String(value);
+          
+          // Badge formatting for common statuses
+          if (key === "status" || key === "priority" || key === "role") {
+            const isGood = displayValue === "active" || displayValue === "resolved" || displayValue === "admin";
+            const isWarn = displayValue === "medium" || displayValue === "in_progress" || displayValue === "open";
+            const variant = isGood ? "default" : (isWarn ? "secondary" : "destructive");
+            displayValue = (
+              <Badge variant={variant as any} className="text-[10px] uppercase h-4 px-1.5 py-0 leading-none">
+                {displayValue.replace(/_/g, ' ')}
+              </Badge>
+            );
+          }
+          
+          // Truncate very long text like descriptions
+          if (typeof value === "string" && value.length > 100) {
+            displayValue = value.substring(0, 100) + "...";
+          }
+
+          return (
+            <div key={key} className="flex justify-between items-start gap-4">
+              <span className="text-muted-foreground shrink-0">{formattedKey}</span>
+              <span className="font-medium text-foreground text-right">{displayValue}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Markdown-to-React renderer ───────────────────────────────────────────────
 // Renders **bold**, and newlines safely without dangerouslySetInnerHTML.
 
@@ -547,6 +597,9 @@ export default function FloatingChatbot() {
                         {/* Custom Widgets */}
                         {message.role === "assistant" && message.widgetType === "ASSET_HEALTH" && (
                           <AssetHealthWidget data={message.widgetData} />
+                        )}
+                        {message.role === "assistant" && message.widgetType === "RECORD_SUMMARY" && (
+                          <RecordSummaryWidget payload={message.widgetData} />
                         )}
 
                         {/* Action Buttons — rendered as clickable nav buttons */}

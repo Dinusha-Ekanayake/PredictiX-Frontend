@@ -563,7 +563,6 @@ export default function FloatingChatbot() {
                                     key={i}
                                     type="button"
                                     onClick={() => {
-                                      setIsOpen(false);
                                       router.push(btn.path);
                                     }}
                                     className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/60 dark:border-violet-600/60 bg-violet-50 dark:bg-violet-900/40 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-800/60 transition-all duration-200 hover:shadow-sm"

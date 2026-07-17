@@ -31,7 +31,7 @@ import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialo
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
 import EditUserDialog from "@/components/admin/users/EditUserDialog";
 import { toast } from "@/lib/customToast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   listUsers,
@@ -207,6 +207,7 @@ function DonutChart({ data, title }: { data: ChartEntry[]; title: string }) {
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = React.useState(true);
   const [users, setUsers] = React.useState<UserItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -235,6 +236,15 @@ export default function AdminUsersPage() {
     const next = String(maxNumber + 1).padStart(4, "0");
     return `${roleLetter}${next}${deptLetter}`;
   }
+
+  // Deep link support
+  const deepLinkUserId = searchParams.get("user_id");
+  React.useEffect(() => {
+    if (deepLinkUserId && users.length > 0) {
+      const u = users.find((x) => x.id === deepLinkUserId);
+      if (u) setDetailsUser(u);
+    }
+  }, [deepLinkUserId, users]);
 
   React.useEffect(() => {
     let cancelled = false;

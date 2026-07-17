@@ -46,8 +46,15 @@ export default function AdminAssetsPage() {
   // paginated list page it happens to be on. Read once on mount — the
   // asset list's own auto-select effect below must not override this.
   const searchParams = useSearchParams();
-  const deepLinkAssetId = React.useRef(searchParams.get("asset_id")).current;
-  const [hasDeepLinked, setHasDeepLinked] = React.useState(!!deepLinkAssetId);
+  const currentDeepLink = searchParams.get("asset_id");
+
+  React.useEffect(() => {
+    if (currentDeepLink) {
+      setSelectedId(currentDeepLink);
+    }
+  }, [currentDeepLink]);
+
+  const [hasDeepLinked, setHasDeepLinked] = React.useState(!!currentDeepLink);
 
   // ── Asset list state (paginated — 50 rows/page instead of the whole fleet) ─────
   const [filters, setFilters] = React.useState<AssetFilters>(DEFAULT_FILTERS);
@@ -70,7 +77,7 @@ export default function AdminAssetsPage() {
   >([]);
 
   // ── Selected asset detail state ───────────────────────────────────────────────
-  const [selectedId, setSelectedId] = React.useState<string | null>(deepLinkAssetId);
+  const [selectedId, setSelectedId] = React.useState<string | null>(currentDeepLink);
   const [detail, setDetail] = React.useState<AssetDetail | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
   const [detailError, setDetailError] = React.useState<string | null>(null);

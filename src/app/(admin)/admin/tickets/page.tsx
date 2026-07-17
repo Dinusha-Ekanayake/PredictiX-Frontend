@@ -85,10 +85,11 @@ export default function AdminTicketsPage() {
   // ticket's detail dialog directly. Fetched once on mount, independent
   // of whatever page/filter the paginated list is currently showing.
   const searchParams = useSearchParams();
-  const deepLinkTicketId = React.useRef(searchParams.get("ticket_id")).current;
+  const deepLinkTicketId = searchParams.get("ticket_id");
 
   React.useEffect(() => {
     if (!deepLinkTicketId) return;
+    
     fetchTicketById(deepLinkTicketId)
       .then((t) => {
         setSelectedTicket(t);
@@ -99,7 +100,6 @@ export default function AdminTicketsPage() {
           description: err instanceof Error ? err.message : "Ticket not found or not accessible.",
         });
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deepLinkTicketId]);
 
   React.useEffect(() => {

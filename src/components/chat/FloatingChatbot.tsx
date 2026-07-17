@@ -43,6 +43,8 @@ type ChatMessage = {
   createdAt: number;
   actionButtons?: ActionButton[];
   toolTrace?: ToolTraceItem[];
+  widgetType?: string;
+  widgetData?: any;
 };
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -75,6 +77,37 @@ function CopyActionButton({ label, textToCopy }: { label: string; textToCopy: st
       {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
       {copied ? "Copied!" : label}
     </button>
+  );
+}
+
+// ─── Widgets ──────────────────────────────────────────────────────────────────
+
+function AssetHealthWidget({ data }: { data: any }) {
+  if (!data) return null;
+  const isGood = data.healthScore >= 70;
+  return (
+    <div className="mt-3 overflow-hidden rounded-xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="font-semibold text-sm text-foreground">{data.name}</h4>
+        <Badge variant={isGood ? "default" : "destructive"} className="text-[10px] uppercase">
+          {data.status}
+        </Badge>
+      </div>
+      <div className="space-y-2 text-xs">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Health Score</span>
+          <span className="font-medium text-foreground">{data.healthScore}%</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Failure Prob.</span>
+          <span className="font-medium text-foreground">{(data.failureProbability * 100).toFixed(0)}%</span>
+        </div>
+        <div className="flex justify-between border-t border-border/50 pt-2">
+          <span className="text-muted-foreground">Predicted Failure</span>
+          <span className="font-medium text-red-500">{data.predictedFailureDate}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -167,6 +200,29 @@ export default function FloatingChatbot() {
     return () => window.removeEventListener("keydown", onEscape);
   }, [isOpen]);
 
+  // Proactive Alert Listener
+  React.useEffect(() => {
+    const handleProactiveAlert = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const payload = customEvent.detail;
+      
+      setIsOpen(true);
+      
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          text: `🚨 **Critical Alert!**\n\n${payload.title}\n${payload.message}`,
+          createdAt: Date.now(),
+        }
+      ]);
+    };
+    
+    window.addEventListener("proactive_alert", handleProactiveAlert);
+    return () => window.removeEventListener("proactive_alert", handleProactiveAlert);
+  }, []);
+
   // Speech Recognition Setup
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -193,22 +249,28 @@ export default function FloatingChatbot() {
         };
 
         recognition.onerror = (event: any) => {
-          if (event.error !== "no-speech") {
+          if (event.error !== "no-speech" && event.error !== "network") {
             console.error("Speech recognition error", event.error);
             setIsListening(false);
             isListeningRef.current = false;
+          } else if (event.error === "network") {
+            console.warn("Speech recognition network error, will retry...");
           }
         };
 
         recognition.onend = () => {
           if (isListeningRef.current) {
-            try {
-              recognition.start();
-            } catch (e) {
-              console.error("Failed to restart speech recognition", e);
-              setIsListening(false);
-              isListeningRef.current = false;
-            }
+            setTimeout(() => {
+              if (isListeningRef.current) {
+                try {
+                  recognition.start();
+                } catch (e) {
+                  console.error("Failed to restart speech recognition", e);
+                  setIsListening(false);
+                  isListeningRef.current = false;
+                }
+              }
+            }, 300);
           } else {
             setIsListening(false);
             setInterimDraft("");
@@ -296,6 +358,8 @@ export default function FloatingChatbot() {
       const toolTrace: ToolTraceItem[] = Array.isArray(payload?.tool_trace)
         ? (payload.tool_trace as ToolTraceItem[])
         : [];
+      const widgetType = payload?.widget_type;
+      const widgetData = payload?.widget_data;
 
       setMessages((prev) => [
         ...prev,
@@ -306,6 +370,8 @@ export default function FloatingChatbot() {
           createdAt: Date.now(),
           actionButtons,
           toolTrace,
+          widgetType,
+          widgetData,
         },
       ]);
     } catch (error) {
@@ -477,6 +543,11 @@ export default function FloatingChatbot() {
                             </button>
                           )}
                         </div>
+
+                        {/* Custom Widgets */}
+                        {message.role === "assistant" && message.widgetType === "ASSET_HEALTH" && (
+                          <AssetHealthWidget data={message.widgetData} />
+                        )}
 
                         {/* Action Buttons — rendered as clickable nav buttons */}
                         {message.role === "assistant" &&

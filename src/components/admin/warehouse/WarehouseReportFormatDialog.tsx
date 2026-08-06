@@ -15,7 +15,7 @@ import {
  * WarehouseReportFormatDialog
  * ----------------------------
  * Simple confirmation window that appears when user clicks "Generate Report".
- * No format options — always generates the Full Report.
+ * No format options - always generates the Full Report.
  * Shows what data sources and sections will be included.
  */
 
@@ -74,7 +74,7 @@ export default function WarehouseReportFormatDialog({
                   Generate Warehouse Report
                 </h2>
                 <p className="text-xs text-violet-200 mt-0.5">
-                  Full AI-powered analysis · Llama 3 (Meta AI)
+                  Full AI-powered analysis · PredictiX AI
                 </p>
               </div>
             </div>
@@ -138,7 +138,7 @@ export default function WarehouseReportFormatDialog({
           <div className="flex items-center gap-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 px-3 py-2.5">
             <Cpu className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
             <p className="text-[11px] text-indigo-700 dark:text-indigo-300">
-              Live data is injected into <strong>Llama 3 (Meta AI)</strong> via LangChain.
+              Live data is injected into <strong>PredictiX AI</strong> via LangChain.
               Generation takes approximately 10–25 seconds.
             </p>
           </div>

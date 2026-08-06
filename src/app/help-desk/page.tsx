@@ -281,14 +281,24 @@ export default function HelpDeskPage() {
 
   React.useEffect(() => { fetchFaqs(); }, [fetchFaqs]);
 
-  const categories = React.useMemo(() => [
-    { id: "all", label: "All Topics" },
-    { id: "ticket", label: "Ticket" },
-    { id: "asset", label: "Asset" },
-    { id: "user", label: "User" },
-    { id: "warehouse", label: "Warehouse" },
-    { id: "general", label: "General" },
-  ], []);
+  const categories = React.useMemo(() => {
+    const baseCategories = ["ticket", "asset", "user", "warehouse", "general"];
+    
+    const dynamicCats = new Set<string>(baseCategories);
+    faqItems.forEach((item) => {
+      if (item.category && item.category.trim()) {
+        dynamicCats.add(item.category.trim().toLowerCase());
+      }
+    });
+
+    const list = [{ id: "all", label: "All Topics" }];
+    dynamicCats.forEach((cat) => {
+      const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+      list.push({ id: cat, label });
+    });
+
+    return list;
+  }, [faqItems]);
 
   const filteredFaqs = React.useMemo(() => {
     let result = faqItems;

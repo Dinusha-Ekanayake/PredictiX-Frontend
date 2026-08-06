@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "@/lib/customToast";
+import { toast } from "sonner";
 
 import {
   Dialog,
@@ -19,9 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
 import { Label } from "@/components/ui/label";
-
 import {
   Loader2,
   UserPlus,
@@ -30,14 +28,17 @@ import {
   Shield,
   Building2,
   ShieldCheck,
+  KeyRound,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+
+import { createUser } from "@/lib/userService";
+import type { UserRole, UserStatus } from "@/lib/userService";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-type UserRole = "admin" | "user";
-type UserStatus = "active" | "inactive";
 
 export type NewUser = {
   id: string;
@@ -61,6 +62,7 @@ type FormErrors = {
   contactNumber?: string;
   warehouse?: string;
   email?: string;
+  password?: string;
   role?: string;
   department?: string;
   status?: string;
@@ -78,9 +80,12 @@ type Props = {
 // ---------------------------------------------------------------------------
 
 const DEPARTMENTS = [
-  "Administrative",
+  "Transportation",
   "Mechanical",
   "Electrical",
+  "Software",
+  "Admin",
+  "Administrative",
   "IT",
   "Maintenance",
 ] as const;
@@ -92,10 +97,6 @@ const DEPARTMENTS = [
 function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
-
-// ---------------------------------------------------------------------------
-// Sub-component: form field inside a styled card
-// ---------------------------------------------------------------------------
 
 function FieldCard({
   icon: Icon,
@@ -114,14 +115,15 @@ function FieldCard({
     <div className="rounded-xl bg-muted/50 px-4 py-3.5">
       <div className="flex items-center gap-3 pb-2">
         <Icon className="h-5 w-5 shrink-0 text-muted-foreground" />
-        <Label htmlFor={htmlFor} className="text-sm font-normal text-muted-foreground">
+        <Label
+          htmlFor={htmlFor}
+          className="text-sm font-normal text-muted-foreground"
+        >
           {label}
         </Label>
       </div>
       {children}
-      {error && (
-        <p className="mt-1.5 text-xs text-destructive">{error}</p>
-      )}
+      {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
     </div>
   );
 }
@@ -139,6 +141,8 @@ export default function AddUserDialog({
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
   const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
   const [address, setAddress] = React.useState("");
   const [contactNumber, setContactNumber] = React.useState("");
   const [warehouse, setWarehouse] = React.useState("");
@@ -154,6 +158,8 @@ export default function AddUserDialog({
         setFirstName("");
         setLastName("");
         setEmail("");
+        setPassword("");
+        setShowPassword(false);
         setAddress("");
         setContactNumber("");
         setWarehouse("");
@@ -172,10 +178,11 @@ export default function AddUserDialog({
     if (!firstName.trim()) errs.firstName = "First name is required.";
     if (!lastName.trim()) errs.lastName = "Last name is required.";
     if (!email.trim()) errs.email = "Email is required.";
-    else if (!validateEmail(email.trim())) errs.email = "Please enter a valid email address.";
-    if (!address.trim()) errs.address = "Residence address is required.";
-    if (!contactNumber.trim()) errs.contactNumber = "Contact number is required.";
-    if (!warehouse) errs.warehouse = "Please select a warehouse.";
+    else if (!validateEmail(email.trim()))
+      errs.email = "Please enter a valid email address.";
+    if (!password.trim()) errs.password = "Password is required.";
+    else if (password.length < 8)
+      errs.password = "Password must be at least 8 characters.";
     if (!role) errs.role = "Please select a role.";
     if (!department) errs.department = "Please select a department.";
     if (!status) errs.status = "Please select a status.";
@@ -188,41 +195,58 @@ export default function AddUserDialog({
     setErrors(formErrors);
 
     if (Object.keys(formErrors).length > 0) {
-      toast.error("Please fix the errors in the form.", {
-        description: "All fields are required to add a new user.",
-      });
+      toast.error("Please fix the errors in the form.");
       return;
     }
+
+    if (!role || !department || !status) return;
 
     setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 800));
 
-    if (!role || !department) {
+    try {
+      const created = await createUser({
+        id: generateUserId(role as UserRole, department),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        name: `${firstName.trim()} ${lastName.trim()}`,
+        email: email.trim().toLowerCase(),
+        password: password,
+        role: role as UserRole,
+        status: status as UserStatus,
+        department,
+        address: address.trim(),
+        contactNumber: contactNumber.trim(),
+        warehouse,
+      });
+
+      const newUser: NewUser = {
+        id: created.id,
+        firstName: created.firstName,
+        lastName: created.lastName,
+        name: created.name,
+        address: created.address,
+        contactNumber: created.contactNumber,
+        warehouse: created.warehouse,
+        email: created.email,
+        role: created.role,
+        department: created.department,
+        status: created.status,
+        assignedAssets: 0,
+      };
+
+      onUserAdded(newUser);
+      onOpenChange(false);
+
+      toast.success("User added successfully!", {
+        description: `${newUser.name} (${newUser.email}) has been added as ${newUser.role}.`,
+      });
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
+      toast.error("Failed to add user.", { description: message });
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    const newUser: NewUser = {
-      id: generateUserId(role as UserRole, department),
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      name: `${firstName.trim()} ${lastName.trim()}`,
-      address: address.trim(),
-      contactNumber: contactNumber.trim(),
-      warehouse,
-      email: email.trim().toLowerCase(),
-      role: role as UserRole,
-      department,
-      status: status as UserStatus,
-      assignedAssets: 0,
-    };
-
-    onUserAdded(newUser);
-    onOpenChange(false);
-
-    toast.success("User added successfully!", {
-      description: `${newUser.name} (${newUser.email}) has been added as ${newUser.role}.`,
-    });
   }
 
   return (
@@ -240,62 +264,118 @@ export default function AddUserDialog({
 
         <form onSubmit={handleSubmit} className="grid gap-3 pt-1">
           {/* First Name */}
-          <FieldCard icon={User} label="First Name" htmlFor="add-user-first-name" error={errors.firstName}>
+          <FieldCard
+            icon={User}
+            label="First Name"
+            htmlFor="add-first-name"
+            error={errors.firstName}
+          >
             <Input
-              id="add-user-first-name"
+              id="add-first-name"
               placeholder="e.g. Jane"
               value={firstName}
               onChange={(e) => {
                 setFirstName(e.target.value);
-                if (errors.firstName) setErrors((p) => ({ ...p, firstName: undefined }));
+                if (errors.firstName)
+                  setErrors((p) => ({ ...p, firstName: undefined }));
               }}
-              aria-invalid={!!errors.firstName}
               className="bg-background"
             />
           </FieldCard>
 
           {/* Last Name */}
-          <FieldCard icon={User} label="Last Name" htmlFor="add-user-last-name" error={errors.lastName}>
+          <FieldCard
+            icon={User}
+            label="Last Name"
+            htmlFor="add-last-name"
+            error={errors.lastName}
+          >
             <Input
-              id="add-user-last-name"
+              id="add-last-name"
               placeholder="e.g. Cooper"
               value={lastName}
               onChange={(e) => {
                 setLastName(e.target.value);
-                if (errors.lastName) setErrors((p) => ({ ...p, lastName: undefined }));
+                if (errors.lastName)
+                  setErrors((p) => ({ ...p, lastName: undefined }));
               }}
-              aria-invalid={!!errors.lastName}
               className="bg-background"
             />
           </FieldCard>
 
           {/* Email */}
-          <FieldCard icon={Mail} label="Email Address" htmlFor="add-user-email" error={errors.email}>
+          <FieldCard
+            icon={Mail}
+            label="Email Address"
+            htmlFor="add-email"
+            error={errors.email}
+          >
             <Input
-              id="add-user-email"
+              id="add-email"
               type="email"
-              placeholder="e.g. jane.cooper@warehouse.com"
+              placeholder="e.g. jane.cooper@lankalogix.lk"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
-                if (errors.email) setErrors((p) => ({ ...p, email: undefined }));
+                if (errors.email)
+                  setErrors((p) => ({ ...p, email: undefined }));
               }}
-              aria-invalid={!!errors.email}
               className="bg-background"
             />
           </FieldCard>
 
-          {/* Role & Status side by side */}
+          {/* Password */}
+          <FieldCard
+            icon={KeyRound}
+            label="Password"
+            htmlFor="add-password"
+            error={errors.password}
+          >
+            <div className="relative">
+              <Input
+                id="add-password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Min. 8 characters"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password)
+                    setErrors((p) => ({ ...p, password: undefined }));
+                }}
+                className="bg-background pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+          </FieldCard>
+
+          {/* Role & Status */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <FieldCard icon={Shield} label="Role" htmlFor="add-user-role" error={errors.role}>
+            <FieldCard
+              icon={Shield}
+              label="Role"
+              htmlFor="add-role"
+              error={errors.role}
+            >
               <Select
                 value={role}
                 onValueChange={(v) => {
                   setRole(v as UserRole);
-                  if (errors.role) setErrors((p) => ({ ...p, role: undefined }));
+                  if (errors.role)
+                    setErrors((p) => ({ ...p, role: undefined }));
                 }}
               >
-                <SelectTrigger id="add-user-role" aria-invalid={!!errors.role} className="w-full bg-background">
+                <SelectTrigger id="add-role" className="w-full bg-background">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -305,15 +385,21 @@ export default function AddUserDialog({
               </Select>
             </FieldCard>
 
-            <FieldCard icon={ShieldCheck} label="Status" htmlFor="add-user-status" error={errors.status}>
+            <FieldCard
+              icon={ShieldCheck}
+              label="Status"
+              htmlFor="add-status"
+              error={errors.status}
+            >
               <Select
                 value={status}
                 onValueChange={(v) => {
                   setStatus(v as UserStatus);
-                  if (errors.status) setErrors((p) => ({ ...p, status: undefined }));
+                  if (errors.status)
+                    setErrors((p) => ({ ...p, status: undefined }));
                 }}
               >
-                <SelectTrigger id="add-user-status" aria-invalid={!!errors.status} className="w-full bg-background">
+                <SelectTrigger id="add-status" className="w-full bg-background">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -325,77 +411,101 @@ export default function AddUserDialog({
           </div>
 
           {/* Department */}
-          <FieldCard icon={Building2} label="Department" htmlFor="add-user-department" error={errors.department}>
+          <FieldCard
+            icon={Building2}
+            label="Department"
+            htmlFor="add-department"
+            error={errors.department}
+          >
             <Select
               value={department}
               onValueChange={(v) => {
                 setDepartment(v);
-                if (errors.department) setErrors((p) => ({ ...p, department: undefined }));
+                if (errors.department)
+                  setErrors((p) => ({ ...p, department: undefined }));
               }}
             >
-              <SelectTrigger id="add-user-department" aria-invalid={!!errors.department} className="w-full bg-background">
+              <SelectTrigger
+                id="add-department"
+                className="w-full bg-background"
+              >
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
                 {DEPARTMENTS.map((d) => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </FieldCard>
 
           {/* Residence Address */}
-          <FieldCard icon={Building2} label="Residence Address" htmlFor="add-user-address" error={errors.address}>
+          <FieldCard
+            icon={Building2}
+            label="Residence Address"
+            htmlFor="add-address"
+          >
             <Input
-              id="add-user-address"
+              id="add-address"
               placeholder="e.g. No. 10, Example Road, Colombo"
               value={address}
-              onChange={(e) => {
-                setAddress(e.target.value);
-                if (errors.address) setErrors((p) => ({ ...p, address: undefined }));
-              }}
-              aria-invalid={!!errors.address}
+              onChange={(e) => setAddress(e.target.value)}
               className="bg-background"
             />
           </FieldCard>
 
           {/* Contact Number */}
-          <FieldCard icon={ShieldCheck} label="Contact Number" htmlFor="add-user-contact" error={errors.contactNumber}>
+          <FieldCard
+            icon={ShieldCheck}
+            label="Contact Number"
+            htmlFor="add-contact"
+          >
             <Input
-              id="add-user-contact"
+              id="add-contact"
               type="tel"
               placeholder="e.g. 0712345678"
               value={contactNumber}
-              onChange={(e) => {
-                setContactNumber(e.target.value);
-                if (errors.contactNumber)
-                  setErrors((p) => ({ ...p, contactNumber: undefined }));
-              }}
-              aria-invalid={!!errors.contactNumber}
+              onChange={(e) => setContactNumber(e.target.value)}
               className="bg-background"
             />
           </FieldCard>
 
-          {/* Warehouse Name */}
-          <FieldCard icon={Building2} label="Warehouse" htmlFor="add-user-warehouse" error={errors.warehouse}>
+          {/* Warehouse */}
+          <FieldCard
+            icon={Building2}
+            label="Warehouse"
+            htmlFor="add-warehouse"
+            error={errors.warehouse}
+          >
             <Select
               value={warehouse}
               onValueChange={(v) => {
                 setWarehouse(v);
-                if (errors.warehouse) setErrors((p) => ({ ...p, warehouse: undefined }));
+                if (errors.warehouse)
+                  setErrors((p) => ({ ...p, warehouse: undefined }));
               }}
             >
-              <SelectTrigger id="add-user-warehouse" aria-invalid={!!errors.warehouse} className="w-full bg-background">
+              <SelectTrigger
+                id="add-warehouse"
+                className="w-full bg-background"
+              >
                 <SelectValue placeholder="Select warehouse" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Main Branch - Colombo">Main Branch - Colombo</SelectItem>
+                <SelectItem value="LankaLogix - Colombo">
+                  LankaLogix - Colombo
+                </SelectItem>
+                <SelectItem value="Main Branch - Colombo">
+                  Main Branch - Colombo
+                </SelectItem>
                 <SelectItem value="Galle">Galle</SelectItem>
               </SelectContent>
             </Select>
           </FieldCard>
 
-          {/* Action buttons */}
+          {/* Buttons */}
           <div className="grid grid-cols-2 gap-3 pt-1">
             <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting ? (

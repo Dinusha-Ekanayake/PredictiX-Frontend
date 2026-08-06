@@ -22,6 +22,7 @@ import {
   DollarSign,
   Ticket,
   Clock,
+  HeartPulse,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell,
@@ -31,13 +32,14 @@ import {
   LineChart, Line, Legend,
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
 } from "recharts";
+import WarehouseSurvivalAnalysis from "./WarehouseSurvivalAnalysis";
 
 /**
  * WarehouseAIReportPanel
  * -----------------------
  * Full-report panel rendered inline on the warehouse page.
  * 5 AI sections + comprehensive charts from live PostgreSQL data.
- * No format options — always Full Report.
+ * No format options - always Full Report.
  */
 
 // ── Palette ─────────────────────────────────────────────
@@ -103,6 +105,7 @@ interface Ctx {
   ticket_trend_direction?: string;
   total_users?: number; active_users?: number; inactive_users?: number;
   admin_users?: number; standard_users?: number;
+  survival_summary?: any;
 }
 
 export interface ReportData {
@@ -211,6 +214,7 @@ export default function WarehouseAIReportPanel({
   const [s3Collapsed, toggleS3] = useToggle(false);
   const [s4Collapsed, toggleS4] = useToggle(false);
   const [s5Collapsed, toggleS5] = useToggle(false);
+  const [s6Collapsed, toggleS6] = useToggle(false);
 
   const ctx = data?.context ?? {} as Ctx;
   const ai  = data?.ai_sections ?? {} as AISections;
@@ -244,7 +248,7 @@ export default function WarehouseAIReportPanel({
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold tracking-tight">AI Warehouse Full Report</h2>
               <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[9px] font-bold text-white uppercase tracking-wide">
-                Llama 3 · RAG
+                AI Analysis
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -291,16 +295,16 @@ export default function WarehouseAIReportPanel({
       {sourcesOpen && ctx.total_assets !== undefined && (
         <div className="rounded-2xl border border-violet-200 dark:border-violet-900 bg-violet-50 dark:bg-violet-950/20 px-5 py-4">
           <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">
-            📊 PostgreSQL Tables Injected into Llama 3 Context
+            📊 Live Data Injected into AI Context
           </h4>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-violet-700 dark:text-violet-300 sm:grid-cols-3">
-            <span>🏭 <strong>assets</strong> — {ctx.total_assets} records</span>
-            <span>📉 <strong>asset_failure_predictions</strong> — health, risk, SHAP</span>
-            <span>💰 <strong>asset_cost_predictions</strong> — cost estimates</span>
-            <span>🔧 <strong>maintenance_events</strong> — {ctx.total_maintenance_events_3m} (90d)</span>
-            <span>🎫 <strong>tickets</strong> — {ctx.total_tickets} records</span>
-            <span>👤 <strong>profiles</strong> — {ctx.total_users} users</span>
-            <span>🧠 <strong>prediction_explanations</strong> — SHAP features</span>
+            <span>🏭 <strong>assets</strong> - {ctx.total_assets} records</span>
+            <span>📉 <strong>asset_failure_predictions</strong> - health, risk, SHAP</span>
+            <span>💰 <strong>asset_cost_predictions</strong> - cost estimates</span>
+            <span>🔧 <strong>maintenance_events</strong> - {ctx.total_maintenance_events_3m} (90d)</span>
+            <span>🎫 <strong>tickets</strong> - {ctx.total_tickets} records</span>
+            <span>👤 <strong>profiles</strong> - {ctx.total_users} users</span>
+            <span>🧠 <strong>prediction_explanations</strong> - SHAP features</span>
             <span>🏢 <strong>warehouses</strong> + <strong>departments</strong></span>
           </div>
         </div>
@@ -315,7 +319,7 @@ export default function WarehouseAIReportPanel({
           </div>
           <p className="mt-4 text-sm font-semibold">Generating AI Report…</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            PostgreSQL → RAG Context Injection → Llama 3 (Meta AI) → Structured Report
+            Live Data → AI Analysis → Structured Report
           </p>
         </div>
       )}
@@ -360,7 +364,7 @@ export default function WarehouseAIReportPanel({
           </div>
 
           {/* ─────────────────────────────── */}
-          {/* SECTION 1 — Executive Summary   */}
+          {/* SECTION 1 - Executive Summary   */}
           {/* ─────────────────────────────── */}
           <div className={SECTION_STYLE}>
             <SectionHeader
@@ -453,7 +457,7 @@ export default function WarehouseAIReportPanel({
           </div>
 
           {/* ─────────────────────────────── */}
-          {/* SECTION 2 — Risk Analysis       */}
+          {/* SECTION 2 - Risk Analysis       */}
           {/* ─────────────────────────────── */}
           <div className={SECTION_STYLE}>
             <SectionHeader
@@ -518,71 +522,14 @@ export default function WarehouseAIReportPanel({
                     </div>
                   )}
                 </div>
-
-                <SectionDivider label="Critical Assets (Lowest Health Scores)" />
-                {(ctx.critical_assets?.length ?? 0) > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-100 dark:border-slate-800">
-                          {["Asset Code", "Name / Type", "Health", "Fail Prob", "Risk Level", "Days to Service", "Status"].map((h) => (
-                            <th key={h} className="pb-2 pr-4 text-left font-semibold text-[11px] text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {ctx.critical_assets!.map((a) => (
-                          <tr key={a.code} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                            <td className="py-2 pr-4 font-mono font-semibold text-rose-600">{a.code}</td>
-                            <td className="py-2 pr-4">
-                              <div className="font-medium">{a.name}</div>
-                              <div className="text-muted-foreground">{a.type}</div>
-                            </td>
-                            <td className="py-2 pr-4">
-                              <div className="flex items-center gap-1.5">
-                                <div className="h-1.5 w-16 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full"
-                                    style={{
-                                      width: `${a.health_score}%`,
-                                      backgroundColor: a.health_score < 50 ? P.rose : a.health_score < 70 ? P.amber : P.emerald,
-                                    }}
-                                  />
-                                </div>
-                                <span className="font-semibold">{a.health}</span>
-                              </div>
-                            </td>
-                            <td className="py-2 pr-4 font-medium" style={{ color: P.rose }}>{a.failure_prob}</td>
-                            <td className="py-2 pr-4">
-                              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${P.rose}20`, color: P.rose }}>
-                                {a.risk}
-                              </span>
-                            </td>
-                            <td className="py-2 pr-4 font-medium">
-                              {a.days_to_service !== null
-                                ? <span style={{ color: a.days_to_service! <= 7 ? P.rose : a.days_to_service! <= 30 ? P.amber : P.slate }}>
-                                    {a.days_to_service}d
-                                  </span>
-                                : "N/A"
-                              }
-                            </td>
-                            <td className="py-2">
-                              <span className="capitalize text-muted-foreground">{a.status}</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic text-center py-4">No critical assets found.</p>
-                )}
+                <SectionDivider label="AI Component & Failure Summary" />
+                <AIBlock text={ai.critical_assets_summary} />
               </div>
             )}
           </div>
 
           {/* ─────────────────────────────────────── */}
-          {/* SECTION 3 — Maintenance Intelligence   */}
+          {/* SECTION 3 - Maintenance Intelligence   */}
           {/* ─────────────────────────────────────── */}
           <div className={SECTION_STYLE}>
             <SectionHeader
@@ -673,7 +620,7 @@ export default function WarehouseAIReportPanel({
           </div>
 
           {/* ─────────────────────────────────────── */}
-          {/* SECTION 4 — Pattern & Trend Analysis   */}
+          {/* SECTION 4 - Pattern & Trend Analysis   */}
           {/* ─────────────────────────────────────── */}
           <div className={SECTION_STYLE}>
             <SectionHeader
@@ -761,13 +708,13 @@ export default function WarehouseAIReportPanel({
           </div>
 
           {/* ─────────────────────────────────────── */}
-          {/* SECTION 5 — 3-Month Conclusion (RAG)   */}
+          {/* SECTION 5 - 3-Month Conclusion (RAG)   */}
           {/* ─────────────────────────────────────── */}
           <div className={`${SECTION_STYLE} border-violet-200 dark:border-violet-800`}>
             <SectionHeader
               icon={FileText} accent={P.indigo} collapsed={s5Collapsed} onToggle={toggleS5}
               title="5. Overall Warehouse Conclusion (Last 3 Months)"
-              subtitle="AI-generated executive summary with top recommendations — powered by full RAG context"
+              subtitle="AI-generated executive summary with top recommendations - powered by full RAG context"
             />
             {!s5Collapsed && (
               <div className="px-6 py-5 space-y-5">
@@ -838,6 +785,64 @@ export default function WarehouseAIReportPanel({
               </div>
             )}
           </div>
+          {/* ─────────────────────────────────────── */}
+          {/* SECTION 6 - Component Survival Analysis */}
+          {/* ─────────────────────────────────────── */}
+          {ctx.survival_summary && (
+            <div className={SECTION_STYLE}>
+              <SectionHeader
+                icon={HeartPulse} accent={P.teal} collapsed={s6Collapsed} onToggle={toggleS6}
+                title="6. Asset component survival analysis"
+              />
+              {!s6Collapsed && (
+                <div className="px-6 py-5 space-y-5">
+                  <WarehouseSurvivalAnalysis data={ctx.survival_summary} isLoading={false} />
+
+                  <SectionDivider label="Soonest-Failing Watchlist" />
+                  {(ctx.survival_summary?.watchlist?.length ?? 0) > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-100 dark:border-slate-800">
+                            {["Asset", "Component", "Median RUL (days)", "Risk"].map((h) => (
+                              <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ctx.survival_summary!.watchlist!.map((w) => (
+                            <React.Fragment key={w.asset}>
+                              <tr className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                                <td className="py-2 pr-3 font-mono font-bold text-rose-600">{w.asset}</td>
+                                <td className="py-2 pr-3 font-medium">{w.component}</td>
+                                <td className="py-2 pr-3 font-semibold">{w.rul_days == null ? '-' : w.rul_days.toLocaleString()}</td>
+                                <td className="py-2 pr-3">
+                                  <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `${P.rose}20`, color: P.rose }}>
+                                    {w.risk}
+                                  </span>
+                                </td>
+                              </tr>
+                              {/* Inject AI Summary if available in data.ai_sections.asset_summaries, though currently the report builder generates them dynamically */}
+                              {data.ai_sections?.asset_summaries?.[w.asset] && (
+                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/20">
+                                  <td colSpan={4} className="px-3 py-3 text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
+                                    <span className="font-bold text-violet-600 dark:text-violet-400 mr-1">AI Summary:</span>
+                                    {data.ai_sections.asset_summaries[w.asset]}
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic text-center py-3">No watchlist available.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 

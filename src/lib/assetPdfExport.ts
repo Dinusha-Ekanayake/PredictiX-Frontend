@@ -232,10 +232,21 @@ function subH(title:string):string{
 }
 
 // ── Page wrapper: header + content + footer (no browser chrome) ───────────────
-function page(content:string,warehouse:string,section:string,origin=""):string{
+function page(content:string,warehouse:string,section:string,origin="",footerInfo?:{pageNum:number;total:number}):string{
+  // footerInfo is only passed for the browser print-dialog fallback path
+  // (downloadAssetPDF) — that path never reaches the server, so Playwright's
+  // repeating footer template (reports.py) never runs for it, and without
+  // this the fallback PDF would have no footer at all. The primary
+  // server-rendered path (downloadAssetPDFServer / generateAssetReportHtml)
+  // omits footerInfo so only Playwright's footer shows there — never both.
+  const footerHtml = footerInfo ? `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 16px;background:${C.tealLight};border-top:1px solid ${C.tealBorder};flex-shrink:0">
+        <span style="font-size:7.5px;color:${C.textLight}">PredictiX AI Platform &nbsp;·&nbsp; Asset Performance Report &nbsp;·&nbsp; Confidential &nbsp;·&nbsp; © Predictix 2026</span>
+        <span style="font-size:7.5px;color:${C.textLight}">Page ${footerInfo.pageNum} of ${footerInfo.total}</span>
+      </div>` : "";
   return`<div class="page">
     <!-- inner border frame -->
-    <div style="border:1.5px solid ${C.teal};border-radius:4px;min-height:calc(100% - 0px);display:flex;flex-direction:column">
+    <div style="border:1.5px solid ${C.teal};border-radius:4px;min-height:calc(297mm - 27mm);display:flex;flex-direction:column">
       <!-- page header -->
       <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;background:${C.tealLight};border-bottom:1px solid ${C.tealBorder};flex-shrink:0">
         <div style="display:flex;align-items:center;gap:7px">
@@ -244,13 +255,9 @@ function page(content:string,warehouse:string,section:string,origin=""):string{
         </div>
         <span style="font-size:8.5px;color:${C.textLight}">${section}</span>
       </div>
-      <!-- page body — footer removed here; a repeating footer (with a live,
-           correct page count that includes any overflow pages) is now
-           rendered by Playwright itself, once per physical PDF page, via
-           reports.py's footer_template. See downloadAssetPDFServer. -->
-      <div style="padding:14px 18px;flex:1">${content}</div>
-    
-      </div>
+      <!-- page body — see footerInfo above for why the footer is conditional -->
+      <div style="padding:14px 18px;flex:1">${content}</div>${footerHtml}
+    </div>
   </div>`;
 }
 
@@ -302,7 +309,7 @@ const CSS=`
 // ══════════════════════════════════════════════════════════════════════════════
 //  MAIN GENERATOR
 // ══════════════════════════════════════════════════════════════════════════════
-function generateHTML(data:AssetReportData, origin=""):string{
+function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):string{
   const {asset,fleet,sensor,maintenance,tickets,maintenanceMetrics,ticketMetrics,insights}=data;
   const cur=data.currency||"LKR";
   const hs=data.health_score, fp=data.failure_probability, rl=data.risk_level??"—";
@@ -422,7 +429,7 @@ function generateHTML(data:AssetReportData, origin=""):string{
 
     ${subH("1.2 Asset Details")}
     ${infoTbl(assetRows)}
-  `,wLbl,"Asset Overview",origin);
+  `,wLbl,"Asset Overview",origin,includeDomFooter?{pageNum:1,total:4}:undefined);
 
   // ── PAGE 2: HEALTH, RISK & COST ESTIMATION ───────────────────────────────────────
   // Build SHAP data — normalise to 0-100% regardless of input format
@@ -533,7 +540,7 @@ function generateHTML(data:AssetReportData, origin=""):string{
     ${recBlock("Medium",recs.medium,C.sky)}
     ${!recs.critical.length&&!recs.high.length&&!recs.medium.length
       ?hlBox("RECOMMENDATIONS","No specific recommendations. Run AI prediction for asset-specific guidance.",C.slate):""}
-  `,wLbl,"Health, Risk & Cost Estimation",origin);
+  `,wLbl,"Health, Risk & Cost Estimation",origin,includeDomFooter?{pageNum:2,total:4}:undefined);
 
   // ── PAGE 3: SENSOR + MAINTENANCE ──────────────────────────────────
   const sRows:[string,string][]=sensor?[
@@ -602,7 +609,7 @@ function generateHTML(data:AssetReportData, origin=""):string{
     ${maintDonut?chartBox("MAINTENANCE TYPE BREAKDOWN",maintDonut,"Figure 3.2 — Preventive vs corrective events"):""}
     ${maintenance.length?`${subH("3.4 Recent Maintenance Events")}${dataTbl(["Date","Type","Description",`Cost (${cur})`,"Downtime"],maintRows,"Figure 3.3 — Most recent maintenance events")}`
       :hlBox("MAINTENANCE HISTORY","No maintenance events recorded.",C.slate)}
-  `,wLbl,"Sensor & Maintenance",origin);
+  `,wLbl,"Sensor & Maintenance",origin,includeDomFooter?{pageNum:3,total:4}:undefined);
 
   // ── PAGE 4: TICKETS + INSIGHTS ────────────────────────────────────────────
   const p6=page(`
@@ -620,7 +627,7 @@ function generateHTML(data:AssetReportData, origin=""):string{
       :hlBox("TICKET HISTORY","No tickets raised for this asset.",C.slate)}
 
     ${insights.conclusion?`${subH("4.3 Conclusion")}${hlBox("EXECUTIVE CONCLUSION",insights.conclusion,C.teal)}`:""}
-  `,wLbl,"Tickets & Insights",origin);
+  `,wLbl,"Tickets & Insights",origin,includeDomFooter?{pageNum:4,total:4}:undefined);
 
   return`<!DOCTYPE html>
 <html lang="en">
@@ -684,7 +691,7 @@ export async function downloadAssetPDFServer(
 export function downloadAssetPDF(data:AssetReportData,filename="asset-report.pdf"):void{
   try{
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const html=generateHTML(data, origin);
+    const html=generateHTML(data, origin, true);
     const ex=document.getElementById("__px_asset_pdf__");
     if(ex)ex.remove();
     const blob=new Blob([html],{type:"text/html"}),url=URL.createObjectURL(blob);

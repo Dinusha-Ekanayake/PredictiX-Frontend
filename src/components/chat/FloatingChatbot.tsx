@@ -9,6 +9,8 @@ import {
   ExternalLink,
   Loader2,
   MessageCircle,
+  Mic,
+  MicOff,
   SendHorizontal,
   Sparkles,
   Trash2,
@@ -41,6 +43,8 @@ type ChatMessage = {
   createdAt: number;
   actionButtons?: ActionButton[];
   toolTrace?: ToolTraceItem[];
+  widgetType?: string;
+  widgetData?: any;
 };
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -73,6 +77,87 @@ function CopyActionButton({ label, textToCopy }: { label: string; textToCopy: st
       {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
       {copied ? "Copied!" : label}
     </button>
+  );
+}
+
+// ─── Widgets ──────────────────────────────────────────────────────────────────
+
+function AssetHealthWidget({ data }: { data: any }) {
+  if (!data) return null;
+  const isGood = data.healthScore >= 70;
+  return (
+    <div className="mt-3 overflow-hidden rounded-xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="font-semibold text-sm text-foreground">{data.name}</h4>
+        <Badge variant={isGood ? "default" : "destructive"} className="text-[10px] uppercase">
+          {data.status}
+        </Badge>
+      </div>
+      <div className="space-y-2 text-xs">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Health Score</span>
+          <span className="font-medium text-foreground">{data.healthScore}%</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Failure Prob.</span>
+          <span className="font-medium text-foreground">{(data.failureProbability * 100).toFixed(0)}%</span>
+        </div>
+        <div className="flex justify-between border-t border-border/50 pt-2">
+          <span className="text-muted-foreground">Predicted Failure</span>
+          <span className="font-medium text-red-500">{data.predictedFailureDate}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecordSummaryWidget({ payload }: { payload: any }) {
+  if (!payload || !payload.data) return null;
+  const { type, data } = payload;
+  
+  // Title mapping
+  let title = "Record Details";
+  if (type === "ticket") title = data.title || data.id;
+  if (type === "asset") title = data.asset_name || data.asset_code || data.id;
+  if (type === "user") title = data.full_name || data.email || data.id;
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm">
+      <h4 className="font-semibold text-sm text-foreground mb-3 pb-2 border-b border-border/50">{title}</h4>
+      <div className="space-y-2 text-xs">
+        {Object.entries(data).map(([key, value]) => {
+          // Skip internal or empty fields
+          if (!value || key === "id" || key.endsWith("_id")) return null;
+          
+          const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          let displayValue = String(value);
+          
+          // Badge formatting for common statuses
+          if (key === "status" || key === "priority" || key === "role") {
+            const isGood = displayValue === "active" || displayValue === "resolved" || displayValue === "admin";
+            const isWarn = displayValue === "medium" || displayValue === "in_progress" || displayValue === "open";
+            const variant = isGood ? "default" : (isWarn ? "secondary" : "destructive");
+            displayValue = (
+              <Badge variant={variant as any} className="text-[10px] uppercase h-4 px-1.5 py-0 leading-none">
+                {displayValue.replace(/_/g, ' ')}
+              </Badge>
+            );
+          }
+          
+          // Truncate very long text like descriptions
+          if (typeof value === "string" && value.length > 100) {
+            displayValue = value.substring(0, 100) + "...";
+          }
+
+          return (
+            <div key={key} className="flex justify-between items-start gap-4">
+              <span className="text-muted-foreground shrink-0">{formattedKey}</span>
+              <span className="font-medium text-foreground text-right">{displayValue}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -110,8 +195,15 @@ export default function FloatingChatbot() {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSending, setIsSending] = React.useState(false);
   const [draft, setDraft] = React.useState("");
+  const [interimDraft, setInterimDraft] = React.useState("");
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
+
+  // Speech Recognition
+  const [isListening, setIsListening] = React.useState(false);
+  const isListeningRef = React.useRef(false);
+  const [speechSupported, setSpeechSupported] = React.useState(true);
+  const recognitionRef = React.useRef<any>(null);
 
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const messageEndRef = React.useRef<HTMLDivElement | null>(null);
@@ -140,6 +232,13 @@ export default function FloatingChatbot() {
     return () => observer.disconnect();
   }, [isMounted]);
 
+  // Clear chat history when returning to auth routes (e.g. logging out)
+  React.useEffect(() => {
+    if (isHiddenRoute) {
+      setMessages([]);
+    }
+  }, [isHiddenRoute]);
+
   // Escape key to close
   React.useEffect(() => {
     if (!isOpen) return;
@@ -150,6 +249,107 @@ export default function FloatingChatbot() {
     window.addEventListener("keydown", onEscape);
     return () => window.removeEventListener("keydown", onEscape);
   }, [isOpen]);
+
+  // Proactive Alert Listener
+  React.useEffect(() => {
+    const handleProactiveAlert = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const payload = customEvent.detail;
+      
+      setIsOpen(true);
+      
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          text: `🚨 **Critical Alert!**\n\n${payload.title}\n${payload.message}`,
+          createdAt: Date.now(),
+        }
+      ]);
+    };
+    
+    window.addEventListener("proactive_alert", handleProactiveAlert);
+    return () => window.removeEventListener("proactive_alert", handleProactiveAlert);
+  }, []);
+
+  // Speech Recognition Setup
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        
+        recognition.onresult = (event: any) => {
+          let finalTranscript = "";
+          let interimTranscript = "";
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+          if (finalTranscript) {
+            setDraft((prev) => (prev ? prev + " " + finalTranscript.trim() : finalTranscript.trim()));
+          }
+          setInterimDraft(interimTranscript);
+        };
+
+        recognition.onerror = (event: any) => {
+          if (event.error !== "no-speech" && event.error !== "network") {
+            console.error("Speech recognition error", event.error);
+            setIsListening(false);
+            isListeningRef.current = false;
+          } else if (event.error === "network") {
+            console.warn("Speech recognition network error, will retry...");
+          }
+        };
+
+        recognition.onend = () => {
+          if (isListeningRef.current) {
+            setTimeout(() => {
+              if (isListeningRef.current) {
+                try {
+                  recognition.start();
+                } catch (e) {
+                  console.error("Failed to restart speech recognition", e);
+                  setIsListening(false);
+                  isListeningRef.current = false;
+                }
+              }
+            }, 300);
+          } else {
+            setIsListening(false);
+            setInterimDraft("");
+          }
+        };
+
+        recognitionRef.current = recognition;
+      } else {
+        setSpeechSupported(false);
+      }
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) return;
+    if (isListeningRef.current) {
+      isListeningRef.current = false;
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      isListeningRef.current = true;
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        console.warn("Already started");
+      }
+      setIsListening(true);
+    }
+  };
 
   // Auto-scroll on new messages
   React.useEffect(() => {
@@ -208,6 +408,8 @@ export default function FloatingChatbot() {
       const toolTrace: ToolTraceItem[] = Array.isArray(payload?.tool_trace)
         ? (payload.tool_trace as ToolTraceItem[])
         : [];
+      const widgetType = payload?.widget_type;
+      const widgetData = payload?.widget_data;
 
       setMessages((prev) => [
         ...prev,
@@ -218,6 +420,8 @@ export default function FloatingChatbot() {
           createdAt: Date.now(),
           actionButtons,
           toolTrace,
+          widgetType,
+          widgetData,
         },
       ]);
     } catch (error) {
@@ -275,7 +479,7 @@ export default function FloatingChatbot() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    PredictiX Assistant
+                    Sidekick
                     <Sparkles className="size-3 text-violet-500" />
                   </p>
                   <p className="text-[10px] text-muted-foreground flex items-center gap-1">
@@ -285,15 +489,6 @@ export default function FloatingChatbot() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setMessages([])}
-                  aria-label="Clear conversation"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -310,8 +505,8 @@ export default function FloatingChatbot() {
             <div className="flex-1 overflow-y-auto px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-violet-500/20 hover:[&::-webkit-scrollbar-thumb]:bg-violet-500/40 [&::-webkit-scrollbar-thumb]:rounded-full">
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center pb-12">
-                  <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-4">
-                    <Sparkles className="size-7 text-violet-500" />
+                  <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3.5">
+                    <img src="/logo/predictix-icon.svg" alt="PredictiX" className="size-8 object-contain drop-shadow-md" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">How can I help you?</p>
@@ -399,6 +594,14 @@ export default function FloatingChatbot() {
                           )}
                         </div>
 
+                        {/* Custom Widgets */}
+                        {message.role === "assistant" && message.widgetType === "ASSET_HEALTH" && (
+                          <AssetHealthWidget data={message.widgetData} />
+                        )}
+                        {message.role === "assistant" && message.widgetType === "RECORD_SUMMARY" && (
+                          <RecordSummaryWidget payload={message.widgetData} />
+                        )}
+
                         {/* Action Buttons — rendered as clickable nav buttons */}
                         {message.role === "assistant" &&
                           message.actionButtons &&
@@ -413,7 +616,6 @@ export default function FloatingChatbot() {
                                     key={i}
                                     type="button"
                                     onClick={() => {
-                                      setIsOpen(false);
                                       router.push(btn.path);
                                     }}
                                     className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/60 dark:border-violet-600/60 bg-violet-50 dark:bg-violet-900/40 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-800/60 transition-all duration-200 hover:shadow-sm"
@@ -456,14 +658,47 @@ export default function FloatingChatbot() {
               <div className="flex items-center gap-2">
                 <Input
                   ref={inputRef}
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
+                  value={draft + (draft && interimDraft ? " " : "") + interimDraft}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    setInterimDraft("");
+                  }}
                   placeholder="Ask a question..."
                   aria-label="Chatbot message input"
                   className="h-10 text-sm"
                   disabled={isSending}
                   maxLength={500}
                 />
+                
+                {speechSupported && (
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="outline"
+                    aria-label="Toggle voice input"
+                    onClick={toggleListening}
+                    disabled={isSending}
+                    className={cn(
+                      "shrink-0 transition-all duration-300 relative h-10 w-10",
+                      isListening ? "border-violet-500 bg-violet-50 text-violet-600 w-[72px] hover:bg-violet-100 dark:bg-violet-900/30 dark:text-violet-400" : ""
+                    )}
+                  >
+                    {isListening ? (
+                      <div className="flex items-center gap-1.5 w-full justify-center">
+                        <Mic className="size-5" />
+                        <div className="flex items-center gap-0.5 h-4">
+                          <span className="w-0.5 h-full bg-current animate-[pulse_0.75s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '0ms' }} />
+                          <span className="w-0.5 h-2/3 bg-current animate-[pulse_0.6s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '150ms' }} />
+                          <span className="w-0.5 h-full bg-current animate-[pulse_0.9s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '300ms' }} />
+                          <span className="w-0.5 h-1/2 bg-current animate-[pulse_0.5s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '450ms' }} />
+                        </div>
+                      </div>
+                    ) : (
+                      <MicOff className="size-5 text-muted-foreground" />
+                    )}
+                  </Button>
+                )}
+
                 <Button
                   type="submit"
                   size="icon-sm"
@@ -498,7 +733,7 @@ export default function FloatingChatbot() {
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label={isOpen ? "Close chatbot" : "Open chatbot"}
       >
-        <span className="sr-only">PredictiX Assistant</span>
+        <span className="sr-only">Sidekick</span>
         <span className="pointer-events-none absolute inset-0 rounded-full bg-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-violet-400/40 to-sky-400/40 blur-md opacity-60" />
         {isOpen ? (

@@ -160,7 +160,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           </p>
         </div>
         <div className="flex-1 w-full min-h-[250px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <BarChart data={categoryChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={true} horizontal={true} />
               <XAxis 
@@ -209,7 +209,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           </p>
         </div>
         <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <PieChart>
               <Tooltip content={<CustomPieTooltip />} />
               <Legend 

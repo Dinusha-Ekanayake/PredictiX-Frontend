@@ -31,7 +31,7 @@ import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialo
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
 import EditUserDialog from "@/components/admin/users/EditUserDialog";
 import { toast } from "@/lib/customToast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   listUsers,
@@ -161,8 +161,8 @@ function DonutChart({
         </CardTitle>
       </CardHeader>
       <CardContent className="flex items-center gap-6">
-        <div className="h-[130px] w-[130px] shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-[120px] w-[120px] shrink-0">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <PieChart>
               <Pie
                 data={data.map((d) => ({ name: d.label, value: d.value }))}
@@ -229,6 +229,7 @@ function DonutChart({
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = React.useState(true);
   const [users, setUsers] = React.useState<UserItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -261,7 +262,15 @@ export default function AdminUsersPage() {
     return `${roleLetter}${next}${deptLetter}`;
   }
 
-  // Load users on mount
+  // Deep link support
+  const deepLinkUserId = searchParams.get("user_id");
+  React.useEffect(() => {
+    if (deepLinkUserId && users.length > 0) {
+      const u = users.find((x) => x.id === deepLinkUserId);
+      if (u) setDetailsUser(u);
+    }
+  }, [deepLinkUserId, users]);
+
   React.useEffect(() => {
     let cancelled = false;
     (async () => {

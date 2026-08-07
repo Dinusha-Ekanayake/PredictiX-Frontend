@@ -92,6 +92,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
   const [assetId, setAssetId] = React.useState("");
   const [assets, setAssets] = React.useState<Asset[]>([]);
   const [assetsLoading, setAssetsLoading] = React.useState(false);
+  const [assetsLoadFailed, setAssetsLoadFailed] = React.useState(false);
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
 
@@ -195,15 +196,18 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
   // ── dialog open/close ────────────────────────────────────────────────────────
   React.useEffect(() => {
     if (open) {
-      setAssetsLoading(true);
+      setAssetsLoading(true); setAssetsLoadFailed(false);
       apiGet<Asset[]>("/assets/dropdown")
         .then((d) => setAssets(d ?? []))
-        .catch(() => {})
+        .catch(() => {
+          setAssetsLoadFailed(true);
+          toast.error("Couldn't load assets", { description: "The asset list failed to load. You can still create the ticket without linking an asset, or try reopening this dialog." });
+        })
         .finally(() => setAssetsLoading(false));
       return;
     }
     const t = setTimeout(() => {
-      setAssetId(""); setAssets([]); setTitle(""); setDescription("");
+      setAssetId(""); setAssets([]); setAssetsLoadFailed(false); setTitle(""); setDescription("");
       setAssetSummary(null); setTicketSummary(null);
       setAi({ status: "idle" }); setCategoryOverride(""); setPriorityOverride("");
       setIsSubmitting(false); setResult(null); setFile(null);
@@ -352,6 +356,12 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
                     <option value="">Select an asset (optional)</option>
                     {assets.map((a) => <option key={a.id} value={a.id}>{a.asset_name}</option>)}
                   </select>
+                )}
+                {assetsLoadFailed && (
+                  <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                    Failed to load the asset list — you can still submit without one.
+                  </p>
                 )}
               </div>
 

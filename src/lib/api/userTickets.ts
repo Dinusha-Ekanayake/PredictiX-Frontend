@@ -261,12 +261,6 @@ export async function updateMyTicket(
   });
 }
 
-export async function listMyTicketComments(
-  ticketId: string
-): Promise<UserTicketComment[]> {
-  return request<UserTicketComment[]>(`/user/tickets/${ticketId}/comments`);
-}
-
 export async function addMyTicketComment(
   ticketId: string,
   comment: string

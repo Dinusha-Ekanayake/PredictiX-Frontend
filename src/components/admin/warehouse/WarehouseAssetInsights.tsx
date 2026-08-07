@@ -199,34 +199,80 @@ export function AssetStatusDistributionCard({ data: externalData }: { data?: any
 
 export function HealthScoreDistributionCard({ data: externalData }: { data?: any[] }) {
   const data = externalData || [];
-  const { axisColor, gridColor } = useChartStyles();
-  const COLORS = ['#22d3ee', '#3b82f6', '#8b5cf6', '#a855f7', '#ec4899', '#ef4444', '#f59e0b', '#10b981'];
+  const total = data.reduce((s, d) => s + d.count, 0) || 1;
+
+  const HEALTH_COLOR: Record<string, string> = {
+    "90-100%": "#10b981",
+    "80-89%": "#6366f1",
+    "70-79%": "#f59e0b",
+    "60-69%": "#f97316",
+    "< 60%": "#ef4444",
+  };
+
+  const BAND_LABEL: Record<string, string> = {
+    "90-100%": "Excellent",
+    "80-89%": "Good",
+    "70-79%": "Moderate",
+    "60-69%": "Poor",
+    "< 60%": "Critical",
+  };
+
+  const pieData = data.map((d) => ({
+    name: BAND_LABEL[d.bucket] || d.bucket,
+    value: d.count,
+    color: HEALTH_COLOR[d.bucket] ?? "#6b7280"
+  }));
 
   return (
     <Card className="rounded-2xl">
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          Health Score Distribution
-        </CardTitle>
+      <CardHeader className="pb-0">
+        <CardTitle className="text-sm font-semibold">Health Band Distribution</CardTitle>
       </CardHeader>
-
       <CardContent>
-        <div className="h-[260px] w-full mt-2">
-          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} barCategoryGap={16}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
-              <XAxis dataKey="bucket" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: axisColor, fontSize: 11 }} allowDecimals={false} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--muted)', opacity: 0.2 }} />
-              <Legend wrapperStyle={{ paddingTop: "20px", fontSize: "12px" }} iconType="circle" />
-              <Bar dataKey="count" name="Number of Assets" radius={[6, 6, 0, 0]}>
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="flex items-center gap-4 mt-2">
+          <div style={{ height: 140, width: 140, flexShrink: 0 }}>
+            <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieData} dataKey="value" innerRadius={38} outerRadius={58}
+                  paddingAngle={2} startAngle={90} endAngle={-270}>
+                  {pieData.map((d, i) => <Cell key={i} fill={d.color} strokeWidth={0} />)}
+                </Pie>
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null;
+                    return (
+                      <div className="rounded-xl border border-border bg-card px-3 py-2 text-xs shadow-lg">
+                        {payload.map((p: any) => (
+                          <div key={p.name} className="flex items-center gap-2 text-muted-foreground">
+                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: p.payload.color }} />
+                            <span className="flex-1">{p.name}</span>
+                            <span className="font-semibold text-foreground tabular-nums">{p.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }} 
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex-1 space-y-2">
+            {pieData.map((d) => {
+              const pct = Math.round((d.value / total) * 100);
+              return (
+                <div key={d.name} className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: d.color }} />
+                  <span className="text-[11px] text-muted-foreground flex-1 capitalize">{d.name}</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1 w-12 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: d.color }} />
+                    </div>
+                    <span className="text-[11px] font-semibold tabular-nums w-5 text-right">{d.value}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </CardContent>
     </Card>

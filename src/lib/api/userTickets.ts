@@ -1,15 +1,15 @@
 /**
  * Typed client for the user-role ticket endpoints (FastAPI: /user/tickets/*).
  *
- * Auth: the project currently stores the JWT under TWO different localStorage
- * keys depending on how the user logged in (`token` from the login page,
- * `predictix.access_token` from the shared authService). We read both, just
- * like `userProfileApi.ts` does, so requests always carry the bearer.
+ * Auth: requests go through apiClient.ts's apiFetch(), which attaches the
+ * bearer token and handles an expired/invalid session (401 → logout +
+ * redirect to /login) the same way every other authenticated call in the
+ * app does.
  *
  * Response shapes mirror `app/schemas/user_tickets.py`.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { apiFetch } from "@/lib/apiClient";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -141,29 +141,11 @@ export interface UpdateTicketPayload {
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
-function getAuthHeaders(): Record<string, string> {
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("token") ||
-        localStorage.getItem("predictix.access_token")
-      : null;
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
 async function request<T>(
   path: string,
   init: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      ...getAuthHeaders(),
-      ...(init.headers as Record<string, string> | undefined),
-    },
-  });
+  const res = await apiFetch(path, init);
 
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`;

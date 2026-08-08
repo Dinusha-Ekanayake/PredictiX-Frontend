@@ -40,8 +40,13 @@ export async function apiFetch(
 ): Promise<Response> {
   const token = getAccessToken();
 
+  // A FormData body (file uploads) needs the browser to set its own
+  // multipart/form-data boundary — forcing application/json here would
+  // corrupt the request.
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(options.headers as Record<string, string>),
   };
 

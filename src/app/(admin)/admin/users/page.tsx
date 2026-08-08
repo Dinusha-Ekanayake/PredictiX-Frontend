@@ -67,6 +67,12 @@ type AssignedAsset = {
   healthPercent: number;
 };
 
+type ChartEntry = {
+  label: string;
+  value: number;
+  color: string;
+};
+
 // ---------------------------------------------------------------------------
 // KPI helpers
 // ---------------------------------------------------------------------------
@@ -135,12 +141,16 @@ function UserAvatar({ name }: { name: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Donut Chart (recharts)
+// Donut Chart
 // ---------------------------------------------------------------------------
 
-type ChartEntry = { label: string; value: number; color: string };
-
-function DonutChart({ data, title }: { data: ChartEntry[]; title: string }) {
+function DonutChart({
+  data,
+  title,
+}: {
+  data: ChartEntry[];
+  title: string;
+}) {
   const total = data.reduce((s, d) => s + d.value, 0);
 
   return (
@@ -152,14 +162,14 @@ function DonutChart({ data, title }: { data: ChartEntry[]; title: string }) {
       </CardHeader>
       <CardContent className="flex items-center gap-6">
         <div className="h-[120px] w-[120px] shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <PieChart>
               <Pie
                 data={data.map((d) => ({ name: d.label, value: d.value }))}
                 cx="50%"
                 cy="50%"
-                innerRadius={35}
-                outerRadius={55}
+                innerRadius={38}
+                outerRadius={58}
                 dataKey="value"
                 strokeWidth={0}
               >
@@ -168,17 +178,29 @@ function DonutChart({ data, title }: { data: ChartEntry[]; title: string }) {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: any, name: any) => [value, name]}
-                contentStyle={{
-                  background: "var(--background)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "8px",
-                  fontSize: "12px",
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0];
+                  const pct =
+                    total > 0
+                      ? Math.round((Number(d.value) / total) * 100)
+                      : 0;
+                  return (
+                    <div className="rounded-xl border border-border bg-popover px-3 py-2 shadow-md text-xs">
+                      <p className="font-semibold text-foreground mb-0.5">
+                        {d.name}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {d.value} users&nbsp;·&nbsp;{pct}%
+                      </p>
+                    </div>
+                  );
                 }}
               />
             </PieChart>
           </ResponsiveContainer>
         </div>
+
         <div className="flex flex-col gap-1.5 min-w-0 flex-1">
           {data.map((d) => (
             <div key={d.label} className="flex items-center gap-2 text-xs">
@@ -187,7 +209,7 @@ function DonutChart({ data, title }: { data: ChartEntry[]; title: string }) {
                 style={{ background: d.color }}
               />
               <span className="truncate text-muted-foreground">{d.label}</span>
-              <span className="ml-auto font-medium tabular-nums">
+              <span className="ml-auto font-medium tabular-nums whitespace-nowrap">
                 {d.value}
                 <span className="text-muted-foreground font-normal ml-1">
                   ({total > 0 ? Math.round((d.value / total) * 100) : 0}%)
@@ -212,13 +234,16 @@ export default function AdminUsersPage() {
   const [users, setUsers] = React.useState<UserItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
-  const [departmentFilter, setDepartmentFilter] = React.useState<string>("all");
+  const [departmentFilter, setDepartmentFilter] =
+    React.useState<string>("all");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [editUser, setEditUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
-  const [assignedAssets, setAssignedAssets] = React.useState<AssignedAsset[]>([]);
+  const [assignedAssets, setAssignedAssets] = React.useState<AssignedAsset[]>(
+    []
+  );
   const [assetsLoading, setAssetsLoading] = React.useState(false);
 
   function generateUserId(role: UserRole, department: string): string {
@@ -264,7 +289,9 @@ export default function AdminUsersPage() {
         if (!cancelled) setIsLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Dynamic department list from real data
@@ -276,8 +303,14 @@ export default function AdminUsersPage() {
   // Department chart data
   const deptChartData = React.useMemo((): ChartEntry[] => {
     const COLORS = [
-      "#2a78d6", "#1baf7a", "#eda100", "#4a3aa7",
-      "#e34948", "#e87ba4", "#eb6834", "#888780",
+      "#2a78d6",
+      "#1baf7a",
+      "#eda100",
+      "#4a3aa7",
+      "#e34948",
+      "#e87ba4",
+      "#eb6834",
+      "#888780",
     ];
     const map: Record<string, number> = {};
     users.forEach((u) => {
@@ -302,6 +335,7 @@ export default function AdminUsersPage() {
     ].filter((d) => d.value > 0);
   }, [users]);
 
+  // Filtered users for table
   const filteredUsers = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return users.filter((user) => {
@@ -337,7 +371,9 @@ export default function AdminUsersPage() {
         status: newUser.status,
       });
       setUsers((prev) => [created, ...prev]);
-      toast.success("User created", { description: `${created.name} added.` });
+      toast.success("User created", {
+        description: `${created.name} added.`,
+      });
     } catch (err) {
       toast.error("Failed to create user", {
         description: err instanceof Error ? err.message : undefined,
@@ -462,14 +498,19 @@ export default function AdminUsersPage() {
               </SelectContent>
             </Select>
 
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+            <Select
+              value={departmentFilter}
+              onValueChange={setDepartmentFilter}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Departments" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
                 {departments.map((d) => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -496,7 +537,7 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      {/* Users table — click row to open View Details */}
+      {/* Users table — click any row to open View Details */}
       <Card className="rounded-2xl">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -589,7 +630,9 @@ export default function AdminUsersPage() {
       <ViewUserDetailsDialog
         user={detailsUser}
         open={detailsUser !== null}
-        onOpenChange={(open) => { if (!open) setDetailsUser(null); }}
+        onOpenChange={(open) => {
+          if (!open) setDetailsUser(null);
+        }}
         onEditUser={(user) => {
           setDetailsUser(null);
           setEditUser(user as UserItem);
@@ -616,7 +659,9 @@ export default function AdminUsersPage() {
       <EditUserDialog
         user={editUser}
         open={editUser !== null}
-        onOpenChange={(open) => { if (!open) setEditUser(null); }}
+        onOpenChange={(open) => {
+          if (!open) setEditUser(null);
+        }}
         onUserUpdated={handleUserUpdated}
       />
 
@@ -626,7 +671,9 @@ export default function AdminUsersPage() {
         assets={assignedAssets}
         loading={assetsLoading}
         open={assetsUser !== null}
-        onOpenChange={(open) => { if (!open) setAssetsUser(null); }}
+        onOpenChange={(open) => {
+          if (!open) setAssetsUser(null);
+        }}
         onNavigateToAsset={handleNavigateToAsset}
         onBackToDetails={
           assetsUser

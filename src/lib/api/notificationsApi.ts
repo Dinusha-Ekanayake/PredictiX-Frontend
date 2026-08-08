@@ -15,7 +15,7 @@ export type NotificationOut = {
 
 export async function fetchNotifications(status?: string): Promise<NotificationOut[]> {
   const query = status ? `?status=${status}` : "";
-  return apiGet<NotificationOut[]>(`/notifications/${query}`);
+  return apiGet<NotificationOut[]>(`/notifications${query}`);
 }
 
 export async function getUnreadNotifications(): Promise<NotificationOut[]> {

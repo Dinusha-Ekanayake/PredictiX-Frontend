@@ -82,7 +82,7 @@ export default function WarehouseTicketsByDepartment({ data = [], isLoading }: P
       </CardHeader>
       <CardContent>
         <div style={{ width: "100%", height: Math.max(160, data.length * 46) }}>
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
             <BarChart data={data} layout="vertical" margin={{ top: 0, right: 36, left: 8, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
               <XAxis

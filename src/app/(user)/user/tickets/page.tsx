@@ -505,7 +505,6 @@ export default function UserTicketsPage() {
         open={newOpen}
         onOpenChange={setNewOpen}
         onCreated={() => loadTickets("refresh")}
-        users={users}
       />
       <UserTicketDetailsDialog
         open={detailOpen}

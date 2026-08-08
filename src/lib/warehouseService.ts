@@ -35,22 +35,50 @@ export interface WarehouseSummaryData {
 export interface SurvivalComponentSummary {
   component: string;
   avg_rul_days: number | null;
+  /** count of scored assets whose component fails within 7 / 30 days */
+  at_risk_7d: number;
   at_risk_30d: number;
-  at_risk_90d: number;
   assets_scored: number;
 }
 
 export interface SurvivalWatchlistItem {
   asset: string;
   component: string;
-  rul_days: number;
+  rul_days: number | null;
   risk: string;
+}
+
+/** Per-component failure risk for one asset (v3 warehouse report). */
+export interface SurvivalAssetComponentRisk {
+  fail_prob_7d: number;
+  fail_prob_30d: number;
+  median_days: number;
+  health_pct: number | null;
+}
+
+/** One critical asset's 5-component breakdown + cost (v3 warehouse report). */
+export interface SurvivalAssetBreakdown {
+  asset: string;
+  components: Record<string, SurvivalAssetComponentRisk>;
+  soonest_component: string;
+  soonest_median_days: number | null;
+  p_service_7d: number;
+  p_service_30d: number;
+  est_cost_lkr: number | null;
+  exp_cost_7d_lkr: number | null;
+  exp_cost_30d_lkr: number | null;
 }
 
 export interface SurvivalSummary {
   assets_analyzed: number;
   horizon_days: number;
+  currency?: string;
+  /** expected fleet replacement spend within 7 / 30 days (cost-estimation model) */
+  expected_spend_7d?: number;
+  expected_spend_30d?: number;
   component_summary: SurvivalComponentSummary[];
+  /** per-critical-asset 5-component risk + cost (drives the risk heatmap) */
+  assets?: SurvivalAssetBreakdown[];
   watchlist: SurvivalWatchlistItem[];
   /** ISO-8601 UTC timestamp of when the analysis was scored (from the backend). */
   generated_at?: string;

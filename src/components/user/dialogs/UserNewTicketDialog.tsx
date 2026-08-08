@@ -68,6 +68,9 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (ticket: UserTicketDetail) => void;
+  presetAssetId?: string;
+  presetAssetName?: string;
+  lockAsset?: boolean;
 };
 
 const selectCls =
@@ -87,7 +90,9 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 // ─── component ────────────────────────────────────────────────────────────────
 
-export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: Props) {
+export default function UserNewTicketDialog({
+  open, onOpenChange, onCreated, presetAssetId, presetAssetName, lockAsset,
+}: Props) {
   // form
   const [assetId, setAssetId] = React.useState("");
   const [assets, setAssets] = React.useState<Asset[]>([]);
@@ -196,6 +201,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
   // ── dialog open/close ────────────────────────────────────────────────────────
   React.useEffect(() => {
     if (open) {
+      if (presetAssetId) setAssetId(presetAssetId);
       setAssetsLoading(true); setAssetsLoadFailed(false);
       apiGet<Asset[]>("/assets/dropdown")
         .then((d) => setAssets(d ?? []))
@@ -213,7 +219,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
       setIsSubmitting(false); setResult(null); setFile(null);
     }, 200);
     return () => clearTimeout(t);
-  }, [open]);
+  }, [open, presetAssetId]);
 
   // ── submit ───────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
@@ -321,7 +327,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
               )}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <Button variant="secondary" onClick={() => {
-                  setTitle(""); setDescription(""); setAssetId("");
+                  setTitle(""); setDescription(""); setAssetId(lockAsset && presetAssetId ? presetAssetId : "");
                   setAi({ status: "idle" }); setCategoryOverride(""); setPriorityOverride(""); setResult(null); setAssetSummary(null); setTicketSummary(null); setFile(null);
                 }}>
                   Create another
@@ -346,18 +352,28 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
             <form onSubmit={handleSubmit} className="grid gap-3 pt-2">
               {/* Asset */}
               <div>
-                <p className="text-sm text-muted-foreground mb-2">Asset (optional)</p>
-                {assetsLoading ? (
+                <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
+                  {lockAsset && <Lock className="h-3.5 w-3.5" />}
+                  Asset{lockAsset ? "" : " (optional)"}
+                  {lockAsset && presetAssetName ? ` · ${presetAssetName}` : ""}
+                </p>
+                {assetsLoading && !lockAsset ? (
                   <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input text-sm text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />Loading assets…
                   </div>
                 ) : (
-                  <select value={assetId} onChange={(e) => setAssetId(e.target.value)} className={selectCls} disabled={isSubmitting}>
-                    <option value="">Select an asset (optional)</option>
-                    {assets.map((a) => <option key={a.id} value={a.id}>{a.asset_name}</option>)}
+                  <select value={assetId} onChange={(e) => setAssetId(e.target.value)} className={selectCls} disabled={isSubmitting || lockAsset}>
+                    {lockAsset && presetAssetId ? (
+                      <option value={presetAssetId}>{presetAssetName ?? "Selected asset"}</option>
+                    ) : (
+                      <>
+                        <option value="">Select an asset (optional)</option>
+                        {assets.map((a) => <option key={a.id} value={a.id}>{a.asset_name}</option>)}
+                      </>
+                    )}
                   </select>
                 )}
-                {assetsLoadFailed && (
+                {assetsLoadFailed && !lockAsset && (
                   <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
                     <AlertTriangle className="h-3 w-3 shrink-0" />
                     Failed to load the asset list — you can still submit without one.

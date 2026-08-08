@@ -475,12 +475,11 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
         </DialogHeader>
 
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 bg-muted/40 p-1 rounded-xl mb-4">
+          <TabsList className="grid w-full grid-cols-3 md:grid-cols-4 bg-muted/40 p-1 rounded-xl mb-4">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="discussion">Discussion</TabsTrigger>
             {isTechnician && <TabsTrigger value="notes">Private Notes</TabsTrigger>}
             <TabsTrigger value="audit">Audit Log</TabsTrigger>
-            <TabsTrigger value="copilot">AI Copilot</TabsTrigger>
           </TabsList>
 
           <TabsContent value="details" className="grid gap-4 mt-0">
@@ -890,49 +889,6 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                     })}
                   </div>
                 )}
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="copilot" className="space-y-4 pt-1">
-            <div className="rounded-xl border border-border bg-card p-4 flex flex-col h-[400px]">
-              <div className="flex-1 overflow-y-auto p-1 space-y-3 custom-scrollbar">
-                {copilotMessages.map((m, idx) => {
-                  const isAi = m.role === "assistant";
-                  return (
-                    <div key={idx} className={cn("flex gap-2.5 max-w-[85%]", isAi ? "mr-auto" : "ml-auto flex-row-reverse")}>
-                      <div className={cn("w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs border shadow-sm", isAi ? "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300 border-violet-200 dark:border-violet-900" : "bg-muted text-muted-foreground border-border")}>
-                        {isAi ? <Bot className="h-4 w-4" /> : <UserIcon className="h-4 w-4" />}
-                      </div>
-                      <div className={cn("rounded-2xl p-3 text-sm leading-relaxed", isAi ? "bg-muted text-foreground rounded-tl-none" : "bg-violet-600 text-white rounded-tr-none")}>
-                        {m.content}
-                      </div>
-                    </div>
-                  );
-                })}
-                {copilotLoading && (
-                  <div className="flex gap-2.5 max-w-[85%] mr-auto">
-                    <div className="w-7 h-7 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300 border border-violet-200 dark:border-violet-900 flex items-center justify-center shrink-0">
-                      <Bot className="h-4 w-4" />
-                    </div>
-                    <div className="bg-muted text-foreground rounded-2xl rounded-tl-none p-3 text-sm flex items-center gap-2">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Analyzing ticket context...
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
-                <Input
-                  value={copilotInput}
-                  onChange={(e) => setCopilotInput(e.target.value)}
-                  placeholder="Ask diagnostics copilot..."
-                  className="flex-1 h-10"
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleSendCopilot(); }}
-                  disabled={copilotLoading}
-                />
-                <Button size="icon" onClick={handleSendCopilot} disabled={!copilotInput.trim() || copilotLoading} className="h-10 w-10 shrink-0">
-                  <Send className="h-4 w-4" />
-                </Button>
               </div>
             </div>
           </TabsContent>

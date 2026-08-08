@@ -69,7 +69,7 @@ export async function createTicketViaApi(payload: AdminTicketCreatePayload): Pro
 
 export type TicketStatus = "open" | "in-progress" | "resolved" | "closed";
 export type TicketPriority = "High" | "Medium" | "Low";
-export type TicketCategory = "Mechanical" | "Electrical" | "Software" | "General";
+export type TicketCategory = "Mechanical" | "Electrical" | "Software";
 
 export type Ticket = {
   id: string;
@@ -186,7 +186,7 @@ export async function createTicket(payload: {
       description: payload.description,
       status: "open",
       priority: dbPriority(payload.priority),
-      predicted_category: payload.category === "General" ? "mechanical" : payload.category.toLowerCase(),
+      predicted_category: payload.category.toLowerCase(),
       assigned_to: payload.assigned_to || null,
       opened_at: new Date().toISOString(),
       created_at: new Date().toISOString(),

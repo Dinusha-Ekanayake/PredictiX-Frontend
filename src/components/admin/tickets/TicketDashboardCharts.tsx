@@ -149,73 +149,53 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   const techQueueData = Object.values(techQueueCounts)
     .sort((a, b) => b.total - a.total);
 
-  // 4. Process data for Ticket Category vs. Status Scatter Plot (4x3 Grid)
-  const scatterData = React.useMemo(() => {
-    return data.map((t) => {
-      // Map category to Y coordinate (discrete 1, 2, 3)
+  // 4. Process data for 4x3 Status vs Category Grid Counts
+  const gridCountsData = React.useMemo(() => {
+    const categories = ["Mechanical", "Electrical", "Software"];
+    const statuses = ["Open", "In Progress", "Resolved", "Closed"];
+    
+    const counts: Record<string, Record<string, number>> = {
+      Mechanical: { Open: 0, "In Progress": 0, Resolved: 0, Closed: 0 },
+      Electrical: { Open: 0, "In Progress": 0, Resolved: 0, Closed: 0 },
+      Software: { Open: 0, "In Progress": 0, Resolved: 0, Closed: 0 },
+    };
+
+    data.forEach((t) => {
       const rawCat = t.final_category || t.predicted_category;
       let cat = (rawCat || "").toLowerCase();
-      let yVal = 2; // Default to Electrical (Y-axis)
       let catLabel = "Electrical";
-      if (cat === "mechanical") {
-        yVal = 1;
-        catLabel = "Mechanical";
-      } else if (cat === "software") {
-        yVal = 3;
-        catLabel = "Software";
-      }
+      if (cat === "mechanical") catLabel = "Mechanical";
+      else if (cat === "software") catLabel = "Software";
 
-      // Map status to X coordinate (discrete 1, 2, 3, 4)
       const status = (t.status || "").toLowerCase();
-      let xVal = 1; // Default to Open (X-axis)
       let statusLabel = "Open";
       if (status === "in-progress" || status === "in_progress") {
-        xVal = 2;
         statusLabel = "In Progress";
       } else if (status === "resolved") {
-        xVal = 3;
         statusLabel = "Resolved";
       } else if (status === "closed") {
-        xVal = 4;
         statusLabel = "Closed";
       }
 
-      // Generate deterministic jitter using ticket ID string
-      let hash = 0;
-      for (let i = 0; i < t.id.length; i++) {
-        hash = t.id.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      const jitterX = ((hash % 100) / 100 - 0.5) * 0.45;
-      const jitterY = (((hash >> 8) % 100) / 100 - 0.5) * 0.45;
-
-      const prio = (t.priority || "Medium").toLowerCase();
-      let prioLabel = "Medium";
-      let fill = PRIORITY_COLORS.Medium;
-      if (prio === "high") {
-        prioLabel = "High";
-        fill = PRIORITY_COLORS.High;
-      } else if (prio === "low") {
-        prioLabel = "Low";
-        fill = PRIORITY_COLORS.Low;
-      }
-
-      return {
-        id: t.id,
-        title: t.title,
-        x: xVal + jitterX,
-        y: yVal + jitterY,
-        category: catLabel,
-        status: statusLabel,
-        priority: prioLabel,
-        fill,
-        z: 80,
-      };
+      counts[catLabel][statusLabel] += 1;
     });
-  }, [data]);
 
-  const scatterLow = React.useMemo(() => scatterData.filter(d => d.priority === "Low"), [scatterData]);
-  const scatterMed = React.useMemo(() => scatterData.filter(d => d.priority === "Medium"), [scatterData]);
-  const scatterHigh = React.useMemo(() => scatterData.filter(d => d.priority === "High"), [scatterData]);
+    const resultList: any[] = [];
+    categories.forEach((cat, catIdx) => {
+      statuses.forEach((status, statusIdx) => {
+        resultList.push({
+          x: statusIdx + 1,
+          y: catIdx + 1,
+          category: cat,
+          status,
+          count: counts[cat][status],
+          z: 100,
+        });
+      });
+    });
+
+    return resultList;
+  }, [data]);
 
   if (loading) {
     return (
@@ -280,37 +260,52 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     return null;
   };
 
-  // Custom Tooltip for Category vs Status Scatter
-  const CustomScatterTooltip = ({ active, payload }: any) => {
+  // Custom Tooltip for Grid Counts Scatter
+  const CustomGridTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const item = payload[0].payload;
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md max-w-xs">
-          <p className="text-sm font-bold text-slate-200 truncate">{item.title}</p>
-          <p className="text-xs text-slate-400 mt-1">Category: <span className="font-semibold text-white">{item.category}</span></p>
-          <p className="text-xs text-slate-400">Status: <span className="font-semibold text-white">{item.status}</span></p>
-          <p className="text-xs text-slate-400">Priority: <span className="font-semibold" style={{ color: item.fill }}>{item.priority}</span></p>
+        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="text-sm font-bold text-slate-200">{item.category} &bull; {item.status}</p>
+          <p className="text-xs text-slate-400 mt-1">Ticket Count: <span className="font-semibold text-white">{item.count} tickets</span></p>
         </div>
       );
     }
     return null;
   };
 
-  // Custom shape to render ticket scatter nodes as colored circles with a white border
-  const CustomScatterNode = (props: any) => {
-    const { cx, cy, fill } = props;
+  // Custom shape to render grid counts as centered badges
+  const CustomGridNode = (props: any) => {
+    const { cx, cy, payload } = props;
     if (!cx || !cy) return null;
 
+    const count = payload.count || 0;
+
     return (
-      <circle 
-        cx={cx} 
-        cy={cy} 
-        r={7.5} 
-        fill={fill} 
-        stroke="#ffffff" 
-        strokeWidth={1.5} 
-        style={{ filter: "drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.4))" }}
-      />
+      <g>
+        <rect
+          x={cx - 24}
+          y={cy - 14}
+          width={48}
+          height={28}
+          rx={14}
+          fill="#1e293b"
+          stroke="#475569"
+          strokeWidth={1.5}
+          className="drop-shadow-md"
+        />
+        <text
+          x={cx}
+          y={cy + 5}
+          textAnchor="middle"
+          fill="#f8fafc"
+          fontSize={13}
+          fontWeight="bold"
+          style={{ pointerEvents: "none" }}
+        >
+          {count}
+        </text>
+      </g>
     );
   };
 
@@ -459,28 +454,28 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
         </div>
         <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 5, left: -20 }}>
+            <ScatterChart margin={{ top: 20, right: 20, bottom: 5, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
               
               {/* Column 1 backgrounds: Open (Red risk profile) */}
-              <ReferenceArea x1={0.5} x2={1.5} y1={0.5} y2={1.5} fill="#ef4444" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={0.5} x2={1.5} y1={1.5} y2={2.5} fill="#ef4444" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={0.5} x2={1.5} y1={2.5} y2={3.5} fill="#ef4444" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={0.5} x2={1.5} y1={0.5} y2={1.5} fill="#ef4444" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={0.5} x2={1.5} y1={1.5} y2={2.5} fill="#ef4444" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={0.5} x2={1.5} y1={2.5} y2={3.5} fill="#ef4444" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
 
               {/* Column 2 backgrounds: In Progress (Orange risk profile) */}
-              <ReferenceArea x1={1.5} x2={2.5} y1={0.5} y2={1.5} fill="#f97316" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={1.5} x2={2.5} y1={1.5} y2={2.5} fill="#f97316" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={1.5} x2={2.5} y1={2.5} y2={3.5} fill="#f97316" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={1.5} x2={2.5} y1={0.5} y2={1.5} fill="#f97316" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={1.5} x2={2.5} y1={1.5} y2={2.5} fill="#f97316" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={1.5} x2={2.5} y1={2.5} y2={3.5} fill="#f97316" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
 
               {/* Column 3 backgrounds: Resolved (Yellow risk profile) */}
-              <ReferenceArea x1={2.5} x2={3.5} y1={0.5} y2={1.5} fill="#eab308" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={2.5} x2={3.5} y1={1.5} y2={2.5} fill="#eab308" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={2.5} x2={3.5} y1={2.5} y2={3.5} fill="#eab308" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={2.5} x2={3.5} y1={0.5} y2={1.5} fill="#eab308" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={2.5} x2={3.5} y1={1.5} y2={2.5} fill="#eab308" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={2.5} x2={3.5} y1={2.5} y2={3.5} fill="#eab308" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
 
               {/* Column 4 backgrounds: Closed (Green risk profile) */}
-              <ReferenceArea x1={3.5} x2={4.5} y1={0.5} y2={1.5} fill="#22c55e" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={3.5} x2={4.5} y1={1.5} y2={2.5} fill="#22c55e" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={3.5} x2={4.5} y1={2.5} y2={3.5} fill="#22c55e" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={3.5} x2={4.5} y1={0.5} y2={1.5} fill="#22c55e" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={3.5} x2={4.5} y1={1.5} y2={2.5} fill="#22c55e" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={3.5} x2={4.5} y1={2.5} y2={3.5} fill="#22c55e" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
 
               <XAxis 
                 type="number" 
@@ -505,13 +500,11 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                 tickFormatter={(val) => val === 1 ? 'Mechanical' : val === 2 ? 'Electrical' : val === 3 ? 'Software' : ''}
                 tickLine={false}
                 axisLine={false}
+                width={90}
               />
               <ZAxis type="number" dataKey="z" range={[80, 80]} />
-              <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomScatterTooltip />} />
-              <Scatter name="Low" data={scatterLow} fill={PRIORITY_COLORS.Low} shape={<CustomScatterNode />} />
-              <Scatter name="Medium" data={scatterMed} fill={PRIORITY_COLORS.Medium} shape={<CustomScatterNode />} />
-              <Scatter name="High" data={scatterHigh} fill={PRIORITY_COLORS.High} shape={<CustomScatterNode />} />
-              <Legend verticalAlign="bottom" height={24} iconType="circle" iconSize={8} formatter={renderLegendText} />
+              <Tooltip cursor={false} content={<CustomGridTooltip />} />
+              <Scatter name="Tickets" data={gridCountsData} shape={<CustomGridNode />} />
             </ScatterChart>
           </ResponsiveContainer>
         </div>

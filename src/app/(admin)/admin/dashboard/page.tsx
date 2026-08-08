@@ -18,6 +18,7 @@ import {
   getAdminDashboard,
   type AdminDashboardData,
   type AlertSeverity,
+  type DashboardInsight,
   type InsightTone,
   type TicketPriority,
   type TicketStatus,
@@ -187,7 +188,12 @@ export default function AdminDashboardPage() {
   const risks = data?.topRiskAssets ?? [];
   const alerts = data?.recentAlerts ?? [];
   const tickets = data?.latestTickets ?? [];
-  const insights = data?.aiInsights ?? [];
+  // Drop any malformed entries (null/non-object) before rendering — insights.map
+  // previously read ins.tone unconditionally, so a single bad item crashed the
+  // whole dashboard (unhandled TypeError) instead of just skipping that card.
+  const insights = (data?.aiInsights ?? []).filter(
+    (ins): ins is DashboardInsight => !!ins && typeof ins === "object"
+  );
   const footer = data?.footerStats;
 
   return (
@@ -258,9 +264,13 @@ export default function AdminDashboardPage() {
         )}
 
         {/* ══ KPIs ══════════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        {/* All page-level rows below share this same 12-col grid at xl so their
+            card edges land on the same vertical lines instead of drifting
+            past each other (6-col vs 4-col vs 5-col grids only coincide at
+            their outermost edges). */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-12">
           {kpiCards.map((c) => (
-            <Card key={c.label} className="p-4 hover:shadow-sm transition-shadow cursor-default">
+            <Card key={c.label} className="p-4 hover:shadow-sm transition-shadow cursor-default xl:col-span-2">
               <div className="flex items-center justify-between mb-3">
                 <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", c.iconBg)}>
                   <c.icon className={cn("h-4 w-4", c.iconColor)} />
@@ -279,15 +289,12 @@ export default function AdminDashboardPage() {
             <div className="flex items-center gap-2 mb-3">
               <Bot className="h-4 w-4 text-violet-500" />
               <span className="text-[12px] font-semibold text-foreground">AI Insights</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/25 px-2 py-0.5 text-[9px] font-bold text-violet-700 dark:text-violet-300 uppercase tracking-wide">
-                <Zap className="h-2.5 w-2.5" /> XGBoost · BERT
-              </span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
               {insights.map((ins, i) => {
                 const s = INSIGHT_STYLE[ins.tone] ?? INSIGHT_STYLE.info;
                 return (
-                  <div key={`${ins.title}-${i}`} className={cn("rounded-xl border p-4", s.bg)}>
+                  <div key={`${ins.title}-${i}`} className={cn("rounded-xl border p-4 xl:col-span-4", s.bg)}>
                     <div className="flex items-start gap-2.5">
                       <div className="mt-0.5 shrink-0"><s.icon className={cn("h-4 w-4", s.color)} /></div>
                       <div>
@@ -303,8 +310,8 @@ export default function AdminDashboardPage() {
         )}
 
         {/* ══ Charts row ════════════════════════════════════════════════════ */}
-        <div className="grid gap-4 lg:grid-cols-5">
-          <Card className="lg:col-span-3 overflow-hidden">
+        <div className="grid gap-3 xl:grid-cols-12">
+          <Card className="xl:col-span-8 overflow-hidden">
             <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-200 dark:border-slate-700">
               <div>
                 <SectionTitle>Asset & Operations Trends</SectionTitle>
@@ -399,7 +406,7 @@ export default function AdminDashboardPage() {
           </Card>
 
           {/* Right column */}
-          <div className="lg:col-span-2 flex flex-col gap-4">
+          <div className="xl:col-span-4 flex flex-col gap-4">
             <Card className="p-4 flex-1">
               <SectionTitle>Health Distribution</SectionTitle>
               <SectionSub>{distTotal > 1 ? `${distTotal} assets by condition band` : "By condition band"}</SectionSub>
@@ -454,8 +461,8 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* ══ Risk + Alerts ═════════════════════════════════════════════════ */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
+        <div className="grid gap-3 xl:grid-cols-12">
+          <Card className="xl:col-span-6">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-700">
               <div><SectionTitle>Top Risk Assets</SectionTitle><SectionSub>Ranked by AI predicted failure probability</SectionSub></div>
               <button
@@ -497,7 +504,7 @@ export default function AdminDashboardPage() {
             </div>
           </Card>
 
-          <Card>
+          <Card className="xl:col-span-6">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-700">
               <div><SectionTitle>Recent Alerts</SectionTitle><SectionSub>Asset monitoring — latest events</SectionSub></div>
               <button className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground font-medium">View all<ChevronRight className="h-3.5 w-3.5" /></button>
@@ -572,7 +579,7 @@ export default function AdminDashboardPage() {
                   {data.aiSummaryIsGenerated ? (
                     <>
                       <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-violet-100 text-violet-700 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/25">
-                        <Zap className="h-2.5 w-2.5" /> XGBoost · BERT · RAG
+                        <Zap className="h-2.5 w-2.5" /> AI-Generated
                       </span>
                       <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/25">
                         <CheckCircle2 className="h-2.5 w-2.5" /> High confidence

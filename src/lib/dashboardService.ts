@@ -119,7 +119,7 @@ export interface AdminDashboardData {
   aiSummary: string | null;
   // False when aiSummary is the deterministic KPI-derived fallback string
   // rather than real LLM output — lets the UI avoid claiming
-  // "XGBoost · BERT · RAG / High confidence" for plain templated text.
+  // "AI-Generated / High confidence" for plain templated text.
   aiSummaryIsGenerated: boolean;
   aiInsights: DashboardInsight[];
 }

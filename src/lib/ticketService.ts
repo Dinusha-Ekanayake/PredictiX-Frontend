@@ -89,6 +89,8 @@ export type Ticket = {
   opened_at: string | null;
   created_at: string;
   updated_at: string;
+  resolved_at?: string | null;
+  closed_at?: string | null;
 };
 
 const PAGE_SIZE = 10;
@@ -130,6 +132,8 @@ function mapRow(row: any): Ticket {
     opened_at: row.opened_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    resolved_at: row.resolved_at,
+    closed_at: row.closed_at,
   };
 }
 
@@ -383,3 +387,51 @@ export async function fetchTicketEnrichment(ticket: {
 
   return result;
 }
+
+export async function fetchTicketComments(ticketId: string): Promise<any[]> {
+  try {
+    const data = await apiGet<any[]>(`/ticket-comments/?ticket_id=${ticketId}`);
+    return data || [];
+  } catch (err) {
+    console.error("Failed to fetch ticket comments:", err);
+    return [];
+  }
+}
+
+export async function createTicketComment(
+  ticketId: string,
+  userId: string,
+  comment: string,
+  isInternal: boolean = false
+): Promise<any> {
+  return apiPost<any>("/ticket-comments/", {
+    ticket_id: ticketId,
+    user_id: userId,
+    comment,
+    is_internal: isInternal,
+  });
+}
+
+export async function deleteTicketComment(commentId: string): Promise<void> {
+  await apiDelete(`/ticket-comments/${commentId}`);
+}
+
+export interface AgentResponse {
+  answer: string;
+  action_buttons: Array<{ label: string; path: string }>;
+  tool_trace: Array<{ name: string; args: any; result_preview: string }>;
+  iterations: number;
+}
+
+export async function askChatbotAgent(
+  question: string,
+  history?: Array<{ role: string; content: string }>,
+  frontendContext?: any
+): Promise<AgentResponse> {
+  return apiPost<AgentResponse>("/chatbot/agent", {
+    question,
+    history,
+    frontend_context: frontendContext,
+  });
+}
+

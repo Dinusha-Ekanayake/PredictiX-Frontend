@@ -14,7 +14,7 @@ import { toast } from "@/lib/customToast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/hooks/useAuth";
-import { getAccessToken } from "@/lib/authService";
+import { getAccessToken, logout } from "@/lib/authService";
 
 function timeAgo(dateString: string) {
   const date = new Date(dateString);
@@ -59,49 +59,85 @@ export default function NotificationBell() {
   const { user } = useUser();
   const userId = user?.id;
 
-    // WebSocket Connection
+    // WebSocket Connection — reconnects with backoff on a transient drop
+    // (network blip, backend restart/redeploy), and treats an auth
+    // rejection (WS_1008_POLICY_VIOLATION, the only close code
+    // websockets.py's _verify_ws_token ever sends) exactly like a REST 401
+    // in apiClient.ts: the token is dead, not just this socket, so force a
+    // re-login instead of quietly retrying with a token that will never
+    // succeed.
     React.useEffect(() => {
       if (!userId) return;
 
-      // The backend now authenticates the socket: it requires the caller's JWT
-      // (passed as a query param) and checks it belongs to this userId.
-      const token = getAccessToken();
-      if (!token) return;
+      let cancelled = false;
+      let ws: WebSocket | null = null;
+      let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+      let reconnectAttempt = 0;
+      const MAX_RECONNECT_DELAY_MS = 30_000;
 
-      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
-      const ws = new WebSocket(
-        `${wsUrl}/ws/notifications/${userId}?token=${encodeURIComponent(token)}`
-      );
+      function connect() {
+        // Re-read the token on every (re)connect attempt, not just once —
+        // a long-lived tab may reconnect hours after mount, by which point
+        // the original token could be stale.
+        const token = getAccessToken();
+        if (!token) return; // logged out elsewhere — nothing to reconnect to
 
-    ws.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        if (payload && payload.id) {
-          // It's a new notification!
-          setNotifications((prev) => [payload, ...prev]);
-          toast.info(payload.title, {
-            description: payload.message,
-          });
-          
-          // Trigger Proactive Alert if critical
-          if (payload.is_critical || (payload.title || "").toLowerCase().includes("critical") || payload.type === "critical") {
-            const customEvent = new CustomEvent("proactive_alert", { detail: payload });
-            window.dispatchEvent(customEvent);
+        const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
+        ws = new WebSocket(
+          `${wsUrl}/ws/notifications/${userId}?token=${encodeURIComponent(token)}`
+        );
+
+        ws.onopen = () => {
+          reconnectAttempt = 0; // reset backoff once a connection actually succeeds
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload && payload.id) {
+              // It's a new notification!
+              setNotifications((prev) => [payload, ...prev]);
+              toast.info(payload.title, {
+                description: payload.message,
+              });
+
+              // Trigger Proactive Alert if critical
+              if (payload.is_critical || (payload.title || "").toLowerCase().includes("critical") || payload.type === "critical") {
+                const customEvent = new CustomEvent("proactive_alert", { detail: payload });
+                window.dispatchEvent(customEvent);
+              }
+            }
+          } catch (err) {
+            console.error("Failed to parse websocket message", err);
           }
-        }
-      } catch (err) {
-        console.error("Failed to parse websocket message", err);
+        };
+
+        ws.onclose = (event) => {
+          if (cancelled) return;
+
+          if (event.code === 1008) {
+            // Same session-expiry handling as apiClient.ts's 401 path.
+            logout();
+            if (typeof window !== "undefined") {
+              window.location.href = "/login";
+            }
+            return;
+          }
+
+          reconnectAttempt += 1;
+          const delay = Math.min(1000 * 2 ** reconnectAttempt, MAX_RECONNECT_DELAY_MS);
+          reconnectTimer = setTimeout(connect, delay);
+        };
       }
-    };
 
-    ws.onclose = () => {
-      // socket closed; NotificationBell will re-open on next mount / userId change
-    };
+      connect();
 
-    return () => {
-      ws.close();
-    };
-  }, [userId]);
+      return () => {
+        cancelled = true;
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        ws?.close();
+      };
+    }, [userId]);
 
   // Close on outside click
   React.useEffect(() => {

@@ -33,9 +33,9 @@ type TicketData = {
 };
 
 const PRIORITY_COLORS = {
-  High: "#f59e0b",   // Orange
-  Medium: "#3b82f6", // Blue
-  Low: "#94a3b8",    // Slate/Gray
+  High: "#ef4444",   // Red
+  Medium: "#f59e0b", // Amber/Orange
+  Low: "#10b981",    // Emerald Green
 };
 
 const CATEGORY_COLORS = {
@@ -117,7 +117,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     }))
     .sort((a, b) => b.value - a.value);
 
-  // 3. Process data for Technician Queue Depth (Active Tickets only)
+  // 3. Process data for Technician Queue Depth (Active Tickets only, grouped by priority)
   const techQueueCounts = data.reduce((acc, ticket) => {
     // Exclude resolved and closed from queue depth
     const status = (ticket.status || "").toLowerCase();
@@ -126,39 +126,57 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     const assigneeId = ticket.assigned_to;
     const name = assigneeId ? (userMap.get(assigneeId) ?? "Unknown") : "Unassigned";
     
-    acc[name] = (acc[name] || 0) + 1;
+    let prio = (ticket.priority || "Medium").toLowerCase();
+    let prioKey: "High" | "Medium" | "Low" = "Medium";
+    if (prio === "high") prioKey = "High";
+    else if (prio === "medium") prioKey = "Medium";
+    else if (prio === "low") prioKey = "Low";
+
+    if (!acc[name]) {
+      acc[name] = { name, High: 0, Medium: 0, Low: 0, total: 0 };
+    }
+    acc[name][prioKey] += 1;
+    acc[name].total += 1;
     return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<string, { name: string; High: number; Medium: number; Low: number; total: number }>);
 
-  const techQueueData = Object.entries(techQueueCounts)
-    .map(([name, count]) => ({
-      name,
-      count,
-    }))
-    .sort((a, b) => b.count - a.count);
+  const techQueueData = Object.values(techQueueCounts)
+    .sort((a, b) => b.total - a.total);
 
-  // 4. Process data for Ticket Age vs. Priority Matrix
-  const now = new Date();
-  const scatterData = data
-    .filter((t) => t.status !== "resolved" && t.status !== "closed")
-    .map((t) => {
-      const createdDate = new Date(t.created_at);
-      const ageDays = Math.max(0, parseFloat(((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)).toFixed(1)));
-      
-      let prio = (t.priority || "Medium").toLowerCase();
-      prio = prio.charAt(0).toUpperCase() + prio.slice(1) as keyof typeof PRIORITY_VALS;
-      const priorityVal = PRIORITY_VALS[prio as keyof typeof PRIORITY_VALS] || 2;
+  // 4. Process data for Ticket Category vs. Priority (Stacked Bar Chart)
+  const categoryPriorityData = React.useMemo(() => {
+    const counts = {
+      Mechanical: { name: "Mechanical", High: 0, Medium: 0, Low: 0, total: 0 },
+      Electrical: { name: "Electrical", High: 0, Medium: 0, Low: 0, total: 0 },
+      Software: { name: "Software", High: 0, Medium: 0, Low: 0, total: 0 },
+    };
 
-      return {
-        id: t.id,
-        title: t.title,
-        age: ageDays,
-        priority: prio,
-        priorityVal,
-        z: 100, // constant size for bubble
-        fill: PRIORITY_COLORS[prio as keyof typeof PRIORITY_COLORS] || PRIORITY_COLORS.Medium,
-      };
+    data.forEach((ticket) => {
+      // Exclude resolved and closed
+      const status = (ticket.status || "").toLowerCase();
+      if (status === "resolved" || status === "closed") return;
+
+      const rawCat = ticket.final_category || ticket.predicted_category;
+      let cat = (rawCat || "").toLowerCase();
+      let catKey: "Mechanical" | "Electrical" | "Software" | null = null;
+      if (cat === "mechanical") catKey = "Mechanical";
+      else if (cat === "electrical") catKey = "Electrical";
+      else if (cat === "software") catKey = "Software";
+
+      if (!catKey) return;
+
+      let prio = (ticket.priority || "Medium").toLowerCase();
+      let prioKey: "High" | "Medium" | "Low" = "Medium";
+      if (prio === "high") prioKey = "High";
+      else if (prio === "medium") prioKey = "Medium";
+      else if (prio === "low") prioKey = "Low";
+
+      counts[catKey][prioKey] += 1;
+      counts[catKey].total += 1;
     });
+
+    return Object.values(counts);
+  }, [data]);
 
   if (loading) {
     return (
@@ -207,11 +225,15 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   // Custom Tooltip for Technician Queue
   const CustomTechTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload;
       return (
         <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="mb-1 text-sm font-semibold text-slate-200">{label}</p>
-          <p className="text-sm font-medium text-violet-400">
-            Active Tickets: {payload[0].value}
+          <p className="mb-1.5 text-sm font-semibold text-slate-200">{label}</p>
+          <p className="text-xs font-medium text-rose-500">High Priority: {data.High}</p>
+          <p className="text-xs font-medium text-amber-500">Medium Priority: {data.Medium}</p>
+          <p className="text-xs font-medium text-emerald-500">Low Priority: {data.Low}</p>
+          <p className="text-sm font-semibold text-violet-400 mt-1 border-t border-slate-800 pt-1">
+            Total Active Tickets: {data.total}
           </p>
         </div>
       );
@@ -219,15 +241,19 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     return null;
   };
 
-  // Custom Tooltip for Scatter Plot
-  const CustomScatterTooltip = ({ active, payload }: any) => {
+  // Custom Tooltip for Category vs Priority
+  const CustomCatPrioTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const item = payload[0].payload;
+      const data = payload[0].payload;
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md max-w-xs">
-          <p className="text-sm font-bold text-slate-200 truncate">{item.title}</p>
-          <p className="text-xs text-slate-400 mt-1">Priority: <span className="font-semibold" style={{ color: item.fill }}>{item.priority}</span></p>
-          <p className="text-xs text-slate-400">Age: <span className="font-semibold text-white">{item.age} days</span></p>
+        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="mb-1.5 text-sm font-semibold text-slate-200">{label}</p>
+          <p className="text-xs font-medium text-rose-500">High Priority: {data.High}</p>
+          <p className="text-xs font-medium text-amber-500">Medium Priority: {data.Medium}</p>
+          <p className="text-xs font-medium text-emerald-500">Low Priority: {data.Low}</p>
+          <p className="text-sm font-semibold text-violet-400 mt-1 border-t border-slate-800 pt-1">
+            Total Active Tickets: {data.total}
+          </p>
         </div>
       );
     }
@@ -358,54 +384,49 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                 width={90}
               />
               <Tooltip cursor={{ fill: '#262626', opacity: 0.3 }} content={<CustomTechTooltip />} />
-              <Bar dataKey="count" fill="#8b5cf6" radius={[0, 6, 6, 0]} />
+              <Bar dataKey="Low" stackId="a" fill={PRIORITY_COLORS.Low} />
+              <Bar dataKey="Medium" stackId="a" fill={PRIORITY_COLORS.Medium} />
+              <Bar dataKey="High" stackId="a" fill={PRIORITY_COLORS.High} />
+              <Legend verticalAlign="bottom" height={24} iconType="circle" iconSize={8} formatter={renderLegendText} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Ticket Age vs. Priority Matrix (Scatter/Bubble Chart) */}
+      {/* Ticket Category vs. Priority Chart */}
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col h-[350px]">
         <div className="mb-2">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-200">
-            <Clock className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Ticket Age vs. Priority
+            <BarChart3 className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Category vs. Priority
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Visualization of unresolved tickets by age (days) and priority.
+            Active tickets by category stacked by priority breakdown.
           </p>
         </div>
         <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 5, left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+            <BarChart data={categoryPriorityData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} horizontal={true} />
               <XAxis 
-                type="number" 
-                dataKey="age" 
-                name="Age" 
-                unit=" days" 
+                dataKey="name" 
                 stroke="#737373" 
                 fontSize={12}
                 tickLine={false}
+                axisLine={false}
               />
               <YAxis 
-                type="number" 
-                dataKey="priorityVal" 
-                name="Priority" 
                 stroke="#737373" 
                 fontSize={12}
-                domain={[0.5, 3.5]}
-                ticks={[1, 2, 3]}
-                tickFormatter={(val) => val === 1 ? 'Low' : val === 2 ? 'Medium' : val === 3 ? 'High' : ''}
                 tickLine={false}
+                axisLine={false}
+                tickFormatter={(val) => Math.floor(val).toString()}
               />
-              <ZAxis type="number" dataKey="z" range={[150, 150]} />
-              <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomScatterTooltip />} />
-              <Scatter name="Tickets" data={scatterData}>
-                {scatterData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                ))}
-              </Scatter>
-            </ScatterChart>
+              <Tooltip cursor={{ fill: '#262626', opacity: 0.3 }} content={<CustomCatPrioTooltip />} />
+              <Bar dataKey="Low" stackId="a" fill={PRIORITY_COLORS.Low} />
+              <Bar dataKey="Medium" stackId="a" fill={PRIORITY_COLORS.Medium} />
+              <Bar dataKey="High" stackId="a" fill={PRIORITY_COLORS.High} radius={[6, 6, 0, 0]} />
+              <Legend verticalAlign="bottom" height={24} iconType="circle" iconSize={8} formatter={renderLegendText} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>

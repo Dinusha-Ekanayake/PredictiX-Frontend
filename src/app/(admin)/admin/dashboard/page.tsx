@@ -127,6 +127,9 @@ export default function AdminDashboardPage() {
     try {
       const result = await getAdminDashboard();
       setData(result);
+      if (result) {
+        window.localStorage.setItem("predictix.cached_dashboard_data", JSON.stringify(result));
+      }
     } catch (e) {
       console.warn("Failed to load dashboard data:", e);
       setError(e instanceof Error ? e.message : "Failed to load dashboard data");

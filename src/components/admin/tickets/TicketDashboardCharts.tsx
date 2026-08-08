@@ -16,6 +16,13 @@ import {
   ScatterChart,
   Scatter,
   ZAxis,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ReferenceArea,
+  ReferenceLine,
 } from "recharts";
 import { apiGet } from "@/lib/apiClient";
 import { listUsers, type UserItem } from "@/lib/userService";
@@ -143,40 +150,67 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   const techQueueData = Object.values(techQueueCounts)
     .sort((a, b) => b.total - a.total);
 
-  // 4. Process data for Ticket Category vs. Priority (Stacked Bar Chart)
-  const categoryPriorityData = React.useMemo(() => {
-    const counts = {
-      Mechanical: { name: "Mechanical", High: 0, Medium: 0, Low: 0, total: 0 },
-      Electrical: { name: "Electrical", High: 0, Medium: 0, Low: 0, total: 0 },
-      Software: { name: "Software", High: 0, Medium: 0, Low: 0, total: 0 },
-    };
+  // 4. Process data for Ticket Category vs. Status Scatter Plot
+  const scatterData = React.useMemo(() => {
+    return data
+      .filter((t) => t.status !== "resolved" && t.status !== "closed") // only active tickets
+      .map((t) => {
+        const rawCat = t.final_category || t.predicted_category;
+        let cat = (rawCat || "").toLowerCase();
+        let xVal = 2; // Default to Electrical
+        let catLabel = "Electrical";
+        if (cat === "mechanical") {
+          xVal = 1;
+          catLabel = "Mechanical";
+        } else if (cat === "software") {
+          xVal = 3;
+          catLabel = "Software";
+        }
 
-    data.forEach((ticket) => {
-      // Exclude resolved and closed
-      const status = (ticket.status || "").toLowerCase();
-      if (status === "resolved" || status === "closed") return;
+        const status = (t.status || "").toLowerCase();
+        let yVal = 1; // Default to Open
+        let statusLabel = "Open";
+        if (status === "in-progress" || status === "in_progress") {
+          yVal = 2;
+          statusLabel = "In Progress";
+        }
 
-      const rawCat = ticket.final_category || ticket.predicted_category;
-      let cat = (rawCat || "").toLowerCase();
-      let catKey: "Mechanical" | "Electrical" | "Software" | null = null;
-      if (cat === "mechanical") catKey = "Mechanical";
-      else if (cat === "electrical") catKey = "Electrical";
-      else if (cat === "software") catKey = "Software";
+        // Generate deterministic jitter using ticket ID string
+        let hash = 0;
+        for (let i = 0; i < t.id.length; i++) {
+          hash = t.id.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const jitterX = ((hash % 100) / 100 - 0.5) * 0.4;
+        const jitterY = (((hash >> 8) % 100) / 100 - 0.5) * 0.4;
 
-      if (!catKey) return;
+        const prio = (t.priority || "Medium").toLowerCase();
+        let prioLabel = "Medium";
+        let fill = PRIORITY_COLORS.Medium;
+        if (prio === "high") {
+          prioLabel = "High";
+          fill = PRIORITY_COLORS.High;
+        } else if (prio === "low") {
+          prioLabel = "Low";
+          fill = PRIORITY_COLORS.Low;
+        }
 
-      let prio = (ticket.priority || "Medium").toLowerCase();
-      let prioKey: "High" | "Medium" | "Low" = "Medium";
-      if (prio === "high") prioKey = "High";
-      else if (prio === "medium") prioKey = "Medium";
-      else if (prio === "low") prioKey = "Low";
-
-      counts[catKey][prioKey] += 1;
-      counts[catKey].total += 1;
-    });
-
-    return Object.values(counts);
+        return {
+          id: t.id,
+          title: t.title,
+          x: xVal + jitterX,
+          y: yVal + jitterY,
+          category: catLabel,
+          status: statusLabel,
+          priority: prioLabel,
+          fill,
+          z: 80,
+        };
+      });
   }, [data]);
+
+  const scatterLow = React.useMemo(() => scatterData.filter(d => d.priority === "Low"), [scatterData]);
+  const scatterMed = React.useMemo(() => scatterData.filter(d => d.priority === "Medium"), [scatterData]);
+  const scatterHigh = React.useMemo(() => scatterData.filter(d => d.priority === "High"), [scatterData]);
 
   if (loading) {
     return (
@@ -241,19 +275,16 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     return null;
   };
 
-  // Custom Tooltip for Category vs Priority
-  const CustomCatPrioTooltip = ({ active, payload, label }: any) => {
+  // Custom Tooltip for Category vs Status Scatter
+  const CustomScatterTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload;
+      const item = payload[0].payload;
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="mb-1.5 text-sm font-semibold text-slate-200">{label}</p>
-          <p className="text-xs font-medium text-rose-500">High Priority: {data.High}</p>
-          <p className="text-xs font-medium text-amber-500">Medium Priority: {data.Medium}</p>
-          <p className="text-xs font-medium text-emerald-500">Low Priority: {data.Low}</p>
-          <p className="text-sm font-semibold text-violet-400 mt-1 border-t border-slate-800 pt-1">
-            Total Active Tickets: {data.total}
-          </p>
+        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md max-w-xs">
+          <p className="text-sm font-bold text-slate-200 truncate">{item.title}</p>
+          <p className="text-xs text-slate-400 mt-1">Category: <span className="font-semibold text-white">{item.category}</span></p>
+          <p className="text-xs text-slate-400">Status: <span className="font-semibold text-white">{item.status}</span></p>
+          <p className="text-xs text-slate-400">Priority: <span className="font-semibold" style={{ color: item.fill }}>{item.priority}</span></p>
         </div>
       );
     }
@@ -393,40 +424,51 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
         </div>
       </div>
 
-      {/* Ticket Category vs. Priority Chart */}
+      {/* Ticket Category vs. Status Scatter Plot */}
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col h-[350px]">
         <div className="mb-2">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-200">
-            <BarChart3 className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Category vs. Priority
+            <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Category vs. Status
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Active tickets by category stacked by priority breakdown.
+            Active tickets distributed by category and current status.
           </p>
         </div>
         <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={categoryPriorityData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} horizontal={true} />
+            <ScatterChart margin={{ top: 20, right: 20, bottom: 5, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
               <XAxis 
-                dataKey="name" 
+                type="number" 
+                dataKey="x" 
+                name="Category" 
                 stroke="#737373" 
                 fontSize={12}
+                domain={[0.5, 3.5]}
+                ticks={[1, 2, 3]}
+                tickFormatter={(val) => val === 1 ? 'Mechanical' : val === 2 ? 'Electrical' : val === 3 ? 'Software' : ''}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis 
+                type="number" 
+                dataKey="y" 
+                name="Status" 
                 stroke="#737373" 
                 fontSize={12}
+                domain={[0.5, 2.5]}
+                ticks={[1, 2]}
+                tickFormatter={(val) => val === 1 ? 'Open' : val === 2 ? 'In Progress' : ''}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(val) => Math.floor(val).toString()}
               />
-              <Tooltip cursor={{ fill: '#262626', opacity: 0.3 }} content={<CustomCatPrioTooltip />} />
-              <Bar dataKey="Low" stackId="a" fill={PRIORITY_COLORS.Low} />
-              <Bar dataKey="Medium" stackId="a" fill={PRIORITY_COLORS.Medium} />
-              <Bar dataKey="High" stackId="a" fill={PRIORITY_COLORS.High} radius={[6, 6, 0, 0]} />
+              <ZAxis type="number" dataKey="z" range={[80, 80]} />
+              <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomScatterTooltip />} />
+              <Scatter name="Low" data={scatterLow} fill={PRIORITY_COLORS.Low} />
+              <Scatter name="Medium" data={scatterMed} fill={PRIORITY_COLORS.Medium} />
+              <Scatter name="High" data={scatterHigh} fill={PRIORITY_COLORS.High} />
               <Legend verticalAlign="bottom" height={24} iconType="circle" iconSize={8} formatter={renderLegendText} />
-            </BarChart>
+            </ScatterChart>
           </ResponsiveContainer>
         </div>
       </div>

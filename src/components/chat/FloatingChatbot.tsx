@@ -130,7 +130,7 @@ function RecordSummaryWidget({ payload }: { payload: any }) {
           if (!value || key === "id" || key.endsWith("_id")) return null;
           
           const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          let displayValue = String(value);
+          let displayValue: any = String(value);
           
           // Badge formatting for common statuses
           if (key === "status" || key === "priority" || key === "role") {
@@ -386,10 +386,25 @@ export default function FloatingChatbot() {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
 
+      // Retrieve cached frontend data for chatbot fallback
+      const cachedDashboard = window.localStorage.getItem("predictix.cached_dashboard_data");
+      const cachedAssetStats = window.localStorage.getItem("predictix.cached_asset_stats");
+      const cachedAssetAnalytics = window.localStorage.getItem("predictix.cached_asset_analytics");
+      
+      const frontendContext = {
+        dashboard_data: cachedDashboard ? JSON.parse(cachedDashboard) : null,
+        asset_stats: cachedAssetStats ? JSON.parse(cachedAssetStats) : null,
+        asset_analytics: cachedAssetAnalytics ? JSON.parse(cachedAssetAnalytics) : null,
+      };
+
       const response = await fetch(`${CHATBOT_API_BASE}/chatbot/agent`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ question: text, history: historyForAgent }),
+        body: JSON.stringify({ 
+          question: text, 
+          history: historyForAgent,
+          frontend_context: frontendContext
+        }),
       });
 
       if (!response.ok) {

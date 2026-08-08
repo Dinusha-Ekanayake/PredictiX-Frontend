@@ -108,6 +108,12 @@ export default function AdminAssetsPage() {
       setStats(statsData);
       setAnalytics(analyticsData);
       setWarehouseOptions(whOptions.map((w) => ({ value: w.id, label: w.name })));
+      if (statsData) {
+        window.localStorage.setItem("predictix.cached_asset_stats", JSON.stringify(statsData));
+      }
+      if (analyticsData) {
+        window.localStorage.setItem("predictix.cached_asset_analytics", JSON.stringify(analyticsData));
+      }
     } catch (e: unknown) {
       console.warn("Failed to load asset stats / warehouse options:", e instanceof Error ? e.message : e);
     }

@@ -30,4 +30,4 @@
   ```typescript
   const key = params.toString();
   ```
-  But `params.toString()` doesn't include the page number when checking for page limits in some places, or caching pages without keys including page index might return the same page list.
+  But `params.toString()` doesn't include the page number when checking for page limits in some places, or caching pages without keys including page index might return the same page list. (In `listAssets`, it does: `params.set("limit", String(pageSize)); params.set("offset", String((page - 1) * pageSize));` before calling `params.toString()`, so it works, but the cache expires after 15 seconds. If the data is edited on the server by another admin, the user will see stale data for 15 seconds unless they trigger a manual refresh).

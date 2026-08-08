@@ -22,11 +22,11 @@ type Props = {
   onUpdated?: (ticket: Ticket) => void;
 };
 
-const CATEGORIES: TicketCategory[] = ["Mechanical", "Electrical", "Software", "General"];
+const CATEGORIES: TicketCategory[] = ["Mechanical", "Electrical", "Software"];
 
 function toCategory(raw: string | null): TicketCategory {
   const m: Record<string, TicketCategory> = {
-    mechanical: "Mechanical", electrical: "Electrical", software: "Software", general: "General",
+    mechanical: "Mechanical", electrical: "Electrical", software: "Software", general: "Mechanical",
   };
   return m[(raw ?? "").toLowerCase()] ?? "Mechanical";
 }

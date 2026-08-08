@@ -476,12 +476,36 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     );
   };
 
+  const formatName = (name: string) => {
+    if (!name) return "";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length < 2) {
+      return name.length > 14 ? name.slice(0, 12) + "..." : name;
+    }
+    const firstName = parts[0];
+    const secondName = parts[1];
+    const combined = `${firstName} ${secondName}`;
+    if (combined.length <= 14) {
+      return combined;
+    }
+    const shortSecond = secondName.slice(0, 3);
+    return `${firstName} ${shortSecond}...`;
+  };
+
   const renderLegendText = (value: string, entry: any) => {
-    return <span className="text-sm font-medium text-slate-300 ml-1">{value}</span>;
+    return <span className="text-sm font-medium text-slate-700 dark:text-slate-300 ml-1">{value}</span>;
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
+      <style>{`
+        .recharts-cartesian-axis-tick text {
+          fill: #475569 !important;
+        }
+        .dark .recharts-cartesian-axis-tick text {
+          fill: #94a3b8 !important;
+        }
+      `}</style>
       {/* Category Bar Chart */}
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col h-[350px]">
         <div className="mb-2">
@@ -555,13 +579,6 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Tooltip content={<CustomPieTooltip />} />
-              <Legend
-                verticalAlign="bottom"
-                height={36}
-                iconType="square"
-                formatter={renderLegendText}
-                wrapperStyle={{ paddingTop: "10px" }}
-              />
               <Pie
                 data={priorityChartData}
                 cx="50%"
@@ -594,9 +611,9 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                   if (entry.name === "Low") cellFill = "url(#pieLowGrad)";
                   else if (entry.name === "High") cellFill = "url(#pieHighGrad)";
                   return (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={cellFill}
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={cellFill} 
                       filter="url(#pieShadow)"
                     />
                   );
@@ -613,7 +630,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
             if (entry.name === "Low") color = PRIORITY_COLORS.Low;
             else if (entry.name === "High") color = PRIORITY_COLORS.High;
             return (
-              <div key={index} className="flex items-center gap-1.5 text-xs text-slate-300">
+              <div key={index} className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
                 <span className="w-3 h-3 rounded" style={{ backgroundColor: color }} />
                 <span>{entry.name}: {entry.value}</span>
               </div>
@@ -674,6 +691,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                 axisLine={false}
                 width={90}
                 interval={0}
+                tickFormatter={formatName}
               />
               <Tooltip cursor={{ fill: '#262626', opacity: 0.3 }} content={<CustomTechTooltip />} />
               <Bar dataKey="Low" stackId="a" fill="url(#techLowGrad)" shape={<Custom3DHorizontalBar />} barSize={9} />

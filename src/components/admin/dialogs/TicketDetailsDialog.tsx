@@ -143,6 +143,17 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     return userObj?.department?.toLowerCase().includes("maintenance") || false;
   }, [users, currentUserId, currentUserRole]);
 
+  const canDelete = React.useMemo(() => {
+    const role = (currentUserRole || "").toLowerCase();
+    if (role === "admin" || role === "superadmin" || role === "super_admin") {
+      return true;
+    }
+    if (ticket && currentUserId && ticket.created_by === currentUserId) {
+      return true;
+    }
+    return false;
+  }, [currentUserRole, currentUserId, ticket]);
+
   React.useEffect(() => {
     if (ticket) {
       setLocalStatus(ticket.status);
@@ -469,7 +480,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
               </div>
             </div>
 
-            {isAdmin && (
+            {canDelete && (
               <Button
                 variant="ghost"
                 onClick={() => setConfirmOpen((s) => !s)}

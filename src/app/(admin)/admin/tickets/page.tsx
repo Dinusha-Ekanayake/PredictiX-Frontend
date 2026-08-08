@@ -570,8 +570,8 @@ export default function AdminTicketsPage() {
         ticket={selectedTicket}
         open={detailOpen}
         onOpenChange={(v) => setDetailOpen(v)}
-        onDelete={isAdmin ? handleDeleteTicket : undefined}
-        onUpdated={isAdmin ? handleTicketUpdated : undefined}
+        onDelete={handleDeleteTicket}
+        onUpdated={handleTicketUpdated}
         isAdmin={isAdmin}
         users={users}
       />

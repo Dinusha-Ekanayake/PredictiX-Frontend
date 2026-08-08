@@ -231,7 +231,7 @@ export async function updateTicketAssignee(id: string, assignedTo: string | null
 }
 
 export async function deleteTicket(id: string): Promise<void> {
-  await apiDelete(`/tickets/${id}`);
+  await apiDelete(`/tickets/mine/${id}`);
 }
 
 export async function addTicketAttachment(
@@ -302,22 +302,22 @@ export async function fetchTicketEnrichment(ticket: {
   if (ticket.created_by) profileIds.add(ticket.created_by);
   if (ticket.assigned_to) profileIds.add(ticket.assigned_to);
 
-  const { data: historyData, error: historyError } = await supabase
-    .from("ticket_status_history")
-    .select("id,old_status,new_status,changed_by,note,created_at")
-    .eq("ticket_id", ticket.id)
-    .order("created_at", { ascending: true });
-
-  if (historyError) throw historyError;
-
-  const historyRows = (historyData ?? []) as Array<{
+  let historyRows: Array<{
     id: string;
     old_status: string | null;
     new_status: string;
     changed_by: string | null;
     note: string | null;
     created_at: string;
-  }>;
+  }> = [];
+
+  try {
+    const data = await apiGet<any[]>(`/ticket-status-history/?ticket_id=${ticket.id}`);
+    historyRows = ((data || []) as any[]).slice().reverse();
+  } catch (err) {
+    console.error("Failed to fetch status history from backend:", err);
+  }
+
   for (const h of historyRows) {
     if (h.changed_by) profileIds.add(h.changed_by);
   }

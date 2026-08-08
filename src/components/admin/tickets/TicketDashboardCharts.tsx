@@ -274,37 +274,202 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     return null;
   };
 
-  // Custom shape to render grid counts as centered badges
+  // Custom shape to render grid counts as centered badges with active status gradients and hover effects
   const CustomGridNode = (props: any) => {
     const { cx, cy, payload } = props;
     if (!cx || !cy) return null;
 
     const count = payload.count || 0;
+    const xVal = payload.x;
+    const [hovered, setHovered] = React.useState(false);
+
+    let startColor = "#475569";
+    let endColor = "#1e293b";
+    let glowColor = "rgba(0, 0, 0, 0.5)";
+    let textFill = "#64748b";
+    let strokeColor = "#334155";
+
+    if (count > 0) {
+      textFill = "#ffffff";
+      strokeColor = "#ffffff";
+      if (xVal === 1) { // Open
+        startColor = "#f87171";
+        endColor = "#dc2626";
+        glowColor = "rgba(239, 68, 68, 0.6)";
+      } else if (xVal === 2) { // In Progress
+        startColor = "#fbbf24";
+        endColor = "#ea580c";
+        glowColor = "rgba(249, 115, 22, 0.6)";
+      } else if (xVal === 3) { // Resolved
+        startColor = "#fde047";
+        endColor = "#ca8a04";
+        glowColor = "rgba(234, 179, 8, 0.6)";
+      } else if (xVal === 4) { // Closed
+        startColor = "#4ade80";
+        endColor = "#16a34a";
+        glowColor = "rgba(34, 197, 94, 0.6)";
+      }
+    }
+
+    const gradId = `badgeGrad-${xVal}-${count > 0 ? "active" : "inactive"}`;
+    const shadowId = `badgeShadow-${xVal}-${count > 0 ? "active" : "inactive"}`;
 
     return (
-      <g>
+      <g
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          transform: hovered ? "scale(1.15)" : "scale(1)",
+          transformOrigin: `${cx}px ${cy}px`,
+          transition: "transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+          cursor: count > 0 ? "pointer" : "default"
+        }}
+      >
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={startColor} />
+            <stop offset="100%" stopColor={endColor} />
+          </linearGradient>
+          <filter id={shadowId} x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy={hovered ? 5 : 3} stdDeviation={hovered ? 4 : 2} floodColor={glowColor} floodOpacity={count > 0 ? 0.8 : 0.4} />
+          </filter>
+        </defs>
         <rect
           x={cx - 24}
           y={cy - 14}
           width={48}
           height={28}
           rx={14}
-          fill="#1e293b"
-          stroke="#475569"
-          strokeWidth={1.5}
-          className="drop-shadow-md"
+          fill={`url(#${gradId})`}
+          stroke={strokeColor}
+          strokeWidth={hovered ? 2 : 1.5}
+          filter={`url(#${shadowId})`}
         />
         <text
           x={cx}
-          y={cy + 5}
+          y={cy + 4.5}
           textAnchor="middle"
-          fill="#f8fafc"
+          fill={textFill}
           fontSize={13}
           fontWeight="bold"
           style={{ pointerEvents: "none" }}
         >
           {count}
         </text>
+      </g>
+    );
+  };
+
+  // Custom shape to render 3D vertical bars (isometric cuboid)
+  const Custom3DBar = (props: any) => {
+    const { x, y, width, height, fill } = props;
+    if (!width || !height) return null;
+
+    const depth = 12;
+
+    return (
+      <g>
+        {/* Front Face */}
+        <rect x={x} y={y} width={width} height={height} fill={fill} />
+        
+        {/* Right Face (Shadow Overlay) */}
+        <polygon 
+          points={`
+            ${x + width},${y} 
+            ${x + width + depth},${y - depth} 
+            ${x + width + depth},${y + height - depth} 
+            ${x + width},${y + height}
+          `}
+          fill={fill}
+        />
+        <polygon 
+          points={`
+            ${x + width},${y} 
+            ${x + width + depth},${y - depth} 
+            ${x + width + depth},${y + height - depth} 
+            ${x + width},${y + height}
+          `}
+          fill="#000000"
+          fillOpacity={0.25}
+        />
+
+        {/* Top Face (Highlight Overlay) */}
+        <polygon 
+          points={`
+            ${x},${y} 
+            ${x + depth},${y - depth} 
+            ${x + width + depth},${y - depth} 
+            ${x + width},${y}
+          `}
+          fill={fill}
+        />
+        <polygon 
+          points={`
+            ${x},${y} 
+            ${x + depth},${y - depth} 
+            ${x + width + depth},${y - depth} 
+            ${x + width},${y}
+          `}
+          fill="#ffffff"
+          fillOpacity={0.2}
+        />
+      </g>
+    );
+  };
+
+  // Custom shape to render 3D horizontal bars (isometric horizontal cuboid)
+  const Custom3DHorizontalBar = (props: any) => {
+    const { x, y, width, height, fill } = props;
+    if (!width || !height) return null;
+
+    const depth = 8;
+
+    return (
+      <g>
+        {/* Front Face */}
+        <rect x={x} y={y} width={width} height={height} fill={fill} />
+        
+        {/* Right/End Face (Shadow Overlay) */}
+        <polygon 
+          points={`
+            ${x + width},${y} 
+            ${x + width + depth},${y - depth} 
+            ${x + width + depth},${y + height - depth} 
+            ${x + width},${y + height}
+          `}
+          fill={fill}
+        />
+        <polygon 
+          points={`
+            ${x + width},${y} 
+            ${x + width + depth},${y - depth} 
+            ${x + width + depth},${y + height - depth} 
+            ${x + width},${y + height}
+          `}
+          fill="#000000"
+          fillOpacity={0.25}
+        />
+
+        {/* Top Face (Highlight Overlay) */}
+        <polygon 
+          points={`
+            ${x},${y} 
+            ${x + depth},${y - depth} 
+            ${x + width + depth},${y - depth} 
+            ${x + width},${y}
+          `}
+          fill={fill}
+        />
+        <polygon 
+          points={`
+            ${x},${y} 
+            ${x + depth},${y - depth} 
+            ${x + width + depth},${y - depth} 
+            ${x + width},${y}
+          `}
+          fill="#ffffff"
+          fillOpacity={0.2}
+        />
       </g>
     );
   };
@@ -328,6 +493,15 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
         <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={categoryChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="categoryGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#818cf8" />
+                  <stop offset="100%" stopColor="#4f46e5" />
+                </linearGradient>
+                <filter id="barShadow" x="-10%" y="-10%" width="120%" height="120%">
+                  <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.4" />
+                </filter>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={true} horizontal={true} />
               <XAxis 
                 dataKey="name" 
@@ -344,11 +518,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                 tickFormatter={(val) => Math.floor(val).toString()}
               />
               <Tooltip cursor={{ fill: '#262626', opacity: 0.5 }} content={<CustomBarTooltip />} />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                {categoryChartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                ))}
-              </Bar>
+              <Bar dataKey="count" fill="url(#categoryGrad)" shape={<Custom3DBar />} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -375,30 +545,82 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                 formatter={renderLegendText}
                 wrapperStyle={{ paddingTop: "10px" }}
               />
-              <Pie
-                data={priorityChartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={65}
-                outerRadius={90}
-                paddingAngle={2}
-                dataKey="value"
-                stroke="none"
-              >
-                {priorityChartData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={PRIORITY_COLORS[entry.name as keyof typeof PRIORITY_COLORS] || PRIORITY_COLORS.Medium} 
-                  />
-                ))}
-              </Pie>
+              <g style={{ transform: "rotateX(55deg) translateY(-20px)", transformOrigin: "center" }}>
+                {/* 3D Extrusion Layer (Shifted Down) */}
+                <Pie
+                  data={priorityChartData}
+                  cx="50%"
+                  cy="54%"
+                  innerRadius={65}
+                  outerRadius={90}
+                  paddingAngle={2}
+                  dataKey="value"
+                  stroke="none"
+                  legendType="none"
+                >
+                  {priorityChartData.map((entry, index) => {
+                    let cellFill = "url(#pieMediumGrad)";
+                    if (entry.name === "Low") cellFill = "url(#pieLowGrad)";
+                    else if (entry.name === "High") cellFill = "url(#pieHighGrad)";
+                    return (
+                      <Cell 
+                        key={`cell-3d-${index}`} 
+                        fill={cellFill} 
+                        style={{ filter: "brightness(0.6)" }}
+                      />
+                    );
+                  })}
+                </Pie>
+
+                {/* Main/Top Pie Layer */}
+                <Pie
+                  data={priorityChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={65}
+                  outerRadius={90}
+                  paddingAngle={2}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  <defs>
+                    <linearGradient id="pieLowGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#34d399" />
+                      <stop offset="100%" stopColor="#10b981" />
+                    </linearGradient>
+                    <linearGradient id="pieMediumGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#fbbf24" />
+                      <stop offset="100%" stopColor="#f59e0b" />
+                    </linearGradient>
+                    <linearGradient id="pieHighGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f87171" />
+                      <stop offset="100%" stopColor="#ef4444" />
+                    </linearGradient>
+                    <filter id="pieShadow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.4" />
+                    </filter>
+                  </defs>
+                  {priorityChartData.map((entry, index) => {
+                    let cellFill = "url(#pieMediumGrad)";
+                    if (entry.name === "Low") cellFill = "url(#pieLowGrad)";
+                    else if (entry.name === "High") cellFill = "url(#pieHighGrad)";
+                    return (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={cellFill} 
+                        filter="url(#pieShadow)"
+                      />
+                    );
+                  })}
+                </Pie>
+              </g>
             </PieChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Technician Queue Depth (Horizontal Bar Chart) */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col h-[350px]">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col lg:col-span-2 h-[700px]">
         <div className="mb-2">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-200">
             <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Technician Workload
@@ -414,6 +636,23 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
               layout="vertical"
               margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
             >
+              <defs>
+                <linearGradient id="techLowGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#34d399" />
+                  <stop offset="100%" stopColor="#10b981" />
+                </linearGradient>
+                <linearGradient id="techMediumGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#fbbf24" />
+                  <stop offset="100%" stopColor="#f59e0b" />
+                </linearGradient>
+                <linearGradient id="techHighGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#f87171" />
+                  <stop offset="100%" stopColor="#ef4444" />
+                </linearGradient>
+                <filter id="techShadow" x="-10%" y="-10%" width="120%" height="120%">
+                  <feDropShadow dx="2" dy="0" stdDeviation="2" floodColor="#000000" floodOpacity="0.4" />
+                </filter>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={true} horizontal={false} />
               <XAxis 
                 type="number"
@@ -433,9 +672,9 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                 width={90}
               />
               <Tooltip cursor={{ fill: '#262626', opacity: 0.3 }} content={<CustomTechTooltip />} />
-              <Bar dataKey="Low" stackId="a" fill={PRIORITY_COLORS.Low} />
-              <Bar dataKey="Medium" stackId="a" fill={PRIORITY_COLORS.Medium} />
-              <Bar dataKey="High" stackId="a" fill={PRIORITY_COLORS.High} />
+              <Bar dataKey="Low" stackId="a" fill="url(#techLowGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />
+              <Bar dataKey="Medium" stackId="a" fill="url(#techMediumGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />
+              <Bar dataKey="High" stackId="a" fill="url(#techHighGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />
               <Legend verticalAlign="bottom" height={24} iconType="circle" iconSize={8} formatter={renderLegendText} />
             </BarChart>
           </ResponsiveContainer>

@@ -510,7 +510,7 @@ export default function AdminTicketsPage() {
 
                     <div className="mt-3 flex items-center gap-3 flex-wrap">
                       <Badge className={cn(categoryClass(t.predicted_category ?? t.final_category), "font-medium")}>
-                        {t.predicted_category ?? t.final_category ?? "General"}
+                        {t.predicted_category ?? t.final_category ?? "Mechanical"}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
                         Created {t.opened_at ? new Date(t.opened_at).toLocaleDateString() : new Date(t.created_at).toLocaleDateString()}

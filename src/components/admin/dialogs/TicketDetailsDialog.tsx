@@ -494,7 +494,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                 <h4 className="text-sm font-medium text-muted-foreground">Category</h4>
                 <div className="mt-2">
                   <Badge className={categoryBadgeClass(category)}>
-                    {category ?? "General"}
+                    {category ?? "Mechanical"}
                   </Badge>
                 </div>
               </div>

@@ -200,38 +200,8 @@ export default function TicketDetailsCharts({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mt-4">
-      {/* 1. Ticket State Duration (Gantt/Timeline stacked horizontal chart) */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] p-4 flex flex-col h-[260px]">
-        <div className="mb-2">
-          <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
-            <Clock className="h-4 w-4 text-slate-500" /> State Duration Timeline
-          </h4>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Duration (in hours) spent in each ticket status.
-          </p>
-        </div>
-        <div className="flex-1 w-full min-h-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart 
-              data={durationData} 
-              layout="vertical"
-              margin={{ top: 20, right: 10, left: -30, bottom: 5 }}
-            >
-              <XAxis type="number" stroke="#737373" fontSize={11} tickLine={false} />
-              <YAxis type="category" dataKey="name" hide />
-              <Tooltip content={<CustomTimelineTooltip />} />
-              <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={8} />
-              <Bar dataKey="Open" stackId="a" fill={STATE_COLORS["Open"]} radius={[4, 0, 0, 4]} />
-              <Bar dataKey="In Progress" stackId="a" fill={STATE_COLORS["In Progress"]} />
-              <Bar dataKey="Resolved" stackId="a" fill={STATE_COLORS["Resolved"]} />
-              <Bar dataKey="Closed" stackId="a" fill={STATE_COLORS["Closed"]} radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* 2. Asset Chronology Scatter Plot */}
+    <div className="w-full mt-4">
+      {/* Asset Chronology Scatter Plot */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] p-4 flex flex-col h-[260px]">
         <div className="mb-2">
           <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">

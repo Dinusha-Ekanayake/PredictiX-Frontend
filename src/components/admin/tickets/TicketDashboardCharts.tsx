@@ -22,7 +22,6 @@ import {
   PolarRadiusAxis,
   Radar,
   ReferenceArea,
-  ReferenceLine,
 } from "recharts";
 import { apiGet } from "@/lib/apiClient";
 import { listUsers, type UserItem } from "@/lib/userService";
@@ -150,62 +149,68 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   const techQueueData = Object.values(techQueueCounts)
     .sort((a, b) => b.total - a.total);
 
-  // 4. Process data for Ticket Category vs. Status Scatter Plot
+  // 4. Process data for Ticket Category vs. Status Scatter Plot (4x3 Grid)
   const scatterData = React.useMemo(() => {
-    return data
-      .filter((t) => t.status !== "resolved" && t.status !== "closed") // only active tickets
-      .map((t) => {
-        const rawCat = t.final_category || t.predicted_category;
-        let cat = (rawCat || "").toLowerCase();
-        let xVal = 2; // Default to Electrical
-        let catLabel = "Electrical";
-        if (cat === "mechanical") {
-          xVal = 1;
-          catLabel = "Mechanical";
-        } else if (cat === "software") {
-          xVal = 3;
-          catLabel = "Software";
-        }
+    return data.map((t) => {
+      // Map category to Y coordinate (discrete 1, 2, 3)
+      const rawCat = t.final_category || t.predicted_category;
+      let cat = (rawCat || "").toLowerCase();
+      let yVal = 2; // Default to Electrical (Y-axis)
+      let catLabel = "Electrical";
+      if (cat === "mechanical") {
+        yVal = 1;
+        catLabel = "Mechanical";
+      } else if (cat === "software") {
+        yVal = 3;
+        catLabel = "Software";
+      }
 
-        const status = (t.status || "").toLowerCase();
-        let yVal = 1; // Default to Open
-        let statusLabel = "Open";
-        if (status === "in-progress" || status === "in_progress") {
-          yVal = 2;
-          statusLabel = "In Progress";
-        }
+      // Map status to X coordinate (discrete 1, 2, 3, 4)
+      const status = (t.status || "").toLowerCase();
+      let xVal = 1; // Default to Open (X-axis)
+      let statusLabel = "Open";
+      if (status === "in-progress" || status === "in_progress") {
+        xVal = 2;
+        statusLabel = "In Progress";
+      } else if (status === "resolved") {
+        xVal = 3;
+        statusLabel = "Resolved";
+      } else if (status === "closed") {
+        xVal = 4;
+        statusLabel = "Closed";
+      }
 
-        // Generate deterministic jitter using ticket ID string
-        let hash = 0;
-        for (let i = 0; i < t.id.length; i++) {
-          hash = t.id.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const jitterX = ((hash % 100) / 100 - 0.5) * 0.4;
-        const jitterY = (((hash >> 8) % 100) / 100 - 0.5) * 0.4;
+      // Generate deterministic jitter using ticket ID string
+      let hash = 0;
+      for (let i = 0; i < t.id.length; i++) {
+        hash = t.id.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const jitterX = ((hash % 100) / 100 - 0.5) * 0.45;
+      const jitterY = (((hash >> 8) % 100) / 100 - 0.5) * 0.45;
 
-        const prio = (t.priority || "Medium").toLowerCase();
-        let prioLabel = "Medium";
-        let fill = PRIORITY_COLORS.Medium;
-        if (prio === "high") {
-          prioLabel = "High";
-          fill = PRIORITY_COLORS.High;
-        } else if (prio === "low") {
-          prioLabel = "Low";
-          fill = PRIORITY_COLORS.Low;
-        }
+      const prio = (t.priority || "Medium").toLowerCase();
+      let prioLabel = "Medium";
+      let fill = PRIORITY_COLORS.Medium;
+      if (prio === "high") {
+        prioLabel = "High";
+        fill = PRIORITY_COLORS.High;
+      } else if (prio === "low") {
+        prioLabel = "Low";
+        fill = PRIORITY_COLORS.Low;
+      }
 
-        return {
-          id: t.id,
-          title: t.title,
-          x: xVal + jitterX,
-          y: yVal + jitterY,
-          category: catLabel,
-          status: statusLabel,
-          priority: prioLabel,
-          fill,
-          z: 80,
-        };
-      });
+      return {
+        id: t.id,
+        title: t.title,
+        x: xVal + jitterX,
+        y: yVal + jitterY,
+        category: catLabel,
+        status: statusLabel,
+        priority: prioLabel,
+        fill,
+        z: 80,
+      };
+    });
   }, [data]);
 
   const scatterLow = React.useMemo(() => scatterData.filter(d => d.priority === "Low"), [scatterData]);
@@ -289,6 +294,24 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
       );
     }
     return null;
+  };
+
+  // Custom shape to render ticket scatter nodes as colored circles with a white border
+  const CustomScatterNode = (props: any) => {
+    const { cx, cy, fill } = props;
+    if (!cx || !cy) return null;
+
+    return (
+      <circle 
+        cx={cx} 
+        cy={cy} 
+        r={7.5} 
+        fill={fill} 
+        stroke="#ffffff" 
+        strokeWidth={1.5} 
+        style={{ filter: "drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.4))" }}
+      />
+    );
   };
 
   const renderLegendText = (value: string, entry: any) => {
@@ -424,23 +447,56 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
         </div>
       </div>
 
-      {/* Ticket Category vs. Status Scatter Plot */}
+      {/* Ticket Category vs. Status Scatter (9-Square style Grid) */}
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col h-[350px]">
         <div className="mb-2">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-200">
             <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Category vs. Status
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Active tickets distributed by category and current status.
+            4x3 Grid showing ticket locations categorized by type and active status.
           </p>
         </div>
         <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 20, right: 20, bottom: 5, left: -20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+              
+              {/* Column 1 backgrounds: Open (Red risk profile) */}
+              <ReferenceArea x1={0.5} x2={1.5} y1={0.5} y2={1.5} fill="#ef4444" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={0.5} x2={1.5} y1={1.5} y2={2.5} fill="#ef4444" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={0.5} x2={1.5} y1={2.5} y2={3.5} fill="#ef4444" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+
+              {/* Column 2 backgrounds: In Progress (Orange risk profile) */}
+              <ReferenceArea x1={1.5} x2={2.5} y1={0.5} y2={1.5} fill="#f97316" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={1.5} x2={2.5} y1={1.5} y2={2.5} fill="#f97316" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={1.5} x2={2.5} y1={2.5} y2={3.5} fill="#f97316" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+
+              {/* Column 3 backgrounds: Resolved (Yellow risk profile) */}
+              <ReferenceArea x1={2.5} x2={3.5} y1={0.5} y2={1.5} fill="#eab308" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={2.5} x2={3.5} y1={1.5} y2={2.5} fill="#eab308" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={2.5} x2={3.5} y1={2.5} y2={3.5} fill="#eab308" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+
+              {/* Column 4 backgrounds: Closed (Green risk profile) */}
+              <ReferenceArea x1={3.5} x2={4.5} y1={0.5} y2={1.5} fill="#22c55e" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={3.5} x2={4.5} y1={1.5} y2={2.5} fill="#22c55e" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={3.5} x2={4.5} y1={2.5} y2={3.5} fill="#22c55e" fillOpacity={0.12} stroke="#262626" strokeWidth={1} />
+
               <XAxis 
                 type="number" 
                 dataKey="x" 
+                name="Status" 
+                stroke="#737373" 
+                fontSize={12}
+                domain={[0.5, 4.5]}
+                ticks={[1, 2, 3, 4]}
+                tickFormatter={(val) => val === 1 ? 'Open' : val === 2 ? 'In Progress' : val === 3 ? 'Resolved' : val === 4 ? 'Closed' : ''}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis 
+                type="number" 
+                dataKey="y" 
                 name="Category" 
                 stroke="#737373" 
                 fontSize={12}
@@ -450,23 +506,11 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                 tickLine={false}
                 axisLine={false}
               />
-              <YAxis 
-                type="number" 
-                dataKey="y" 
-                name="Status" 
-                stroke="#737373" 
-                fontSize={12}
-                domain={[0.5, 2.5]}
-                ticks={[1, 2]}
-                tickFormatter={(val) => val === 1 ? 'Open' : val === 2 ? 'In Progress' : ''}
-                tickLine={false}
-                axisLine={false}
-              />
               <ZAxis type="number" dataKey="z" range={[80, 80]} />
               <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomScatterTooltip />} />
-              <Scatter name="Low" data={scatterLow} fill={PRIORITY_COLORS.Low} />
-              <Scatter name="Medium" data={scatterMed} fill={PRIORITY_COLORS.Medium} />
-              <Scatter name="High" data={scatterHigh} fill={PRIORITY_COLORS.High} />
+              <Scatter name="Low" data={scatterLow} fill={PRIORITY_COLORS.Low} shape={<CustomScatterNode />} />
+              <Scatter name="Medium" data={scatterMed} fill={PRIORITY_COLORS.Medium} shape={<CustomScatterNode />} />
+              <Scatter name="High" data={scatterHigh} fill={PRIORITY_COLORS.High} shape={<CustomScatterNode />} />
               <Legend verticalAlign="bottom" height={24} iconType="circle" iconSize={8} formatter={renderLegendText} />
             </ScatterChart>
           </ResponsiveContainer>

@@ -39,14 +39,14 @@ type TicketData = {
 };
 
 const PRIORITY_COLORS = {
-  High: "#ef4444",   // Red
+  High: "#f11313ff",   // Red
   Medium: "#f59e0b", // Amber/Orange
-  Low: "#10b981",    // Emerald Green
+  Low: "#11dd0aff",    // Emerald Green
 };
 
 const CATEGORY_COLORS = {
-  Electrical: "#06b6d4", // Cyan
-  Software: "#ec4899",   // Pink
+  Electrical: "#04dfefff", // Cyan
+  Software: "#ec1e85ff",   // Pink
 };
 
 const PRIORITY_VALS = {
@@ -91,10 +91,10 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   const categoryCounts = data.reduce((acc, ticket) => {
     const rawCat = ticket.final_category || ticket.predicted_category;
     if (!rawCat) return acc;
-    
+
     let cat = rawCat.toLowerCase();
     if (cat === "general") return acc;
-    
+
     cat = cat.charAt(0).toUpperCase() + cat.slice(1);
     acc[cat] = (acc[cat] || 0) + 1;
     return acc;
@@ -104,7 +104,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     .map(([name, count]) => ({
       name,
       count,
-      fill: CATEGORY_COLORS[name as keyof typeof CATEGORY_COLORS] || "#94a3b8",
+      fill: CATEGORY_COLORS[name as keyof typeof CATEGORY_COLORS] || "#0b67e9ff",
     }))
     .sort((a, b) => b.count - a.count);
 
@@ -112,7 +112,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   const priorityCounts = data.reduce((acc, ticket) => {
     let prio = (ticket.priority || "Medium").toLowerCase();
     prio = prio.charAt(0).toUpperCase() + prio.slice(1);
-    acc[prio] = (acc[prio] || 0) + 1;
+    acc[prio] = (acc[prio] || 0) + 1
+      ;
     return acc;
   }, {} as Record<string, number>);
 
@@ -131,7 +132,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
 
     const assigneeId = ticket.assigned_to;
     const name = assigneeId ? (userMap.get(assigneeId) ?? "Unknown") : "Unassigned";
-    
+
     let prio = (ticket.priority || "Medium").toLowerCase();
     let prioKey: "High" | "Medium" | "Low" = "Medium";
     if (prio === "high") prioKey = "High";
@@ -147,13 +148,14 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   }, {} as Record<string, { name: string; High: number; Medium: number; Low: number; total: number }>);
 
   const techQueueData = Object.values(techQueueCounts)
+    .filter((tech) => tech.name !== "Unassigned")
     .sort((a, b) => b.total - a.total);
 
   // 4. Process data for 4x3 Status vs Category Grid Counts
   const gridCountsData = React.useMemo(() => {
     const categories = ["Mechanical", "Electrical", "Software"];
     const statuses = ["Open", "In Progress", "Resolved", "Closed"];
-    
+
     const counts: Record<string, Record<string, number>> = {
       Mechanical: { Open: 0, "In Progress": 0, Resolved: 0, Closed: 0 },
       Electrical: { Open: 0, "In Progress": 0, Resolved: 0, Closed: 0 },
@@ -229,9 +231,9 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
       return (
         <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
           <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-            <span 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: payload[0].payload.fill }} 
+            <span
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: payload[0].payload.fill }}
             />
             {payload[0].name}: {payload[0].value}
           </p>
@@ -371,9 +373,9 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
       <g>
         {/* Front Face */}
         <rect x={x} y={y} width={width} height={height} fill={fill} />
-        
+
         {/* Right Face (Shadow Overlay) */}
-        <polygon 
+        <polygon
           points={`
             ${x + width},${y} 
             ${x + width + depth},${y - depth} 
@@ -382,7 +384,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           `}
           fill={fill}
         />
-        <polygon 
+        <polygon
           points={`
             ${x + width},${y} 
             ${x + width + depth},${y - depth} 
@@ -394,7 +396,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
         />
 
         {/* Top Face (Highlight Overlay) */}
-        <polygon 
+        <polygon
           points={`
             ${x},${y} 
             ${x + depth},${y - depth} 
@@ -403,7 +405,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           `}
           fill={fill}
         />
-        <polygon 
+        <polygon
           points={`
             ${x},${y} 
             ${x + depth},${y - depth} 
@@ -428,9 +430,9 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
       <g>
         {/* Front Face */}
         <rect x={x} y={y} width={width} height={height} fill={fill} />
-        
+
         {/* Right/End Face (Shadow Overlay) */}
-        <polygon 
+        <polygon
           points={`
             ${x + width},${y} 
             ${x + width + depth},${y - depth} 
@@ -439,7 +441,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           `}
           fill={fill}
         />
-        <polygon 
+        <polygon
           points={`
             ${x + width},${y} 
             ${x + width + depth},${y - depth} 
@@ -451,7 +453,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
         />
 
         {/* Top Face (Highlight Overlay) */}
-        <polygon 
+        <polygon
           points={`
             ${x},${y} 
             ${x + depth},${y - depth} 
@@ -460,7 +462,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           `}
           fill={fill}
         />
-        <polygon 
+        <polygon
           points={`
             ${x},${y} 
             ${x + depth},${y - depth} 
@@ -494,31 +496,46 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={categoryChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
-                <linearGradient id="categoryGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#818cf8" />
-                  <stop offset="100%" stopColor="#4f46e5" />
+                <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#046f7bff" />
+                  <stop offset="100%" stopColor="#a6e7ecff" />
+                </linearGradient>
+                <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0247afff" />
+                  <stop offset="100%" stopColor="#506591ff" />
+                </linearGradient>
+                <linearGradient id="pinkGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#ec4899" />
+                  <stop offset="100%" stopColor="#be185d" />
                 </linearGradient>
                 <filter id="barShadow" x="-10%" y="-10%" width="120%" height="120%">
                   <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.4" />
                 </filter>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={true} horizontal={true} />
-              <XAxis 
-                dataKey="name" 
-                stroke="#737373" 
-                fontSize={12} 
-                tickLine={false} 
-                axisLine={false} 
+              <XAxis
+                dataKey="name"
+                stroke="#737373"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
               />
-              <YAxis 
-                stroke="#737373" 
-                fontSize={12} 
-                tickLine={false} 
-                axisLine={false} 
+              <YAxis
+                stroke="#737373"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
                 tickFormatter={(val) => Math.floor(val).toString()}
               />
               <Tooltip cursor={{ fill: '#262626', opacity: 0.5 }} content={<CustomBarTooltip />} />
-              <Bar dataKey="count" fill="url(#categoryGrad)" shape={<Custom3DBar />} />
+              <Bar dataKey="count" shape={<Custom3DBar />}>
+                {categoryChartData.map((entry, index) => {
+                  let cellFill = "url(#cyanGrad)";
+                  if (entry.name === "Mechanical") cellFill = "url(#blueGrad)";
+                  else if (entry.name === "Software") cellFill = "url(#pinkGrad)";
+                  return <Cell key={`cell-${index}`} fill={cellFill} />;
+                })}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -538,84 +555,70 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Tooltip content={<CustomPieTooltip />} />
-              <Legend 
-                verticalAlign="bottom" 
-                height={36} 
-                iconType="square" 
+              <Legend
+                verticalAlign="bottom"
+                height={36}
+                iconType="square"
                 formatter={renderLegendText}
                 wrapperStyle={{ paddingTop: "10px" }}
               />
-              <g style={{ transform: "rotateX(55deg) translateY(-20px)", transformOrigin: "center" }}>
-                {/* 3D Extrusion Layer (Shifted Down) */}
-                <Pie
-                  data={priorityChartData}
-                  cx="50%"
-                  cy="54%"
-                  innerRadius={65}
-                  outerRadius={90}
-                  paddingAngle={2}
-                  dataKey="value"
-                  stroke="none"
-                  legendType="none"
-                >
-                  {priorityChartData.map((entry, index) => {
-                    let cellFill = "url(#pieMediumGrad)";
-                    if (entry.name === "Low") cellFill = "url(#pieLowGrad)";
-                    else if (entry.name === "High") cellFill = "url(#pieHighGrad)";
-                    return (
-                      <Cell 
-                        key={`cell-3d-${index}`} 
-                        fill={cellFill} 
-                        style={{ filter: "brightness(0.6)" }}
-                      />
-                    );
-                  })}
-                </Pie>
-
-                {/* Main/Top Pie Layer */}
-                <Pie
-                  data={priorityChartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={65}
-                  outerRadius={90}
-                  paddingAngle={2}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  <defs>
-                    <linearGradient id="pieLowGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#34d399" />
-                      <stop offset="100%" stopColor="#10b981" />
-                    </linearGradient>
-                    <linearGradient id="pieMediumGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#fbbf24" />
-                      <stop offset="100%" stopColor="#f59e0b" />
-                    </linearGradient>
-                    <linearGradient id="pieHighGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f87171" />
-                      <stop offset="100%" stopColor="#ef4444" />
-                    </linearGradient>
-                    <filter id="pieShadow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.4" />
-                    </filter>
-                  </defs>
-                  {priorityChartData.map((entry, index) => {
-                    let cellFill = "url(#pieMediumGrad)";
-                    if (entry.name === "Low") cellFill = "url(#pieLowGrad)";
-                    else if (entry.name === "High") cellFill = "url(#pieHighGrad)";
-                    return (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={cellFill} 
-                        filter="url(#pieShadow)"
-                      />
-                    );
-                  })}
-                </Pie>
-              </g>
+              <Pie
+                data={priorityChartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={65}
+                outerRadius={90}
+                paddingAngle={2}
+                dataKey="value"
+                stroke="none"
+              >
+                <defs>
+                  <linearGradient id="pieLowGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#34d399" />
+                    <stop offset="100%" stopColor="#10b981" />
+                  </linearGradient>
+                  <linearGradient id="pieMediumGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#fbbf24" />
+                    <stop offset="100%" stopColor="#f59e0b" />
+                  </linearGradient>
+                  <linearGradient id="pieHighGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f87171" />
+                    <stop offset="100%" stopColor="#ef4444" />
+                  </linearGradient>
+                  <filter id="pieShadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.4" />
+                  </filter>
+                </defs>
+                {priorityChartData.map((entry, index) => {
+                  let cellFill = "url(#pieMediumGrad)";
+                  if (entry.name === "Low") cellFill = "url(#pieLowGrad)";
+                  else if (entry.name === "High") cellFill = "url(#pieHighGrad)";
+                  return (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={cellFill}
+                      filter="url(#pieShadow)"
+                    />
+                  );
+                })}
+              </Pie>
             </PieChart>
           </ResponsiveContainer>
+        </div>
+
+        {/* Flat Legend outside of 3D tilt for perfect readability */}
+        <div className="flex justify-center gap-4 mt-2">
+          {priorityChartData.map((entry, index) => {
+            let color = PRIORITY_COLORS.Medium;
+            if (entry.name === "Low") color = PRIORITY_COLORS.Low;
+            else if (entry.name === "High") color = PRIORITY_COLORS.High;
+            return (
+              <div key={index} className="flex items-center gap-1.5 text-xs text-slate-300">
+                <span className="w-3 h-3 rounded" style={{ backgroundColor: color }} />
+                <span>{entry.name}: {entry.value}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -631,48 +634,49 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
         </div>
         <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart 
-              data={techQueueData} 
+            <BarChart
+              data={techQueueData}
               layout="vertical"
               margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
             >
               <defs>
                 <linearGradient id="techLowGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#34d399" />
-                  <stop offset="100%" stopColor="#10b981" />
+                  <stop offset="0%" stopColor="#4ff409ff" />
+                  <stop offset="100%" stopColor="#97f079ff" />
                 </linearGradient>
                 <linearGradient id="techMediumGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#fbbf24" />
-                  <stop offset="100%" stopColor="#f59e0b" />
+                  <stop offset="0%" stopColor="#f4e408ff" />
+                  <stop offset="100%" stopColor="#e3bd70ff" />
                 </linearGradient>
                 <linearGradient id="techHighGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#f87171" />
-                  <stop offset="100%" stopColor="#ef4444" />
+                  <stop offset="0%" stopColor="#b70505ff" />
+                  <stop offset="100%" stopColor="#eb6e6eff" />
                 </linearGradient>
                 <filter id="techShadow" x="-10%" y="-10%" width="120%" height="120%">
                   <feDropShadow dx="2" dy="0" stdDeviation="2" floodColor="#000000" floodOpacity="0.4" />
                 </filter>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={true} horizontal={false} />
-              <XAxis 
+              <XAxis
                 type="number"
-                stroke="#737373" 
-                fontSize={12} 
-                tickLine={false} 
-                axisLine={false} 
+                stroke="#737373"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
                 tickFormatter={(val) => Math.floor(val).toString()}
               />
-              <YAxis 
+              <YAxis
                 type="category"
-                dataKey="name" 
-                stroke="#737373" 
-                fontSize={11} 
-                tickLine={false} 
-                axisLine={false} 
+                dataKey="name"
+                stroke="#737373"
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
                 width={90}
+                interval={0}
               />
               <Tooltip cursor={{ fill: '#262626', opacity: 0.3 }} content={<CustomTechTooltip />} />
-              <Bar dataKey="Low" stackId="a" fill="url(#techLowGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />
+              <Bar dataKey="Low" stackId="a" fill="url(#techLowGrad)" shape={<Custom3DHorizontalBar />} barSize={9} />
               <Bar dataKey="Medium" stackId="a" fill="url(#techMediumGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />
               <Bar dataKey="High" stackId="a" fill="url(#techHighGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />
               <Legend verticalAlign="bottom" height={24} iconType="circle" iconSize={8} formatter={renderLegendText} />
@@ -695,11 +699,11 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 20, right: 20, bottom: 5, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-              
+
               {/* Column 1 backgrounds: Open (Red risk profile) */}
-              <ReferenceArea x1={0.5} x2={1.5} y1={0.5} y2={1.5} fill="#ef4444" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={0.5} x2={1.5} y1={1.5} y2={2.5} fill="#ef4444" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={0.5} x2={1.5} y1={2.5} y2={3.5} fill="#ef4444" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={0.5} x2={1.5} y1={0.5} y2={1.5} fill="#fb0505ff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={0.5} x2={1.5} y1={1.5} y2={2.5} fill="#f60c0cff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={0.5} x2={1.5} y1={2.5} y2={3.5} fill="#f50a0aff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
 
               {/* Column 2 backgrounds: In Progress (Orange risk profile) */}
               <ReferenceArea x1={1.5} x2={2.5} y1={0.5} y2={1.5} fill="#f97316" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
@@ -707,20 +711,20 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
               <ReferenceArea x1={1.5} x2={2.5} y1={2.5} y2={3.5} fill="#f97316" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
 
               {/* Column 3 backgrounds: Resolved (Yellow risk profile) */}
-              <ReferenceArea x1={2.5} x2={3.5} y1={0.5} y2={1.5} fill="#eab308" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={2.5} x2={3.5} y1={0.5} y2={1.5} fill="#f5f10bff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
               <ReferenceArea x1={2.5} x2={3.5} y1={1.5} y2={2.5} fill="#eab308" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
               <ReferenceArea x1={2.5} x2={3.5} y1={2.5} y2={3.5} fill="#eab308" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
 
               {/* Column 4 backgrounds: Closed (Green risk profile) */}
-              <ReferenceArea x1={3.5} x2={4.5} y1={0.5} y2={1.5} fill="#22c55e" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={3.5} x2={4.5} y1={1.5} y2={2.5} fill="#22c55e" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={3.5} x2={4.5} y1={2.5} y2={3.5} fill="#22c55e" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={3.5} x2={4.5} y1={0.5} y2={1.5} fill="#07f00fff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={3.5} x2={4.5} y1={1.5} y2={2.5} fill="#07f70bff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={3.5} x2={4.5} y1={2.5} y2={3.5} fill="#13f407ff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
 
-              <XAxis 
-                type="number" 
-                dataKey="x" 
-                name="Status" 
-                stroke="#737373" 
+              <XAxis
+                type="number"
+                dataKey="x"
+                name="Status"
+                stroke="#737373"
                 fontSize={12}
                 domain={[0.5, 4.5]}
                 ticks={[1, 2, 3, 4]}
@@ -728,11 +732,11 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                 tickLine={false}
                 axisLine={false}
               />
-              <YAxis 
-                type="number" 
-                dataKey="y" 
-                name="Category" 
-                stroke="#737373" 
+              <YAxis
+                type="number"
+                dataKey="y"
+                name="Category"
+                stroke="#737373"
                 fontSize={12}
                 domain={[0.5, 3.5]}
                 ticks={[1, 2, 3]}

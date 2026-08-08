@@ -201,6 +201,19 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     try {
       await updateTicketStatus(ticket.id, newStatus);
       onUpdated?.({ ...ticket, status: newStatus, priority: localPriority });
+      
+      // Append a new status history log dynamically so the Audit Log updates instantly!
+      const newLog = {
+        id: crypto.randomUUID(),
+        ticket_id: ticket.id,
+        old_status: prev,
+        new_status: newStatus,
+        changed_by: currentUserId || null,
+        note: "",
+        created_at: new Date().toISOString()
+      };
+      setHistory((prevHist) => [newLog, ...prevHist]);
+      
       toast.success("Status updated");
     } catch (err: any) {
       setLocalStatus(prev);

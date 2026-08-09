@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList,
 } from "recharts";
 import {
   Activity, AlertTriangle, ArrowUpRight, Bot, Brain,
@@ -43,7 +43,10 @@ const STA: Record<TicketStatus, string> = {
   open: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20",
 };
 
-const DIST_COLORS = ["#10b981", "#6366f1", "#f59e0b", "#f97316", "#ef4444"];
+// 5 health bands (Excellent..Critical) + a neutral gray for the "No Data"
+// band (assets with no completed prediction yet) appended by the backend —
+// keep it visually distinct from every real band, not a wrapped-around reuse.
+const DIST_COLORS = ["#10b981", "#6366f1", "#f59e0b", "#f97316", "#ef4444", "#94a3b8"];
 
 const INSIGHT_STYLE: Record<InsightTone, { icon: React.ElementType; color: string; bg: string }> = {
   critical: { icon: AlertTriangle, color: "text-rose-500", bg: "bg-rose-50 dark:bg-rose-500/10 border-rose-100 dark:border-rose-500/20" },
@@ -133,12 +136,22 @@ export default function AdminDashboardPage() {
       setError(e instanceof Error ? e.message : "Failed to load dashboard data");
       setData(null);
     } finally {
-      setNow(new Date());
       setLoading(false);
     }
   }, []);
 
   React.useEffect(() => { load(); }, [load]);
+
+  // The header clock/date next to the "Live" badge is a real clock, not a
+  // "data last fetched" timestamp — it previously only updated inside load()'s
+  // finally block, so it froze at whatever moment the page last loaded or was
+  // manually refreshed instead of ticking forward on its own. Tick it
+  // independently of data fetching so it always reflects the current time.
+  React.useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   if (loading && !data) {
     return (
@@ -311,7 +324,7 @@ export default function AdminDashboardPage() {
 
         {/* ══ Charts row ════════════════════════════════════════════════════ */}
         <div className="grid gap-3 xl:grid-cols-12">
-          <Card className="xl:col-span-8 overflow-hidden">
+          <Card className="xl:col-span-8 overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-200 dark:border-slate-700">
               <div>
                 <SectionTitle>Asset & Operations Trends</SectionTitle>
@@ -331,9 +344,12 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            <div className="px-5 pt-4 pb-2">
+            {/* flex-1 + min-h-0: when the grid stretches this card to match the
+                (taller) right column, the chart grows to actually use that space
+                instead of leaving it as dead whitespace below the footer stats. */}
+            <div className="px-5 pt-4 pb-2 flex-1 min-h-0">
               {tab === "health" && (
-                <div style={{ height: 210, minHeight: 210 }}>
+                <div style={{ height: "100%", minHeight: 210 }}>
                   {healthTrend.length === 0 ? <EmptyRow>No health-trend data.</EmptyRow> : (
                     <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <AreaChart data={healthTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
@@ -355,7 +371,7 @@ export default function AdminDashboardPage() {
                 </div>
               )}
               {tab === "tickets" && (
-                <div style={{ height: 210, minHeight: 210 }}>
+                <div style={{ height: "100%", minHeight: 210 }}>
                   {ticketTrend.length === 0 ? <EmptyRow>No ticket-trend data.</EmptyRow> : (
                     <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <BarChart data={ticketTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barGap={3}>
@@ -373,7 +389,7 @@ export default function AdminDashboardPage() {
                 </div>
               )}
               {tab === "cost" && (
-                <div style={{ height: 210, minHeight: 210 }}>
+                <div style={{ height: "100%", minHeight: 210 }}>
                   {costTrend.length === 0 ? <EmptyRow>No cost-trend data.</EmptyRow> : (
                     <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <BarChart data={costTrend} margin={{ top: 4, right: 4, left: -10, bottom: 0 }} barGap={4}>
@@ -441,17 +457,31 @@ export default function AdminDashboardPage() {
             <Card className="p-4">
               <SectionTitle>{downtimeByMonth ? "Downtime Trend" : "Downtime by Warehouse"}</SectionTitle>
               <SectionSub>{downtimeByMonth ? "Planned vs unplanned hours — last 6 months" : "Planned vs unplanned hours — this month"}</SectionSub>
-              <div className="mt-3" style={{ height: 110, minHeight: 110 }}>
+              {/* Height sized for 6 categories at ~35px/row so every YAxis tick has
+                  room to render — Recharts silently drops category labels that
+                  don't fit rather than shrinking them, which was dropping every
+                  other month at the previous, tighter height. */}
+              <div className="mt-3" style={{ height: 230, minHeight: 230 }}>
                 {downtime.length === 0 ? <EmptyRow>No downtime data.</EmptyRow> : (
                   <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
-                    <BarChart data={downtime} layout="vertical" margin={{ top: 0, right: 4, left: 36, bottom: 0 }} barGap={3}>
+                    {/* Planned hours are routinely 1-2 orders of magnitude larger
+                        than unplanned hours, so on a shared linear axis the
+                        unplanned bars rendered as an invisible sliver (#98).
+                        minPointSize floors every non-zero bar to a visible
+                        pixel size, and the value labels make the exact hours
+                        readable regardless of how short the bar itself is. */}
+                    <BarChart data={downtime} layout="vertical" margin={{ top: 0, right: 28, left: 36, bottom: 0 }} barGap={3}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} horizontal={false} />
                       <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                      <YAxis type="category" dataKey="warehouse" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={34} />
+                      <YAxis type="category" dataKey="warehouse" interval={0} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={34} />
                       <Tooltip content={<CTip />} />
                       <Legend wrapperStyle={{ fontSize: 10 }} />
-                      <Bar dataKey="planned" name="Planned" fill="#6366f1" radius={[0, 3, 3, 0]} />
-                      <Bar dataKey="unplanned" name="Unplanned" fill="#ef4444" radius={[0, 3, 3, 0]} />
+                      <Bar dataKey="planned" name="Planned" fill="#6366f1" radius={[0, 3, 3, 0]} minPointSize={2}>
+                        <LabelList dataKey="planned" position="right" style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                      </Bar>
+                      <Bar dataKey="unplanned" name="Unplanned" fill="#ef4444" radius={[0, 3, 3, 0]} minPointSize={2}>
+                        <LabelList dataKey="unplanned" position="right" style={{ fontSize: 10, fill: "#ef4444", fontWeight: 600 }} />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}

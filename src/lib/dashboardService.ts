@@ -24,8 +24,10 @@ export interface DashboardKpis {
 // Chart-data rows carry an index signature so recharts accepts them directly.
 export interface HealthTrendPoint {
   month: string; // e.g. "Jan"
-  avgHealth: number; // 0–100
-  [key: string]: string | number;
+  // null when no predictions were recorded that month (real gap, not 0%) —
+  // recharts breaks the line there instead of drawing a false zero.
+  avgHealth: number | null; // 0–100
+  [key: string]: string | number | null;
 }
 
 export interface TicketTrendPoint {

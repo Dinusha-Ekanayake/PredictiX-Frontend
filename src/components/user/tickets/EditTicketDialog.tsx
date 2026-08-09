@@ -59,7 +59,6 @@ export default function EditTicketDialog({ open, onOpenChange, ticket, onUpdated
       const updated = await updateMyTicket(ticket.id, {
         title: title.trim(),
         description: description.trim(),
-        priority,
         category,
       });
       toast.success("Ticket updated", { description: updated.title });
@@ -98,18 +97,7 @@ export default function EditTicketDialog({ open, onOpenChange, ticket, onUpdated
               placeholder="Describe the issue"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Priority</p>
-              <Select value={priority} onValueChange={(v) => setPriority(v as TicketPriority)}>
-                <SelectTrigger className="w-full bg-background"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="Low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-1 gap-3">
             <div>
               <p className="text-sm text-muted-foreground mb-2">Category</p>
               <Select value={category} onValueChange={(v) => setCategory(v as TicketCategory)}>

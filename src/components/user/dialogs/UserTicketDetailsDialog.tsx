@@ -343,25 +343,7 @@ export default function UserTicketDetailsDialog({
                       className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[110px] resize-vertical"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Priority</p>
-                      <Select
-                        value={editPriority}
-                        onValueChange={(v) => setEditPriority(v)}
-                        disabled={savingEdit}
-                      >
-                        <SelectTrigger className="w-full bg-background">
-                          <SelectValue placeholder="Unset" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+
                   <div className="flex justify-end gap-2">
                     <Button
                       variant="ghost"

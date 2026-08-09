@@ -440,24 +440,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                 {/* Priority */}
                 <div className="flex items-center gap-1.5">
                   <PriorityIcon priority={localPriority} />
-                  {hasAdminAccess ? (
-                    priorityUpdating ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                    ) : (
-                      <select
-                        value={localPriority}
-                        onChange={handlePriorityChange}
-                        disabled={priorityUpdating}
-                        className={selectCls + " w-[110px]"}
-                      >
-                        <option value="High">High</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Low">Low</option>
-                      </select>
-                    )
-                  ) : (
-                    <span className="text-sm font-medium">{localPriority}</span>
-                  )}
+                  <span className="text-sm font-medium">{localPriority}</span>
                 </div>
 
                 {/* Status */}

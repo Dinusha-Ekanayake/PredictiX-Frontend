@@ -398,7 +398,7 @@ export default function UserTicketDetailsDialog({
                       <h4 className="text-sm font-medium text-muted-foreground">Category</h4>
                       <div className="mt-2">
                         <Badge className="bg-sky-100 text-sky-800">
-                          {ticket.final_category || ticket.predicted_category || "General"}
+                          {ticket.final_category || ticket.predicted_category || "Mechanical"}
                         </Badge>
                       </div>
                     </div>

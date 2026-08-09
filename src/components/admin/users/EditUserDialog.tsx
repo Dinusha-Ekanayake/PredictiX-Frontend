@@ -40,6 +40,7 @@ import type {
   UserStatus,
   CreateUserPayload,
 } from "@/lib/userService";
+import { fetchDepartments, fetchWarehouses } from "@/lib/api/userProfileApi";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -126,6 +127,27 @@ export default function EditUserDialog({
   const [status, setStatus] = React.useState<UserStatus | "">("");
   const [errors, setErrors] = React.useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const [departments, setDepartments] = React.useState<string[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = React.useState(false);
+  const [warehouses, setWarehouses] = React.useState<string[]>([]);
+  const [warehousesLoading, setWarehousesLoading] = React.useState(false);
+  const [listsLoadFailed, setListsLoadFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open) return;
+    setDepartmentsLoading(true);
+    setWarehousesLoading(true);
+    setListsLoadFailed(false);
+    fetchDepartments()
+      .then(setDepartments)
+      .catch(() => setListsLoadFailed(true))
+      .finally(() => setDepartmentsLoading(false));
+    fetchWarehouses()
+      .then(setWarehouses)
+      .catch(() => setListsLoadFailed(true))
+      .finally(() => setWarehousesLoading(false));
+  }, [open]);
 
   React.useEffect(() => {
     if (open && user) {
@@ -388,22 +410,20 @@ export default function EditUserDialog({
                 if (errors.department)
                   setErrors((p) => ({ ...p, department: undefined }));
               }}
+              disabled={departmentsLoading}
             >
               <SelectTrigger
                 id="edit-department"
                 className="w-full bg-background"
               >
-                <SelectValue placeholder="Select department" />
+                <SelectValue placeholder={departmentsLoading ? "Loading…" : "Select department"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Transportation">Transportation</SelectItem>
-                <SelectItem value="Electrical">Electrical</SelectItem>
-                <SelectItem value="Mechanical">Mechanical</SelectItem>
-                <SelectItem value="Software">Software</SelectItem>
-                <SelectItem value="Admin">Admin</SelectItem>
-                <SelectItem value="Administrative">Administrative</SelectItem>
-                <SelectItem value="IT">IT</SelectItem>
-                <SelectItem value="Maintenance">Maintenance</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </FieldCard>
@@ -448,24 +468,28 @@ export default function EditUserDialog({
             <Select
               value={warehouse}
               onValueChange={(v) => setWarehouse(v)}
+              disabled={warehousesLoading}
             >
               <SelectTrigger
                 id="edit-warehouse"
                 className="w-full bg-background"
               >
-                <SelectValue placeholder="Select warehouse" />
+                <SelectValue placeholder={warehousesLoading ? "Loading…" : "Select warehouse"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="LankaLogix - Colombo">
-                  LankaLogix - Colombo
-                </SelectItem>
-                <SelectItem value="Main Branch - Colombo">
-                  Main Branch - Colombo
-                </SelectItem>
-                <SelectItem value="Galle">Galle</SelectItem>
+                {warehouses.map((w) => (
+                  <SelectItem key={w} value={w}>
+                    {w}
+                  </SelectItem>
+                ))}
                 <SelectItem value="Not assigned">Not assigned</SelectItem>
               </SelectContent>
             </Select>
+            {listsLoadFailed && (
+              <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                Failed to load department/warehouse lists — try reopening this dialog.
+              </p>
+            )}
           </FieldCard>
 
           {/* Buttons */}

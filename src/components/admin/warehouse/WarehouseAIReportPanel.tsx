@@ -822,15 +822,6 @@ export default function WarehouseAIReportPanel({
                                   </span>
                                 </td>
                               </tr>
-                              {/* Inject AI Summary if available in data.ai_sections.asset_summaries, though currently the report builder generates them dynamically */}
-                              {data.ai_sections?.asset_summaries?.[w.asset] && (
-                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/20">
-                                  <td colSpan={4} className="px-3 py-3 text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
-                                    <span className="font-bold text-violet-600 dark:text-violet-400 mr-1">AI Summary:</span>
-                                    {data.ai_sections.asset_summaries[w.asset]}
-                                  </td>
-                                </tr>
-                              )}
                             </React.Fragment>
                           ))}
                         </tbody>

@@ -168,37 +168,6 @@ export async function fetchTickets(
   };
 }
 
-export async function createTicket(payload: {
-  asset_id: string | null;
-  title: string;
-  description: string;
-  priority: TicketPriority;
-  category: TicketCategory;
-  assigned_to?: string | null;
-}): Promise<Ticket> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const { data, error } = await supabase
-    .from("tickets")
-    .insert({
-      asset_id: payload.asset_id || null,
-      title: payload.title,
-      description: payload.description,
-      status: "open",
-      priority: dbPriority(payload.priority),
-      predicted_category: payload.category.toLowerCase(),
-      assigned_to: payload.assigned_to || null,
-      opened_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .select("*, assets(asset_name)")
-    .single();
-
-  if (error) throw error;
-  return mapRow(data);
-}
-
 export async function fetchTicketById(id: string): Promise<Ticket> {
   const row = await apiGet<any>(`/tickets/${id}`);
   return mapRow(row);

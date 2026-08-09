@@ -11,19 +11,9 @@ import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { downloadAssetPDF, downloadAssetPDFServer, type AssetReportData } from "@/lib/assetPdfExport";
 import { getAccessToken } from "@/lib/authService";
+import { apiFetch } from "@/lib/apiClient";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-
-/** fetch() wrapper that attaches the JWT — the data endpoints this modal reads
- *  (assets, predictions, tickets, etc.) now require authentication. */
-function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {
-    ...(init.headers as Record<string, string>),
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return fetch(input, { ...init, headers });
-}
 
 type Props = {
   isOpen: boolean;
@@ -126,8 +116,8 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
       try {
         // ── Step 1: asset + fleet summary in parallel ──────────
         const [assetRes, fleetRes] = await Promise.all([
-          authFetch(`${API_URL}/assets/${assetId}`),
-          authFetch(`${API_URL}/admin-dashboard/summary`).catch(() => null),
+          apiFetch(`/assets/${assetId}`),
+          apiFetch(`/admin-dashboard/summary`).catch(() => null),
         ]);
         if (!assetRes.ok) throw new Error(`Asset not found (${assetRes.status})`);
         const asset = await assetRes.json();
@@ -144,21 +134,21 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
           maintRes, ticketRes, sensorRes,
           warehouseRes, deptRes, assetListRes,
         ] = await Promise.all([
-          authFetch(`${API_URL}/batch-predictions/${assetId}`).catch(() => null),
+          apiFetch(`/batch-predictions/${assetId}`).catch(() => null),
           // breakdown-cost-v4.0 — separate endpoint, flat response shape
           // (top_drivers with relative_impact/direction — see Step 7b below)
-          authFetch(`${API_URL}/predictions/cost/${assetId}`).catch(() => null),
-          authFetch(`${API_URL}/maintenance?asset_id=${assetId}&limit=50`).catch(() => null),
-          authFetch(`${API_URL}/tickets?asset_id=${assetId}&limit=20`).catch(() => null),
-          authFetch(`${API_URL}/sensor-readings?asset_id=${assetId}&limit=1`).catch(() => null),
+          apiFetch(`/predictions/cost/${assetId}`).catch(() => null),
+          apiFetch(`/maintenance?asset_id=${assetId}&limit=50`).catch(() => null),
+          apiFetch(`/tickets?asset_id=${assetId}&limit=20`).catch(() => null),
+          apiFetch(`/sensor-readings?asset_id=${assetId}&limit=1`).catch(() => null),
           asset.warehouse_id
-            ? authFetch(`${API_URL}/warehouses/${asset.warehouse_id}`).catch(() => null)
+            ? apiFetch(`/warehouses/${asset.warehouse_id}`).catch(() => null)
             : Promise.resolve(null),
           asset.department_id
-            ? authFetch(`${API_URL}/departments/${asset.department_id}`).catch(() => null)
+            ? apiFetch(`/departments/${asset.department_id}`).catch(() => null)
             : Promise.resolve(null),
           // fetch all assets to build status+vehicle distribution
-          authFetch(`${API_URL}/assets?limit=1500&sort_by=created_at&sort_order=desc`).catch(() => null),
+          apiFetch(`/assets?limit=1500&sort_by=created_at&sort_order=desc`).catch(() => null),
         ]);
 
         // ── Step 3: parse all responses ────────────────────────

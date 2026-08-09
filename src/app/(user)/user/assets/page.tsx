@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
-import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
+import UserNewTicketDialog from "@/components/user/dialogs/UserNewTicketDialog";
 import PageHero from "@/components/common/PageHero";
 import { fetchMyAssets, type UserAssetData } from "@/lib/api/userProfileApi";
 import { listAssets } from "@/components/admin/assets/assetService";
@@ -234,14 +234,15 @@ export default function UserAssetsPage() {
         )}
       </div>
 
-      {/* Create ticket on a selected asset (asset locked) */}
-      <NewTicketDialog
+      {/* Create ticket on a selected asset (asset locked). UserNewTicketDialog
+          shows its own success toast + confirmation panel (Create another /
+          Done) — don't duplicate the toast or force-close here. */}
+      <UserNewTicketDialog
         open={ticketAsset !== null}
         onOpenChange={(o) => { if (!o) setTicketAsset(null); }}
         presetAssetId={ticketAsset?.id}
         presetAssetName={ticketAsset?.name}
         lockAsset
-        onCreated={() => { toast.success("Ticket created", { description: "View it under My Tickets." }); setTicketAsset(null); }}
       />
 
       {/* Asset Details Dialog */}

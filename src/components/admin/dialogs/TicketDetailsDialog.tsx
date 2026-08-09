@@ -4,8 +4,15 @@ import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, AlertCircle, CheckCircle, Trash2, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, AlertCircle, CheckCircle, Trash2, Loader2, Sparkles, RefreshCw, XCircle } from "lucide-react";
 import { toast } from "@/lib/customToast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   updateTicketStatus, 
   updateTicketPriority, 
@@ -210,8 +217,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     }
   }, [ticket, open]);
 
-  async function handleStatusChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const newStatus = e.target.value as TicketStatus;
+  async function handleStatusChange(newStatus: TicketStatus) {
     if (!ticket || newStatus === localStatus) return;
     setStatusUpdating(true);
     const prev = localStatus;
@@ -451,20 +457,50 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />Updating…
                       </span>
                     ) : (
-                      <select
+                      <Select
                         value={localStatus}
-                        onChange={handleStatusChange}
+                        onValueChange={(val) => handleStatusChange(val as TicketStatus)}
                         disabled={statusUpdating}
-                        className={selectCls + " w-[140px]"}
                       >
-                        <option value="open">Open</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="resolved">Resolved</option>
-                        <option value="closed">Closed</option>
-                      </select>
+                        <SelectTrigger className="w-[155px] h-8 text-xs font-semibold">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="open">
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="h-3.5 w-3.5 text-rose-500 animate-pulse" />
+                              <span>Open</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="in-progress">
+                            <div className="flex items-center gap-2">
+                              <RefreshCw className="h-3.5 w-3.5 text-amber-500" />
+                              <span>In Progress</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="resolved">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                              <span>Resolved</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="closed">
+                            <div className="flex items-center gap-2">
+                              <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span>Closed</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     )
                   ) : (
-                    <span className="text-sm font-medium capitalize">{localStatus.replace("-", " ")}</span>
+                    <span className="text-sm font-medium capitalize flex items-center gap-1.5">
+                      {localStatus === "open" && <AlertCircle className="h-3.5 w-3.5 text-rose-500 animate-pulse" />}
+                      {localStatus === "in-progress" && <RefreshCw className="h-3.5 w-3.5 text-amber-500" />}
+                      {localStatus === "resolved" && <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
+                      {localStatus === "closed" && <XCircle className="h-3.5 w-3.5 text-muted-foreground" />}
+                      {localStatus.replace("-", " ")}
+                    </span>
                   )}
                 </div>
               </div>

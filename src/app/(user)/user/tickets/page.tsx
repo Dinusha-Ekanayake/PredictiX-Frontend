@@ -280,11 +280,19 @@ export default function UserTicketsPage() {
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="open">
+                    <div className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-rose-500" /><span>Open</span></div>
+                  </SelectItem>
+                  <SelectItem value="in_progress">
+                    <div className="flex items-center gap-2"><RefreshCw className="h-4 w-4 text-amber-500" /><span>In Progress</span></div>
+                  </SelectItem>
+                  <SelectItem value="resolved">
+                    <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-emerald-500" /><span>Resolved</span></div>
+                  </SelectItem>
+                  <SelectItem value="closed">
+                    <div className="flex items-center gap-2"><XCircle className="h-4 w-4 text-muted-foreground" /><span>Closed</span></div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
 

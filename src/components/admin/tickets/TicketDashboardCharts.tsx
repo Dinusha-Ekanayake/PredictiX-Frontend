@@ -149,7 +149,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
 
   const techQueueData = Object.values(techQueueCounts)
     .filter((tech) => tech.name !== "Unassigned")
-    .sort((a, b) => b.total - a.total);
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 10);
 
   // 4. Process data for 4x3 Status vs Category Grid Counts
   const gridCountsData = React.useMemo(() => {
@@ -640,13 +641,13 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
       </div>
 
       {/* Technician Queue Depth (Horizontal Bar Chart) */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col lg:col-span-2 h-[700px]">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col lg:col-span-2 h-[480px]">
         <div className="mb-2">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-200">
             <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Technician Workload
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Active tickets assigned to each maintenance technician.
+            Top 10 maintenance technicians by active ticket workload.
           </p>
         </div>
         <div className="flex-1 w-full min-h-0">

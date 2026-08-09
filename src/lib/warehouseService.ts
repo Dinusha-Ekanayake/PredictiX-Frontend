@@ -39,6 +39,8 @@ export interface SurvivalComponentSummary {
   at_risk_7d: number;
   at_risk_30d: number;
   assets_scored: number;
+  avg_fail_prob_7d?: number;
+  avg_fail_prob_30d?: number;
 }
 
 export interface SurvivalWatchlistItem {

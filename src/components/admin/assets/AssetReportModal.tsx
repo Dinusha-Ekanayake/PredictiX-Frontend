@@ -453,11 +453,11 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-bold truncate">
-                  {asset?.asset_name ?? assetName ?? "Asset Performance Report"}
+                  {reportData?.assetName ?? assetName ?? "Asset Performance Report"}
                 </h2>
-                {asset?.asset_code && (
+                {reportData?.assetCode && (
                   <span className="text-[11px] font-mono text-white/40 bg-white/6 px-2 py-0.5 rounded-full shrink-0">
-                    {asset.asset_code}
+                    {reportData.assetCode}
                   </span>
                 )}
               </div>
@@ -524,7 +524,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
               <Section title="1. Asset Overview" icon={BarChart3}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
                   <div>
-                    <Field label="Asset Name"    value={asset?.asset_name ?? "—"} />
+                    <Field label="Asset Name"    value={reportData?.assetName ?? "—"} />
                     <Field label="Type"          value={[asset?.asset_type, asset?.vehicle_type].filter(Boolean).join(" · ") || "—"} />
                     <Field label="Make / Model"  value={[asset?.make, asset?.model, asset?.manufacture_year].filter(Boolean).join(" ") || "—"} />
                     <Field label="Fuel Type"     value={asset?.fuel_type ?? "—"} />

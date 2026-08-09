@@ -138,10 +138,17 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
   }, []);
 
   const isTechnician = React.useMemo(() => {
-    if (currentUserRole.toLowerCase() === "admin") return true;
+    const r = (currentUserRole || "").toLowerCase();
+    if (r === "admin" || r === "superadmin" || r === "super_admin") return true;
     const userObj = users?.find((u) => u.id === currentUserId);
     return userObj?.department?.toLowerCase().includes("maintenance") || false;
   }, [users, currentUserId, currentUserRole]);
+
+  const hasAdminAccess = React.useMemo(() => {
+    if (isAdmin) return true;
+    const r = (currentUserRole || "").toLowerCase();
+    return r === "admin" || r === "superadmin" || r === "super_admin";
+  }, [isAdmin, currentUserRole]);
 
   const canDelete = React.useMemo(() => {
     const role = (currentUserRole || "").toLowerCase();
@@ -433,7 +440,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                 {/* Priority */}
                 <div className="flex items-center gap-1.5">
                   <PriorityIcon priority={localPriority} />
-                  {isAdmin ? (
+                  {hasAdminAccess ? (
                     priorityUpdating ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
                     ) : (
@@ -455,7 +462,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
 
                 {/* Status */}
                 <div className="flex items-center gap-1.5">
-                  {isAdmin ? (
+                  {hasAdminAccess ? (
                     statusUpdating ? (
                       <span className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />Updating…
@@ -547,7 +554,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                             className="object-cover w-full h-full cursor-zoom-in"
                             onClick={() => setFullSizeImage(a.file_path)}
                           />
-                          {isAdmin && (
+                           {hasAdminAccess && (
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <Button 
                                 variant="destructive" 
@@ -566,7 +573,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                     <p className="text-sm text-muted-foreground italic">No attachments.</p>
                   )}
                   
-                  {isAdmin && (
+                  {hasAdminAccess && (
                     <div className="mt-3 flex items-end gap-2 max-w-sm">
                       <div className="flex-1">
                         <p className="text-xs text-muted-foreground mb-1">Upload New Image</p>
@@ -595,7 +602,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
             <div className="rounded-md border p-3 bg-muted/30">
               <h4 className="text-sm font-medium text-muted-foreground">Assigned To</h4>
               <div className="mt-2 text-sm">
-                {isAdmin ? (
+                {hasAdminAccess ? (
                   assigneeUpdating ? (
                     <span className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />Updating…
@@ -798,7 +805,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                           <span className="text-[10px] opacity-75">{new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                         </div>
                         <p className="leading-relaxed whitespace-pre-wrap">{c.comment}</p>
-                        {(isMe || isAdmin) && (
+                        {(isMe || hasAdminAccess) && (
                           <button onClick={() => handleDeleteComment(c.id)} className="self-end mt-1 text-[10px] opacity-60 hover:opacity-100 flex items-center gap-0.5 hover:text-red-400">
                             <Trash className="h-3 w-3" /> Delete
                           </button>
@@ -851,7 +858,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                             <span className="text-[10px] opacity-75">{new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                           </div>
                           <p className="leading-relaxed whitespace-pre-wrap">{c.comment}</p>
-                          {(isMe || isAdmin) && (
+                          {(isMe || hasAdminAccess) && (
                             <button onClick={() => handleDeleteComment(c.id)} className="self-end mt-1 text-[10px] opacity-60 hover:opacity-100 flex items-center gap-0.5 hover:text-red-500">
                               <Trash className="h-3 w-3" /> Delete
                             </button>

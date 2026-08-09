@@ -104,7 +104,8 @@ export default function AdminTicketsPage() {
 
   React.useEffect(() => {
     const role = window.localStorage.getItem("predictix.user.role");
-    setIsAdmin(role === "admin" || role === "ADMIN");
+    const r = (role || "").toLowerCase();
+    setIsAdmin(r === "admin" || r === "superadmin" || r === "super_admin");
     listUsers()
       .then(setUsers)
       .catch((err) => console.error("Failed to load users:", err));

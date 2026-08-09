@@ -78,7 +78,7 @@ export default function AdminTicketsPage() {
   const [debouncedQuery, setDebouncedQuery] = React.useState("");
   const [selectedStatus, setSelectedStatus] = React.useState("all");
   const [selectedPriority, setSelectedPriority] = React.useState("all");
-  const [sortBy, setSortBy] = React.useState("title");
+  const [sortBy, setSortBy] = React.useState("created_at");
   const [sortDir, setSortDir] = React.useState("asc");
   const [users, setUsers] = React.useState<UserItem[]>([]);
 
@@ -358,10 +358,29 @@ export default function AdminTicketsPage() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tickets by title, description…"
+              placeholder="Search tickets by title, ticket number, description…"
               className="pl-9 h-10 bg-background/60 dark:bg-slate-900/60"
             />
           </div>
+
+          <Select
+            value={`${sortBy}_${sortDir}`}
+            onValueChange={(v) => {
+              const [by, dir] = v.split("_");
+              setSortBy(by);
+              setSortDir(dir);
+            }}
+          >
+            <SelectTrigger className="w-44 h-10 bg-background/60 dark:bg-slate-900/60">
+              <SelectValue placeholder="Sort By" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_at_asc">Oldest First</SelectItem>
+              <SelectItem value="created_at_desc">Newest First</SelectItem>
+              <SelectItem value="title_asc">Name (A-Z)</SelectItem>
+              <SelectItem value="title_desc">Name (Z-A)</SelectItem>
+            </SelectContent>
+          </Select>
 
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v)}>
@@ -403,30 +422,11 @@ export default function AdminTicketsPage() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={`${sortBy}_${sortDir}`}
-              onValueChange={(v) => {
-                const [by, dir] = v.split("_");
-                setSortBy(by);
-                setSortDir(dir);
-              }}
-            >
-              <SelectTrigger className="w-44 h-10">
-                <SelectValue placeholder="Sort By" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="title_asc">Name (A-Z)</SelectItem>
-                <SelectItem value="title_desc">Name (Z-A)</SelectItem>
-                <SelectItem value="created_at_desc">Newest First</SelectItem>
-                <SelectItem value="created_at_asc">Oldest First</SelectItem>
-              </SelectContent>
-            </Select>
-
             <Button variant="ghost" size="sm" className="h-10">
               <Filter className="h-4 w-4" />
             </Button>
 
-            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "" || sortBy !== "title" || sortDir !== "asc") && (
+            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "" || sortBy !== "created_at" || sortDir !== "asc") && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -435,7 +435,7 @@ export default function AdminTicketsPage() {
                   setQuery("");
                   setSelectedStatus("all");
                   setSelectedPriority("all");
-                  setSortBy("title");
+                  setSortBy("created_at");
                   setSortDir("asc");
                 }}
               >

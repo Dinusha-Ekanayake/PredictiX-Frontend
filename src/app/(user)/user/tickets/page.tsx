@@ -310,11 +310,30 @@ export default function UserTicketsPage() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <Select
+                value={`${sortBy}_${sortDir}`}
+                onValueChange={(v) => {
+                  const [by, dir] = v.split("_");
+                  setSortBy(by);
+                  setSortDir(dir);
+                }}
+              >
+                <SelectTrigger className="w-[170px]">
+                  <SelectValue placeholder="Sort By" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="title_asc">Name (A-Z)</SelectItem>
+                  <SelectItem value="title_desc">Name (Z-A)</SelectItem>
+                  <SelectItem value="created_at_desc">Newest First</SelectItem>
+                  <SelectItem value="created_at_asc">Oldest First</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "") && (
+            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "" || sortBy !== "title" || sortDir !== "asc") && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -323,6 +342,8 @@ export default function UserTicketsPage() {
                   setQuery("");
                   setSelectedStatus("all");
                   setSelectedPriority("all");
+                  setSortBy("title");
+                  setSortDir("asc");
                 }}
               >
                 <XCircle className="h-4 w-4" />

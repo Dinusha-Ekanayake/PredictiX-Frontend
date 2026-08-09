@@ -134,6 +134,8 @@ export default function UserTicketsPage() {
   const [query, setQuery] = React.useState("");
   const [selectedStatus, setSelectedStatus] = React.useState("all");
   const [selectedPriority, setSelectedPriority] = React.useState("all");
+  const [sortBy, setSortBy] = React.useState("title");
+  const [sortDir, setSortDir] = React.useState("asc");
 
   const [newOpen, setNewOpen] = React.useState(false);
   const [detailOpen, setDetailOpen] = React.useState(false);

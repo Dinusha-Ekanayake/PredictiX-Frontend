@@ -78,6 +78,8 @@ export default function AdminTicketsPage() {
   const [debouncedQuery, setDebouncedQuery] = React.useState("");
   const [selectedStatus, setSelectedStatus] = React.useState("all");
   const [selectedPriority, setSelectedPriority] = React.useState("all");
+  const [sortBy, setSortBy] = React.useState("title");
+  const [sortDir, setSortDir] = React.useState("asc");
   const [users, setUsers] = React.useState<UserItem[]>([]);
 
   // ── Deep-link support: ?ticket_id=<uuid> (e.g. from the dashboard's
@@ -147,7 +149,7 @@ export default function AdminTicketsPage() {
     setTickets([]);
     loadPage(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery, selectedStatus, selectedPriority]);
+  }, [debouncedQuery, selectedStatus, selectedPriority, sortBy, sortDir]);
 
   async function loadPage(pageNum: number, reset: boolean) {
     if (pageNum === 0) setIsLoading(true);
@@ -158,7 +160,9 @@ export default function AdminTicketsPage() {
         pageNum,
         debouncedQuery,
         selectedStatus,
-        selectedPriority
+        selectedPriority,
+        sortBy,
+        sortDir
       );
       setTotal(t);
       setTickets(rows);
@@ -399,11 +403,30 @@ export default function AdminTicketsPage() {
               </SelectContent>
             </Select>
 
+            <Select
+              value={`${sortBy}_${sortDir}`}
+              onValueChange={(v) => {
+                const [by, dir] = v.split("_");
+                setSortBy(by);
+                setSortDir(dir);
+              }}
+            >
+              <SelectTrigger className="w-44 h-10">
+                <SelectValue placeholder="Sort By" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="title_asc">Name (A-Z)</SelectItem>
+                <SelectItem value="title_desc">Name (Z-A)</SelectItem>
+                <SelectItem value="created_at_desc">Newest First</SelectItem>
+                <SelectItem value="created_at_asc">Oldest First</SelectItem>
+              </SelectContent>
+            </Select>
+
             <Button variant="ghost" size="sm" className="h-10">
               <Filter className="h-4 w-4" />
             </Button>
 
-            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "") && (
+            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "" || sortBy !== "title" || sortDir !== "asc") && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -412,6 +435,8 @@ export default function AdminTicketsPage() {
                   setQuery("");
                   setSelectedStatus("all");
                   setSelectedPriority("all");
+                  setSortBy("title");
+                  setSortDir("asc");
                 }}
               >
                 <XCircle className="h-4 w-4" />

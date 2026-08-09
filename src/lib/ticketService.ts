@@ -141,7 +141,9 @@ export async function fetchTickets(
   page: number,
   search: string,
   status: string,
-  priority: string
+  priority: string,
+  sortBy?: string,
+  sortDir?: string
 ): Promise<{ tickets: Ticket[]; total: number }> {
   // Build query params for the FastAPI backend endpoint
   const params = new URLSearchParams();
@@ -150,6 +152,8 @@ export async function fetchTickets(
   if (search.trim()) params.set("search", search.trim());
   if (status && status !== "all") params.set("status", dbStatus(status));
   if (priority && priority !== "all") params.set("priority", dbPriority(priority));
+  if (sortBy) params.set("sort_by", sortBy);
+  if (sortDir) params.set("sort_dir", sortDir);
 
   // Call FastAPI — this uses the authenticated session and the backend DB connection
   // which is resilient to Supabase sleeping. Response includes X-Total-Count header.

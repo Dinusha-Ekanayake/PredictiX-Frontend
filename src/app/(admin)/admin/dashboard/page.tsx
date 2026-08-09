@@ -8,7 +8,7 @@ import {
 import {
   Activity, AlertTriangle, ArrowUpRight, Bot, Brain,
   ChevronRight, Clock, ExternalLink, Flame, Package,
-  RefreshCw, ShieldAlert, Ticket, Wrench, Zap, CheckCircle2,
+  RefreshCw, ShieldAlert, Ticket, Wrench,
   Timer, BarChart2, ThumbsUp, Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -537,7 +537,10 @@ export default function AdminDashboardPage() {
           <Card className="xl:col-span-6">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-700">
               <div><SectionTitle>Recent Alerts</SectionTitle><SectionSub>Asset monitoring — latest events</SectionSub></div>
-              <button className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground font-medium">View all<ChevronRight className="h-3.5 w-3.5" /></button>
+              <button
+                onClick={() => router.push("/admin/assets")}
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground font-medium"
+              >View all<ChevronRight className="h-3.5 w-3.5" /></button>
             </div>
             <div>
               {alerts.length === 0 ? <EmptyRow>No recent alerts.</EmptyRow> : alerts.map((a) => (
@@ -563,7 +566,10 @@ export default function AdminDashboardPage() {
         <Card>
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-700">
             <div><SectionTitle>Maintenance Tickets</SectionTitle><SectionSub>Latest open and in-progress work orders</SectionSub></div>
-            <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-[11px] font-medium hover:bg-muted transition-colors">
+            <button
+              onClick={() => router.push("/admin/tickets")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-[11px] font-medium hover:bg-muted transition-colors"
+            >
               <ArrowUpRight className="h-3.5 w-3.5" /> Manage
             </button>
           </div>
@@ -596,7 +602,14 @@ export default function AdminDashboardPage() {
           </div>
         </Card>
 
-        {/* ══ AI summary banner ═════════════════════════════════════════════ */}
+        {/* ══ Operational summary banner ════════════════════════════════════ */}
+        {/* Deliberately not called "AI ..." — the backend deterministically
+            builds this from real KPI data (see admin_dashboard.py), it never
+            calls an LLM for it. aiSummaryIsGenerated is kept in the API
+            contract as a forward-compat hook (a cheap daily-batch real-AI
+            upgrade is a known possible follow-up), but it's permanently
+            false today, so there's nothing to branch on here — showing a
+            single honest badge instead of dead either/or UI. */}
         {data?.aiSummary && (
           <div className="rounded-xl border border-violet-200 dark:border-violet-500/20 bg-linear-to-br from-violet-50 to-indigo-50/60 dark:from-violet-500/10 dark:to-transparent dark:bg-white/2 p-5">
             <div className="flex items-start gap-4">
@@ -605,25 +618,17 @@ export default function AdminDashboardPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-2">
-                  <p className="text-[13px] font-semibold">AI Operational Summary</p>
-                  {data.aiSummaryIsGenerated ? (
-                    <>
-                      <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-violet-100 text-violet-700 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/25">
-                        <Zap className="h-2.5 w-2.5" /> AI-Generated
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/25">
-                        <CheckCircle2 className="h-2.5 w-2.5" /> High confidence
-                      </span>
-                    </>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-slate-100 text-slate-600 ring-slate-200 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10">
-                      Data summary
-                    </span>
-                  )}
+                  <p className="text-[13px] font-semibold">Operational Summary</p>
+                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-slate-100 text-slate-600 ring-slate-200 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10">
+                    Data summary
+                  </span>
                 </div>
                 <p className="text-[12px] text-muted-foreground leading-relaxed">{data.aiSummary}</p>
               </div>
-              <button className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-violet-200 dark:border-violet-500/30 bg-white/70 dark:bg-violet-500/10 hover:bg-violet-50 dark:hover:bg-violet-500/20 px-3 py-1.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300 transition-colors">
+              <button
+                onClick={() => router.push("/admin/warehouse")}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-violet-200 dark:border-violet-500/30 bg-white/70 dark:bg-violet-500/10 hover:bg-violet-50 dark:hover:bg-violet-500/20 px-3 py-1.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300 transition-colors"
+              >
                 Full report <ExternalLink className="h-3.5 w-3.5" />
               </button>
             </div>

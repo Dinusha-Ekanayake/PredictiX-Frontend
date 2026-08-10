@@ -1,10 +1,10 @@
 /**
  * Asset Service
  * All API calls for the admin assets section.
- * Uses apiGet / apiPost / apiPut / apiDelete from apiClient so JWT is auto-attached.
+ * Uses apiGet / apiPost / apiPut / apiFetch (for DELETE) from apiClient so JWT is auto-attached.
  */
 
-import { apiGet, apiFetch, apiPost, apiPut } from "@/lib/apiClient";
+import { apiGet, apiFetch, apiPost, apiPut, ApiError } from "@/lib/apiClient";
 import type {
   Asset,
   AssetListItem,
@@ -166,8 +166,17 @@ export async function getAssetAssignments(assetId: string): Promise<AssetAssignm
 export async function getBatchPrediction(assetId: string): Promise<BatchPrediction | null> {
   try {
     return await apiGet<BatchPrediction>(`/batch-predictions/${assetId}`);
-  } catch {
-    return null; // 404 means no prediction yet — not an error
+  } catch (e) {
+    // 404 genuinely means no prediction yet — the normal, expected state
+    // before the first batch run. Anything else (500, network failure,
+    // auth) is a real error that was previously indistinguishable from
+    // "no data yet" both to the UI and to whoever was debugging it — still
+    // degrade to null so one failed fetch doesn't break the whole detail
+    // panel, but at least surface it in the console instead of hiding it.
+    if (!(e instanceof ApiError) || e.status !== 404) {
+      console.error(`Failed to load batch prediction for asset ${assetId}:`, e);
+    }
+    return null;
   }
 }
 
@@ -176,7 +185,13 @@ export async function getBatchPrediction(assetId: string): Promise<BatchPredicti
 export async function getComponentRul(assetId: string): Promise<AssetComponentRulResponse | null> {
   try {
     return await apiGet<AssetComponentRulResponse>(`/assets/${assetId}/component-rul`);
-  } catch {
+  } catch (e) {
+    // Same reasoning as getBatchPrediction above — only a 404 is the
+    // expected "no RUL data yet" case; anything else gets logged so it's
+    // diagnosable instead of silently looking like an empty state.
+    if (!(e instanceof ApiError) || e.status !== 404) {
+      console.error(`Failed to load component RUL for asset ${assetId}:`, e);
+    }
     return null;
   }
 }
@@ -281,24 +296,11 @@ export async function updateAssetStatus(assetId: string, status: string): Promis
   return response.json();
 }
 
-// ─── Generate asset PDF report ────────────────────────────────────────────────
-
-export async function generateAssetReport(assetId: string): Promise<void> {
-  const response = await apiFetch(`/asset-reports/${assetId}`, { method: "POST" });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ detail: "Report generation failed" }));
-    throw new Error(err.detail || "Report generation failed");
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `asset-report-${assetId}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
+// generateAssetReport() (POST /asset-reports/{assetId}, server-rendered PDF
+// download) removed — dead since the report flow moved to the client-built
+// HTML path (src/lib/assetPdfExport.ts + POST /reports/render-pdf); nothing
+// has called this since. The backend route itself stays live (marked
+// deprecated) in case any external caller still depends on it.
 
 // ─── Delete asset ──────────────────────────────────────────────────────────────
 

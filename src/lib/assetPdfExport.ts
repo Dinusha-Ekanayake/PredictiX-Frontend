@@ -74,9 +74,27 @@ const C = {
   border:"#e5e7eb", bg:"#f9fafb", white:"#ffffff",
 };
 
-function fmt(v:any,fb="—"):string{return(v==null||v===""||v==="—")?fb:String(v);}
-function fmtCost(v:number,cur="LKR"):string{return`${cur} ${Number(v).toLocaleString()}`;}
-function fmtDate(v:any):string{return v?String(v).slice(0,10):"—";}
+// This report's HTML is rendered two ways: server-side via Playwright with
+// JS disabled (safe from script execution either way), and — as a fallback
+// whenever that fails for any reason — client-side in a live iframe with
+// full JavaScript enabled (downloadAssetPDF below). Every string on this
+// page ultimately traces back to some free-text field a user can set
+// (asset name/description/make/model, a maintenance note, a ticket
+// title…), so nothing gets interpolated into the HTML without going
+// through this first. Un-escaped interpolation here was a stored-XSS
+// hole: a ticket title of "<script>…</script>" would execute in
+// whichever admin's browser later opened that asset's report.
+function esc(v:any):string{
+  return String(v)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+}
+function fmt(v:any,fb="—"):string{return(v==null||v===""||v==="—")?fb:esc(v);}
+function fmtCost(v:number,cur="LKR"):string{return`${esc(cur)} ${Number(v).toLocaleString()}`;}
+function fmtDate(v:any):string{return v?esc(String(v).slice(0,10)):"—";}
 function cap(s:string):string{return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
 
 // ── PredictiX Logo — uses actual icon from public/logo/ ─────────────────────
@@ -214,7 +232,7 @@ function hlBox(label:string,body:string,color=C.teal):string{
 
 function riskBadge(level:string):string{
   const col:Record<string,string>={Low:C.emerald,Medium:C.amber,High:C.rose,Critical:"#dc2626"};
-  return`<span style="display:inline-block;padding:1px 7px;border-radius:3px;font-size:9px;font-weight:700;color:white;background:${col[level]||C.slate}">${level}</span>`;
+  return`<span style="display:inline-block;padding:1px 7px;border-radius:3px;font-size:9px;font-weight:700;color:white;background:${col[level]||C.slate}">${esc(level)}</span>`;
 }
 
 function secH(num:string,title:string,sub=""):string{
@@ -343,17 +361,17 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
       <!-- report card -->
       <div style="border:1px solid ${C.tealBorder};border-radius:8px;padding:24px 40px;background:${C.tealLight};max-width:400px;width:100%;margin-bottom:26px">
         <div style="font-size:9px;font-weight:700;color:${C.teal};letter-spacing:1.8px;text-transform:uppercase;margin-bottom:10px">Asset Performance Report</div>
-        <h1 style="font-size:22px;font-weight:800;color:${C.textDark};line-height:1.2;margin-bottom:5px">${data.assetName}</h1>
-        <div style="font-size:12px;color:${C.textLight};margin-bottom:0">${data.warehouseName}</div>
+        <h1 style="font-size:22px;font-weight:800;color:${C.textDark};line-height:1.2;margin-bottom:5px">${esc(data.assetName)}</h1>
+        <div style="font-size:12px;color:${C.textLight};margin-bottom:0">${esc(data.warehouseName)}</div>
       </div>
 
       <!-- meta -->
       <div style="font-size:10.5px;color:${C.textLight};margin-bottom:3px">
-        Report Generated: <strong style="color:${C.textDark}">${data.reportDate}</strong>
+        Report Generated: <strong style="color:${C.textDark}">${esc(data.reportDate)}</strong>
       </div>
       <div style="font-size:10.5px;color:${C.textLight};margin-bottom:16px">
-        Asset Code: <strong style="color:${C.textDark}">${data.assetCode}</strong>
-        &nbsp;·&nbsp; Make / Model: <strong style="color:${C.textDark}">${[asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"—"}</strong>
+        Asset Code: <strong style="color:${C.textDark}">${esc(data.assetCode)}</strong>
+        &nbsp;·&nbsp; Make / Model: <strong style="color:${C.textDark}">${esc([asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"—")}</strong>
       </div>
       <div style="display:inline-block;border:1px solid ${C.amber};color:${C.amber};font-size:8.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;padding:3px 14px;border-radius:3px">Confidential</div>
     </div>
@@ -386,16 +404,16 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
 
   const assetRows:[string,string][]=[
     ["Asset Code",          fmt(data.assetCode)],
-    ["Asset Type",         [asset.asset_type,asset.vehicle_type].filter(Boolean).join(" · ")||"—"],
-    ["Make / Model",       [asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"—"],
+    ["Asset Type",         esc([asset.asset_type,asset.vehicle_type].filter(Boolean).join(" · ")||"—")],
+    ["Make / Model",       esc([asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"—")],
     ["Status",              cap(fmt(asset.status))],
     ["Health Band",         cap(fmt(asset.health_band))],
     ["Criticality Score",   fmt(asset.criticality_score)],
     ["Fuel Type",           fmt(asset.fuel_type)],
-    ["Current Mileage",     asset.current_mileage?`${asset.current_mileage} km`:"—"],
+    ["Current Mileage",     asset.current_mileage?`${esc(asset.current_mileage)} km`:"—"],
     ["Vehicle Role",        fmt(asset.vehicle_role)],
-    ["Vehicle Age",         asset.vehicle_age_years?`${asset.vehicle_age_years} yrs`:"—"],
-    ["Payload Capacity",    asset.payload_capacity_kg?`${asset.payload_capacity_kg} kg`:"—"],
+    ["Vehicle Age",         asset.vehicle_age_years?`${esc(asset.vehicle_age_years)} yrs`:"—"],
+    ["Payload Capacity",    asset.payload_capacity_kg?`${esc(asset.payload_capacity_kg)} kg`:"—"],
     ["Purchase Date",       fmtDate(asset.purchase_date)],
     ["Warranty Expiry",     fmtDate(asset.warranty_expiry_date)],
     ["Last Service",        fmtDate(asset.last_service_date)],
@@ -441,28 +459,35 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
     // Check if keys are numeric indices (bad format) — skip if so
     const allNumeric=entries.every(([k])=>!isNaN(Number(k)));
     if(allNumeric) return []; // no named features — show "no data"
-    // Values may be 0-1 or already 0-100; normalise to sum=100
+    // Values may be 0-1 or already 0-100; normalise to sum=100 so each
+    // factor's pct is its share of total impact (dividing by the max
+    // instead of the sum would inflate every factor toward the top one
+    // and the bars would never actually add up to 100%).
     const vals=entries.map(([,v])=>Math.abs(Number(v)));
     const total=vals.reduce((a,b)=>a+b,0)||1;
-    const maxV=Math.max(...vals)||1;
-    // If sum ≈ 1, values are fractions → multiply by 100; if sum > 5, already pct
-    const scale=total<2?100:1;
     return entries
       .map(([name,val],i)=>({
-        name:name.replace(/_/g," ").replace(/pct/g,"%").replace(/\w/g,c=>c.toUpperCase()),
-        pct:Math.round((vals[i]/maxV)*100*10)/10,
+        name:esc(name.replace(/_/g," ").replace(/pct/g,"%").replace(/\w/g,c=>c.toUpperCase())),
+        pct:Math.round((vals[i]/total)*100*10)/10,
       }))
       .sort((a,b)=>b.pct-a.pct)
       .slice(0,8);
   })();
 
-  const costDrivers=data.cost_drivers||[];
+  // Escaped once here (feature/value are the only free-text-derived fields
+  // on a cost driver) rather than at each of the two places that read them
+  // below (the SVG bar chart and the data table), so neither can be missed.
+  const costDrivers=(data.cost_drivers||[]).map(d=>({
+    ...d,
+    feature:esc(d.feature),
+    value:esc(d.value),
+  }));
 
   const recBlock=(level:string,items:string[],col:string)=>
-    items.length?`<div class="no-break" style="break-inside:avoid;page-break-inside:avoid">${hlBox(level+" PRIORITY",items.map(r=>`• ${r}`).join("<br/>"),col)}</div>`:"";
+    items.length?`<div class="no-break" style="break-inside:avoid;page-break-inside:avoid">${hlBox(level+" PRIORITY",items.map(r=>`• ${esc(r)}`).join("<br/>"),col)}</div>`:"";
 
   const p4=page(`
-    ${secH("2","Health, Risk Analysis & Cost Estimation",`Key factors · ${data.cost_model_version||"AI Cost Model"}`)}
+    ${secH("2","Health, Risk Analysis & Cost Estimation",`Key factors · ${esc(data.cost_model_version||"AI Cost Model")}`)}
 
     ${subH("2.1 Failure Prediction — Key Risk Factors")}
     ${shapData.length
@@ -484,12 +509,12 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
         return hlBox("HOW TO READ THIS",
           `These are the factors that influenced this cost estimate the most, shown as their share of total impact (0–100%) rather than a direct LKR amount.<br/>
            Red bars = factors that push cost above the fleet average &nbsp;|&nbsp; Green bars = factors that pull cost below the fleet average.<br/>
-           Model: ${data.cost_model_version||"AI Cost Model"} · Target: cost in the next 30 days given current health${statSuffix}`,
+           Model: ${esc(data.cost_model_version||"AI Cost Model")} · Target: cost in the next 30 days given current health${statSuffix}`,
           C.amber);
       })()}
       ${chartBox("COST DRIVERS — RELATIVE IMPORTANCE",
         svgCostBars(costDrivers,430),
-        `Figure 2.3 — ${data.cost_model_version||"AI Cost Model"} relative importance of each cost factor · red = increases estimate · green = decreases estimate`)}
+        `Figure 2.3 — ${esc(data.cost_model_version||"AI Cost Model")} relative importance of each cost factor · red = increases estimate · green = decreases estimate`)}
       ${dataTbl(
         ["Feature","Current Value","Relative Impact","Effect"],
         costDrivers.map(d=>{
@@ -502,7 +527,7 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
             `<span style="color:${col}">${isUp?"▲ Increases cost":"▼ Decreases cost"}</span>`,
           ];
         }),
-        `Figure 2.4 — Top cost factors ranked by relative importance (${data.cost_model_version||"AI Cost Model"})`
+        `Figure 2.4 — Top cost factors ranked by relative importance (${esc(data.cost_model_version||"AI Cost Model")})`
       )}
       <div class="no-break" style="border:1px solid ${C.border};border-radius:5px;overflow:hidden;margin-bottom:12px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr">
@@ -524,15 +549,15 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
       </div>
     `:hlBox("COST MODEL DATA NOT AVAILABLE",
         data.cost_error
-          ? `The cost prediction request failed: <strong>${data.cost_error}</strong>. Contact your system administrator with this message.`
+          ? `The cost prediction request failed: <strong>${esc(data.cost_error)}</strong>. Contact your system administrator with this message.`
           : "Run the cost prediction model to generate a cost breakdown.",
         C.amber)}
 
     ${insights.executive_summary?`${subH("2.3 AI Executive Summary")}${hlBox("AI ANALYSIS",
-      String(insights.executive_summary).slice(0,350)+(String(insights.executive_summary).length>350?"…":""),
+      esc(String(insights.executive_summary).slice(0,350)+(String(insights.executive_summary).length>350?"…":"")),
       C.teal)}`:""}
     ${insights.ai_narrative&&insights.ai_narrative!==insights.executive_summary&&insights.ai_narrative.length>5?
-      hlBox("AI NARRATIVE",String(insights.ai_narrative).slice(0,250),C.sky):""}
+      hlBox("AI NARRATIVE",esc(String(insights.ai_narrative).slice(0,250)),C.sky):""}
 
     ${subH("2.4 Recommendations")}
     ${recBlock("Critical",recs.critical,C.rose)}
@@ -626,7 +651,7 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
     ${tickets.length?`${subH("4.2 Recent Tickets")}${dataTbl(["Ticket ID","Title","Priority","Status","Created"],ticketRows,"Figure 4.2 — Most recent support tickets")}`
       :hlBox("TICKET HISTORY","No tickets raised for this asset.",C.slate)}
 
-    ${insights.conclusion?`${subH("4.3 Conclusion")}${hlBox("EXECUTIVE CONCLUSION",insights.conclusion,C.teal)}`:""}
+    ${insights.conclusion?`${subH("4.3 Conclusion")}${hlBox("EXECUTIVE CONCLUSION",esc(insights.conclusion),C.teal)}`:""}
   `,wLbl,"Tickets & Insights",origin,includeDomFooter?{pageNum:4,total:4}:undefined);
 
   return`<!DOCTYPE html>
@@ -634,7 +659,7 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Asset Report — ${data.assetName}</title>
+  <title>Asset Report — ${esc(data.assetName)}</title>
   <style>${CSS}</style>
 </head>
 <body>${cover}${p3}${p4}${p5}${p6}</body>

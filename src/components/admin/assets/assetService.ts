@@ -16,7 +16,7 @@ import type {
   MaintenanceEvent,
   Ticket,
   AssetAssignment,
-  AssetComponentRulResponse,
+  AssetSurvivalResponse,
 } from "./types";
 
 // ─── Create / update payloads ────────────────────────────────────────────────
@@ -180,17 +180,23 @@ export async function getBatchPrediction(assetId: string): Promise<BatchPredicti
   }
 }
 
-// ─── Component RUL for an asset (independent of the FRSO report models) ───────
+// ─── Component RUL for an asset (trained per-component Weibull AFT survival
+// models — same models the warehouse report uses, see survival_service.py).
+// Previously called /assets/{assetId}/component-rul, a much weaker per-asset
+// OLS trend on 1-4 sensor readings that degraded to a guessed flat decay
+// rate whenever reading history was thin (the common case). That endpoint
+// is now deprecated but still live for any external caller.
 
-export async function getComponentRul(assetId: string): Promise<AssetComponentRulResponse | null> {
+export async function getComponentRul(assetId: string): Promise<AssetSurvivalResponse | null> {
   try {
-    return await apiGet<AssetComponentRulResponse>(`/assets/${assetId}/component-rul`);
+    return await apiGet<AssetSurvivalResponse>(`/survival/${assetId}?horizon_days=180&step_days=30`);
   } catch (e) {
     // Same reasoning as getBatchPrediction above — only a 404 is the
-    // expected "no RUL data yet" case; anything else gets logged so it's
-    // diagnosable instead of silently looking like an empty state.
+    // expected "no RUL data yet" case (e.g. no sensor reading at all yet);
+    // anything else gets logged so it's diagnosable instead of silently
+    // looking like an empty state.
     if (!(e instanceof ApiError) || e.status !== 404) {
-      console.error(`Failed to load component RUL for asset ${assetId}:`, e);
+      console.error(`Failed to load component survival for asset ${assetId}:`, e);
     }
     return null;
   }

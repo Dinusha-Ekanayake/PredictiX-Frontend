@@ -98,7 +98,12 @@ export default function AdminAssetsPage() {
   const [editingAsset, setEditingAsset] = React.useState<Asset | null>(null);
 
   // ── Warehouse options + fleet-wide stats: fetched once, refreshed after writes ──
+  const [statsLoading, setStatsLoading] = React.useState(true);
+  const [statsError, setStatsError] = React.useState<string | null>(null);
+
   const loadStatsAndWarehouses = React.useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError(null);
     try {
       const [statsData, analyticsData, whOptions] = await Promise.all([
         getAssetStats(),
@@ -115,7 +120,15 @@ export default function AdminAssetsPage() {
         window.localStorage.setItem("predictix.cached_asset_analytics", JSON.stringify(analyticsData));
       }
     } catch (e: unknown) {
-      console.warn("Failed to load asset stats / warehouse options:", e instanceof Error ? e.message : e);
+      // Previously only console.warn'd here — stats/analytics stayed null
+      // forever with statsLoading derived as `stats === null`, so the hero
+      // header and summary/analytics cards were stuck on their loading
+      // skeleton indefinitely with no visible error and no way to retry.
+      const message = e instanceof Error ? e.message : "Failed to load fleet stats";
+      console.warn("Failed to load asset stats / warehouse options:", message);
+      setStatsError(message);
+    } finally {
+      setStatsLoading(false);
     }
   }, []);
 
@@ -129,6 +142,24 @@ export default function AdminAssetsPage() {
   React.useEffect(() => {
     setPage(1);
   }, [filters]);
+
+  // A deep-linked selection stays pinned until the operator explicitly moves
+  // off it — either by picking a different row (handled inline in onSelect
+  // below) or by changing what "the current page of the fleet" even means
+  // (a filter or pagination change). Previously this flag only ever cleared
+  // on a row click, so following a deep link and then changing a filter or
+  // page left the detail panel stuck on an asset that may no longer be in
+  // the filtered/paginated results at all. Skip the very first run so
+  // mounting with a ?asset_id= deep link doesn't clear itself before the
+  // list-load effect below gets a chance to honor it.
+  const isFirstFilterPageRun = React.useRef(true);
+  React.useEffect(() => {
+    if (isFirstFilterPageRun.current) {
+      isFirstFilterPageRun.current = false;
+      return;
+    }
+    setHasDeepLinked(false);
+  }, [filters, page]);
 
   // ── Load one page of the asset list whenever filters or page change ────────────
   React.useEffect(() => {
@@ -243,7 +274,6 @@ export default function AdminAssetsPage() {
   // ── Fleet-wide stats for hero header (from /assets/stats — independent of page) ─
   const criticalCount = stats?.critical ?? 0;
   const avgHealth = stats?.avgHealth ?? 0;
-  const statsLoading = stats === null;
   const totalPages = Math.max(1, Math.ceil(totalCount / ASSETS_PAGE_SIZE));
 
   if (initialLoad) {
@@ -321,6 +351,23 @@ export default function AdminAssetsPage() {
         </div>
       )}
 
+      {/* ── Stats/analytics error ── */}
+      {statsError && (
+        <div className="flex items-center gap-3 rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-500/10 px-5 py-4 text-sm text-red-700 dark:text-red-400">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>Failed to load fleet stats: {statsError}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7 rounded-lg gap-1.5 text-xs text-red-700 dark:text-red-400 hover:text-red-800"
+            onClick={loadStatsAndWarehouses}
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </Button>
+        </div>
+      )}
+
       {/* ── Summary KPIs ── */}
       <AssetsSummary stats={stats} loading={statsLoading} />
 
@@ -335,8 +382,6 @@ export default function AdminAssetsPage() {
         warehouseOptions={warehouseOptions}
         loading={listLoading}
         onAddAsset={openCreate}
-        selectedAssetId={selectedId}
-        selectedAssetName={detail?.asset?.asset_name}
       />
 
       {/* ── Table + Details ── */}
@@ -412,6 +457,7 @@ export default function AdminAssetsPage() {
               onDelete={handleDelete}
               onEdit={openEdit}
               onReport={() => openReport(detail.asset.id, detail.asset.asset_name)}
+              warehouseOptions={warehouseOptions}
             />
           ) : (
             <div className="card-dynamic flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-card px-6 py-24 text-center transition-all">

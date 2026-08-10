@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   MapPin, User, Building2, Calendar, CalendarClock,
-  TrendingUp, TrendingDown, Minus, Pencil, Trash2, Bot,
+  TrendingUp, TrendingDown, Minus, ArrowLeftRight, Pencil, Trash2, Bot,
   ClipboardList, Users, ShieldCheck, Zap, AlertTriangle,
   RefreshCw, Ticket, ChevronRight, Loader2,
   Info, Gauge, Hash, Wrench, FileText,
@@ -278,10 +278,17 @@ type Props = {
   onEdit?: (asset: AssetDetail["asset"]) => void;
   onReport?: () => void; // CHANGE 2: added onReport prop — opens shared AssetReportModal in page.tsx
   readOnly?: boolean;
+  // Same {value, label} list the toolbar's warehouse filter already fetches
+  // (page.tsx's warehouseOptions) — passed through so this panel can show
+  // "LankaLogix - Colombo" instead of the raw warehouse_id UUID without a
+  // second fetch. Optional/falls back to the UUID so this component still
+  // works wherever it's used without the parent wiring it up.
+  warehouseOptions?: { value: string; label: string }[];
 };
 
-export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, onReport, readOnly = false }: Props) {
+export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, onReport, readOnly = false, warehouseOptions }: Props) {
   const { asset, prediction, componentRul, maintenanceEvents, tickets, assignments } = detail;
+  const warehouseName = warehouseOptions?.find((w) => w.value === asset.warehouse_id)?.label ?? asset.warehouse_id;
   const router = useNavRouter();
 
   const [runningPrediction, setRunningPrediction] = React.useState(false);
@@ -313,16 +320,26 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
         )
       : null;
 
-  const costVariance =
-    prediction?.estimated_cost_lkr && prediction?.min_cost_lkr
-      ? (Number(prediction.estimated_cost_lkr) - Number(prediction.min_cost_lkr)) /
-        (Number(prediction.min_cost_lkr) || 1)
-      : 0;
+  // How wide the cost model's 80% confidence interval is, relative to the
+  // point estimate — NOT a trend (there's no earlier estimate to compare
+  // against here). The previous version divided (estimate - min) by min,
+  // which can only ever be >= 0 since min is the lower bound of the SAME
+  // estimate — the "down"/green branch was dead code, and the icon's
+  // up/down framing implied a comparison that was never actually being
+  // made. This uses the full [min, max] range to show estimate confidence
+  // instead: a tight range means a more precise estimate, a wide one means
+  // more uncertainty.
+  const costSpreadPct =
+    prediction?.estimated_cost_lkr && prediction?.min_cost_lkr != null && prediction?.max_cost_lkr != null
+      ? (Number(prediction.max_cost_lkr) - Number(prediction.min_cost_lkr)) /
+        (Number(prediction.estimated_cost_lkr) || 1)
+      : null;
 
-  const CostDeltaIcon =
-    costVariance > 0.05 ? TrendingUp : costVariance < -0.05 ? TrendingDown : Minus;
+  const CostDeltaIcon = costSpreadPct == null ? Minus : costSpreadPct > 0.5 ? ArrowLeftRight : Minus;
   const costDeltaColor =
-    costVariance > 0.05 ? "text-red-500" : costVariance < -0.05 ? "text-emerald-500" : "text-muted-foreground";
+    costSpreadPct == null ? "text-muted-foreground"
+      : costSpreadPct > 0.5 ? "text-amber-500"
+      : "text-emerald-500";
 
   async function handleRunPrediction() {
     setRunningPrediction(true);
@@ -514,9 +531,9 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           <InfoField
             icon={<Building2 className="h-3.5 w-3.5" />}
-            label="Warehouse ID"
-            value={asset.warehouse_id}
-            mono
+            label="Warehouse"
+            value={warehouseName}
+            mono={warehouseName === asset.warehouse_id}
           />
           <InfoField
             icon={<MapPin className="h-3.5 w-3.5" />}
@@ -576,7 +593,16 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
           />
           {/* Cost prediction */}
           <div className="h-full rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
-            <div className={cn("mt-0.5 shrink-0", costDeltaColor)}>
+            <div
+              className={cn("mt-0.5 shrink-0", costDeltaColor)}
+              title={
+                costSpreadPct == null
+                  ? "Confidence range not available"
+                  : costSpreadPct > 0.5
+                    ? "Wide confidence range — this estimate carries more uncertainty"
+                    : "Tight confidence range — this estimate is well constrained"
+              }
+            >
               <CostDeltaIcon className="h-3.5 w-3.5" />
             </div>
             <div>

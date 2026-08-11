@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import {
-  X, Download, FileText, Loader2, RefreshCw,
+  X, Download, FileText, Loader2,
   Activity, AlertTriangle, Wrench, Bot, Shield,
   DollarSign, Ticket, BarChart3,
 } from "lucide-react";
@@ -11,30 +11,15 @@ import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { downloadAssetPDF, downloadAssetPDFServer, type AssetReportData } from "@/lib/assetPdfExport";
 import { getAccessToken } from "@/lib/authService";
+import { apiFetch } from "@/lib/apiClient";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-
-/** fetch() wrapper that attaches the JWT — the data endpoints this modal reads
- *  (assets, predictions, tickets, etc.) now require authentication. */
-function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {
-    ...(init.headers as Record<string, string>),
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return fetch(input, { ...init, headers });
-}
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   assetId: string | null;
   assetName?: string;
-};
-
-const HEALTH_COLOR: Record<string, string> = {
-  excellent: "text-emerald-400", good: "text-green-400",
-  moderate: "text-amber-400",   poor: "text-orange-400", critical: "text-red-400",
 };
 
 function KpiCard({ icon: Icon, label, value, accent }: {
@@ -126,8 +111,8 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
       try {
         // ── Step 1: asset + fleet summary in parallel ──────────
         const [assetRes, fleetRes] = await Promise.all([
-          authFetch(`${API_URL}/assets/${assetId}`),
-          authFetch(`${API_URL}/admin-dashboard/summary`).catch(() => null),
+          apiFetch(`/assets/${assetId}`),
+          apiFetch(`/admin-dashboard/summary`).catch(() => null),
         ]);
         if (!assetRes.ok) throw new Error(`Asset not found (${assetRes.status})`);
         const asset = await assetRes.json();
@@ -142,23 +127,27 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const [
           batchPredRes, costPredRes,
           maintRes, ticketRes, sensorRes,
-          warehouseRes, deptRes, assetListRes,
+          warehouseRes, deptRes,
         ] = await Promise.all([
-          authFetch(`${API_URL}/batch-predictions/${assetId}`).catch(() => null),
+          apiFetch(`/batch-predictions/${assetId}`).catch(() => null),
           // breakdown-cost-v4.0 — separate endpoint, flat response shape
           // (top_drivers with relative_impact/direction — see Step 7b below)
-          authFetch(`${API_URL}/predictions/cost/${assetId}`).catch(() => null),
-          authFetch(`${API_URL}/maintenance?asset_id=${assetId}&limit=50`).catch(() => null),
-          authFetch(`${API_URL}/tickets?asset_id=${assetId}&limit=20`).catch(() => null),
-          authFetch(`${API_URL}/sensor-readings?asset_id=${assetId}&limit=1`).catch(() => null),
+          apiFetch(`/predictions/cost/${assetId}`).catch(() => null),
+          apiFetch(`/maintenance?asset_id=${assetId}&limit=50`).catch(() => null),
+          apiFetch(`/tickets?asset_id=${assetId}&limit=20`).catch(() => null),
+          // The real route is path-based, not query-param based — this
+          // previously hit /sensor-readings?asset_id=… which doesn't
+          // exist (405), so the report's Sensor Snapshot section was
+          // always empty. The endpoint has no limit param of its own
+          // (always returns up to 50, newest first); sensorList[0]
+          // below already takes just the latest reading from that.
+          apiFetch(`/sensor-readings/asset/${assetId}`).catch(() => null),
           asset.warehouse_id
-            ? authFetch(`${API_URL}/warehouses/${asset.warehouse_id}`).catch(() => null)
+            ? apiFetch(`/warehouses/${asset.warehouse_id}`).catch(() => null)
             : Promise.resolve(null),
           asset.department_id
-            ? authFetch(`${API_URL}/departments/${asset.department_id}`).catch(() => null)
+            ? apiFetch(`/departments/${asset.department_id}`).catch(() => null)
             : Promise.resolve(null),
-          // fetch all assets to build status+vehicle distribution
-          authFetch(`${API_URL}/assets?limit=1500&sort_by=created_at&sort_order=desc`).catch(() => null),
         ]);
 
         // ── Step 3: parse all responses ────────────────────────
@@ -169,7 +158,6 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const sensorList  = await safeJson(sensorRes) ?? [];
         const warehouse   = await safeJson(warehouseRes);
         const dept        = await safeJson(deptRes);
-        const allAssets   = await safeJson(assetListRes) ?? [];
 
         // ── Step 4: resolve prediction ──────────────────────────
         const latestPred = (Array.isArray(batchPred) ? batchPred[0] : batchPred) ?? null;
@@ -177,24 +165,6 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const sensor = Array.isArray(sensorList) ? sensorList[0] : sensorList ?? null;
         const mArr   = Array.isArray(maintList)  ? maintList      : [];
         const tArr   = Array.isArray(ticketList) ? ticketList     : [];
-
-        // ── Step 5: build status + vehicle distribution ────────
-        const aArr = Array.isArray(allAssets) ? allAssets : (allAssets?.data ?? []);
-        const statusMap:  Record<string, number> = {};
-        const vehicleMap: Record<string, number> = {};
-        aArr.forEach((a: any) => {
-          const s = a.status ?? "unknown";
-          statusMap[s] = (statusMap[s] ?? 0) + 1;
-          const v = a.vehicle_type ?? a.asset_type ?? "Other";
-          vehicleMap[v] = (vehicleMap[v] ?? 0) + 1;
-        });
-        const statusDist  = Object.entries(statusMap)
-          .map(([name, count]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), count }))
-          .sort((a, b) => b.count - a.count);
-        const vehicleDist = Object.entries(vehicleMap)
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 10);
 
         // ── Step 6: maintenance metrics ────────────────────────
         const preventive    = mArr.filter((m: any) => (m.event_type ?? "").toLowerCase() === "preventive").length;
@@ -344,15 +314,20 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
             closed_tickets:        closedT.length,
           },
           fleet: {
-            total_assets:         kpis.totalAssets        ?? aArr.length ?? 0,
+            total_assets:         kpis.totalAssets        ?? 0,
             fleet_health:         kpis.fleetHealth        ?? 0,
             critical_alerts:      kpis.criticalAlerts     ?? 0,
             open_tickets:         kpis.openTickets        ?? 0,
             predicted_failures:   kpis.predictedFailures  ?? 0,
             est_maintenance_cost: kpis.estMaintenanceCost ?? 0,
             health_distribution:  healthDist,
-            status_distribution:  statusDist,
-            vehicle_distribution: vehicleDist,
+            // status/vehicle distribution previously required fetching all
+            // ~1500 assets on every modal open just to compute counts that
+            // no report section or PDF page ever reads (assetPdfExport.ts
+            // declares the fields but never renders them) — left empty
+            // rather than paying that cost for dead output.
+            status_distribution:  [],
+            vehicle_distribution: [],
             top_risk_assets:      topRisk.map((r: any) => ({
               name:               r.name  ?? r.asset_name  ?? "—",
               location:           r.location ?? r.warehouse_name ?? "—",
@@ -377,7 +352,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
     };
 
     load();
-  }, [isOpen, assetId]);
+  }, [isOpen, assetId, assetName]);
 
   const handleDownloadPDF = async () => {
     if (!reportData) return;
@@ -453,11 +428,11 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-bold truncate">
-                  {asset?.asset_name ?? assetName ?? "Asset Performance Report"}
+                  {reportData?.assetName ?? "Asset Performance Report"}
                 </h2>
-                {asset?.asset_code && (
+                {reportData?.assetCode && reportData.assetCode !== "—" && (
                   <span className="text-[11px] font-mono text-white/40 bg-white/6 px-2 py-0.5 rounded-full shrink-0">
-                    {asset.asset_code}
+                    {reportData.assetCode}
                   </span>
                 )}
               </div>
@@ -524,7 +499,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
               <Section title="1. Asset Overview" icon={BarChart3}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
                   <div>
-                    <Field label="Asset Name"    value={asset?.asset_name ?? "—"} />
+                    <Field label="Asset Name"    value={reportData?.assetName ?? "—"} />
                     <Field label="Type"          value={[asset?.asset_type, asset?.vehicle_type].filter(Boolean).join(" · ") || "—"} />
                     <Field label="Make / Model"  value={[asset?.make, asset?.model, asset?.manufacture_year].filter(Boolean).join(" ") || "—"} />
                     <Field label="Fuel Type"     value={asset?.fuel_type ?? "—"} />

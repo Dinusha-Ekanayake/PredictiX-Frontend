@@ -177,31 +177,6 @@ export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
 }
 
 /**
- * Fetch critical assets for warehouse table
- */
-export async function getCriticalAssets() {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/assets/?status=at_risk`,
-      {
-        method: 'GET',
-        headers: authHeaders(),
-        cache: 'no-store',
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch critical assets: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching critical assets:', error);
-    return [];
-  }
-}
-
-/**
  * Fetch fleet-level FRSO survival summary (per-component RUL + watchlist)
  * from the backend GET /survival/warehouse/summary endpoint.
  */

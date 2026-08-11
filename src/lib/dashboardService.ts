@@ -24,8 +24,10 @@ export interface DashboardKpis {
 // Chart-data rows carry an index signature so recharts accepts them directly.
 export interface HealthTrendPoint {
   month: string; // e.g. "Jan"
-  avgHealth: number; // 0–100
-  [key: string]: string | number;
+  // null when no predictions were recorded that month (real gap, not 0%) —
+  // recharts breaks the line there instead of drawing a false zero.
+  avgHealth: number | null; // 0–100
+  [key: string]: string | number | null;
 }
 
 export interface TicketTrendPoint {
@@ -119,7 +121,7 @@ export interface AdminDashboardData {
   aiSummary: string | null;
   // False when aiSummary is the deterministic KPI-derived fallback string
   // rather than real LLM output — lets the UI avoid claiming
-  // "XGBoost · BERT · RAG / High confidence" for plain templated text.
+  // "AI-Generated / High confidence" for plain templated text.
   aiSummaryIsGenerated: boolean;
   aiInsights: DashboardInsight[];
 }

@@ -130,16 +130,17 @@ function RecordSummaryWidget({ payload }: { payload: any }) {
           if (!value || key === "id" || key.endsWith("_id")) return null;
           
           const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          let displayValue = String(value);
-          
+          const textValue = String(value);
+          let displayValue: React.ReactNode = textValue;
+
           // Badge formatting for common statuses
           if (key === "status" || key === "priority" || key === "role") {
-            const isGood = displayValue === "active" || displayValue === "resolved" || displayValue === "admin";
-            const isWarn = displayValue === "medium" || displayValue === "in_progress" || displayValue === "open";
+            const isGood = textValue === "active" || textValue === "resolved" || textValue === "admin";
+            const isWarn = textValue === "medium" || textValue === "in_progress" || textValue === "open";
             const variant = isGood ? "default" : (isWarn ? "secondary" : "destructive");
             displayValue = (
               <Badge variant={variant as any} className="text-[10px] uppercase h-4 px-1.5 py-0 leading-none">
-                {displayValue.replace(/_/g, ' ')}
+                {textValue.replace(/_/g, ' ')}
               </Badge>
             );
           }
@@ -386,10 +387,25 @@ export default function FloatingChatbot() {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
 
+      // Retrieve cached frontend data for chatbot fallback
+      const cachedDashboard = window.localStorage.getItem("predictix.cached_dashboard_data");
+      const cachedAssetStats = window.localStorage.getItem("predictix.cached_asset_stats");
+      const cachedAssetAnalytics = window.localStorage.getItem("predictix.cached_asset_analytics");
+      
+      const frontendContext = {
+        dashboard_data: cachedDashboard ? JSON.parse(cachedDashboard) : null,
+        asset_stats: cachedAssetStats ? JSON.parse(cachedAssetStats) : null,
+        asset_analytics: cachedAssetAnalytics ? JSON.parse(cachedAssetAnalytics) : null,
+      };
+
       const response = await fetch(`${CHATBOT_API_BASE}/chatbot/agent`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ question: text, history: historyForAgent }),
+        body: JSON.stringify({ 
+          question: text, 
+          history: historyForAgent,
+          frontend_context: frontendContext
+        }),
       });
 
       if (!response.ok) {

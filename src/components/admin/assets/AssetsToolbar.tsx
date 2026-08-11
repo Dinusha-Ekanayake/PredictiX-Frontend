@@ -22,8 +22,6 @@ type Props = {
   warehouseOptions: WarehouseOption[];
   loading?: boolean;
   onAddAsset?: () => void;
-  selectedAssetId?: string | null;
-  selectedAssetName?: string;
 };
 
 export const DEFAULT_FILTERS: AssetFilters = {
@@ -56,8 +54,6 @@ export default function AssetsToolbar({
   warehouseOptions,
   loading,
   onAddAsset,
-  selectedAssetId,
-  selectedAssetName,
 }: Props) {
   const isDirty =
     filters.query !== "" ||
@@ -93,7 +89,7 @@ export default function AssetsToolbar({
                 setFilters((prev) => ({ ...prev, status: v }))
               }
             >
-              <SelectTrigger className="h-9 w-36 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
+              <SelectTrigger aria-label="Filter by status" className="h-9 w-36 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -113,7 +109,7 @@ export default function AssetsToolbar({
                 setFilters((prev) => ({ ...prev, health_band: v }))
               }
             >
-              <SelectTrigger className="h-9 w-40 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
+              <SelectTrigger aria-label="Filter by health band" className="h-9 w-40 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
                 <SelectValue placeholder="Health Band" />
               </SelectTrigger>
               <SelectContent>
@@ -133,7 +129,7 @@ export default function AssetsToolbar({
                 setFilters((prev) => ({ ...prev, warehouse_id: v }))
               }
             >
-              <SelectTrigger className="h-9 w-40 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
+              <SelectTrigger aria-label="Filter by warehouse" className="h-9 w-40 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
                 <SelectValue placeholder="Warehouse" />
               </SelectTrigger>
               <SelectContent>
@@ -153,7 +149,7 @@ export default function AssetsToolbar({
                 setFilters((prev) => ({ ...prev, sort_by: v as AssetSortBy }))
               }
             >
-              <SelectTrigger className="h-9 w-44 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
+              <SelectTrigger aria-label="Sort assets by" className="h-9 w-44 rounded-xl text-sm bg-background/60 dark:bg-white/4 border-slate-200 dark:border-slate-700">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>

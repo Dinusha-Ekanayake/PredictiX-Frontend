@@ -76,14 +76,21 @@ export type Asset = {
   vehicle_age_years: number | null;
   lifetime_service_count: number | null;
   lifetime_breakdown_count: number | null;
+  fuel_type: string | null;
+  transmission: string | null;
+  make_model: string | null;
+  maintenance_priority: string | null;
+  service_provider_type: string | null;
   // Custom metadata
   meta?: {
     image_url?: string; // Legacy
     images?: string[];
     [key: string]: any;
   };
-  created_at: string;
-  updated_at: string;
+  // NOTE: AssetOut (app/schemas/asset.py) does not return created_at/
+  // updated_at — this type previously claimed both as always-present
+  // strings, which nothing actually reads today, but which would have
+  // been `undefined` at runtime for any code that started trusting them.
 };
 
 // ─── PDM Batch Prediction (from GET /batch-predictions/{asset_id}) ─────────────

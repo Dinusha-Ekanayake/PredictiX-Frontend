@@ -159,7 +159,11 @@ export default function AssetsTable({ assets, selectedId, onSelect, loading }: P
             No assets match your filters.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-white/4">
+          <div
+            role="listbox"
+            aria-label="Assets"
+            className="divide-y divide-slate-100 dark:divide-white/4"
+          >
             {assets.map((a) => {
               const active = selectedId === a.id;
               const displayName = a.asset_name;
@@ -174,6 +178,8 @@ export default function AssetsTable({ assets, selectedId, onSelect, loading }: P
               return (
                 <button
                   key={a.id}
+                  role="option"
+                  aria-selected={active}
                   onClick={() => onSelect(a.id)}
                   className={cn(
                     "w-full grid grid-cols-12 items-center gap-2 px-4 py-3.5 text-left transition-all duration-150",

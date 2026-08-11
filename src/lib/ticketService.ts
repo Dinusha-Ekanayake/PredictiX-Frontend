@@ -69,7 +69,7 @@ export async function createTicketViaApi(payload: AdminTicketCreatePayload): Pro
 
 export type TicketStatus = "open" | "in-progress" | "resolved" | "closed";
 export type TicketPriority = "High" | "Medium" | "Low";
-export type TicketCategory = "Mechanical" | "Electrical" | "Software" | "General";
+export type TicketCategory = "Mechanical" | "Electrical" | "Software";
 
 export type Ticket = {
   id: string;
@@ -89,6 +89,8 @@ export type Ticket = {
   opened_at: string | null;
   created_at: string;
   updated_at: string;
+  resolved_at?: string | null;
+  closed_at?: string | null;
 };
 
 const PAGE_SIZE = 10;
@@ -130,6 +132,8 @@ function mapRow(row: any): Ticket {
     opened_at: row.opened_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    resolved_at: row.resolved_at,
+    closed_at: row.closed_at,
   };
 }
 
@@ -164,37 +168,6 @@ export async function fetchTickets(
   };
 }
 
-export async function createTicket(payload: {
-  asset_id: string | null;
-  title: string;
-  description: string;
-  priority: TicketPriority;
-  category: TicketCategory;
-  assigned_to?: string | null;
-}): Promise<Ticket> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const { data, error } = await supabase
-    .from("tickets")
-    .insert({
-      asset_id: payload.asset_id || null,
-      title: payload.title,
-      description: payload.description,
-      status: "open",
-      priority: dbPriority(payload.priority),
-      predicted_category: payload.category === "General" ? "mechanical" : payload.category.toLowerCase(),
-      assigned_to: payload.assigned_to || null,
-      opened_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .select("*, assets(asset_name)")
-    .single();
-
-  if (error) throw error;
-  return mapRow(data);
-}
-
 export async function fetchTicketById(id: string): Promise<Ticket> {
   const row = await apiGet<any>(`/tickets/${id}`);
   return mapRow(row);
@@ -227,7 +200,7 @@ export async function updateTicketAssignee(id: string, assignedTo: string | null
 }
 
 export async function deleteTicket(id: string): Promise<void> {
-  await apiDelete(`/tickets/${id}`);
+  await apiDelete(`/tickets/mine/${id}`);
 }
 
 export async function addTicketAttachment(
@@ -298,22 +271,22 @@ export async function fetchTicketEnrichment(ticket: {
   if (ticket.created_by) profileIds.add(ticket.created_by);
   if (ticket.assigned_to) profileIds.add(ticket.assigned_to);
 
-  const { data: historyData, error: historyError } = await supabase
-    .from("ticket_status_history")
-    .select("id,old_status,new_status,changed_by,note,created_at")
-    .eq("ticket_id", ticket.id)
-    .order("created_at", { ascending: true });
-
-  if (historyError) throw historyError;
-
-  const historyRows = (historyData ?? []) as Array<{
+  let historyRows: Array<{
     id: string;
     old_status: string | null;
     new_status: string;
     changed_by: string | null;
     note: string | null;
     created_at: string;
-  }>;
+  }> = [];
+
+  try {
+    const data = await apiGet<any[]>(`/ticket-status-history/?ticket_id=${ticket.id}`);
+    historyRows = ((data || []) as any[]).slice().reverse();
+  } catch (err) {
+    console.error("Failed to fetch status history from backend:", err);
+  }
+
   for (const h of historyRows) {
     if (h.changed_by) profileIds.add(h.changed_by);
   }
@@ -383,3 +356,51 @@ export async function fetchTicketEnrichment(ticket: {
 
   return result;
 }
+
+export async function fetchTicketComments(ticketId: string): Promise<any[]> {
+  try {
+    const data = await apiGet<any[]>(`/ticket-comments/?ticket_id=${ticketId}`);
+    return data || [];
+  } catch (err) {
+    console.error("Failed to fetch ticket comments:", err);
+    return [];
+  }
+}
+
+export async function createTicketComment(
+  ticketId: string,
+  userId: string,
+  comment: string,
+  isInternal: boolean = false
+): Promise<any> {
+  return apiPost<any>("/ticket-comments/", {
+    ticket_id: ticketId,
+    user_id: userId,
+    comment,
+    is_internal: isInternal,
+  });
+}
+
+export async function deleteTicketComment(commentId: string): Promise<void> {
+  await apiDelete(`/ticket-comments/${commentId}`);
+}
+
+export interface AgentResponse {
+  answer: string;
+  action_buttons: Array<{ label: string; path: string }>;
+  tool_trace: Array<{ name: string; args: any; result_preview: string }>;
+  iterations: number;
+}
+
+export async function askChatbotAgent(
+  question: string,
+  history?: Array<{ role: string; content: string }>,
+  frontendContext?: any
+): Promise<AgentResponse> {
+  return apiPost<AgentResponse>("/chatbot/agent", {
+    question,
+    history,
+    frontend_context: frontendContext,
+  });
+}
+

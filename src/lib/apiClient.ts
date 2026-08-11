@@ -40,8 +40,13 @@ export async function apiFetch(
 ): Promise<Response> {
   const token = getAccessToken();
 
+  // A FormData body (file uploads) needs the browser to set its own
+  // multipart/form-data boundary — forcing application/json here would
+  // corrupt the request.
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(options.headers as Record<string, string>),
   };
 
@@ -65,6 +70,19 @@ export async function apiFetch(
   return response;
 }
 
+/** Thrown by apiGet on a non-2xx response. Carries the real HTTP status so
+ *  callers can tell "genuinely not found" (404) apart from an actual
+ *  failure (500, network error, etc.) instead of having to string-match
+ *  the message. */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 /**
  * GET request helper
  */
@@ -78,7 +96,7 @@ export async function apiGet<T>(endpoint: string): Promise<T> {
     } catch {
       errorObj = {};
     }
-    throw new Error(extractErrorMessage(errorObj, `Request failed with status ${response.status}`));
+    throw new ApiError(extractErrorMessage(errorObj, `Request failed with status ${response.status}`), response.status);
   }
 
   return response.json();

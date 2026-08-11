@@ -3,12 +3,12 @@
 import * as React from "react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList,
 } from "recharts";
 import {
   Activity, AlertTriangle, ArrowUpRight, Bot, Brain,
   ChevronRight, Clock, ExternalLink, Flame, Package,
-  RefreshCw, ShieldAlert, Ticket, Wrench, Zap, CheckCircle2,
+  RefreshCw, ShieldAlert, Ticket, Wrench,
   Timer, BarChart2, ThumbsUp, Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import {
   getAdminDashboard,
   type AdminDashboardData,
   type AlertSeverity,
+  type DashboardInsight,
   type InsightTone,
   type TicketPriority,
   type TicketStatus,
@@ -42,7 +43,10 @@ const STA: Record<TicketStatus, string> = {
   open: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20",
 };
 
-const DIST_COLORS = ["#10b981", "#6366f1", "#f59e0b", "#f97316", "#ef4444"];
+// 5 health bands (Excellent..Critical) + a neutral gray for the "No Data"
+// band (assets with no completed prediction yet) appended by the backend —
+// keep it visually distinct from every real band, not a wrapped-around reuse.
+const DIST_COLORS = ["#10b981", "#6366f1", "#f59e0b", "#f97316", "#ef4444", "#94a3b8"];
 
 const INSIGHT_STYLE: Record<InsightTone, { icon: React.ElementType; color: string; bg: string }> = {
   critical: { icon: AlertTriangle, color: "text-rose-500", bg: "bg-rose-50 dark:bg-rose-500/10 border-rose-100 dark:border-rose-500/20" },
@@ -127,17 +131,30 @@ export default function AdminDashboardPage() {
     try {
       const result = await getAdminDashboard();
       setData(result);
+      if (result) {
+        window.localStorage.setItem("predictix.cached_dashboard_data", JSON.stringify(result));
+      }
     } catch (e) {
       console.warn("Failed to load dashboard data:", e);
       setError(e instanceof Error ? e.message : "Failed to load dashboard data");
       setData(null);
     } finally {
-      setNow(new Date());
       setLoading(false);
     }
   }, []);
 
   React.useEffect(() => { load(); }, [load]);
+
+  // The header clock/date next to the "Live" badge is a real clock, not a
+  // "data last fetched" timestamp — it previously only updated inside load()'s
+  // finally block, so it froze at whatever moment the page last loaded or was
+  // manually refreshed instead of ticking forward on its own. Tick it
+  // independently of data fetching so it always reflects the current time.
+  React.useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   if (loading && !data) {
     return (
@@ -187,7 +204,12 @@ export default function AdminDashboardPage() {
   const risks = data?.topRiskAssets ?? [];
   const alerts = data?.recentAlerts ?? [];
   const tickets = data?.latestTickets ?? [];
-  const insights = data?.aiInsights ?? [];
+  // Drop any malformed entries (null/non-object) before rendering — insights.map
+  // previously read ins.tone unconditionally, so a single bad item crashed the
+  // whole dashboard (unhandled TypeError) instead of just skipping that card.
+  const insights = (data?.aiInsights ?? []).filter(
+    (ins): ins is DashboardInsight => !!ins && typeof ins === "object"
+  );
   const footer = data?.footerStats;
 
   return (
@@ -258,9 +280,13 @@ export default function AdminDashboardPage() {
         )}
 
         {/* ══ KPIs ══════════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        {/* All page-level rows below share this same 12-col grid at xl so their
+            card edges land on the same vertical lines instead of drifting
+            past each other (6-col vs 4-col vs 5-col grids only coincide at
+            their outermost edges). */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-12">
           {kpiCards.map((c) => (
-            <Card key={c.label} className="p-4 hover:shadow-sm transition-shadow cursor-default">
+            <Card key={c.label} className="p-4 hover:shadow-sm transition-shadow cursor-default xl:col-span-2">
               <div className="flex items-center justify-between mb-3">
                 <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", c.iconBg)}>
                   <c.icon className={cn("h-4 w-4", c.iconColor)} />
@@ -279,15 +305,12 @@ export default function AdminDashboardPage() {
             <div className="flex items-center gap-2 mb-3">
               <Bot className="h-4 w-4 text-violet-500" />
               <span className="text-[12px] font-semibold text-foreground">AI Insights</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 dark:bg-violet-500/15 border border-violet-200 dark:border-violet-500/25 px-2 py-0.5 text-[9px] font-bold text-violet-700 dark:text-violet-300 uppercase tracking-wide">
-                <Zap className="h-2.5 w-2.5" /> XGBoost · BERT
-              </span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
               {insights.map((ins, i) => {
                 const s = INSIGHT_STYLE[ins.tone] ?? INSIGHT_STYLE.info;
                 return (
-                  <div key={`${ins.title}-${i}`} className={cn("rounded-xl border p-4", s.bg)}>
+                  <div key={`${ins.title}-${i}`} className={cn("rounded-xl border p-4 xl:col-span-4", s.bg)}>
                     <div className="flex items-start gap-2.5">
                       <div className="mt-0.5 shrink-0"><s.icon className={cn("h-4 w-4", s.color)} /></div>
                       <div>
@@ -303,8 +326,8 @@ export default function AdminDashboardPage() {
         )}
 
         {/* ══ Charts row ════════════════════════════════════════════════════ */}
-        <div className="grid gap-4 lg:grid-cols-5">
-          <Card className="lg:col-span-3 overflow-hidden">
+        <div className="grid gap-3 xl:grid-cols-12">
+          <Card className="xl:col-span-8 overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-200 dark:border-slate-700">
               <div>
                 <SectionTitle>Asset & Operations Trends</SectionTitle>
@@ -324,9 +347,12 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            <div className="px-5 pt-4 pb-2">
+            {/* flex-1 + min-h-0: when the grid stretches this card to match the
+                (taller) right column, the chart grows to actually use that space
+                instead of leaving it as dead whitespace below the footer stats. */}
+            <div className="px-5 pt-4 pb-2 flex-1 min-h-0">
               {tab === "health" && (
-                <div style={{ height: 210, minHeight: 210 }}>
+                <div style={{ height: "100%", minHeight: 210 }}>
                   {healthTrend.length === 0 ? <EmptyRow>No health-trend data.</EmptyRow> : (
                     <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <AreaChart data={healthTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
@@ -348,7 +374,7 @@ export default function AdminDashboardPage() {
                 </div>
               )}
               {tab === "tickets" && (
-                <div style={{ height: 210, minHeight: 210 }}>
+                <div style={{ height: "100%", minHeight: 210 }}>
                   {ticketTrend.length === 0 ? <EmptyRow>No ticket-trend data.</EmptyRow> : (
                     <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <BarChart data={ticketTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barGap={3}>
@@ -366,7 +392,7 @@ export default function AdminDashboardPage() {
                 </div>
               )}
               {tab === "cost" && (
-                <div style={{ height: 210, minHeight: 210 }}>
+                <div style={{ height: "100%", minHeight: 210 }}>
                   {costTrend.length === 0 ? <EmptyRow>No cost-trend data.</EmptyRow> : (
                     <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <BarChart data={costTrend} margin={{ top: 4, right: 4, left: -10, bottom: 0 }} barGap={4}>
@@ -399,7 +425,7 @@ export default function AdminDashboardPage() {
           </Card>
 
           {/* Right column */}
-          <div className="lg:col-span-2 flex flex-col gap-4">
+          <div className="xl:col-span-4 flex flex-col gap-4">
             <Card className="p-4 flex-1">
               <SectionTitle>Health Distribution</SectionTitle>
               <SectionSub>{distTotal > 1 ? `${distTotal} assets by condition band` : "By condition band"}</SectionSub>
@@ -434,17 +460,31 @@ export default function AdminDashboardPage() {
             <Card className="p-4">
               <SectionTitle>{downtimeByMonth ? "Downtime Trend" : "Downtime by Warehouse"}</SectionTitle>
               <SectionSub>{downtimeByMonth ? "Planned vs unplanned hours — last 6 months" : "Planned vs unplanned hours — this month"}</SectionSub>
-              <div className="mt-3" style={{ height: 110, minHeight: 110 }}>
+              {/* Height sized for 6 categories at ~35px/row so every YAxis tick has
+                  room to render — Recharts silently drops category labels that
+                  don't fit rather than shrinking them, which was dropping every
+                  other month at the previous, tighter height. */}
+              <div className="mt-3" style={{ height: 230, minHeight: 230 }}>
                 {downtime.length === 0 ? <EmptyRow>No downtime data.</EmptyRow> : (
                   <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
-                    <BarChart data={downtime} layout="vertical" margin={{ top: 0, right: 4, left: 36, bottom: 0 }} barGap={3}>
+                    {/* Planned hours are routinely 1-2 orders of magnitude larger
+                        than unplanned hours, so on a shared linear axis the
+                        unplanned bars rendered as an invisible sliver (#98).
+                        minPointSize floors every non-zero bar to a visible
+                        pixel size, and the value labels make the exact hours
+                        readable regardless of how short the bar itself is. */}
+                    <BarChart data={downtime} layout="vertical" margin={{ top: 0, right: 28, left: 36, bottom: 0 }} barGap={3}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} horizontal={false} />
                       <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                      <YAxis type="category" dataKey="warehouse" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={34} />
+                      <YAxis type="category" dataKey="warehouse" interval={0} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={34} />
                       <Tooltip content={<CTip />} />
                       <Legend wrapperStyle={{ fontSize: 10 }} />
-                      <Bar dataKey="planned" name="Planned" fill="#6366f1" radius={[0, 3, 3, 0]} />
-                      <Bar dataKey="unplanned" name="Unplanned" fill="#ef4444" radius={[0, 3, 3, 0]} />
+                      <Bar dataKey="planned" name="Planned" fill="#6366f1" radius={[0, 3, 3, 0]} minPointSize={2}>
+                        <LabelList dataKey="planned" position="right" style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                      </Bar>
+                      <Bar dataKey="unplanned" name="Unplanned" fill="#ef4444" radius={[0, 3, 3, 0]} minPointSize={2}>
+                        <LabelList dataKey="unplanned" position="right" style={{ fontSize: 10, fill: "#ef4444", fontWeight: 600 }} />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -454,8 +494,8 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* ══ Risk + Alerts ═════════════════════════════════════════════════ */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
+        <div className="grid gap-3 xl:grid-cols-12">
+          <Card className="xl:col-span-6">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-700">
               <div><SectionTitle>Top Risk Assets</SectionTitle><SectionSub>Ranked by AI predicted failure probability</SectionSub></div>
               <button
@@ -497,10 +537,13 @@ export default function AdminDashboardPage() {
             </div>
           </Card>
 
-          <Card>
+          <Card className="xl:col-span-6">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-700">
               <div><SectionTitle>Recent Alerts</SectionTitle><SectionSub>Asset monitoring — latest events</SectionSub></div>
-              <button className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground font-medium">View all<ChevronRight className="h-3.5 w-3.5" /></button>
+              <button
+                onClick={() => router.push("/admin/assets")}
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground font-medium"
+              >View all<ChevronRight className="h-3.5 w-3.5" /></button>
             </div>
             <div>
               {alerts.length === 0 ? <EmptyRow>No recent alerts.</EmptyRow> : alerts.map((a) => (
@@ -526,7 +569,10 @@ export default function AdminDashboardPage() {
         <Card>
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-700">
             <div><SectionTitle>Maintenance Tickets</SectionTitle><SectionSub>Latest open and in-progress work orders</SectionSub></div>
-            <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-[11px] font-medium hover:bg-muted transition-colors">
+            <button
+              onClick={() => router.push("/admin/tickets")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-[11px] font-medium hover:bg-muted transition-colors"
+            >
               <ArrowUpRight className="h-3.5 w-3.5" /> Manage
             </button>
           </div>
@@ -559,7 +605,14 @@ export default function AdminDashboardPage() {
           </div>
         </Card>
 
-        {/* ══ AI summary banner ═════════════════════════════════════════════ */}
+        {/* ══ Operational summary banner ════════════════════════════════════ */}
+        {/* Deliberately not called "AI ..." — the backend deterministically
+            builds this from real KPI data (see admin_dashboard.py), it never
+            calls an LLM for it. aiSummaryIsGenerated is kept in the API
+            contract as a forward-compat hook (a cheap daily-batch real-AI
+            upgrade is a known possible follow-up), but it's permanently
+            false today, so there's nothing to branch on here — showing a
+            single honest badge instead of dead either/or UI. */}
         {data?.aiSummary && (
           <div className="rounded-xl border border-violet-200 dark:border-violet-500/20 bg-linear-to-br from-violet-50 to-indigo-50/60 dark:from-violet-500/10 dark:to-transparent dark:bg-white/2 p-5">
             <div className="flex items-start gap-4">
@@ -568,25 +621,17 @@ export default function AdminDashboardPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-2">
-                  <p className="text-[13px] font-semibold">AI Operational Summary</p>
-                  {data.aiSummaryIsGenerated ? (
-                    <>
-                      <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-violet-100 text-violet-700 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/25">
-                        <Zap className="h-2.5 w-2.5" /> XGBoost · BERT · RAG
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/25">
-                        <CheckCircle2 className="h-2.5 w-2.5" /> High confidence
-                      </span>
-                    </>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-slate-100 text-slate-600 ring-slate-200 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10">
-                      Data summary
-                    </span>
-                  )}
+                  <p className="text-[13px] font-semibold">Operational Summary</p>
+                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-slate-100 text-slate-600 ring-slate-200 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10">
+                    Data summary
+                  </span>
                 </div>
                 <p className="text-[12px] text-muted-foreground leading-relaxed">{data.aiSummary}</p>
               </div>
-              <button className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-violet-200 dark:border-violet-500/30 bg-white/70 dark:bg-violet-500/10 hover:bg-violet-50 dark:hover:bg-violet-500/20 px-3 py-1.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300 transition-colors">
+              <button
+                onClick={() => router.push("/admin/warehouse")}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-violet-200 dark:border-violet-500/30 bg-white/70 dark:bg-violet-500/10 hover:bg-violet-50 dark:hover:bg-violet-500/20 px-3 py-1.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300 transition-colors"
+              >
                 Full report <ExternalLink className="h-3.5 w-3.5" />
               </button>
             </div>

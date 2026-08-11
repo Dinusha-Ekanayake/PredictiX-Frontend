@@ -94,7 +94,7 @@ export default function EditTicketDialog({ open, onOpenChange, ticket, onUpdated
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base min-h-[110px] resize-vertical"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base min-h-27.5 resize-vertical"
               placeholder="Describe the issue"
             />
           </div>

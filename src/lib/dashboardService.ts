@@ -44,10 +44,18 @@ export interface HealthDistBucket {
   [key: string]: string | number;
 }
 
+/**
+ * Maintenance spend for a month, split by whether the work was planned.
+ *
+ * Was previously `estimated` / `actual`, which described a budget-vs-outturn
+ * comparison the backend cannot produce (no budget is stored) and whose
+ * `estimated` series was always 0. Both figures here are money already spent;
+ * the split matches the downtime chart so the two read consistently.
+ */
 export interface CostTrendPoint {
   month: string;
-  estimated: number; // raw amount (LKR)
-  actual: number | null;
+  planned: number;   // raw amount (LKR)
+  unplanned: number; // raw amount (LKR)
   [key: string]: string | number | null;
 }
 

@@ -89,9 +89,16 @@ function CTip({ active, payload, label, fmt }: { active?: boolean; payload?: Arr
   );
 }
 
+// Health-band cut-offs, mirroring app/services/health_bands.py — the backend is
+// the source of truth. Previously this bar used its own 40/70 split, a third
+// health scale alongside the dashboard's bands and assets.health_band, so a
+// score could read amber here while the chart called it Poor.
+const HEALTH_POOR = 38;   // below this: poor or critical
+const HEALTH_GOOD = 50;   // at or above this: good or excellent
+
 function ScoreBar({ score }: { score: number }) {
-  const c = score < 40 ? "#ef4444" : score < 70 ? "#f59e0b" : "#10b981";
-  const tc = score < 40 ? "text-rose-600 dark:text-rose-400" : score < 70 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
+  const c = score < HEALTH_POOR ? "#ef4444" : score < HEALTH_GOOD ? "#f59e0b" : "#10b981";
+  const tc = score < HEALTH_POOR ? "text-rose-600 dark:text-rose-400" : score < HEALTH_GOOD ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
   return (
     <div className="flex items-center gap-2 shrink-0">
       <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
@@ -401,8 +408,11 @@ export default function AdminDashboardPage() {
                         <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => fmtCompact(v)} />
                         <Tooltip content={<CTip fmt={(v) => `LKR ${fmtCompact(v)}`} />} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="estimated" name="Estimated" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
-                        <Bar dataKey="actual" name="Actual" fill="#06b6d4" radius={[3, 3, 0, 0]} />
+                        {/* Planned vs unplanned spend, same classification as
+                            the downtime chart below. Reactive spend is the
+                            figure a maintenance operation is managed against. */}
+                        <Bar dataKey="planned" name="Planned" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="unplanned" name="Unplanned" fill="#ef4444" radius={[3, 3, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -459,7 +469,9 @@ export default function AdminDashboardPage() {
 
             <Card className="p-4">
               <SectionTitle>{downtimeByMonth ? "Downtime Trend" : "Downtime by Warehouse"}</SectionTitle>
-              <SectionSub>{downtimeByMonth ? "Planned vs unplanned hours — last 6 months" : "Planned vs unplanned hours — this month"}</SectionSub>
+              {/* The warehouse-grouped branch applies no date filter at all, so
+                  it is an all-time total — it previously claimed "this month". */}
+              <SectionSub>{downtimeByMonth ? "Planned vs unplanned hours — last 6 months" : "Planned vs unplanned hours — all time"}</SectionSub>
               {/* Height sized for 6 categories at ~35px/row so every YAxis tick has
                   room to render — Recharts silently drops category labels that
                   don't fit rather than shrinking them, which was dropping every
@@ -467,12 +479,14 @@ export default function AdminDashboardPage() {
               <div className="mt-3" style={{ height: 230, minHeight: 230 }}>
                 {downtime.length === 0 ? <EmptyRow>No downtime data.</EmptyRow> : (
                   <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
-                    {/* Planned hours are routinely 1-2 orders of magnitude larger
-                        than unplanned hours, so on a shared linear axis the
-                        unplanned bars rendered as an invisible sliver (#98).
-                        minPointSize floors every non-zero bar to a visible
-                        pixel size, and the value labels make the exact hours
-                        readable regardless of how short the bar itself is. */}
+                    {/* The two series can differ by an order of magnitude, so on
+                        a shared linear axis the smaller one rendered as an
+                        invisible sliver (#98). minPointSize floors every
+                        non-zero bar to a visible pixel size, and the value
+                        labels make the exact hours readable regardless of how
+                        short the bar itself is. (The old note here claimed
+                        planned always dwarfs unplanned — that was an artefact
+                        of planned being computed as a constant 0.) */}
                     <BarChart data={downtime} layout="vertical" margin={{ top: 0, right: 28, left: 36, bottom: 0 }} barGap={3}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} horizontal={false} />
                       <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
@@ -577,7 +591,7 @@ export default function AdminDashboardPage() {
             </button>
           </div>
           <div className="overflow-x-auto">
-            <div className="min-w-[600px]">
+            <div className="min-w-150">
               <div className="grid grid-cols-[1fr_auto_auto_auto_auto] bg-muted/40 border-b border-slate-200 dark:border-slate-700">
                 {["Ticket", "Asset", "Priority", "Status", "Assigned"].map((h) => (
                   <div key={h} className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{h}</div>

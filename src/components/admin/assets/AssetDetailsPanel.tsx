@@ -10,12 +10,12 @@ import {
   TrendingUp, TrendingDown, Minus, ArrowLeftRight, Pencil, Trash2, Bot,
   ClipboardList, Users, ShieldCheck, Zap, AlertTriangle,
   RefreshCw, Ticket, ChevronRight, Loader2,
-  Info, Gauge, Hash, Wrench, FileText,
+  Info, Gauge, Hash, Wrench, FileText, SquareParking,
 } from "lucide-react";
 import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
-import type { AssetDetail, ComponentRulOut, PredictionTier } from "./types";
+import type { AssetDetail, PredictionTier } from "./types";
 // CHANGE 1: removed generateAssetReport from import — report now handled by parent via onReport prop
 import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
 import LogMaintenanceDialog from "./LogMaintenanceDialog";
@@ -557,6 +557,14 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             value={asset.vin ?? "—"}
             mono
           />
+          {/* Yard bay the vehicle is parked in, "<zone>-<bay>" e.g. A-012.
+              Unique per warehouse; forklifts get a bay just like road vehicles. */}
+          <InfoField
+            icon={<SquareParking className="h-3.5 w-3.5" />}
+            label="Parking Bay"
+            value={asset.parking_slot ?? "Unassigned"}
+            mono={!!asset.parking_slot}
+          />
           <InfoField
             icon={<Calendar className="h-3.5 w-3.5" />}
             label="Last Service"
@@ -697,8 +705,8 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                           { label: "Hydraulic", key: "hydraulic" },
                         ].map(({ label, key }) => {
                           const comp = componentRul?.components.find((c) => c.component === key);
-                          const pct = comp?.current_health_pct != null
-                            ? Math.min(100, Math.max(0, Math.round(comp.current_health_pct)))
+                          const pct = comp && !("error" in comp) && comp.health_pct != null
+                            ? Math.min(100, Math.max(0, Math.round(comp.health_pct)))
                             : null;
                           const color = pct == null ? "bg-slate-200 dark:bg-white/10" : pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
                           return (
@@ -914,10 +922,10 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   )}
                 </div>
 
-                {/* ── Row 4: Component RUL (this asset's own sensor history trend,
-                     cross-checked against the v7 regressor's whole-asset
-                     prediction — see ComponentRulOut.model_corroborated /
-                     disagrees_with_model / horizon_capped) ── */}
+                {/* ── Row 4: Component RUL — trained per-component Weibull AFT
+                     survival models (survival_service.py), the same models
+                     the warehouse report uses. Needs only the asset's latest
+                     snapshot, not a reading history. ── */}
                 {componentRul && (
                   <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-4 mt-3">
                     <div className="flex items-center justify-between gap-2">
@@ -926,7 +934,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       </div>
                       <span
                         className="text-[10px] text-muted-foreground/50 cursor-help"
-                        title="Estimated from this asset's own last 4 sensor readings per component — directional, not precise. Cross-checked against the AI model's overall maintenance prediction."
+                        title="From a trained survival model (Weibull AFT) per component, fitted on the fleet's real service history — not just this asset's own readings. Median is the 50% failure point; the range is the model's own 10%-90% band."
                       >
                         What is this?
                       </span>
@@ -938,128 +946,93 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                         {[...componentRul.components]
                           // Soonest-to-fail first — the row that actually needs
                           // attention should never be buried under 4 "fine" ones.
-                          // No-data / capped-at-cap rows sort to the bottom since
-                          // they carry the least actionable signal.
+                          // Errored components (model unavailable for this one
+                          // component) sort to the bottom.
                           .sort((a, b) => {
-                            const rank = (c: ComponentRulOut) =>
-                              c.confidence === "no_data" || c.current_health_pct == null
-                                ? Infinity
-                                : c.rul_days == null
-                                ? Infinity - 1
-                                : c.rul_days;
+                            const rank = (c: typeof a) => ("error" in c ? Infinity : c.median_days);
                             return rank(a) - rank(b);
                           })
-                          .map((comp: ComponentRulOut, i) => {
-                          if (comp.confidence === "no_data" || comp.current_health_pct == null) {
+                          .map((comp, i) => {
+                          if ("error" in comp) {
                             return (
                               <div key={i} className="flex justify-between items-center text-[11px] text-muted-foreground/60">
                                 <span className="capitalize">{comp.component}</span>
-                                <span>No sensor history</span>
+                                <span>No prediction available</span>
                               </div>
                             );
                           }
 
-                          // Three-tier urgency: red (<30d, matches the decision
-                          // layer's "urgent" cutoff), amber (30-90d, "watch"),
-                          // neutral otherwise — including capped (730+) rows,
-                          // which are de-emphasized rather than colored as if
-                          // they were a confident "all clear".
+                          // Three-tier urgency from the model's own 30-day
+                          // failure probability — same bands the warehouse
+                          // survival report uses (fleet_survival_summary).
                           const urgency: "critical" | "watch" | "safe" =
-                            comp.rul_days != null && comp.rul_days < 30
-                              ? "critical"
-                              : comp.rul_days != null && comp.rul_days < 90
-                              ? "watch"
-                              : "safe";
+                            comp.fail_prob_30d >= 0.5 ? "critical" : comp.fail_prob_30d >= 0.2 ? "watch" : "safe";
                           const barColor =
                             urgency === "critical" ? "bg-red-500"
                             : urgency === "watch" ? "bg-amber-500"
-                            : comp.horizon_capped ? "bg-slate-300 dark:bg-white/15"
                             : "bg-primary";
                           const textColor =
                             urgency === "critical" ? "text-red-500"
                             : urgency === "watch" ? "text-amber-600 dark:text-amber-400"
-                            : comp.horizon_capped ? "text-muted-foreground/60"
                             : "text-foreground";
-                          const healthPct = Math.max(0, Math.min(100, comp.current_health_pct));
-                          const hasRange = comp.rul_days_low != null && comp.rul_days_high != null && comp.rul_days_high > comp.rul_days_low;
+                          const healthPct = comp.health_pct != null ? Math.max(0, Math.min(100, comp.health_pct)) : null;
+                          // The backend clamps median/p10/p90 to the survival
+                          // model's trained horizon (currently 180d) when the
+                          // raw prediction extrapolated beyond it — a value
+                          // sitting exactly at that ceiling isn't a precise
+                          // day count, so it's marked "+" and de-emphasized
+                          // rather than shown with the same confidence as an
+                          // in-range prediction (same convention the old
+                          // OLS-based card used for its own horizon cap).
+                          const CAPPED_HORIZON_DAYS = 180;
+                          const fmtDays = (d: number) => {
+                            const base = d >= 365 ? `${(d / 365).toFixed(1)}y` : `${Math.round(d)}d`;
+                            return comp.horizon_capped && d >= CAPPED_HORIZON_DAYS ? `${base}+` : base;
+                          };
+                          const medianCapped = comp.horizon_capped && comp.median_days >= CAPPED_HORIZON_DAYS;
 
                           return (
                             <div key={i} className="space-y-1.5">
                               <div className="flex justify-between items-start text-[11px] gap-2">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className="capitalize font-medium text-muted-foreground">{comp.component}</span>
-                                  {comp.post_service && (
+                                  {urgency !== "safe" && (
                                     <span
-                                      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200/60 dark:bg-sky-500/10 dark:text-sky-400 dark:ring-sky-500/20"
-                                      title="A service-event jump was detected in this component's history — this estimate uses only the readings since then, not the stale pre-service trend"
-                                    >
-                                      Since service
-                                    </span>
-                                  )}
-                                  {comp.model_corroborated && (
-                                    <span
-                                      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200/60 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20"
-                                      title="This component is among the AI model's top factors for this asset's maintenance prediction"
-                                    >
-                                      Model-confirmed
-                                    </span>
-                                  )}
-                                  {comp.disagrees_with_model && (
-                                    <span
-                                      className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20"
-                                      title={`This component's own trend looks fine, but the AI model predicts maintenance is needed sooner (~${comp.model_days_ceiling}d) for this asset overall — treat this component's estimate with caution`}
+                                      className={cn(
+                                        "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ring-1 ring-inset",
+                                        urgency === "critical"
+                                          ? "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20"
+                                          : "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+                                      )}
+                                      title={`${Math.round(comp.fail_prob_30d * 100)}% chance this component needs service within 30 days`}
                                     >
                                       <AlertTriangle className="h-2.5 w-2.5" />
-                                      Check model
+                                      {urgency === "critical" ? "High risk" : "Elevated risk"}
                                     </span>
                                   )}
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <span className={cn("font-bold tabular-nums block", (comp.confidence === "insufficient_trend" || comp.confidence === "recently_serviced") ? "text-muted-foreground/60" : textColor)}>
-                                    {comp.rul_days != null
-                                      ? `${comp.rul_days}${comp.horizon_capped ? "+" : ""} days left`
-                                      : comp.confidence === "insufficient_trend"
-                                      ? "Not enough data"
-                                      : comp.confidence === "recently_serviced"
-                                      ? "Recently serviced"
-                                      : comp.degradation_pct_per_day != null && comp.degradation_pct_per_day >= 0
-                                      ? "Improving"
-                                      : "—"}
+                                  <span
+                                    className={cn("font-bold tabular-nums block", medianCapped ? "text-muted-foreground/60" : textColor)}
+                                    title={medianCapped ? "Beyond the model's reliable prediction range — not a precise estimate" : undefined}
+                                  >
+                                    ~{fmtDays(comp.median_days)} left
                                   </span>
-                                  {hasRange && (
-                                    <span className="text-[9px] text-muted-foreground/50 font-mono">
-                                      range {comp.rul_days_low}–{comp.rul_days_high}d
-                                    </span>
-                                  )}
+                                  <span className="text-[9px] text-muted-foreground/50 font-mono">
+                                    range {fmtDays(comp.p10_days)}–{fmtDays(comp.p90_days)}
+                                  </span>
                                 </div>
                               </div>
                               <div className="relative h-2 rounded-full bg-slate-200/60 dark:bg-white/8">
                                 <div
                                   className={cn("absolute h-full rounded-full", barColor)}
-                                  style={{ width: `${healthPct}%` }}
+                                  style={{ width: `${healthPct ?? 0}%` }}
                                 />
                               </div>
                               <div className="flex justify-between text-[9px] text-muted-foreground/50 font-mono">
-                                <span>{healthPct.toFixed(0)}% health</span>
-                                <span className="flex items-center gap-1.5">
-                                  {comp.model_days_ceiling != null && (
-                                    <span title="The AI model's own overall predicted days-until-maintenance for this asset">
-                                      AI: {comp.model_days_ceiling}d
-                                    </span>
-                                  )}
-                                  <span>
-                                    {comp.confidence === "single_point"
-                                      ? "Low confidence (1 reading)"
-                                      : comp.confidence === "recently_serviced"
-                                      ? "Jump detected — only 1 reading since"
-                                      : comp.confidence === "insufficient_trend"
-                                      ? comp.post_service
-                                        ? "Flat within noise since service"
-                                        : `Flat within noise over ${comp.readings_used} readings`
-                                      : comp.post_service
-                                      ? `Trend over ${comp.readings_used} readings since service`
-                                      : `Trend over ${comp.readings_used} readings`}
-                                  </span>
+                                <span>{healthPct != null ? `${healthPct.toFixed(0)}% health` : "No reading"}</span>
+                                <span title="Model-predicted chance of needing service within 7 / 30 days">
+                                  {Math.round(comp.fail_prob_7d * 100)}% in 7d · {Math.round(comp.fail_prob_30d * 100)}% in 30d
                                 </span>
                               </div>
                             </div>

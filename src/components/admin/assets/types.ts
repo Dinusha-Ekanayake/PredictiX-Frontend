@@ -61,6 +61,9 @@ export type Asset = {
   manufacture_year: number | null;
   registration_number: string | null;
   vin: string | null;
+  // Warehouse parking bay, "<zone>-<bay>" e.g. "A-012". Unique per warehouse;
+  // null when the vehicle has no assigned bay.
+  parking_slot: string | null;
   status: string;                  // "active" | "inactive" | "under_maintenance" | "critical" | "decommissioned"
   health_band: string | null;      // "excellent" | "good" | "moderate" | "poor" | "critical"
   criticality_score: number | null;
@@ -191,9 +194,16 @@ export type SurvivalCurvePoint = {
 export type ComponentSurvivalResponse = {
   asset_id: string;
   component: "brake" | "tire" | "battery" | "oil" | "hydraulic";
+  health_pct: number | null;
   median_days: number;
   p10_days: number;
   p90_days: number;
+  fail_prob_7d: number;
+  fail_prob_30d: number;
+  // True if median/p10/p90 were clamped to the model's trained horizon —
+  // the raw prediction extrapolated beyond it, so treat the shown value as
+  // "beyond the model's reliable range", not a precise day count.
+  horizon_capped: boolean;
   curve: SurvivalCurvePoint[];
 };
 
@@ -211,38 +221,19 @@ export type AssetSurvivalResponse = {
   components: (ComponentSurvivalResponse | ComponentSurvivalError)[];
 };
 
-// ─── Component RUL (asset-section, independent of the FRSO report models) ─────
-// Grounded against the v7 regressor's whole-asset prediction — see
-// app.ai.services.asset_component_rul_service._apply_model_grounding.
-export type ComponentRulOut = {
-  component: string;
-  current_health_pct: number | null;
-  degradation_pct_per_day: number | null;
-  rul_days: number | null;
-  rul_days_low: number | null;
-  rul_days_high: number | null;
-  estimated_failure_date: string | null;
-  confidence: "trend" | "insufficient_trend" | "single_point" | "no_data" | "recently_serviced";
-  readings_used: number;
-  horizon_capped: boolean;
-  model_corroborated: boolean;
-  model_days_ceiling: number | null;
-  disagrees_with_model: boolean;
-  // True when a service-event jump was detected and this trend/RUL was
-  // refit on only the readings since that jump.
-  post_service: boolean;
-};
-
-export type AssetComponentRulResponse = {
-  asset_id: string;
-  components: ComponentRulOut[];
-};
-
 // ─── Combined asset detail view (assembled in the service layer) ───────────────
+// componentRul comes from GET /survival/{asset_id} — the trained per-
+// component Weibull AFT survival models (app.ai.services.survival_service),
+// same models used for the warehouse report. Previously backed by a much
+// weaker per-asset OLS trend on 1-4 sensor readings
+// (app.ai.services.asset_component_rul_service, now deprecated); replaced
+// since that method degrades to a guessed flat decay rate whenever an
+// asset's reading history is thin — the common case — while the survival
+// model needs only a single current snapshot.
 export type AssetDetail = {
   asset: Asset;
   prediction: BatchPrediction | null;
-  componentRul: AssetComponentRulResponse | null;
+  componentRul: AssetSurvivalResponse | null;
   maintenanceEvents: MaintenanceEvent[];
   tickets: Ticket[];
   assignments: AssetAssignment[];

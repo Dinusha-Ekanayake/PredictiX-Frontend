@@ -290,7 +290,7 @@ export default function UserNewTicketDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[680px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-170 max-h-[90vh] overflow-y-auto">
         {result ? (
           /* ── Success panel ── */
           <>
@@ -411,7 +411,7 @@ export default function UserNewTicketDialog({
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[110px] resize-vertical outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-27.5 resize-vertical outline-none focus:ring-2 focus:ring-ring"
                   placeholder="Describe the issue in detail — AI will analyze this to categorize and prioritize automatically"
                   disabled={isSubmitting}
                 />

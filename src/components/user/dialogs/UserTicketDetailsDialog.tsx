@@ -340,7 +340,7 @@ export default function UserTicketDetailsDialog({
                       value={editDescription}
                       onChange={(e) => setEditDescription(e.target.value)}
                       disabled={savingEdit}
-                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[110px] resize-vertical"
+                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-27.5 resize-vertical"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">

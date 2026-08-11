@@ -577,7 +577,7 @@ export default function AdminDashboardPage() {
             </button>
           </div>
           <div className="overflow-x-auto">
-            <div className="min-w-[600px]">
+            <div className="min-w-150">
               <div className="grid grid-cols-[1fr_auto_auto_auto_auto] bg-muted/40 border-b border-slate-200 dark:border-slate-700">
                 {["Ticket", "Asset", "Priority", "Status", "Assigned"].map((h) => (
                   <div key={h} className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{h}</div>

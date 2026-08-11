@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 
 import {
   Dialog,
@@ -11,44 +11,38 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Mail,
+  Building2,
+  ShieldCheck,
+  Phone,
+  MapPin,
+  Loader2,
+} from "lucide-react";
 
-import { Mail, Building2, ShieldCheck, Phone, MapPin } from "lucide-react";
+import { updateUser, deleteUser } from "@/lib/userService";
+import type { UserItem, UserRole, UserStatus } from "@/lib/userService";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type UserRole = "admin" | "user";
-type UserStatus = "active" | "inactive";
-
-export type ViewUser = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  name: string;
-  email: string;
-  address: string;
-  contactNumber: string;
-  warehouse: string;
-  role: UserRole;
-  department: string;
-  status: UserStatus;
-  assignedAssets: number;
-};
+export type ViewUser = UserItem;
 
 type Props = {
   user: ViewUser | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Called when user clicks "View Assigned Assets" to navigate to the assets dialog. */
   onViewAssets?: (user: ViewUser) => void;
+  onEditUser?: (user: ViewUser) => void;
+  onUserUpdated?: (user: ViewUser) => void;
+  onUserDeleted?: (userId: string) => void;
 };
 
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-/** Single info row — icon + label + value inside a dark rounded card. */
 function InfoCard({
   icon: Icon,
   label,
@@ -63,13 +57,12 @@ function InfoCard({
       <Icon className="h-5 w-5 shrink-0 text-muted-foreground" />
       <div className="min-w-0">
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="text-base font-semibold">{value}</p>
+        <p className="text-base font-semibold">{value || "—"}</p>
       </div>
     </div>
   );
 }
 
-/** Highlighted card for assigned assets with a teal border. */
 function AssetsCard({
   count,
   onViewAssets,
@@ -83,13 +76,15 @@ function AssetsCard({
       <p className="mt-0.5 text-sm text-teal-400">
         {count} asset{count !== 1 ? "s" : ""} currently assigned
       </p>
-      <button
-        type="button"
-        onClick={onViewAssets}
-        className="mt-1.5 text-sm font-medium text-teal-400 underline underline-offset-2 hover:text-teal-300"
-      >
-        View Assigned Assets
-      </button>
+      {count > 0 && (
+        <button
+          type="button"
+          onClick={onViewAssets}
+          className="mt-1.5 text-sm font-medium text-teal-400 underline underline-offset-2 hover:text-teal-300"
+        >
+          View Assigned Assets
+        </button>
+      )}
     </div>
   );
 }
@@ -118,36 +113,77 @@ export default function ViewUserDetailsDialog({
   open,
   onOpenChange,
   onViewAssets,
+  onEditUser,
+  onUserUpdated,
+  onUserDeleted,
 }: Props) {
+  const [isToggling, setIsToggling] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
   if (!user) return null;
 
   function handleEditUser() {
-    toast.info(`Edit user: ${user!.name}`, {
-      description: "Edit functionality will be available when the backend is ready.",
-    });
+    if (onEditUser) {
+      onOpenChange(false);
+      onEditUser(user!);
+    }
   }
 
-  function handleDeactivate() {
-    toast.warning(`Deactivate ${user!.name}?`, {
-      description: "Deactivation will be available when the backend is ready.",
-    });
+  async function handleToggleStatus() {
+    if (!user) return;
+    setIsToggling(true);
+    try {
+      const newStatus: UserStatus =
+        user.status === "active" ? "inactive" : "active";
+      const updated = await updateUser(user.id, { status: newStatus });
+      toast.success(
+        `User ${newStatus === "active" ? "activated" : "deactivated"} successfully.`
+      );
+      onUserUpdated?.({ ...user, ...updated, status: newStatus });
+      onOpenChange(false);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to update status.";
+      toast.error("Status update failed.", { description: message });
+    } finally {
+      setIsToggling(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!user) return;
+    if (
+      !confirm(
+        `Delete ${user.name}? This removes their login and cannot be undone.`
+      )
+    )
+      return;
+    setIsDeleting(true);
+    try {
+      await deleteUser(user.id);
+      toast.success(`${user.name} has been deleted.`);
+      onUserDeleted?.(user.id);
+      onOpenChange(false);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to delete user.";
+      toast.error("Delete failed.", { description: message });
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   function handleViewAssets() {
-    if (onViewAssets) {
-      onViewAssets(user!);
-    } else {
-      toast.info(`Viewing assets for ${user!.name}`, {
-        description: `${user!.assignedAssets} asset(s) assigned.`,
-      });
-    }
+    if (onViewAssets) onViewAssets(user!);
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle className="text-xl">{user.name}</DialogTitle>
+          <DialogTitle className="text-xl">
+            {user.name || "Unknown"}
+          </DialogTitle>
           <div className="pt-1">
             <RoleBadge role={user.role} />
           </div>
@@ -156,29 +192,80 @@ export default function ViewUserDetailsDialog({
         {/* Info cards */}
         <div className="grid gap-3 pt-1">
           <InfoCard icon={Mail} label="Email" value={user.email} />
-          <InfoCard icon={Building2} label="Department" value={user.department} />
+          <InfoCard
+            icon={Building2}
+            label="Department"
+            value={user.department}
+          />
           <InfoCard icon={ShieldCheck} label="Status" value={user.status} />
-          <InfoCard icon={Phone} label="Contact Number" value={user.contactNumber} />
-          <InfoCard icon={MapPin} label="Residence Address" value={user.address} />
-          <InfoCard icon={Building2} label="Warehouse" value={user.warehouse} />
+          <InfoCard
+            icon={Phone}
+            label="Contact Number"
+            value={user.contactNumber}
+          />
+          <InfoCard
+            icon={MapPin}
+            label="Residence Address"
+            value={user.address}
+          />
+          <InfoCard
+            icon={Building2}
+            label="Warehouse"
+            value={user.warehouse}
+          />
         </div>
 
-        {/* Assigned assets highlight card */}
-        <AssetsCard count={user.assignedAssets} onViewAssets={handleViewAssets} />
+        {/* Assigned assets */}
+        <AssetsCard
+          count={user.assignedAssets}
+          onViewAssets={handleViewAssets}
+        />
 
-        {/* Action buttons */}
+        {/* Edit + Deactivate */}
         <div className="grid grid-cols-2 gap-3 pt-1">
-          <Button onClick={handleEditUser} className="w-full">
-            Edit User
-          </Button>
           <Button
-            variant="secondary"
-            onClick={handleDeactivate}
+            onClick={handleEditUser}
+            disabled={isToggling || isDeleting}
             className="w-full"
           >
-            {user.status === "active" ? "Deactivate" : "Activate"}
+            Edit user
+          </Button>
+
+          <Button
+            variant="secondary"
+            onClick={handleToggleStatus}
+            disabled={isToggling || isDeleting}
+            className="w-full"
+          >
+            {isToggling ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating...
+              </>
+            ) : user.status === "active" ? (
+              "Deactivate user"
+            ) : (
+              "Activate user"
+            )}
           </Button>
         </div>
+
+        {/* Delete — full width destructive */}
+        <Button
+          variant="destructive"
+          onClick={handleDelete}
+          disabled={isDeleting || isToggling}
+          className="w-full"
+        >
+          {isDeleting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Deleting...
+            </>
+          ) : (
+            "Delete user"
+          )}
+        </Button>
       </DialogContent>
     </Dialog>
   );

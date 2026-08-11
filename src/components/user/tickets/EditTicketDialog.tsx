@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { Loader2, Pencil } from "lucide-react";
 
 import {
@@ -22,11 +22,11 @@ type Props = {
   onUpdated?: (ticket: Ticket) => void;
 };
 
-const CATEGORIES: TicketCategory[] = ["Mechanical", "Electrical", "Software", "General"];
+const CATEGORIES: TicketCategory[] = ["Mechanical", "Electrical", "Software"];
 
 function toCategory(raw: string | null): TicketCategory {
   const m: Record<string, TicketCategory> = {
-    mechanical: "Mechanical", electrical: "Electrical", software: "Software", general: "General",
+    mechanical: "Mechanical", electrical: "Electrical", software: "Software", general: "Mechanical",
   };
   return m[(raw ?? "").toLowerCase()] ?? "Mechanical";
 }
@@ -94,7 +94,7 @@ export default function EditTicketDialog({ open, onOpenChange, ticket, onUpdated
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base min-h-[110px] resize-vertical"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base min-h-27.5 resize-vertical"
               placeholder="Describe the issue"
             />
           </div>

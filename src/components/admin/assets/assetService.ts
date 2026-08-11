@@ -1,20 +1,21 @@
 /**
  * Asset Service
  * All API calls for the admin assets section.
- * Uses apiGet / apiPost / apiPut / apiDelete from apiClient so JWT is auto-attached.
+ * Uses apiGet / apiPost / apiPut / apiFetch (for DELETE) from apiClient so JWT is auto-attached.
  */
 
-import { apiGet, apiFetch, apiPost, apiPut } from "@/lib/apiClient";
+import { apiGet, apiFetch, apiPost, apiPut, ApiError } from "@/lib/apiClient";
 import type {
   Asset,
+  AssetListItem,
+  AssetStats,
+  AssetAnalytics,
   AssetDetail,
   AssetFilters,
-  FailurePrediction,
-  CostPrediction,
+  BatchPrediction,
   MaintenanceEvent,
   Ticket,
   AssetAssignment,
-  VehiclePredictionResult,
   AssetSurvivalResponse,
 } from "./types";
 
@@ -55,23 +56,79 @@ export interface LogMaintenancePayload {
   notes?: string;
 }
 
-// ─── List / filter assets ──────────────────────────────────────────────────────
+// ─── List / filter assets (paginated) ──────────────────────────────────────────
 
-export async function listAssets(filters: AssetFilters): Promise<Asset[]> {
+export const ASSETS_PAGE_SIZE = 50;
+
+function buildAssetListParams(filters: AssetFilters): URLSearchParams {
   const params = new URLSearchParams();
-
   if (filters.query) params.set("search", filters.query);
   if (filters.status && filters.status !== "all") params.set("status", filters.status);
   if (filters.health_band && filters.health_band !== "all")
     params.set("health_band", filters.health_band);
   if (filters.warehouse_id && filters.warehouse_id !== "all")
     params.set("warehouse_id", filters.warehouse_id);
+  params.set("sort_by", filters.sort_by);
+  params.set("sort_order", filters.sort_order);
+  return params;
+}
 
-  params.set("limit", "1500");
-  params.set("sort_by", "created_at");
-  params.set("sort_order", "desc");
+// ─── Short-TTL client-side cache ───────────────────────────────────────────────
+// Paging back and forth (or the filter-effect re-firing after a delete/save
+// refetch) would otherwise re-hit the network for data that's still fresh.
+// A short TTL keeps the list feeling instant for that back-and-forth while
+// staying safe against showing stale data for long.
+const LIST_CACHE_TTL_MS = 15_000;
+const listCache = new Map<string, { data: AssetListItem[]; expires: number }>();
+const countCache = new Map<string, { count: number; expires: number }>();
 
-  return apiGet<Asset[]>(`/assets/?${params.toString()}`);
+/** Invalidate cached list/count results (call after any create/update/delete). */
+export function invalidateAssetListCache(): void {
+  listCache.clear();
+  countCache.clear();
+}
+
+/** Fetch one page of the trimmed asset list (AssetListOut on the backend). */
+export async function listAssets(
+  filters: AssetFilters,
+  page = 1,
+  pageSize = ASSETS_PAGE_SIZE,
+): Promise<AssetListItem[]> {
+  const params = buildAssetListParams(filters);
+  params.set("limit", String(pageSize));
+  params.set("offset", String((page - 1) * pageSize));
+  const key = params.toString();
+
+  const cached = listCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.data;
+
+  const data = await apiGet<AssetListItem[]>(`/assets/?${key}`);
+  listCache.set(key, { data, expires: Date.now() + LIST_CACHE_TTL_MS });
+  return data;
+}
+
+/** Total count of assets matching the current filters (for pagination controls). */
+export async function countAssets(filters: AssetFilters): Promise<number> {
+  const params = buildAssetListParams(filters);
+  const key = params.toString();
+
+  const cached = countCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.count;
+
+  const result = await apiGet<{ count: number }>(`/assets/count?${key}`);
+  countCache.set(key, { count: result.count, expires: Date.now() + LIST_CACHE_TTL_MS });
+  return result.count;
+}
+
+/** Fleet-wide summary counts, independent of which page is currently shown. */
+export async function getAssetStats(): Promise<AssetStats> {
+  return apiGet<AssetStats>(`/assets/stats`);
+}
+
+/** Fleet-wide descriptive analytics (status/health/type distributions + top
+ * at-risk assets), independent of which page is currently shown. */
+export async function getAssetAnalytics(): Promise<AssetAnalytics> {
+  return apiGet<AssetAnalytics>(`/assets/analytics`);
 }
 
 // ─── Single asset ──────────────────────────────────────────────────────────────
@@ -99,69 +156,83 @@ export async function getAssetAssignments(assetId: string): Promise<AssetAssignm
   return apiGet<AssetAssignment[]>(`/asset-assignments/?asset_id=${assetId}`);
 }
 
-// ─── Latest failure prediction for an asset ───────────────────────────────────
+// ─── Latest PDM batch prediction for an asset ──────────────────────────────────
+// Single source of truth for classifier + regressor + health-score + cost
+// estimate + the decision layer (tier/agreement/horizon). Populated by the
+// daily scheduler and by the manual "Refresh now" trigger — both write the
+// same row via app.ai.services.batch_prediction_service, so this always
+// reflects whichever run happened most recently, scheduled or manual.
 
-export async function getFailurePrediction(assetId: string): Promise<FailurePrediction | null> {
+export async function getBatchPrediction(assetId: string): Promise<BatchPrediction | null> {
   try {
-    return await apiGet<FailurePrediction>(`/predictions/failure/${assetId}`);
-  } catch {
-    return null; // 404 means no prediction yet — not an error
-  }
-}
-
-// ─── Latest cost prediction for an asset ──────────────────────────────────────
-
-export async function getCostPrediction(assetId: string): Promise<CostPrediction | null> {
-  try {
-    return await apiGet<CostPrediction>(`/predictions/cost/${assetId}`);
-  } catch {
+    return await apiGet<BatchPrediction>(`/batch-predictions/${assetId}`);
+  } catch (e) {
+    // 404 genuinely means no prediction yet — the normal, expected state
+    // before the first batch run. Anything else (500, network failure,
+    // auth) is a real error that was previously indistinguishable from
+    // "no data yet" both to the UI and to whoever was debugging it — still
+    // degrade to null so one failed fetch doesn't break the whole detail
+    // panel, but at least surface it in the console instead of hiding it.
+    if (!(e instanceof ApiError) || e.status !== 404) {
+      console.error(`Failed to load batch prediction for asset ${assetId}:`, e);
+    }
     return null;
   }
 }
 
-// ─── Survival prediction for an asset ──────────────────────────────────────────
+// ─── Component RUL for an asset (trained per-component Weibull AFT survival
+// models — same models the warehouse report uses, see survival_service.py).
+// Previously called /assets/{assetId}/component-rul, a much weaker per-asset
+// OLS trend on 1-4 sensor readings that degraded to a guessed flat decay
+// rate whenever reading history was thin (the common case). That endpoint
+// is now deprecated but still live for any external caller.
 
-export async function getSurvivalPrediction(assetId: string): Promise<AssetSurvivalResponse | null> {
+export async function getComponentRul(assetId: string): Promise<AssetSurvivalResponse | null> {
   try {
-    return await apiGet<AssetSurvivalResponse>(`/survival/${assetId}`);
-  } catch {
+    return await apiGet<AssetSurvivalResponse>(`/survival/${assetId}?horizon_days=180&step_days=30`);
+  } catch (e) {
+    // Same reasoning as getBatchPrediction above — only a 404 is the
+    // expected "no RUL data yet" case (e.g. no sensor reading at all yet);
+    // anything else gets logged so it's diagnosable instead of silently
+    // looking like an empty state.
+    if (!(e instanceof ApiError) || e.status !== 404) {
+      console.error(`Failed to load component survival for asset ${assetId}:`, e);
+    }
     return null;
   }
 }
 
-// ─── Run new prediction for an asset (POST to vehicle-predictions) ─────────────
+// ─── Run a fresh prediction for an asset now ───────────────────────────────────
+// Triggers the same pipeline the daily scheduler runs (v7 models + decision
+// layer) for just this asset and upserts pdm_batch_predictions, so the
+// result is immediately visible via getBatchPrediction() afterward.
 
-export async function runVehiclePrediction(
-  assetId: string,
-  requestedBy?: string,
-): Promise<VehiclePredictionResult> {
-  const params = requestedBy ? `?requested_by=${requestedBy}` : "";
-  const response = await apiFetch(`/vehicle-predictions/${assetId}${params}`, {
+export async function runVehiclePrediction(assetId: string): Promise<BatchPrediction> {
+  const response = await apiFetch(`/batch-predictions/run/${assetId}`, {
     method: "POST",
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: "Prediction failed" }));
     throw new Error(err.detail || "Prediction failed");
   }
-  return response.json() as Promise<VehiclePredictionResult>;
+  return response.json() as Promise<BatchPrediction>;
 }
 
 // ─── Load full asset detail (asset + predictions + maintenance + tickets + assignments) ──
 
 export async function getAssetDetail(assetId: string): Promise<AssetDetail> {
   // Run all fetches in parallel for speed
-  const [asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments] =
+  const [asset, prediction, componentRul, maintenanceEvents, tickets, assignments] =
     await Promise.all([
       getAsset(assetId),
-      getFailurePrediction(assetId),
-      getCostPrediction(assetId),
-      getSurvivalPrediction(assetId),
+      getBatchPrediction(assetId),
+      getComponentRul(assetId),
       getMaintenanceEvents(assetId).catch(() => [] as MaintenanceEvent[]),
       getAssetTickets(assetId).catch(() => [] as Ticket[]),
       getAssetAssignments(assetId).catch(() => [] as AssetAssignment[]),
     ]);
 
-  return { asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments };
+  return { asset, prediction, componentRul, maintenanceEvents, tickets, assignments };
 }
 
 // ─── Create asset ────────────────────────────────────────────────────────────
@@ -231,24 +302,11 @@ export async function updateAssetStatus(assetId: string, status: string): Promis
   return response.json();
 }
 
-// ─── Generate asset PDF report ────────────────────────────────────────────────
-
-export async function generateAssetReport(assetId: string): Promise<void> {
-  const response = await apiFetch(`/asset-reports/${assetId}`, { method: "POST" });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ detail: "Report generation failed" }));
-    throw new Error(err.detail || "Report generation failed");
-  }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `asset-report-${assetId}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
+// generateAssetReport() (POST /asset-reports/{assetId}, server-rendered PDF
+// download) removed — dead since the report flow moved to the client-built
+// HTML path (src/lib/assetPdfExport.ts + POST /reports/render-pdf); nothing
+// has called this since. The backend route itself stays live (marked
+// deprecated) in case any external caller still depends on it.
 
 // ─── Delete asset ──────────────────────────────────────────────────────────────
 
@@ -263,7 +321,7 @@ export async function deleteAsset(assetId: string): Promise<void> {
 // ─── Derive health score (0–100) from health_band or criticality_score ─────────
 // The real health_score comes from the prediction; fall back to band mapping.
 
-export function deriveHealthScore(asset: Asset, prediction: FailurePrediction | null): number {
+export function deriveHealthScore(asset: Asset, prediction: BatchPrediction | null): number {
   if (prediction?.health_score != null) return Math.round(Number(prediction.health_score));
 
   const bandMap: Record<string, number> = {
@@ -283,7 +341,7 @@ export function deriveHealthScore(asset: Asset, prediction: FailurePrediction | 
 
 // ─── Derive failure probability ────────────────────────────────────────────────
 
-export function deriveFailureProbability(prediction: FailurePrediction | null): number {
+export function deriveFailureProbability(prediction: BatchPrediction | null): number {
   if (prediction?.failure_probability != null) return Number(prediction.failure_probability);
   return 0;
 }

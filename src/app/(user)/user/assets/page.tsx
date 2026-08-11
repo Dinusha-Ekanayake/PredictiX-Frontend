@@ -1,18 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { Search, Boxes, MapPin, CalendarClock, Ticket as TicketIcon, Info, ChevronRight, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
-import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
+import UserNewTicketDialog from "@/components/user/dialogs/UserNewTicketDialog";
 import PageHero from "@/components/common/PageHero";
 import { fetchMyAssets, type UserAssetData } from "@/lib/api/userProfileApi";
 import { listAssets } from "@/components/admin/assets/assetService";
-import type { Asset } from "@/components/admin/assets/types";
+import { DEFAULT_FILTERS } from "@/components/admin/assets/AssetsToolbar";
+import type { AssetListItem } from "@/components/admin/assets/types";
 import UserAssetDetailsDialog from "@/components/user/assets/UserAssetDetailsDialog";
 
 function healthColor(p: number) {
@@ -41,7 +42,7 @@ export default function UserAssetsPage() {
 
   const [query, setQuery] = React.useState("");
   const [debounced, setDebounced] = React.useState("");
-  const [results, setResults] = React.useState<Asset[]>([]);
+  const [results, setResults] = React.useState<AssetListItem[]>([]);
   const [searching, setSearching] = React.useState(false);
 
   const [ticketAsset, setTicketAsset] = React.useState<{ id: string; name: string } | null>(null);
@@ -72,10 +73,12 @@ export default function UserAssetsPage() {
 
   // Search across ALL assets (read-only)
   React.useEffect(() => {
-    if (!debounced) { setResults([]); return; }
+    // Require at least 2 characters so a single keystroke doesn't fire a
+    // fleet-wide search request.
+    if (debounced.length < 2) { setResults([]); return; }
     let cancelled = false;
     setSearching(true);
-    listAssets({ query: debounced, status: "all", health_band: "all", warehouse_id: "all" })
+    listAssets({ ...DEFAULT_FILTERS, query: debounced })
       .then((data) => { if (!cancelled) setResults(data); })
       .catch((err) => { if (!cancelled) toast.error("Search failed", { description: err instanceof Error ? err.message : undefined }); })
       .finally(() => { if (!cancelled) setSearching(false); });
@@ -91,8 +94,8 @@ export default function UserAssetsPage() {
   }));
 
   const searchRows: Row[] = results.map((a) => ({
-    id: a.id, code: a.asset_code, name: a.asset_name, category: a.category,
-    location: null, status: a.status, healthPercent: null, nextServiceDate: a.next_service_date,
+    id: a.id, code: a.asset_code, name: a.asset_name, category: a.vehicle_type,
+    location: null, status: a.status, healthPercent: null, nextServiceDate: null,
     assigned: myIds.has(a.id),
   }));
 
@@ -231,14 +234,15 @@ export default function UserAssetsPage() {
         )}
       </div>
 
-      {/* Create ticket on a selected asset (asset locked) */}
-      <NewTicketDialog
+      {/* Create ticket on a selected asset (asset locked). UserNewTicketDialog
+          shows its own success toast + confirmation panel (Create another /
+          Done) — don't duplicate the toast or force-close here. */}
+      <UserNewTicketDialog
         open={ticketAsset !== null}
         onOpenChange={(o) => { if (!o) setTicketAsset(null); }}
         presetAssetId={ticketAsset?.id}
         presetAssetName={ticketAsset?.name}
         lockAsset
-        onCreated={() => { toast.success("Ticket created", { description: "View it under My Tickets." }); setTicketAsset(null); }}
       />
 
       {/* Asset Details Dialog */}

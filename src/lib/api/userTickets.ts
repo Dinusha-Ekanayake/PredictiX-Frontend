@@ -1,15 +1,15 @@
 /**
  * Typed client for the user-role ticket endpoints (FastAPI: /user/tickets/*).
  *
- * Auth: the project currently stores the JWT under TWO different localStorage
- * keys depending on how the user logged in (`token` from the login page,
- * `predictix.access_token` from the shared authService). We read both, just
- * like `userProfileApi.ts` does, so requests always carry the bearer.
+ * Auth: requests go through apiClient.ts's apiFetch(), which attaches the
+ * bearer token and handles an expired/invalid session (401 → logout +
+ * redirect to /login) the same way every other authenticated call in the
+ * app does.
  *
  * Response shapes mirror `app/schemas/user_tickets.py`.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { apiFetch } from "@/lib/apiClient";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -141,29 +141,11 @@ export interface UpdateTicketPayload {
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
-function getAuthHeaders(): Record<string, string> {
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("token") ||
-        localStorage.getItem("predictix.access_token")
-      : null;
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
 async function request<T>(
   path: string,
   init: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      ...getAuthHeaders(),
-      ...(init.headers as Record<string, string> | undefined),
-    },
-  });
+  const res = await apiFetch(path, init);
 
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`;
@@ -237,6 +219,20 @@ export async function previewMyTicketAI(
   });
 }
 
+/** (Re)generate the AI summary for an existing ticket via the ONNX model. */
+export async function regenerateMyTicketSummary(
+  ticketId: string
+): Promise<{ summary: string; generated_at: string; model_version: string }> {
+  return request(`/ticket-summaries/by-ticket/${ticketId}`);
+}
+
+/** Generate the AI summary for the ticket's linked asset. */
+export async function regenerateMyAssetSummary(
+  assetId: string
+): Promise<{ summary: string; generated_at: string; model_version: string }> {
+  return request(`/asset-summaries/by-asset/${assetId}`);
+}
+
 export async function updateMyTicket(
   ticketId: string,
   payload: UpdateTicketPayload
@@ -245,12 +241,6 @@ export async function updateMyTicket(
     method: "PUT",
     body: JSON.stringify(payload),
   });
-}
-
-export async function listMyTicketComments(
-  ticketId: string
-): Promise<UserTicketComment[]> {
-  return request<UserTicketComment[]>(`/user/tickets/${ticketId}/comments`);
 }
 
 export async function addMyTicketComment(

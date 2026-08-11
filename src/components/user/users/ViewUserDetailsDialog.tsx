@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { updateUser } from "@/lib/api/userProfileApi";
 import { Loader2 } from "lucide-react";
 

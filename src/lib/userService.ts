@@ -1,16 +1,12 @@
 /**
  * User Service (admin)
  * CRUD for the admin Users management screen.
- * Talks to the backend /users router (returns the flat UserItemOut shape),
- * with JWT auto-attached via apiClient.
  */
-
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/apiClient";
 
 export type UserRole = "admin" | "user";
 export type UserStatus = "active" | "inactive";
 
-/** Flat user shape returned by GET /users/ (matches backend UserItemOut). */
 export interface UserItem {
   id: string;
   firstName: string;
@@ -26,7 +22,6 @@ export interface UserItem {
   assignedAssets: number;
 }
 
-/** Asset assigned to a user, from GET /users/{id}/assets. */
 export interface UserAssignedAsset {
   assignment_id: string;
   asset_id: string;
@@ -41,7 +36,7 @@ export interface UserAssignedAsset {
 }
 
 export interface CreateUserPayload {
-  id: string;
+  id?: string;
   firstName: string;
   lastName: string;
   name: string;
@@ -52,13 +47,16 @@ export interface CreateUserPayload {
   role: UserRole;
   department: string;
   status: UserStatus;
+  password?: string;        // ← added
 }
 
 export async function listUsers(): Promise<UserItem[]> {
   return apiGet<UserItem[]>("/users/");
 }
 
-export async function createUser(payload: CreateUserPayload): Promise<UserItem> {
+export async function createUser(
+  payload: CreateUserPayload
+): Promise<UserItem> {
   return apiPost<UserItem>("/users/", payload);
 }
 
@@ -69,10 +67,14 @@ export async function updateUser(
   return apiPut<UserItem>(`/users/${userId}`, data);
 }
 
-export async function getUserAssets(userId: string): Promise<UserAssignedAsset[]> {
+export async function getUserAssets(
+  userId: string
+): Promise<UserAssignedAsset[]> {
   return apiGet<UserAssignedAsset[]>(`/users/${userId}/assets`);
 }
 
-export async function deleteUser(userId: string): Promise<{ message: string; id: string }> {
+export async function deleteUser(
+  userId: string
+): Promise<{ message: string; id: string }> {
   return apiDelete<{ message: string; id: string }>(`/users/${userId}`);
 }

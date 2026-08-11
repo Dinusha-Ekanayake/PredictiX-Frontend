@@ -4,10 +4,6 @@
  * Fetches the aggregated operations-dashboard payload from the backend.
  * Backed by a single endpoint: GET /admin-dashboard/summary
  * (JWT auto-attached via apiClient).
- *
- * NOTE: This endpoint must be implemented on the backend. Until then the
- * dashboard renders empty/placeholder states gracefully. The shape below is
- * the agreed contract the backend must return.
  */
 
 import { apiGet } from "@/lib/apiClient";
@@ -20,13 +16,18 @@ export interface DashboardKpis {
   fleetHealth: number; // 0–100
   predictedFailures: number;
   estMaintenanceCost: number; // raw amount (LKR)
+  // False for a brand-new warehouse with zero PdM predictions run yet —
+  // distinguishes "no data" from a genuine (alarming) 0% fleet health.
+  hasPredictionData: boolean;
 }
 
 // Chart-data rows carry an index signature so recharts accepts them directly.
 export interface HealthTrendPoint {
   month: string; // e.g. "Jan"
-  avgHealth: number; // 0–100
-  [key: string]: string | number;
+  // null when no predictions were recorded that month (real gap, not 0%) —
+  // recharts breaks the line there instead of drawing a false zero.
+  avgHealth: number | null; // 0–100
+  [key: string]: string | number | null;
 }
 
 export interface TicketTrendPoint {
@@ -43,10 +44,18 @@ export interface HealthDistBucket {
   [key: string]: string | number;
 }
 
+/**
+ * Maintenance spend for a month, split by whether the work was planned.
+ *
+ * Was previously `estimated` / `actual`, which described a budget-vs-outturn
+ * comparison the backend cannot produce (no budget is stored) and whose
+ * `estimated` series was always 0. Both figures here are money already spent;
+ * the split matches the downtime chart so the two read consistently.
+ */
 export interface CostTrendPoint {
   month: string;
-  estimated: number; // raw amount (LKR)
-  actual: number | null;
+  planned: number;   // raw amount (LKR)
+  unplanned: number; // raw amount (LKR)
   [key: string]: string | number | null;
 }
 
@@ -58,7 +67,8 @@ export interface DowntimePoint {
 }
 
 export interface RiskAsset {
-  id: string;
+  id: string; // real asset UUID — use for navigation, not display
+  code: string | null; // human-readable asset code (e.g. "SLW1288")
   name: string;
   location: string;
   healthScore: number; // 0–100
@@ -81,7 +91,8 @@ export type TicketPriority = "critical" | "high" | "medium" | "low";
 export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
 
 export interface DashboardTicket {
-  id: string;
+  id: string; // human-readable ticket_number (display label, not a real id)
+  ticketId: string; // real ticket UUID — use this to navigate/fetch
   title: string;
   asset: string;
   priority: TicketPriority;
@@ -110,11 +121,16 @@ export interface AdminDashboardData {
   healthDistribution: HealthDistBucket[];
   costTrend: CostTrendPoint[];
   downtimeByWarehouse: DowntimePoint[];
+  downtimeScope?: "warehouse" | "month";
   topRiskAssets: RiskAsset[];
   recentAlerts: DashboardAlert[];
   latestTickets: DashboardTicket[];
   footerStats: DashboardFooterStats;
   aiSummary: string | null;
+  // False when aiSummary is the deterministic KPI-derived fallback string
+  // rather than real LLM output — lets the UI avoid claiming
+  // "AI-Generated / High confidence" for plain templated text.
+  aiSummaryIsGenerated: boolean;
   aiInsights: DashboardInsight[];
 }
 

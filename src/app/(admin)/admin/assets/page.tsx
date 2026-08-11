@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { Boxes, ChevronRight, Radio, Box, AlertCircle, RefreshCw, Plus } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import PredictiXLoader from "@/components/loading/PredictiXLoader";
 
 import AssetsSummary from "@/components/admin/assets/AssetsSummary";
 import AssetsAnalytics from "@/components/admin/assets/AssetsAnalytics";
@@ -13,48 +15,153 @@ import AssetsToolbar, { DEFAULT_FILTERS } from "@/components/admin/assets/Assets
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel, { AssetDetailsSkeleton } from "@/components/admin/assets/AssetDetailsPanel";
 import AssetFormDialog from "@/components/admin/assets/AssetFormDialog";
+import AssetReportModal from "@/components/admin/assets/AssetReportModal";
 
 import {
   listAssets,
+  countAssets,
+  getAssetStats,
+  getAssetAnalytics,
   getAssetDetail,
   deleteAsset,
+  getWarehouseOptions,
+  invalidateAssetListCache,
+  ASSETS_PAGE_SIZE,
 } from "@/components/admin/assets/assetService";
-import type { Asset, AssetDetail, AssetFilters } from "@/components/admin/assets/types";
-
-/* ── Warehouse options derived from asset list ────────────────────────────────── */
-function extractWarehouseOptions(assets: Asset[]) {
-  const seen = new Map<string, string>();
-  assets.forEach((a) => seen.set(a.warehouse_id, a.warehouse_id));
-  return Array.from(seen.entries()).map(([value]) => ({
-    value,
-    label: `Warehouse ${value.slice(0, 8)}…`,
-  }));
-}
+import type {
+  Asset,
+  AssetListItem,
+  AssetStats,
+  AssetAnalytics,
+  AssetDetail,
+  AssetFilters,
+} from "@/components/admin/assets/types";
 
 /* ══════════════════════════════════════════════════════════════════════════════
    Page
    ══════════════════════════════════════════════════════════════════════════════ */
 export default function AdminAssetsPage() {
-  // ── Asset list state ──────────────────────────────────────────────────────────
+  // ── Deep-link support: ?asset_id=<uuid> (e.g. from the dashboard's Top
+  // Risk Assets list) selects that asset directly, independent of which
+  // paginated list page it happens to be on. Read once on mount — the
+  // asset list's own auto-select effect below must not override this.
+  const searchParams = useSearchParams();
+  const currentDeepLink = searchParams.get("asset_id");
+
+  React.useEffect(() => {
+    if (currentDeepLink) {
+      setSelectedId(currentDeepLink);
+    }
+  }, [currentDeepLink]);
+
+  const [hasDeepLinked, setHasDeepLinked] = React.useState(!!currentDeepLink);
+
+  // ── Asset list state (paginated — 50 rows/page instead of the whole fleet) ─────
   const [filters, setFilters] = React.useState<AssetFilters>(DEFAULT_FILTERS);
-  const [assets, setAssets] = React.useState<Asset[]>([]);
+  const [page, setPage] = React.useState(1);
+  const [assets, setAssets] = React.useState<AssetListItem[]>([]);
+  const [totalCount, setTotalCount] = React.useState(0);
   const [listLoading, setListLoading] = React.useState(true);
   const [listError, setListError] = React.useState<string | null>(null);
+  // Distinguishes the very first load (full-page loader, same as every other
+  // page in the app) from later filter/refresh loads (per-section skeletons).
+  const [initialLoad, setInitialLoad] = React.useState(true);
+
+  // ── Fleet-wide summary (independent of which page is shown) ────────────────────
+  const [stats, setStats] = React.useState<AssetStats | null>(null);
+  const [analytics, setAnalytics] = React.useState<AssetAnalytics | null>(null);
+
+  // ── Warehouse filter options (real warehouse list, not derived from the page) ──
+  const [warehouseOptions, setWarehouseOptions] = React.useState<
+    { value: string; label: string }[]
+  >([]);
 
   // ── Selected asset detail state ───────────────────────────────────────────────
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [selectedId, setSelectedId] = React.useState<string | null>(currentDeepLink);
   const [detail, setDetail] = React.useState<AssetDetail | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
   const [detailError, setDetailError] = React.useState<string | null>(null);
+
+  // ── Shared report modal state ─────────────────────────────────────────────────
+  const [reportOpen, setReportOpen] = React.useState(false);
+  const [reportAssetId, setReportAssetId] = React.useState<string | null>(null);
+  const [reportAssetName, setReportAssetName] = React.useState<string | undefined>(undefined);
+
+  function openReport(assetId: string, assetName?: string) {
+    setReportAssetId(assetId);
+    setReportAssetName(assetName);
+    setReportOpen(true);
+  }
 
   // ── Create/edit dialog state ──────────────────────────────────────────────────
   const [formOpen, setFormOpen] = React.useState(false);
   const [editingAsset, setEditingAsset] = React.useState<Asset | null>(null);
 
-  // ── Load asset list whenever filters change (debounced on query) ───────────────
-  const queryRef = React.useRef(filters.query);
-  queryRef.current = filters.query;
+  // ── Warehouse options + fleet-wide stats: fetched once, refreshed after writes ──
+  const [statsLoading, setStatsLoading] = React.useState(true);
+  const [statsError, setStatsError] = React.useState<string | null>(null);
 
+  const loadStatsAndWarehouses = React.useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError(null);
+    try {
+      const [statsData, analyticsData, whOptions] = await Promise.all([
+        getAssetStats(),
+        getAssetAnalytics(),
+        getWarehouseOptions(),
+      ]);
+      setStats(statsData);
+      setAnalytics(analyticsData);
+      setWarehouseOptions(whOptions.map((w) => ({ value: w.id, label: w.name })));
+      if (statsData) {
+        window.localStorage.setItem("predictix.cached_asset_stats", JSON.stringify(statsData));
+      }
+      if (analyticsData) {
+        window.localStorage.setItem("predictix.cached_asset_analytics", JSON.stringify(analyticsData));
+      }
+    } catch (e: unknown) {
+      // Previously only console.warn'd here — stats/analytics stayed null
+      // forever with statsLoading derived as `stats === null`, so the hero
+      // header and summary/analytics cards were stuck on their loading
+      // skeleton indefinitely with no visible error and no way to retry.
+      const message = e instanceof Error ? e.message : "Failed to load fleet stats";
+      console.warn("Failed to load asset stats / warehouse options:", message);
+      setStatsError(message);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadStatsAndWarehouses();
+  }, [loadStatsAndWarehouses]);
+
+  // Reset to page 1 whenever filters change (a filter change invalidates the
+  // current page — searching for something on page 3 would otherwise show
+  // nothing while still claiming to be "page 3").
+  React.useEffect(() => {
+    setPage(1);
+  }, [filters]);
+
+  // A deep-linked selection stays pinned until the operator explicitly moves
+  // off it — either by picking a different row (handled inline in onSelect
+  // below) or by changing what "the current page of the fleet" even means
+  // (a filter or pagination change). Previously this flag only ever cleared
+  // on a row click, so following a deep link and then changing a filter or
+  // page left the detail panel stuck on an asset that may no longer be in
+  // the filtered/paginated results at all. Skip the very first run so
+  // mounting with a ?asset_id= deep link doesn't clear itself before the
+  // list-load effect below gets a chance to honor it.
+  const isFirstFilterPageRun = React.useRef(true);
+  React.useEffect(() => {
+    if (isFirstFilterPageRun.current) {
+      isFirstFilterPageRun.current = false;
+      return;
+    }
+    setHasDeepLinked(false);
+  }, [filters, page]);
+
+  // ── Load one page of the asset list whenever filters or page change ────────────
   React.useEffect(() => {
     let cancelled = false;
     const delay = filters.query ? 350 : 0;
@@ -63,18 +170,28 @@ export default function AdminAssetsPage() {
       setListLoading(true);
       setListError(null);
       try {
-        const data = await listAssets(filters);
+        const [data, count] = await Promise.all([
+          listAssets(filters, page, ASSETS_PAGE_SIZE),
+          countAssets(filters),
+        ]);
         if (cancelled) return;
         setAssets(data);
+        setTotalCount(count);
 
-        // Auto-select first asset if current selection is gone
-        if (!selectedId || !data.find((a) => a.id === selectedId)) {
+        // Auto-select first asset on this page if current selection isn't on
+        // it — unless the current selection came from a ?asset_id= deep
+        // link, which is deliberately allowed to be an asset that isn't on
+        // this (arbitrary, unrelated) page of the fleet-wide list.
+        if (!hasDeepLinked && (!selectedId || !data.find((a) => a.id === selectedId))) {
           setSelectedId(data[0]?.id ?? null);
         }
       } catch (e: unknown) {
         if (!cancelled) setListError(e instanceof Error ? e.message : "Failed to load assets");
       } finally {
-        if (!cancelled) setListLoading(false);
+        if (!cancelled) {
+          setListLoading(false);
+          setInitialLoad(false);
+        }
       }
     }, delay);
 
@@ -83,47 +200,55 @@ export default function AdminAssetsPage() {
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+  }, [filters, page]);
 
   // ── Load detail when selection changes ────────────────────────────────────────
+  const loadDetail = React.useCallback(async (id: string, signal?: { cancelled: boolean }) => {
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const d = await getAssetDetail(id);
+      if (!signal?.cancelled) setDetail(d);
+    } catch (e: unknown) {
+      if (!signal?.cancelled)
+        setDetailError(e instanceof Error ? e.message : "Failed to load asset details");
+    } finally {
+      if (!signal?.cancelled) setDetailLoading(false);
+    }
+  }, []);
+
   React.useEffect(() => {
     if (!selectedId) {
       setDetail(null);
       return;
     }
-    let cancelled = false;
-
-    async function load() {
-      setDetailLoading(true);
-      setDetailError(null);
-      try {
-        const d = await getAssetDetail(selectedId!);
-        if (!cancelled) setDetail(d);
-      } catch (e: unknown) {
-        if (!cancelled)
-          setDetailError(e instanceof Error ? e.message : "Failed to load asset details");
-      } finally {
-        if (!cancelled) setDetailLoading(false);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, [selectedId]);
+    const signal = { cancelled: false };
+    loadDetail(selectedId, signal);
+    return () => { signal.cancelled = true; };
+  }, [selectedId, loadDetail]);
 
   // ── Refresh detail ────────────────────────────────────────────────────────────
+  // Re-fetches the currently selected asset's detail directly rather than
+  // toggling selectedId (setSelectedId(id => id) is a no-op in React since
+  // the value is unchanged — that silently never re-triggered the load
+  // effect, so "Run AI" / Log Maintenance / Retry all showed a "success"
+  // toast while the panel kept displaying pre-action stale data).
   function refreshDetail() {
     if (!selectedId) return;
-    setSelectedId((id) => id);
+    loadDetail(selectedId);
   }
 
   // ── Delete handler ────────────────────────────────────────────────────────────
+  // Re-fetches the current page + stats rather than patching the paginated
+  // array client-side, so the total count and page contents stay accurate.
   async function handleDelete(id: string) {
     if (!confirm("Delete this asset? This cannot be undone.")) return;
     try {
       await deleteAsset(id);
-      setAssets((prev) => prev.filter((a) => a.id !== id));
-      if (selectedId === id) setSelectedId(assets.find((a) => a.id !== id)?.id ?? null);
+      if (selectedId === id) setSelectedId(null);
+      invalidateAssetListCache();
+      setFilters((f) => ({ ...f })); // triggers the list effect to refetch
+      loadStatsAndWarehouses();
       toast.success("Asset deleted");
     } catch (e: unknown) {
       toast.error("Delete failed", { description: e instanceof Error ? e.message : undefined });
@@ -140,30 +265,24 @@ export default function AdminAssetsPage() {
     setFormOpen(true);
   }
   function handleSaved(saved: Asset) {
-    setAssets((prev) => {
-      const exists = prev.some((a) => a.id === saved.id);
-      return exists ? prev.map((a) => (a.id === saved.id ? saved : a)) : [saved, ...prev];
-    });
     setSelectedId(saved.id);
-    setSelectedId((id) => id);
+    invalidateAssetListCache();
+    setFilters((f) => ({ ...f })); // triggers the list effect to refetch this page
+    loadStatsAndWarehouses();
   }
 
-  // ── Derived stats for hero header ─────────────────────────────────────────────
-  const criticalCount = assets.filter((a) => a.health_band === "critical").length;
-  const avgBandScore: Record<string, number> = {
-    excellent: 90, good: 72, moderate: 52, poor: 30, critical: 12,
-  };
-  const avgHealth = assets.length
-    ? Math.round(
-        assets.reduce((s, a) => s + (a.health_band ? (avgBandScore[a.health_band] ?? 50) : 50), 0) /
-          assets.length,
-      )
-    : 0;
+  // ── Fleet-wide stats for hero header (from /assets/stats — independent of page) ─
+  const criticalCount = stats?.critical ?? 0;
+  const avgHealth = stats?.avgHealth ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / ASSETS_PAGE_SIZE));
 
-  const warehouseOptions = React.useMemo(
-    () => extractWarehouseOptions(assets),
-    [assets],
-  );
+  if (initialLoad) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <PredictiXLoader label="Loading assets…" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -189,13 +308,13 @@ export default function AdminAssetsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {listLoading ? (
+            {statsLoading ? (
               <Skeleton className="h-7 w-24 rounded-full" />
             ) : (
               <>
                 <Badge variant="outline" className="gap-1.5 rounded-full px-3 py-1 text-xs font-medium border-slate-200 dark:border-slate-700 bg-background/60 dark:bg-white/4">
                   <Boxes className="h-3 w-3" />
-                  {assets.length} assets
+                  {stats?.total ?? 0} assets
                 </Badge>
                 <Badge variant="outline" className="gap-1.5 rounded-full px-3 py-1 text-xs font-medium border-slate-200 dark:border-slate-700 bg-background/60 dark:bg-white/4">
                   Avg. Health: {avgHealth}%
@@ -232,36 +351,85 @@ export default function AdminAssetsPage() {
         </div>
       )}
 
+      {/* ── Stats/analytics error ── */}
+      {statsError && (
+        <div className="flex items-center gap-3 rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-500/10 px-5 py-4 text-sm text-red-700 dark:text-red-400">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>Failed to load fleet stats: {statsError}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7 rounded-lg gap-1.5 text-xs text-red-700 dark:text-red-400 hover:text-red-800"
+            onClick={loadStatsAndWarehouses}
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </Button>
+        </div>
+      )}
+
       {/* ── Summary KPIs ── */}
-      <AssetsSummary assets={assets} />
+      <AssetsSummary stats={stats} loading={statsLoading} />
 
       {/* ── Descriptive Analytics ── */}
-      {!listLoading && assets.length > 0 && <AssetsAnalytics assets={assets} />}
+      <AssetsAnalytics analytics={analytics} loading={statsLoading} />
 
       {/* ── Toolbar ── */}
       <AssetsToolbar
         filters={filters}
         setFilters={setFilters}
-        resultsCount={assets.length}
+        resultsCount={totalCount}
         warehouseOptions={warehouseOptions}
         loading={listLoading}
         onAddAsset={openCreate}
-        selectedAssetId={selectedId}
-        selectedAssetName={detail?.asset?.asset_name}
       />
 
       {/* ── Table + Details ── */}
       <div className="grid grid-cols-12 gap-5">
         {/* List */}
-        <div className="col-span-12 lg:col-span-5 relative h-[520px] lg:h-auto">
-          <div className="h-full w-full lg:absolute lg:inset-0">
-            <AssetsTable
-              assets={assets}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              loading={listLoading}
-            />
+        <div className="col-span-12 lg:col-span-5 flex flex-col gap-2">
+          <div className="relative h-[520px] lg:h-auto lg:flex-1">
+            <div className="h-full w-full lg:absolute lg:inset-0">
+              <AssetsTable
+                assets={assets}
+                selectedId={selectedId}
+                onSelect={(id) => {
+                  setHasDeepLinked(false);
+                  setSelectedId(id);
+                }}
+                loading={listLoading}
+              />
+            </div>
           </div>
+
+          {/* ── Pagination controls ── */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-card px-3 py-2 text-xs text-muted-foreground">
+              <span>
+                Page {page} of {totalPages}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 rounded-lg px-2 text-xs"
+                  disabled={page <= 1 || listLoading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Prev
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 rounded-lg px-2 text-xs"
+                  disabled={page >= totalPages || listLoading}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Detail panel */}
@@ -276,7 +444,7 @@ export default function AdminAssetsPage() {
                 variant="ghost"
                 size="sm"
                 className="mt-3 gap-1.5 text-xs"
-                onClick={() => setSelectedId((id) => id)}
+                onClick={refreshDetail}
               >
                 <RefreshCw className="h-3 w-3" />
                 Retry
@@ -288,6 +456,8 @@ export default function AdminAssetsPage() {
               onRefresh={refreshDetail}
               onDelete={handleDelete}
               onEdit={openEdit}
+              onReport={() => openReport(detail.asset.id, detail.asset.asset_name)}
+              warehouseOptions={warehouseOptions}
             />
           ) : (
             <div className="card-dynamic flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-card px-6 py-24 text-center transition-all">
@@ -300,6 +470,14 @@ export default function AdminAssetsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Shared Report Modal ── */}
+      <AssetReportModal
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        assetId={reportAssetId}
+        assetName={reportAssetName}
+      />
 
       {/* ── Create / Edit dialog ── */}
       <AssetFormDialog

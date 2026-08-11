@@ -5,32 +5,37 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import type { Asset } from "./types";
+import type { AssetListItem } from "./types";
 
 // ── Status pill ────────────────────────────────────────────────────────────────
+// Real asset_status enum values: active | inactive | under_maintenance |
+// critical | decommissioned. "retired"/"maintenance"/"in_maintenance" are
+// not real values — an asset with the real "under_maintenance", "critical",
+// or "decommissioned" status previously fell through to the generic gray
+// fallback below instead of getting its intended amber/red/gray treatment.
 const STATUS_META: Record<string, { label: string; dot: string; bg: string }> = {
   active: {
     label: "Active",
     dot: "bg-emerald-500",
     bg: "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
   },
-  maintenance: {
-    label: "Maintenance",
+  under_maintenance: {
+    label: "Under Maintenance",
     dot: "bg-amber-500",
     bg: "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
   },
-  in_maintenance: {
-    label: "Maintenance",
-    dot: "bg-amber-500",
-    bg: "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  critical: {
+    label: "Critical",
+    dot: "bg-red-500",
+    bg: "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20",
   },
   inactive: {
     label: "Inactive",
     dot: "bg-slate-400",
     bg: "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
   },
-  retired: {
-    label: "Retired",
+  decommissioned: {
+    label: "Decommissioned",
     dot: "bg-slate-400",
     bg: "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
   },
@@ -56,26 +61,38 @@ function StatusPill({ status }: { status: string }) {
 }
 
 // ── Health band mini-bar ───────────────────────────────────────────────────────
-const BAND_META: Record<string, { score: number; color: string }> = {
-  excellent: { score: 90, color: "bg-emerald-500" },
-  good:      { score: 72, color: "bg-lime-500"    },
-  moderate:  { score: 52, color: "bg-amber-500"   },
-  poor:      { score: 30, color: "bg-orange-500"  },
-  critical:  { score: 12, color: "bg-red-500"     },
+// The trimmed list-view payload (AssetListItem) only carries health_band,
+// not a real per-asset health score (that lives on pdm_batch_predictions,
+// fetched separately per-asset on the detail panel). This previously
+// rendered a fixed fake number per band (every "good" asset showed "72",
+// identical regardless of its real score) — misleading in a list an admin
+// scans expecting differentiation between rows. Shows a band-proportional
+// bar with the band label instead of a fabricated precise number; the real
+// score is available on the detail panel via deriveHealthScore().
+const BAND_META: Record<string, { pct: number; color: string; label: string }> = {
+  excellent: { pct: 90, color: "bg-emerald-500", label: "Excellent" },
+  good:      { pct: 72, color: "bg-lime-500",    label: "Good" },
+  moderate:  { pct: 52, color: "bg-amber-500",   label: "Moderate" },
+  poor:      { pct: 30, color: "bg-orange-500",  label: "Poor" },
+  critical:  { pct: 12, color: "bg-red-500",     label: "Critical" },
 };
 
 function HealthBar({ band }: { band: string | null }) {
-  const meta = band ? (BAND_META[band.toLowerCase()] ?? BAND_META.moderate) : BAND_META.moderate;
+  const meta = band ? (BAND_META[band.toLowerCase()] ?? null) : null;
+
+  if (!meta) {
+    return <span className="text-xs text-muted-foreground/50">—</span>;
+  }
 
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 flex-1 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
         <div
           className={cn("h-full rounded-full transition-all duration-500", meta.color)}
-          style={{ width: `${meta.score}%` }}
+          style={{ width: `${meta.pct}%` }}
         />
       </div>
-      <span className="text-xs font-semibold tabular-nums w-8 text-right">{meta.score}</span>
+      <span className="text-[10px] font-semibold w-16 text-right truncate">{meta.label}</span>
     </div>
   );
 }
@@ -108,7 +125,7 @@ function TableSkeleton() {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 type Props = {
-  assets: Asset[];
+  assets: AssetListItem[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   loading?: boolean;
@@ -142,7 +159,11 @@ export default function AssetsTable({ assets, selectedId, onSelect, loading }: P
             No assets match your filters.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-white/4">
+          <div
+            role="listbox"
+            aria-label="Assets"
+            className="divide-y divide-slate-100 dark:divide-white/4"
+          >
             {assets.map((a) => {
               const active = selectedId === a.id;
               const displayName = a.asset_name;
@@ -157,6 +178,8 @@ export default function AssetsTable({ assets, selectedId, onSelect, loading }: P
               return (
                 <button
                   key={a.id}
+                  role="option"
+                  aria-selected={active}
                   onClick={() => onSelect(a.id)}
                   className={cn(
                     "w-full grid grid-cols-12 items-center gap-2 px-4 py-3.5 text-left transition-all duration-150",

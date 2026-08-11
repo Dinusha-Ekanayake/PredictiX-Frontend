@@ -9,6 +9,29 @@ import { getAccessToken, logout } from "./authService";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 /**
+ * Extract a human-readable message from a FastAPI error response body.
+ * `detail` is a plain string for most errors, but for a 422 validation
+ * error it's an array of {loc, msg, type} objects — passing that straight
+ * into `new Error(...)` coerces it to "[object Object],[object Object]"
+ * via String(), producing a garbled, unprofessional toast instead of the
+ * actual validation message (e.g. a malformed date or wrong field type).
+ */
+function extractErrorMessage(body: any, fallback: string): string {
+  const detail = body?.detail ?? body?.error;
+  if (typeof detail === "string" && detail) return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail
+      .map((d: any) => {
+        const field = Array.isArray(d?.loc) ? d.loc[d.loc.length - 1] : undefined;
+        const msg = d?.msg || "Invalid value";
+        return field ? `${field}: ${msg}` : msg;
+      })
+      .join("; ");
+  }
+  return fallback;
+}
+
+/**
  * Core fetch wrapper — attaches JWT and handles 401.
  */
 export async function apiFetch(
@@ -17,8 +40,13 @@ export async function apiFetch(
 ): Promise<Response> {
   const token = getAccessToken();
 
+  // A FormData body (file uploads) needs the browser to set its own
+  // multipart/form-data boundary — forcing application/json here would
+  // corrupt the request.
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(options.headers as Record<string, string>),
   };
 
@@ -42,6 +70,19 @@ export async function apiFetch(
   return response;
 }
 
+/** Thrown by apiGet on a non-2xx response. Carries the real HTTP status so
+ *  callers can tell "genuinely not found" (404) apart from an actual
+ *  failure (500, network error, etc.) instead of having to string-match
+ *  the message. */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 /**
  * GET request helper
  */
@@ -53,9 +94,9 @@ export async function apiGet<T>(endpoint: string): Promise<T> {
     try {
       errorObj = await response.json();
     } catch {
-      errorObj = { detail: "Request failed to parse JSON" };
+      errorObj = {};
     }
-    throw new Error(errorObj.detail || errorObj.error || `Request failed with status ${response.status}`);
+    throw new ApiError(extractErrorMessage(errorObj, `Request failed with status ${response.status}`), response.status);
   }
 
   return response.json();
@@ -71,8 +112,8 @@ export async function apiPost<T>(endpoint: string, body: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(error.detail || "Request failed");
+    const error = await response.json().catch(() => ({}));
+    throw new Error(extractErrorMessage(error, "Request failed"));
   }
 
   return response.json();
@@ -88,8 +129,8 @@ export async function apiPut<T>(endpoint: string, body: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(error.detail || "Request failed");
+    const error = await response.json().catch(() => ({}));
+    throw new Error(extractErrorMessage(error, "Request failed"));
   }
 
   return response.json();
@@ -102,8 +143,8 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
   const response = await apiFetch(endpoint, { method: "DELETE" });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(error.detail || "Request failed");
+    const error = await response.json().catch(() => ({}));
+    throw new Error(extractErrorMessage(error, "Request failed"));
   }
 
   return response.json();

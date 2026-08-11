@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Mail, Phone, MapPin, Briefcase, Building2, User, AlertCircle } from "lucide-react";
 import { UserProfileData, updateMyProfile } from "@/lib/api/userProfileApi";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import ProfilePhotoUpload from "@/components/common/ProfilePhotoUpload";
 
 interface UserProfileFormProps {

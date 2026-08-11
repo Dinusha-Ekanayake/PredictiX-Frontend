@@ -3,7 +3,20 @@
  * Handles all API calls to backend warehouse endpoints
  */
 
+import { getAccessToken } from './authService';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+/**
+ * Build request headers with the auth token attached. The warehouse-dashboard
+ * and survival endpoints require a valid JWT, so every call here must send it.
+ */
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = getAccessToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
 
 export interface WarehouseSummaryData {
   kpiGrid?: any[];
@@ -22,22 +35,56 @@ export interface WarehouseSummaryData {
 export interface SurvivalComponentSummary {
   component: string;
   avg_rul_days: number | null;
+  /** mean P(component fails within 7 / 30 days) over the scored assets */
+  avg_fail_prob_7d: number;
+  avg_fail_prob_30d: number;
+  /** sum of those probabilities — an expected failure count, not a headcount */
+  expected_failures_7d: number;
+  expected_failures_30d: number;
+  /** count of scored assets whose component fails within 7 / 30 days */
+  at_risk_7d: number;
   at_risk_30d: number;
-  at_risk_90d: number;
   assets_scored: number;
 }
 
 export interface SurvivalWatchlistItem {
   asset: string;
   component: string;
-  rul_days: number;
+  rul_days: number | null;
   risk: string;
+}
+
+/** Per-component failure risk for one asset (v3 warehouse report). */
+export interface SurvivalAssetComponentRisk {
+  fail_prob_7d: number;
+  fail_prob_30d: number;
+  median_days: number;
+  health_pct: number | null;
+}
+
+/** One critical asset's 5-component breakdown + cost (v3 warehouse report). */
+export interface SurvivalAssetBreakdown {
+  asset: string;
+  components: Record<string, SurvivalAssetComponentRisk>;
+  soonest_component: string;
+  soonest_median_days: number | null;
+  p_service_7d: number;
+  p_service_30d: number;
+  est_cost_lkr: number | null;
+  exp_cost_7d_lkr: number | null;
+  exp_cost_30d_lkr: number | null;
 }
 
 export interface SurvivalSummary {
   assets_analyzed: number;
   horizon_days: number;
+  currency?: string;
+  /** expected fleet replacement spend within 7 / 30 days (cost-estimation model) */
+  expected_spend_7d?: number;
+  expected_spend_30d?: number;
   component_summary: SurvivalComponentSummary[];
+  /** per-critical-asset 5-component risk + cost (drives the risk heatmap) */
+  assets?: SurvivalAssetBreakdown[];
   watchlist: SurvivalWatchlistItem[];
   /** ISO-8601 UTC timestamp of when the analysis was scored (from the backend). */
   generated_at?: string;
@@ -53,7 +100,7 @@ export async function getSurvivalAnalysis(): Promise<SurvivalSummary | null> {
     const url = `${API_BASE_URL}/warehouse-dashboard/survival`;
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       cache: 'no-store',
     });
 
@@ -79,13 +126,10 @@ export async function getSurvivalAnalysis(): Promise<SurvivalSummary | null> {
 export async function getMaintenanceSchedule() {
   try {
     const url = `${API_BASE_URL}/warehouse-dashboard/maintenance-schedule`;
-    console.log('[DEBUG] Fetching maintenance schedule from:', url);
-    
+
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: authHeaders(),
       cache: 'no-store',
     });
 
@@ -95,7 +139,6 @@ export async function getMaintenanceSchedule() {
     }
 
     const data = await response.json();
-    console.log('[DEBUG] Maintenance schedule data received:', data);
     return data;
   } catch (error) {
     // Backend unreachable — expected when server is not running
@@ -110,13 +153,10 @@ export async function getMaintenanceSchedule() {
 export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
   try {
     const url = `${API_BASE_URL}/warehouse-dashboard/summary`;
-    console.log('[DEBUG] Fetching warehouse summary from:', url);
-    
+
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: authHeaders(),
       cache: 'no-store', // Disable caching for fresh data
     });
 
@@ -126,49 +166,19 @@ export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
     }
 
     const data = await response.json();
-    console.log('[DEBUG] Warehouse summary data received:', data);
-    
+
     // Fetch maintenance schedule separately and include it
     const maintenanceSchedule = await getMaintenanceSchedule();
-    console.log('[DEBUG] Merging maintenance schedule with summary data');
-    
+
     const result = {
       ...data,
       maintenanceSchedule,
     };
-    
-    console.log('[DEBUG] Final warehouse summary with maintenance schedule:', result);
+
     return result;
   } catch (error) {
     console.error('[ERROR] Failed to fetch warehouse summary:', error);
     throw error;
-  }
-}
-
-/**
- * Fetch critical assets for warehouse table
- */
-export async function getCriticalAssets() {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/assets/?status=at_risk`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch critical assets: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching critical assets:', error);
-    return [];
   }
 }
 
@@ -181,7 +191,7 @@ export async function getFleetSurvival(maxAssets = 12, horizonDays = 180) {
     const url = `${API_BASE_URL}/survival/warehouse/summary?max_assets=${maxAssets}&horizon_days=${horizonDays}`;
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       cache: 'no-store',
     });
 

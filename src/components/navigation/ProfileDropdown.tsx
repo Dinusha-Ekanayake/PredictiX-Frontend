@@ -27,7 +27,7 @@ import { logout } from "@/lib/authService";
 export type ProfileDropdownUser = {
   name: string;
   email: string;
-  role: "ADMIN" | "USER";
+  role: "ADMIN" | "SUPER_ADMIN" | "USER";
   department?: string | null;
   warehouse?: string | null;
   initials?: string;
@@ -53,17 +53,18 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function RoleBadge({ role }: { role: "ADMIN" | "USER" }) {
+function RoleBadge({ role }: { role: "ADMIN" | "SUPER_ADMIN" | "USER" }) {
+  const label = role === "SUPER_ADMIN" ? "Super Admin" : role === "ADMIN" ? "Administrator" : "User";
   return (
     <Badge
       className={cn(
         "text-[10px] px-1.5 py-0 leading-4 font-semibold tracking-wide border-transparent",
-        role === "ADMIN"
+        role === "SUPER_ADMIN" || role === "ADMIN"
           ? "bg-violet-600/10 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400"
           : "bg-teal-600/10 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400"
       )}
     >
-      {role === "ADMIN" ? "Administrator" : "User"}
+      {label}
     </Badge>
   );
 }
@@ -119,11 +120,14 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
           open && "bg-slate-100/70 dark:bg-white/5"
         )}
       >
-        {/* Name + role text */}
-        <div className="text-right flex flex-col justify-center gap-0.5">
-          <div className="text-sm font-semibold tracking-tight leading-none">{user.name}</div>
-          <div className="text-[11px] text-muted-foreground font-medium leading-none pb-0.5">
-            {user.role === "ADMIN" ? "Administrator" : "User"}
+        {/* Name + role text — capped width with ellipsis so long names never
+            wrap and stretch the navbar (full name is visible in the panel) */}
+        <div className="text-right flex flex-col justify-center gap-0.5 min-w-0 max-w-[180px]">
+          <div className="text-sm font-semibold tracking-tight leading-none truncate" title={user.name}>
+            {user.name}
+          </div>
+          <div className="text-[11px] text-muted-foreground font-medium leading-none pb-0.5 truncate">
+            {user.role === "SUPER_ADMIN" ? "Super Admin" : user.role === "ADMIN" ? "Administrator" : "User"}
           </div>
         </div>
 
@@ -164,7 +168,7 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
           "ring-2 ring-white/40 dark:ring-white/10",
           "h-9 w-9 text-sm transition-transform hover:scale-105 cursor-pointer"
         )}
-        title={`${user.name} - ${user.role === "ADMIN" ? "Administrator" : "User"}`}
+        title={`${user.name} - ${user.role === "SUPER_ADMIN" ? "Super Admin" : user.role === "ADMIN" ? "Administrator" : "User"}`}
         aria-haspopup="true"
         aria-expanded={open}
       >
@@ -236,10 +240,10 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
                 <span className="truncate">{user.warehouse}</span>
               </div>
             )}
-            {user.role === "ADMIN" && (
+            {(user.role === "ADMIN" || user.role === "SUPER_ADMIN") && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Shield className="h-3.5 w-3.5 flex-shrink-0 text-violet-500" />
-                <span>Full administrative access</span>
+                <span>{user.role === "SUPER_ADMIN" ? "Full administrative access — any warehouse" : "Full administrative access"}</span>
               </div>
             )}
           </div>

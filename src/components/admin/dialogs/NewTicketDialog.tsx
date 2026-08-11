@@ -14,7 +14,7 @@
 
 import * as React from "react";
 import { AlertCircle, Bot, Loader2, Plus, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 
 import {
   Dialog,
@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiGet } from "@/lib/apiClient";
+import { apiGet, apiPost } from "@/lib/apiClient";
 import {
   createTicketViaApi,
   previewTicketAI,
@@ -64,6 +64,9 @@ type Props = {
   presetAssetId?: string;
   presetAssetName?: string;
   lockAsset?: boolean;
+  /** Pass the parent page's already-loaded user list to skip this dialog's
+   * own GET /users/ fetch. If omitted, the dialog fetches it itself. */
+  users?: UserItem[];
 };
 
 const selectCls =
@@ -73,21 +76,28 @@ const selectCls =
 
 export default function NewTicketDialog({
   open, onOpenChange, onCreated, presetAssetId, presetAssetName, lockAsset,
+  users: usersProp,
 }: Props) {
   const [assetId, setAssetId] = React.useState("");
   const [assets, setAssets] = React.useState<Asset[]>([]);
   const [assetsLoading, setAssetsLoading] = React.useState(false);
+  const [assetsLoadFailed, setAssetsLoadFailed] = React.useState(false);
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [assignedTo, setAssignedTo] = React.useState("");
-  const [users, setUsers] = React.useState<UserItem[]>([]);
+  const [fetchedUsers, setFetchedUsers] = React.useState<UserItem[]>([]);
   const [usersLoading, setUsersLoading] = React.useState(false);
+  const [usersLoadFailed, setUsersLoadFailed] = React.useState(false);
+  // Prefer the parent's already-loaded list; fall back to this dialog's own fetch.
+  const users = usersProp ?? fetchedUsers;
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [file, setFile] = React.useState<File | null>(null);
 
   // asset summary
   const [assetSummary, setAssetSummary] = React.useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = React.useState(false);
+  const [ticketSummary, setTicketSummary] = React.useState<string | null>(null);
+  const [ticketSummaryLoading, setTicketSummaryLoading] = React.useState(false);
 
   // AI state
   const [ai, setAi] = React.useState<AiState>({ status: "idle" });
@@ -108,6 +118,32 @@ export default function NewTicketDialog({
       .finally(() => { if (!cancelled) setSummaryLoading(false); });
     return () => { cancelled = true; };
   }, [assetId]);
+
+  // ── ticket summary preview (debounced) ─────────────────────────────────────
+  React.useEffect(() => {
+    const t = title.trim(), d = description.trim();
+    // Generate the summary only once category AND priority are confirmed (set by
+    // the AI or the user), so it reflects those values. Regenerates if changed.
+    if (!t || !d || !category || !priority) { setTicketSummary(null); return; }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setTicketSummaryLoading(true);
+      try {
+        const res = await apiPost<AssetSummaryResponse>("/ticket-summaries/generate", {
+          title: t,
+          description: d,
+          category,
+          priority,
+        });
+        if (!cancelled) setTicketSummary(res?.summary ?? null);
+      } catch {
+        if (!cancelled) setTicketSummary(null);
+      } finally {
+        if (!cancelled) setTicketSummaryLoading(false);
+      }
+    }, 900);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [title, description, category, priority]);
 
   // ── debounced AI ──────────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -142,26 +178,35 @@ export default function NewTicketDialog({
   React.useEffect(() => {
     if (open) {
       if (presetAssetId) setAssetId(presetAssetId);
-      setAssetsLoading(true);
+      setAssetsLoading(true); setAssetsLoadFailed(false);
       apiGet<Asset[]>("/assets/dropdown")
         .then((d) => setAssets(d ?? []))
-        .catch(() => {})
+        .catch(() => {
+          setAssetsLoadFailed(true);
+          toast.error("Couldn't load assets", { description: "The asset list failed to load. You can still create the ticket without linking an asset, or try reopening this dialog." });
+        })
         .finally(() => setAssetsLoading(false));
 
-      setUsersLoading(true);
-      listUsers()
-        .then((d) => setUsers(d ?? []))
-        .catch(() => {})
-        .finally(() => setUsersLoading(false));
+      if (!usersProp) {
+        setUsersLoading(true); setUsersLoadFailed(false);
+        listUsers()
+          .then((d) => setFetchedUsers(d ?? []))
+          .catch(() => {
+            setUsersLoadFailed(true);
+            toast.error("Couldn't load users", { description: "The user list failed to load. You can still create the ticket without assigning it, or try reopening this dialog." });
+          })
+          .finally(() => setUsersLoading(false));
+      }
       return;
     }
     const t = setTimeout(() => {
       setAssetId(""); setTitle(""); setDescription(""); setPriority(""); setCategory("");
-      setAssignedTo(""); setIsSubmitting(false); setAssets([]); setUsers([]);
-      setAssetSummary(null); setAi({ status: "idle" }); setFile(null);
+      setAssignedTo(""); setIsSubmitting(false); setAssets([]); setFetchedUsers([]);
+      setAssetsLoadFailed(false); setUsersLoadFailed(false);
+      setAssetSummary(null); setTicketSummary(null); setAi({ status: "idle" }); setFile(null);
     }, 200);
     return () => clearTimeout(t);
-  }, [open, presetAssetId]);
+  }, [open, presetAssetId, usersProp]);
 
   // ── submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
@@ -229,7 +274,7 @@ export default function NewTicketDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-160 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Plus className="h-5 w-5" />
@@ -262,6 +307,12 @@ export default function NewTicketDialog({
                 )}
               </select>
             )}
+            {assetsLoadFailed && !lockAsset && (
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                Failed to load the asset list — you can still submit without one.
+              </p>
+            )}
           </div>
 
           {/* Asset Summary */}
@@ -289,11 +340,24 @@ export default function NewTicketDialog({
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[110px] resize-vertical outline-none focus:ring-2 focus:ring-ring"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-27.5 resize-vertical outline-none focus:ring-2 focus:ring-ring"
               placeholder="Describe the issue — AI will analyze this to suggest category and priority"
               disabled={isSubmitting}
             />
           </div>
+
+          {/* AI Ticket Summary */}
+          {(ticketSummaryLoading || ticketSummary) && (
+            <div className="rounded-md border border-violet-200/60 bg-violet-50/50 dark:bg-violet-950/20 dark:border-violet-800/40 px-3 py-2.5">
+              <p className="text-xs font-medium text-violet-600 dark:text-violet-400 flex items-center gap-1.5 mb-1">
+                <Bot className="h-3.5 w-3.5" />AI Ticket Summary
+              </p>
+              {ticketSummaryLoading
+                ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin text-violet-500" />Generating…</div>
+                : <p className="text-sm text-foreground/90 leading-relaxed">{ticketSummary}</p>
+              }
+            </div>
+          )}
 
           {/* Image Upload */}
           <div>
@@ -397,6 +461,12 @@ export default function NewTicketDialog({
                 <option value="">Select a user (optional)</option>
                 {users.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
               </select>
+            )}
+            {usersLoadFailed && (
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                Failed to load the user list — you can still submit without an assignee.
+              </p>
             )}
           </div>
 

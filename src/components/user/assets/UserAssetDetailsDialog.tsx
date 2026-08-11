@@ -55,7 +55,7 @@ export default function UserAssetDetailsDialog({
       <DialogContent className="max-w-5xl p-0 overflow-hidden bg-muted/20 border-slate-200 dark:border-slate-800 rounded-3xl" showCloseButton={false}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 dark:border-white/6 bg-white dark:bg-card">
           <DialogTitle className="text-lg font-bold">Asset Details</DialogTitle>
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => onOpenChange(false)} aria-label="Close">
             <X className="h-4 w-4" />
           </Button>
         </div>

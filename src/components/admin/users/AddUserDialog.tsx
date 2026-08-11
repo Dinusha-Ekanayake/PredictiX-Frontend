@@ -319,7 +319,7 @@ export default function AddUserDialog({
             <Input
               id="add-email"
               type="email"
-              placeholder="e.g. jane.cooper@lankalogix.lk"
+              placeholder="e.g. nuwan.mech@lankalogix.com"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);

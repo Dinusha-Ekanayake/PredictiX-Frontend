@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
+import { healthColor, healthTextClass } from "@/lib/healthBands";
 import {
   getAdminDashboard,
   type AdminDashboardData,
@@ -89,16 +90,13 @@ function CTip({ active, payload, label, fmt }: { active?: boolean; payload?: Arr
   );
 }
 
-// Health-band cut-offs, mirroring app/services/health_bands.py — the backend is
-// the source of truth. Previously this bar used its own 40/70 split, a third
-// health scale alongside the dashboard's bands and assets.health_band, so a
-// score could read amber here while the chart called it Poor.
-const HEALTH_POOR = 38;   // below this: poor or critical
-const HEALTH_GOOD = 50;   // at or above this: good or excellent
-
+// Cut-offs now live in @/lib/healthBands, which mirrors
+// app/services/health_bands.py — the backend remains the source of truth. They
+// were defined here, and separately inside other components, which is how the
+// UI ended up with three different health scales at once.
 function ScoreBar({ score }: { score: number }) {
-  const c = score < HEALTH_POOR ? "#ef4444" : score < HEALTH_GOOD ? "#f59e0b" : "#10b981";
-  const tc = score < HEALTH_POOR ? "text-rose-600 dark:text-rose-400" : score < HEALTH_GOOD ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
+  const c = healthColor(score);
+  const tc = healthTextClass(score);
   return (
     <div className="flex items-center gap-2 shrink-0">
       <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
@@ -179,6 +177,20 @@ export default function AdminDashboardPage() {
   // of a false "0%"/"0" when no PdM predictions have run yet (brand-new
   // warehouse) — previously indistinguishable from a genuine alarming 0%.
   const hasPredictions = k?.hasPredictionData ?? false;
+
+  // Cost coverage. Older backends don't send the count at all, so treat a
+  // missing value as "fully covered" rather than showing every deployment a
+  // scary partial-data warning it has no way to act on.
+  const costedAssets = k?.estMaintenanceCostAssetCount ?? (k?.totalAssets ?? 0);
+  const costIsPartial = !!k && costedAssets < k.totalAssets;
+  const costSubLabel = !k
+    ? "LKR · current estimate"
+    : costedAssets === 0
+      ? "No assets could be costed"
+      : costIsPartial
+        ? `LKR · ${costedAssets} of ${k.totalAssets} assets costed`
+        : "LKR · current estimate";
+
   const kpiCards = [
     { label: "Total Assets", value: k ? String(k.totalAssets) : "—", sub: "Fleet-wide", icon: Package, iconBg: "bg-violet-100 dark:bg-violet-500/15", iconColor: "text-violet-600 dark:text-violet-400", accent: "text-violet-600 dark:text-violet-400" },
     { label: "Critical Alerts", value: k ? String(k.criticalAlerts) : "—", sub: "Require action now", icon: Flame, iconBg: "bg-rose-100 dark:bg-rose-500/15", iconColor: "text-rose-600 dark:text-rose-400", accent: "text-rose-600 dark:text-rose-400" },
@@ -193,7 +205,11 @@ export default function AdminDashboardPage() {
     // rolling 30-day figure (pdm_batch_predictions holds one current
     // estimate per asset, not a time-bounded window), so the label no
     // longer claims "30 days".
-    { label: "Est. Maint. Cost", value: k ? fmtCompact(k.estMaintenanceCost) : "—", sub: "LKR · current estimate", icon: Wrench, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", accent: "text-slate-600 dark:text-slate-400" },
+    // The cost model stores NULL for assets it cannot score instead of
+    // guessing, so this sum can cover fewer assets than the fleet. When it
+    // does, the sub-label says so — otherwise a partial total is
+    // indistinguishable from a genuinely cheaper fleet.
+    { label: "Est. Maint. Cost", value: k ? (costedAssets > 0 ? fmtCompact(k.estMaintenanceCost) : "—") : "—", sub: costSubLabel, icon: Wrench, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", accent: "text-slate-600 dark:text-slate-400" },
   ];
 
   const healthTrend = data?.healthTrend ?? [];

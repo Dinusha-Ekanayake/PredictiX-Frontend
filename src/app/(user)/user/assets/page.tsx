@@ -15,10 +15,11 @@ import { listAssets } from "@/components/admin/assets/assetService";
 import { DEFAULT_FILTERS } from "@/components/admin/assets/AssetsToolbar";
 import type { AssetListItem } from "@/components/admin/assets/types";
 import UserAssetDetailsDialog from "@/components/user/assets/UserAssetDetailsDialog";
+import { healthColor } from "@/lib/healthBands";
 
-function healthColor(p: number) {
-  return p >= 80 ? "#10b981" : p >= 60 ? "#f59e0b" : "#ef4444";
-}
+// healthColor now comes from @/lib/healthBands. The local version used a
+// >= 80 green cut-off that no asset could reach (scores top out at 79), so
+// every card on this page rendered amber or red regardless of condition.
 function daysUntil(d: string | null) {
   return d ? Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000) : null;
 }

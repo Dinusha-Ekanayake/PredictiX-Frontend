@@ -16,6 +16,13 @@ export interface DashboardKpis {
   fleetHealth: number; // 0–100
   predictedFailures: number;
   estMaintenanceCost: number; // raw amount (LKR)
+  // How many assets estMaintenanceCost is summed from. The cost model stores
+  // NULL for assets it cannot score rather than guessing, so when this is
+  // below totalAssets the figure is a partial total and must be labelled as
+  // one — a silently smaller number reads as a cheaper fleet.
+  // Optional: a backend deployed before this field existed omits it, and the
+  // UI treats "absent" as fully covered rather than as zero coverage.
+  estMaintenanceCostAssetCount?: number;
   // False for a brand-new warehouse with zero PdM predictions run yet —
   // distinguishes "no data" from a genuine (alarming) 0% fleet health.
   hasPredictionData: boolean;

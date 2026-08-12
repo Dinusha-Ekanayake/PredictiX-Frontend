@@ -432,6 +432,22 @@ export default function AdminUsersPage() {
     router.push(`/admin/assets?assetId=${assetId}`);
   }
 
+  /**
+   * Keep the table's per-user assignment count in step after an unassign.
+   * The dialog owns the asset list it renders; this only corrects the count
+   * shown in the row behind it, which would otherwise stay stale until reload.
+   */
+  function handleAssetUnassigned(assetId: string) {
+    setAssignedAssets((prev) => prev.filter((a) => (a.asset_id ?? a.id) !== assetId));
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === assetsUser?.id
+          ? { ...u, assignedAssets: Math.max(0, (u.assignedAssets ?? 0) - 1) }
+          : u
+      )
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
@@ -675,6 +691,7 @@ export default function AdminUsersPage() {
           if (!open) setAssetsUser(null);
         }}
         onNavigateToAsset={handleNavigateToAsset}
+        onUnassigned={handleAssetUnassigned}
         onBackToDetails={
           assetsUser
             ? () => {

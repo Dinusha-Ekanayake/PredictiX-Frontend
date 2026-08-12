@@ -64,7 +64,7 @@ type AssignedAsset = {
   name: string;
   category: string;
   location: string;
-  healthPercent: number;
+  healthPercent: number | null;
 };
 
 type ChartEntry = {
@@ -414,7 +414,10 @@ export default function AdminUsersPage() {
           name: a.name,
           category: a.category ?? a.asset_type ?? "General",
           location: a.location,
-          healthPercent: Math.round(a.healthPercent),
+          // Null means the asset has no completed prediction. Math.round(null)
+          // is 0, which would render as "0% health" — a worse lie than the
+          // missing value it stands in for.
+          healthPercent: a.healthPercent != null ? Math.round(a.healthPercent) : null,
         }))
       );
     } catch (err) {

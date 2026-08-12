@@ -12,6 +12,8 @@
  *   §7 Conclusion (final KPI summary + executive closing)
  */
 
+import { HEALTH_GOOD } from "@/lib/healthBands";
+
 // ══════════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
 // ══════════════════════════════════════════════════════════════════
@@ -717,7 +719,16 @@ export function generateProfessionalHTML(data: ReportData): string {
   const medT   = fmt(_prioMap['medium'] ?? td.mediumPriorityTickets);
   const lowT   = fmt(_prioMap['low'] ?? td.lowPriorityTickets);
 
-  const healthyAssets  = s.healthScoreDistribution.filter(h => !h.bucket.includes('Below') && parseFloat(h.bucket) >= 80).reduce((sum, h) => sum + h.count, 0);
+  // Assets in the "good" band or better, using the shared cut-off from
+  // @/lib/healthBands (which mirrors app/services/health_bands.py).
+  //
+  // This filter previously required a bucket of >= 80. health_score is the mean
+  // of the component health percentages *minus* a failure-probability and
+  // urgency penalty, so across the real fleet it peaks at 79 — the "90-100%"
+  // and "80-89%" buckets are always empty and this count was always 0. Every
+  // warehouse report therefore claimed none of its assets were healthy. At the
+  // canonical cut-off the same fleet reports 229 of 850.
+  const healthyAssets  = s.healthScoreDistribution.filter(h => !h.bucket.includes('Below') && parseFloat(h.bucket) >= HEALTH_GOOD).reduce((sum, h) => sum + h.count, 0);
   const degradedAssets = s.healthScoreDistribution.find(h => h.bucket.includes('Below'))?.count || 0;
   const healthyPct     = totalAssets > 0 ? Math.round(healthyAssets / totalAssets * 100) : 0;
   void degradedAssets; // computed for context, not directly rendered
@@ -814,7 +825,10 @@ export function generateProfessionalHTML(data: ReportData): string {
 
     ${kpiGrid4(
       kpiCard('Total Fleet Assets', fmtN(totalAssets), `${fmtN(activeA)} active`, C.teal),
-      kpiCard('Fleet Health Score', `${healthFleet}%`, `${healthyPct}% assets ≥80%`, healthFleet >= 70 ? C.green : C.orange),
+      // Label derives from the constant so the caption can't drift from the
+      // filter above — it read "≥80%" while reporting a figure that was
+      // structurally always 0.
+      kpiCard('Fleet Health Score', `${healthFleet}%`, `${healthyPct}% assets ≥${HEALTH_GOOD}%`, healthFleet >= HEALTH_GOOD ? C.green : C.orange),
       kpiCard('Avg Failure Prob.', `${failProb}%`, 'AI model', C.orange),
       kpiCard('Critical Assets', fmtN(critCount), `${Math.round(critCount / Math.max(totalAssets, 1) * 100)}% of fleet`, C.red),
     )}

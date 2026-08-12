@@ -31,7 +31,7 @@ export interface UserAssignedAsset {
   category: string | null;
   location: string;
   status: string;
-  healthPercent: number;
+  healthPercent: number | null;
   nextServiceDate: string | null;
 }
 

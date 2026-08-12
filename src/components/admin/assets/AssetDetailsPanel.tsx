@@ -615,13 +615,27 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             </div>
             <div>
               <div className="text-[11px] text-muted-foreground/80 font-medium">Est. Maintenance Cost</div>
-              <div className="text-sm font-semibold mt-0.5">
-                {fmtCost(prediction?.estimated_cost_lkr)}
-              </div>
-              {prediction && (
-                <div className="text-[11px] text-muted-foreground/60 mt-0.5">
-                  Range: {fmtCost(prediction.min_cost_lkr)} – {fmtCost(prediction.max_cost_lkr)}
+              {/* A null cost means the cost model could not score this asset —
+                  the backend stores NULL rather than a guessed number. Say so
+                  plainly instead of rendering a dash that reads like "zero". */}
+              {prediction && prediction.estimated_cost_lkr == null ? (
+                <div
+                  className="text-sm font-medium mt-0.5 text-muted-foreground"
+                  title="The cost estimation model could not produce an estimate for this asset. No value is shown rather than an approximated one."
+                >
+                  Estimate unavailable
                 </div>
+              ) : (
+                <>
+                  <div className="text-sm font-semibold mt-0.5">
+                    {fmtCost(prediction?.estimated_cost_lkr)}
+                  </div>
+                  {prediction && (
+                    <div className="text-[11px] text-muted-foreground/60 mt-0.5">
+                      Range: {fmtCost(prediction.min_cost_lkr)} – {fmtCost(prediction.max_cost_lkr)}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -889,7 +903,21 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                     </div>
                   </div>
 
-                  {(prediction.estimated_cost_lkr != null) && (
+                  {/* Rendered even when the estimate is missing. Hiding the card
+                      entirely left no trace that a cost was ever expected, so a
+                      failed cost model looked identical to a healthy asset with
+                      nothing to report. */}
+                  {prediction.estimated_cost_lkr == null ? (
+                    <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-2">
+                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Maintenance Cost Estimate</div>
+                      <div className="text-sm font-medium text-muted-foreground">Estimate unavailable</div>
+                      <div className="text-[11px] text-muted-foreground/70 leading-relaxed">
+                        The cost estimation model could not score this asset. No approximate
+                        figure is shown in its place — retry after the next prediction run, and
+                        if it persists the model may need attention.
+                      </div>
+                    </div>
+                  ) : (
                     <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                       <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Maintenance Cost Estimate</div>
                       <div className="space-y-3">

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Box, MapPin, ExternalLink, Loader2, UserMinus } from "lucide-react";
 import { toast } from "@/lib/customToast";
 import { unassignAsset } from "@/lib/userService";
+import { healthBadgeClass, formatHealth } from "@/lib/healthBands";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,7 +26,8 @@ export type AssetItem = {
   name: string;
   category: string;
   location: string;
-  healthPercent: number;
+  /** Real health score; null when the asset has no completed prediction. */
+  healthPercent: number | null;
 };
 
 type Props = {
@@ -49,16 +51,17 @@ type Props = {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function HealthBadge({ percent }: { percent: number }) {
-  const color =
-    percent >= 80
-      ? "border-emerald-500/40 text-emerald-400"
-      : percent >= 60
-        ? "border-amber-500/40 text-amber-400"
-        : "border-red-500/40 text-red-400";
+function HealthBadge({ percent }: { percent: number | null }) {
+  // Bands come from the shared definition rather than being re-derived here.
+  // The old local 80/60 split could never render green — health scores top out
+  // at 79 across the fleet — and a null score printed "Health: null%".
   return (
-    <Badge variant="outline" className={`text-xs font-semibold ${color}`}>
-      Health: {percent}%
+    <Badge
+      variant="outline"
+      className={`text-xs font-semibold ${healthBadgeClass(percent)}`}
+      title={percent == null ? "No completed prediction for this asset yet" : undefined}
+    >
+      Health: {formatHealth(percent)}
     </Badge>
   );
 }

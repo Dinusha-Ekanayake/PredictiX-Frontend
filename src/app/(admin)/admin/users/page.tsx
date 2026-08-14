@@ -73,6 +73,8 @@ type ChartEntry = {
   color: string;
 };
 
+const PAGE_SIZE = 15;
+
 // ---------------------------------------------------------------------------
 // KPI helpers
 // ---------------------------------------------------------------------------
@@ -246,6 +248,9 @@ export default function AdminUsersPage() {
   );
   const [assetsLoading, setAssetsLoading] = React.useState(false);
 
+  // ── Pagination ─────────────────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = React.useState(1);
+
   function generateUserId(role: UserRole, department: string): string {
     const roleLetter = role === "admin" ? "A" : "U";
     const deptLetter = department.charAt(0).toUpperCase() || "X";
@@ -266,9 +271,13 @@ export default function AdminUsersPage() {
   const deepLinkUserId = searchParams.get("user_id");
   React.useEffect(() => {
     if (deepLinkUserId && users.length > 0) {
-      const u = users.find((x) => x.id === deepLinkUserId);
-      if (u) setDetailsUser(u);
+      const idx = filteredUsersRef.current.findIndex((x) => x.id === deepLinkUserId);
+      if (idx >= 0) {
+        setCurrentPage(Math.floor(idx / PAGE_SIZE) + 1);
+        setDetailsUser(filteredUsersRef.current[idx]);
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deepLinkUserId, users]);
 
   React.useEffect(() => {
@@ -353,6 +362,25 @@ export default function AdminUsersPage() {
     });
   }, [users, searchQuery, roleFilter, departmentFilter, statusFilter]);
 
+  // Ref so the deep-link effect can read the latest filtered list without
+  // being re-triggered every time filters change (only users/deepLinkUserId should trigger it)
+  const filteredUsersRef = React.useRef(filteredUsers);
+  React.useEffect(() => {
+    filteredUsersRef.current = filteredUsers;
+  }, [filteredUsers]);
+
+  // Reset to page 1 whenever filters/search change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, roleFilter, departmentFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+
+  const paginatedUsers = React.useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredUsers.slice(start, start + PAGE_SIZE);
+  }, [filteredUsers, currentPage]);
+
   const kpis = computeKpis(users);
 
   async function handleUserAdded(newUser: NewUser) {
@@ -414,9 +442,6 @@ export default function AdminUsersPage() {
           name: a.name,
           category: a.category ?? a.asset_type ?? "General",
           location: a.location,
-          // Null means the asset has no completed prediction. Math.round(null)
-          // is 0, which would render as "0% health" — a worse lie than the
-          // missing value it stands in for.
           healthPercent: a.healthPercent != null ? Math.round(a.healthPercent) : null,
         }))
       );
@@ -435,11 +460,6 @@ export default function AdminUsersPage() {
     router.push(`/admin/assets?assetId=${assetId}`);
   }
 
-  /**
-   * Keep the table's per-user assignment count in step after an unassign.
-   * The dialog owns the asset list it renders; this only corrects the count
-   * shown in the row behind it, which would otherwise stay stale until reload.
-   */
   function handleAssetUnassigned(assetId: string) {
     setAssignedAssets((prev) => prev.filter((a) => (a.asset_id ?? a.id) !== assetId));
     setUsers((prev) =>
@@ -582,7 +602,7 @@ export default function AdminUsersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredUsers.map((user) => (
+                  paginatedUsers.map((user) => (
                     <TableRow
                       key={user.id}
                       className="cursor-pointer"
@@ -636,6 +656,31 @@ export default function AdminUsersPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pagination */}
+      {filteredUsers.length > 0 && (
+        <div className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3">
+          <p className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="text-sm font-medium text-muted-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:text-foreground transition-colors"
+            >
+              Prev
+            </button>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="text-sm font-medium text-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed hover:text-emerald-300 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add User Dialog */}
       <AddUserDialog

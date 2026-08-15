@@ -411,6 +411,17 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
         <div className="flex flex-wrap items-center gap-2">
           {!readOnly && (
             <>
+              {onAssign && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-xl gap-1.5 text-xs border-violet-200 dark:border-violet-900 bg-violet-50/50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/40"
+                  onClick={() => onAssign(asset)}
+                >
+                  <Users className="h-3 w-3" />
+                  {asset.assigned_to ? "Reassign" : "Assign"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

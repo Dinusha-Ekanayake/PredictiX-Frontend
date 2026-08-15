@@ -35,6 +35,7 @@ import {
 
 import { createUser } from "@/lib/userService";
 import type { UserRole, UserStatus } from "@/lib/userService";
+import { fetchDepartments, fetchWarehouses } from "@/lib/api/userProfileApi";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,21 +75,6 @@ type Props = {
   onUserAdded: (user: NewUser) => void;
   generateUserId: (role: UserRole, department: string) => string;
 };
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const DEPARTMENTS = [
-  "Transportation",
-  "Mechanical",
-  "Electrical",
-  "Software",
-  "Admin",
-  "Administrative",
-  "IT",
-  "Maintenance",
-] as const;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -152,25 +138,45 @@ export default function AddUserDialog({
   const [errors, setErrors] = React.useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const [departments, setDepartments] = React.useState<string[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = React.useState(false);
+  const [warehouses, setWarehouses] = React.useState<string[]>([]);
+  const [warehousesLoading, setWarehousesLoading] = React.useState(false);
+  const [listsLoadFailed, setListsLoadFailed] = React.useState(false);
+
   React.useEffect(() => {
-    if (!open) {
-      const timer = setTimeout(() => {
-        setFirstName("");
-        setLastName("");
-        setEmail("");
-        setPassword("");
-        setShowPassword(false);
-        setAddress("");
-        setContactNumber("");
-        setWarehouse("");
-        setRole("");
-        setDepartment("");
-        setStatus("");
-        setErrors({});
-        setIsSubmitting(false);
-      }, 200);
-      return () => clearTimeout(timer);
+    if (open) {
+      setDepartmentsLoading(true);
+      setWarehousesLoading(true);
+      setListsLoadFailed(false);
+      fetchDepartments()
+        .then(setDepartments)
+        .catch(() => setListsLoadFailed(true))
+        .finally(() => setDepartmentsLoading(false));
+      fetchWarehouses()
+        .then(setWarehouses)
+        .catch(() => setListsLoadFailed(true))
+        .finally(() => setWarehousesLoading(false));
+      return;
     }
+    const timer = setTimeout(() => {
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPassword("");
+      setShowPassword(false);
+      setAddress("");
+      setContactNumber("");
+      setWarehouse("");
+      setRole("");
+      setDepartment("");
+      setStatus("");
+      setErrors({});
+      setIsSubmitting(false);
+      setDepartments([]);
+      setWarehouses([]);
+    }, 200);
+    return () => clearTimeout(timer);
   }, [open]);
 
   function validate(): FormErrors {
@@ -313,7 +319,7 @@ export default function AddUserDialog({
             <Input
               id="add-email"
               type="email"
-              placeholder="e.g. jane.cooper@lankalogix.lk"
+              placeholder="e.g. nuwan.mech@lankalogix.com"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -424,15 +430,16 @@ export default function AddUserDialog({
                 if (errors.department)
                   setErrors((p) => ({ ...p, department: undefined }));
               }}
+              disabled={departmentsLoading}
             >
               <SelectTrigger
                 id="add-department"
                 className="w-full bg-background"
               >
-                <SelectValue placeholder="Select department" />
+                <SelectValue placeholder={departmentsLoading ? "Loading…" : "Select department"} />
               </SelectTrigger>
               <SelectContent>
-                {DEPARTMENTS.map((d) => (
+                {departments.map((d) => (
                   <SelectItem key={d} value={d}>
                     {d}
                   </SelectItem>
@@ -486,23 +493,27 @@ export default function AddUserDialog({
                 if (errors.warehouse)
                   setErrors((p) => ({ ...p, warehouse: undefined }));
               }}
+              disabled={warehousesLoading}
             >
               <SelectTrigger
                 id="add-warehouse"
                 className="w-full bg-background"
               >
-                <SelectValue placeholder="Select warehouse" />
+                <SelectValue placeholder={warehousesLoading ? "Loading…" : "Select warehouse"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="LankaLogix - Colombo">
-                  LankaLogix - Colombo
-                </SelectItem>
-                <SelectItem value="Main Branch - Colombo">
-                  Main Branch - Colombo
-                </SelectItem>
-                <SelectItem value="Galle">Galle</SelectItem>
+                {warehouses.map((w) => (
+                  <SelectItem key={w} value={w}>
+                    {w}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {listsLoadFailed && (
+              <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                Failed to load department/warehouse lists — try reopening this dialog.
+              </p>
+            )}
           </FieldCard>
 
           {/* Buttons */}

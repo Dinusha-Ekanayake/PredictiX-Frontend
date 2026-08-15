@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { fetchMyProfile } from "@/lib/api/userProfileApi";
+import { apiFetch } from "@/lib/apiClient";
 import { Camera, Loader2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -60,12 +61,8 @@ export default function ProfilePhotoUpload() {
     formData.append("file", file);
 
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("predictix.access_token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/profiles/me/avatar`, {
+      const res = await apiFetch("/profiles/me/avatar", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-        },
         body: formData,
       });
 

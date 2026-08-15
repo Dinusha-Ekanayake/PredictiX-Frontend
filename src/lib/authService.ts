@@ -129,6 +129,12 @@ export function storeAuthSession(data: LoginResponse): void {
   if (data.avatar_url) {
     localStorage.setItem("predictix.avatar_url", data.avatar_url);
   }
+
+  // Any snapshot still on this device belongs to the previous session — a
+  // different person, or the same super admin on a different warehouse. Drop it
+  // so the chatbot cannot answer the new session from the old one's data. The
+  // pages that own these caches repopulate them on their next load.
+  clearCachedWarehouseData();
 }
 
 /** Return the stored JWT access token, or null. */
@@ -152,18 +158,48 @@ export function getUser(): StoredUser | null {
   }
 }
 
-/** Remove all auth data (logout). */
+/** Identity/session keys written at login. */
+const AUTH_STORAGE_KEYS = [
+  "predictix.access_token",
+  "token",
+  "predictix.user",
+  "predictix.user.role",
+  "predictix.user.email",
+  "predictix.user.id",
+  "predictix.user.name",
+  "predictix.user.warehouse_id",
+  "predictix.user.warehouse_name",
+  "predictix.avatar_url",
+] as const;
+
+/**
+ * Snapshots of warehouse data cached by the dashboard and assets pages.
+ *
+ * These are not decoration: FloatingChatbot reads them and sends them to the
+ * agent as `frontend_context`, so whatever is here becomes the material the
+ * assistant answers from. They must be cleared whenever the viewer or the
+ * viewed warehouse changes — previously logout() cleared only the identity keys
+ * above, so on a shared machine the next person to sign in got the previous
+ * admin's figures in their chatbot context, and a super admin switching sites
+ * kept answering from the warehouse they had just left.
+ */
+export const CACHED_DATA_STORAGE_KEYS = [
+  "predictix.cached_dashboard_data",
+  "predictix.cached_asset_stats",
+  "predictix.cached_asset_analytics",
+] as const;
+
+/** Drop cached warehouse snapshots without touching the session. */
+export function clearCachedWarehouseData(): void {
+  if (typeof window === "undefined") return;
+  for (const key of CACHED_DATA_STORAGE_KEYS) localStorage.removeItem(key);
+}
+
+/** Remove all auth data and any cached warehouse snapshots (logout). */
 export function logout(): void {
-  localStorage.removeItem("predictix.access_token");
-  localStorage.removeItem("token");
-  localStorage.removeItem("predictix.user");
-  localStorage.removeItem("predictix.user.role");
-  localStorage.removeItem("predictix.user.email");
-  localStorage.removeItem("predictix.user.id");
-  localStorage.removeItem("predictix.user.name");
-  localStorage.removeItem("predictix.user.warehouse_id");
-  localStorage.removeItem("predictix.user.warehouse_name");
-  localStorage.removeItem("predictix.avatar_url");
+  if (typeof window === "undefined") return;
+  for (const key of AUTH_STORAGE_KEYS) localStorage.removeItem(key);
+  clearCachedWarehouseData();
 }
 
 /** True if a JWT is present in localStorage. */

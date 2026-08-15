@@ -90,6 +90,7 @@ function fromAsset(a: Asset): FormState {
   };
 }
 
+/** Dialog for creating an asset or editing an existing one, including its photos. */
 export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: Props) {
   const isEdit = !!asset;
   const [form, setForm] = React.useState<FormState>(EMPTY);
@@ -101,11 +102,27 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
   const [imagePreviews, setImagePreviews] = React.useState<string[]>([]);
   const [existingImages, setExistingImages] = React.useState<string[]>([]);
 
+  // Object URLs are only freed by an explicit revokeObjectURL call. This ref
+  // mirrors the latest previews so any code clearing the array can revoke the
+  // exact URLs it is discarding, without closing over stale state.
+  const imagePreviewsRef = React.useRef<string[]>([]);
+  React.useEffect(() => {
+    imagePreviewsRef.current = imagePreviews;
+  }, [imagePreviews]);
+
+  // Revoke whatever's still held if the dialog unmounts entirely (e.g. the
+  // parent page navigates away) without going through the reset effect below.
+  React.useEffect(() => {
+    return () => {
+      imagePreviewsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+
   // Load options + reset form when the dialog opens
   React.useEffect(() => {
     if (!open) return;
     setForm(asset ? fromAsset(asset) : EMPTY);
-    
+
     // Check if asset has existing image(s)
     const existing = asset?.meta?.images || [];
     const legacy = asset?.meta?.image_url;
@@ -113,11 +130,14 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
     if (legacy && !allExisting.includes(legacy)) {
       allExisting.unshift(legacy);
     }
-    
+
     setExistingImages(allExisting);
+    // Free the previous session's preview URLs before starting a new one,
+    // otherwise each image added or removed leaks one for the page's lifetime.
+    imagePreviewsRef.current.forEach((url) => URL.revokeObjectURL(url));
     setImagePreviews([]);
     setImageFiles([]);
-    
+
     getWarehouseOptions().then(setWarehouses).catch(() => setWarehouses([]));
     getDepartmentOptions().then(setDepartments).catch(() => setDepartments([]));
   }, [open, asset]);
@@ -125,12 +145,12 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    
+
     const validFiles = files.filter(f => f.size <= 5 * 1024 * 1024);
     if (validFiles.length < files.length) {
       toast.error("Some files too large", { description: "Each image must be under 5MB" });
     }
-    
+
     if (validFiles.length > 0) {
       setImageFiles(prev => [...prev, ...validFiles]);
       setImagePreviews(prev => [...prev, ...validFiles.map(f => URL.createObjectURL(f))]);
@@ -138,6 +158,8 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
   }
 
   function removeNewImage(index: number) {
+    const removedUrl = imagePreviewsRef.current[index];
+    if (removedUrl) URL.revokeObjectURL(removedUrl);
     setImageFiles(prev => prev.filter((_, i) => i !== index));
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
   }
@@ -253,6 +275,7 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
                     <button
                       type="button"
                       onClick={() => removeNewImage(idx)}
+                      aria-label={`Remove image ${idx + 1}`}
                       className="absolute top-0.5 right-0.5 bg-black/60 text-white p-0.5 rounded-full hover:bg-black/80 transition-colors"
                     >
                       <X className="w-3 h-3" />
@@ -264,28 +287,28 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Asset Code *">
-              <Input value={form.asset_code} onChange={(e) => set("asset_code", e.target.value)}
+            <Field label="Asset Code *" htmlFor="asset-code">
+              <Input id="asset-code" value={form.asset_code} onChange={(e) => set("asset_code", e.target.value)}
                 placeholder="e.g. SLW1234" disabled={isEdit} />
             </Field>
-            <Field label="Asset Name *">
-              <Input value={form.asset_name} onChange={(e) => set("asset_name", e.target.value)}
+            <Field label="Asset Name *" htmlFor="asset-name">
+              <Input id="asset-name" value={form.asset_name} onChange={(e) => set("asset_name", e.target.value)}
                 placeholder="e.g. Forklift FL-22" />
             </Field>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Warehouse *">
+            <Field label="Warehouse *" htmlFor="asset-warehouse">
               <Select value={form.warehouse_id} onValueChange={(v) => set("warehouse_id", v)}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Select warehouse" /></SelectTrigger>
+                <SelectTrigger id="asset-warehouse" className="w-full"><SelectValue placeholder="Select warehouse" /></SelectTrigger>
                 <SelectContent>
                   {warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Department">
+            <Field label="Department" htmlFor="asset-department">
               <Select value={form.department_id} onValueChange={(v) => set("department_id", v)}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Select department" /></SelectTrigger>
+                <SelectTrigger id="asset-department" className="w-full"><SelectValue placeholder="Select department" /></SelectTrigger>
                 <SelectContent>
                   {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                 </SelectContent>
@@ -294,47 +317,47 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Asset Type">
-              <Input value={form.asset_type} onChange={(e) => set("asset_type", e.target.value)} placeholder="vehicle" />
+            <Field label="Asset Type" htmlFor="asset-type">
+              <Input id="asset-type" value={form.asset_type} onChange={(e) => set("asset_type", e.target.value)} placeholder="vehicle" />
             </Field>
-            <Field label="Category">
-              <Input value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="e.g. Forklift" />
+            <Field label="Category" htmlFor="asset-category">
+              <Input id="asset-category" value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="e.g. Forklift" />
             </Field>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Make">
-              <Input value={form.make} onChange={(e) => set("make", e.target.value)} />
+            <Field label="Make" htmlFor="asset-make">
+              <Input id="asset-make" value={form.make} onChange={(e) => set("make", e.target.value)} />
             </Field>
-            <Field label="Model">
-              <Input value={form.model} onChange={(e) => set("model", e.target.value)} />
+            <Field label="Model" htmlFor="asset-model">
+              <Input id="asset-model" value={form.model} onChange={(e) => set("model", e.target.value)} />
             </Field>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Manufacture Year">
-              <Input type="number" value={form.manufacture_year} onChange={(e) => set("manufacture_year", e.target.value)} placeholder="2022" />
+            <Field label="Manufacture Year" htmlFor="asset-manufacture-year">
+              <Input id="asset-manufacture-year" type="number" value={form.manufacture_year} onChange={(e) => set("manufacture_year", e.target.value)} placeholder="2022" />
             </Field>
-            <Field label="Reg. Number">
-              <Input value={form.registration_number} onChange={(e) => set("registration_number", e.target.value)} />
+            <Field label="Reg. Number" htmlFor="asset-registration-number">
+              <Input id="asset-registration-number" value={form.registration_number} onChange={(e) => set("registration_number", e.target.value)} />
             </Field>
-            <Field label="VIN">
-              <Input value={form.vin} onChange={(e) => set("vin", e.target.value)} />
+            <Field label="VIN" htmlFor="asset-vin">
+              <Input id="asset-vin" value={form.vin} onChange={(e) => set("vin", e.target.value)} />
             </Field>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Status">
+            <Field label="Status" htmlFor="asset-status">
               <Select value={form.status} onValueChange={(v) => set("status", v)}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="asset-status" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s.replace("_", " ")}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Health Band">
+            <Field label="Health Band" htmlFor="asset-health-band">
               <Select value={form.health_band} onValueChange={(v) => set("health_band", v)}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Not set" /></SelectTrigger>
+                <SelectTrigger id="asset-health-band" className="w-full"><SelectValue placeholder="Not set" /></SelectTrigger>
                 <SelectContent>
                   {HEALTH_BANDS.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                 </SelectContent>
@@ -342,8 +365,8 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
             </Field>
           </div>
 
-          <Field label="Description">
-            <Input value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Optional notes" />
+          <Field label="Description" htmlFor="asset-description">
+            <Input id="asset-description" value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Optional notes" />
           </Field>
 
           <div className="grid grid-cols-2 gap-3 pt-1">
@@ -360,10 +383,10 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+      <Label htmlFor={htmlFor} className="text-xs font-medium text-muted-foreground">{label}</Label>
       {children}
     </div>
   );

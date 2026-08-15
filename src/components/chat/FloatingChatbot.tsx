@@ -130,16 +130,16 @@ function RecordSummaryWidget({ payload }: { payload: any }) {
           if (!value || key === "id" || key.endsWith("_id")) return null;
           
           const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          let displayValue: any = String(value);
-          
+          const textValue = String(value);
+          let displayValue: React.ReactNode = textValue;
           // Badge formatting for common statuses
           if (key === "status" || key === "priority" || key === "role") {
-            const isGood = displayValue === "active" || displayValue === "resolved" || displayValue === "admin";
-            const isWarn = displayValue === "medium" || displayValue === "in_progress" || displayValue === "open";
+            const isGood = textValue === "active" || textValue === "resolved" || textValue === "admin";
+            const isWarn = textValue === "medium" || textValue === "in_progress" || textValue === "open";
             const variant = isGood ? "default" : (isWarn ? "secondary" : "destructive");
             displayValue = (
               <Badge variant={variant as any} className="text-[10px] uppercase h-4 px-1.5 py-0 leading-none">
-                {displayValue.replace(/_/g, ' ')}
+                {textValue.replace(/_/g, ' ')}
               </Badge>
             );
           }

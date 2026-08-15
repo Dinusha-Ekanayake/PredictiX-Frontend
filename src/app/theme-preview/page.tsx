@@ -1,4 +1,5 @@
 import * as React from "react";
+import { notFound } from "next/navigation";
 import {
   Boxes, Ticket, Activity, Flame, ShieldCheck, AlertTriangle,
   CheckCircle, RefreshCw, Plus,
@@ -207,7 +208,14 @@ function Pill({ icon: Icon, label, tone }: { icon: React.ElementType; label: str
   );
 }
 
+// Dev-only palette comparison tool — not a real product page. 404s in
+// production so it's never a live, unauthenticated, unlinked route
+// (same pattern as /test-loader).
 export default function ThemePreviewPage() {
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 p-8 text-slate-100">
       <div className="mx-auto max-w-7xl space-y-2">

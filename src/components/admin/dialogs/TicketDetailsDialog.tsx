@@ -156,7 +156,6 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     const r = (currentUserRole || "").toLowerCase();
     return r === "admin" || r === "superadmin" || r === "super_admin";
   }, [isAdmin, currentUserRole]);
-
   const canDelete = React.useMemo(() => {
     const role = (currentUserRole || "").toLowerCase();
     if (role === "admin" || role === "superadmin" || role === "super_admin") {

@@ -36,6 +36,9 @@ function initials(name: string) {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
+/** Teammates shown on the dashboard card; the rest live on /user/users. */
+const TEAM_PREVIEW_COUNT = 8;
+
 export default function UserDashboardPage() {
   const [profile, setProfile] = React.useState<UserProfileData | null>(null);
   const [assets, setAssets] = React.useState<UserAssetData[]>([]);
@@ -54,7 +57,11 @@ export default function UserDashboardPage() {
           fetchMyProfile(),
           fetchMyAssets().catch(() => [] as UserAssetData[]),
           fetchMyStats().catch(() => ({ assignedAssets: 0, activeAssets: 0 })),
-          getTeamMembers().catch(() => [] as TeamMemberData[]),
+          // One more than the card renders: the extra row only decides whether
+          // to show the "view all" link. Unbounded this fetched the entire
+          // department — 519 people / 150 KB to render 8 — and was the slowest
+          // of these four parallel calls.
+          getTeamMembers(TEAM_PREVIEW_COUNT + 1).catch(() => [] as TeamMemberData[]),
         ]);
         if (cancelled) return;
         setProfile(p); setAssets(a); setStats(s); setTeam(t);
@@ -204,15 +211,17 @@ export default function UserDashboardPage() {
         <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
+              {/* No count here: this card deliberately fetches only a preview,
+                  so team.length is the page size, not the size of the
+                  department. The full count lives on /user/users. */}
               <UsersIcon className="h-4 w-4 text-muted-foreground" /> My Team
-              {team.length > 0 && <span className="text-xs font-normal text-muted-foreground">({team.length})</span>}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {team.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">No teammates found in your department.</p>
             ) : (
-              team.slice(0, 8).map((m) => (
+              team.slice(0, TEAM_PREVIEW_COUNT).map((m) => (
                 <div key={m.id} className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/40">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
                     {initials(m.name)}
@@ -224,10 +233,12 @@ export default function UserDashboardPage() {
                 </div>
               ))
             )}
-            {team.length > 8 && (
+            {/* The extra row fetched beyond the preview is the signal that
+                more exist — it is not rendered, only counted. */}
+            {team.length > TEAM_PREVIEW_COUNT && (
               <Link href="/user/users">
                 <Button variant="ghost" size="sm" className="w-full gap-1 text-xs text-muted-foreground">
-                  View all {team.length} <ChevronRight className="h-3.5 w-3.5" />
+                  View all teammates <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </Link>
             )}

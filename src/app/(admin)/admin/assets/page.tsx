@@ -11,6 +11,7 @@ import PredictiXLoader from "@/components/loading/PredictiXLoader";
 
 import AssetsSummary from "@/components/admin/assets/AssetsSummary";
 import AssetsAnalytics from "@/components/admin/assets/AssetsAnalytics";
+import AssignAssetDialog from "@/components/admin/assets/AssignAssetDialog";
 import AssetsToolbar, { DEFAULT_FILTERS } from "@/components/admin/assets/AssetsToolbar";
 import AssetsTable from "@/components/admin/assets/AssetsTable";
 import AssetDetailsPanel, { AssetDetailsSkeleton } from "@/components/admin/assets/AssetDetailsPanel";
@@ -41,10 +42,9 @@ import type {
    Page
    ══════════════════════════════════════════════════════════════════════════════ */
 export default function AdminAssetsPage() {
-  // ── Deep-link support: ?asset_id=<uuid> (e.g. from the dashboard's Top
-  // Risk Assets list) selects that asset directly, independent of which
-  // paginated list page it happens to be on. Read once on mount — the
-  // asset list's own auto-select effect below must not override this.
+  // Deep link support. ?asset_id=<uuid>, used by the dashboard's Top Risk
+  // list, selects that asset directly whatever page it sits on. The list's own
+  // auto-select effect below must not override it.
   const searchParams = useSearchParams();
   const currentDeepLink = searchParams.get("asset_id");
 
@@ -56,7 +56,13 @@ export default function AdminAssetsPage() {
 
   const [hasDeepLinked, setHasDeepLinked] = React.useState(!!currentDeepLink);
 
-  // ── Asset list state (paginated — 50 rows/page instead of the whole fleet) ─────
+  // Assignment dialog. The page owns it so the detail panel stays presentational,
+  // matching how the report modal is handled.
+  const [assignTarget, setAssignTarget] = React.useState<{
+    id: string; name: string; code: string; assignedTo: string | null;
+  } | null>(null);
+
+  // ── Asset list state, 50 rows per page ────────────────────────────────────────
   const [filters, setFilters] = React.useState<AssetFilters>(DEFAULT_FILTERS);
   const [page, setPage] = React.useState(1);
   const [assets, setAssets] = React.useState<AssetListItem[]>([]);
@@ -98,7 +104,12 @@ export default function AdminAssetsPage() {
   const [editingAsset, setEditingAsset] = React.useState<Asset | null>(null);
 
   // ── Warehouse options + fleet-wide stats: fetched once, refreshed after writes ──
+  const [statsLoading, setStatsLoading] = React.useState(true);
+  const [statsError, setStatsError] = React.useState<string | null>(null);
+
   const loadStatsAndWarehouses = React.useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError(null);
     try {
       const [statsData, analyticsData, whOptions] = await Promise.all([
         getAssetStats(),
@@ -115,7 +126,13 @@ export default function AdminAssetsPage() {
         window.localStorage.setItem("predictix.cached_asset_analytics", JSON.stringify(analyticsData));
       }
     } catch (e: unknown) {
-      console.warn("Failed to load asset stats / warehouse options:", e instanceof Error ? e.message : e);
+      // Record the failure so the cards can show an error state. Leaving
+      // stats null would keep them on the loading skeleton forever.
+      const message = e instanceof Error ? e.message : "Failed to load fleet stats";
+      console.warn("Failed to load asset stats / warehouse options:", message);
+      setStatsError(message);
+    } finally {
+      setStatsLoading(false);
     }
   }, []);
 
@@ -123,12 +140,23 @@ export default function AdminAssetsPage() {
     loadStatsAndWarehouses();
   }, [loadStatsAndWarehouses]);
 
-  // Reset to page 1 whenever filters change (a filter change invalidates the
-  // current page — searching for something on page 3 would otherwise show
-  // nothing while still claiming to be "page 3").
+  // Reset to page 1 when filters change, otherwise a search made on page 3
+  // shows nothing while still claiming to be on page 3.
   React.useEffect(() => {
     setPage(1);
   }, [filters]);
+
+  // A deep-linked selection stays pinned until the user moves off it, either
+  // by clicking another row or by changing the filters or page. The first run
+  // is skipped so a fresh ?asset_id= link is not cleared before the list loads.
+  const isFirstFilterPageRun = React.useRef(true);
+  React.useEffect(() => {
+    if (isFirstFilterPageRun.current) {
+      isFirstFilterPageRun.current = false;
+      return;
+    }
+    setHasDeepLinked(false);
+  }, [filters, page]);
 
   // ── Load one page of the asset list whenever filters or page change ────────────
   React.useEffect(() => {
@@ -147,10 +175,9 @@ export default function AdminAssetsPage() {
         setAssets(data);
         setTotalCount(count);
 
-        // Auto-select first asset on this page if current selection isn't on
-        // it — unless the current selection came from a ?asset_id= deep
-        // link, which is deliberately allowed to be an asset that isn't on
-        // this (arbitrary, unrelated) page of the fleet-wide list.
+        // Select the first row when the current selection is not on this page.
+        // A deep-linked asset is exempt, since it may legitimately sit on a
+        // different page of the list.
         if (!hasDeepLinked && (!selectedId || !data.find((a) => a.id === selectedId))) {
           setSelectedId(data[0]?.id ?? null);
         }
@@ -197,11 +224,9 @@ export default function AdminAssetsPage() {
   }, [selectedId, loadDetail]);
 
   // ── Refresh detail ────────────────────────────────────────────────────────────
-  // Re-fetches the currently selected asset's detail directly rather than
-  // toggling selectedId (setSelectedId(id => id) is a no-op in React since
-  // the value is unchanged — that silently never re-triggered the load
-  // effect, so "Run AI" / Log Maintenance / Retry all showed a "success"
-  // toast while the panel kept displaying pre-action stale data).
+  // Refetches the selected asset directly. Re-setting selectedId to the same
+  // value would not re-run the load effect, leaving the panel showing stale
+  // data after actions like Run AI or Log Maintenance.
   function refreshDetail() {
     if (!selectedId) return;
     loadDetail(selectedId);
@@ -240,10 +265,9 @@ export default function AdminAssetsPage() {
     loadStatsAndWarehouses();
   }
 
-  // ── Fleet-wide stats for hero header (from /assets/stats — independent of page) ─
+  // ── Fleet-wide stats for the hero header, independent of the current page ─────
   const criticalCount = stats?.critical ?? 0;
   const avgHealth = stats?.avgHealth ?? 0;
-  const statsLoading = stats === null;
   const totalPages = Math.max(1, Math.ceil(totalCount / ASSETS_PAGE_SIZE));
 
   if (initialLoad) {
@@ -321,6 +345,23 @@ export default function AdminAssetsPage() {
         </div>
       )}
 
+      {/* ── Stats/analytics error ── */}
+      {statsError && (
+        <div className="flex items-center gap-3 rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-500/10 px-5 py-4 text-sm text-red-700 dark:text-red-400">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>Failed to load fleet stats: {statsError}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7 rounded-lg gap-1.5 text-xs text-red-700 dark:text-red-400 hover:text-red-800"
+            onClick={loadStatsAndWarehouses}
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </Button>
+        </div>
+      )}
+
       {/* ── Summary KPIs ── */}
       <AssetsSummary stats={stats} loading={statsLoading} />
 
@@ -335,8 +376,6 @@ export default function AdminAssetsPage() {
         warehouseOptions={warehouseOptions}
         loading={listLoading}
         onAddAsset={openCreate}
-        selectedAssetId={selectedId}
-        selectedAssetName={detail?.asset?.asset_name}
       />
 
       {/* ── Table + Details ── */}
@@ -412,6 +451,15 @@ export default function AdminAssetsPage() {
               onDelete={handleDelete}
               onEdit={openEdit}
               onReport={() => openReport(detail.asset.id, detail.asset.asset_name)}
+              onAssign={(a) =>
+                setAssignTarget({
+                  id: a.id,
+                  name: a.asset_name,
+                  code: a.asset_code,
+                  assignedTo: a.assigned_to ?? null,
+                })
+              }
+              warehouseOptions={warehouseOptions}
             />
           ) : (
             <div className="card-dynamic flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-card px-6 py-24 text-center transition-all">
@@ -440,6 +488,27 @@ export default function AdminAssetsPage() {
         asset={editingAsset}
         onSaved={handleSaved}
       />
+
+      {/* ── Assign dialog ── */}
+      {assignTarget && (
+        <AssignAssetDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setAssignTarget(null);
+          }}
+          assetId={assignTarget.id}
+          assetName={assignTarget.name}
+          assetCode={assignTarget.code}
+          currentAssigneeId={assignTarget.assignedTo}
+          onAssigned={() => {
+            // Refresh both: the panel shows the new assignee, and the list's
+            // assignment filter and counts depend on it.
+            invalidateAssetListCache();
+            refreshDetail();
+            setAssignTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 }

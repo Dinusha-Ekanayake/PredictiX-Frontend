@@ -24,6 +24,7 @@ type Props = {
   hasServiceDate: boolean;
 };
 
+/** Button that emails the assigned user a reminder about an upcoming service. */
 export default function SendServiceReminderButton({
   assetId,
   assetName,

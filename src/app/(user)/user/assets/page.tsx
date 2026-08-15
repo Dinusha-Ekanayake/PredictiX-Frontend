@@ -8,17 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
-import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
+import UserNewTicketDialog from "@/components/user/dialogs/UserNewTicketDialog";
 import PageHero from "@/components/common/PageHero";
 import { fetchMyAssets, type UserAssetData } from "@/lib/api/userProfileApi";
 import { listAssets } from "@/components/admin/assets/assetService";
 import { DEFAULT_FILTERS } from "@/components/admin/assets/AssetsToolbar";
 import type { AssetListItem } from "@/components/admin/assets/types";
 import UserAssetDetailsDialog from "@/components/user/assets/UserAssetDetailsDialog";
+import { healthColor } from "@/lib/healthBands";
 
-function healthColor(p: number) {
-  return p >= 80 ? "#10b981" : p >= 60 ? "#f59e0b" : "#ef4444";
-}
+/** Days until a date. Negative when it has already passed, null when unset. */
 function daysUntil(d: string | null) {
   return d ? Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000) : null;
 }
@@ -36,6 +35,7 @@ type Row = {
   assigned: boolean;
 };
 
+/** Assets page for non-admin users, listing only the assets assigned to them. */
 export default function UserAssetsPage() {
   const [mine, setMine] = React.useState<UserAssetData[]>([]);
   const [loadingMine, setLoadingMine] = React.useState(true);
@@ -234,14 +234,15 @@ export default function UserAssetsPage() {
         )}
       </div>
 
-      {/* Create ticket on a selected asset (asset locked) */}
-      <NewTicketDialog
+      {/* Create ticket on a selected asset (asset locked). UserNewTicketDialog
+          shows its own success toast + confirmation panel (Create another /
+          Done) — don't duplicate the toast or force-close here. */}
+      <UserNewTicketDialog
         open={ticketAsset !== null}
         onOpenChange={(o) => { if (!o) setTicketAsset(null); }}
         presetAssetId={ticketAsset?.id}
         presetAssetName={ticketAsset?.name}
         lockAsset
-        onCreated={() => { toast.success("Ticket created", { description: "View it under My Tickets." }); setTicketAsset(null); }}
       />
 
       {/* Asset Details Dialog */}

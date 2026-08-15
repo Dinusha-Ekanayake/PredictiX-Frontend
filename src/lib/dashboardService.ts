@@ -16,6 +16,12 @@ export interface DashboardKpis {
   fleetHealth: number; // 0–100
   predictedFailures: number;
   estMaintenanceCost: number; // raw amount (LKR)
+  /**
+   * How many assets estMaintenanceCost is summed from. Below totalAssets means
+   * the figure is a partial total and the UI labels it as one. Optional, so an
+   * older backend that omits it is treated as fully covered.
+   */
+  estMaintenanceCostAssetCount?: number;
   // False for a brand-new warehouse with zero PdM predictions run yet —
   // distinguishes "no data" from a genuine (alarming) 0% fleet health.
   hasPredictionData: boolean;
@@ -24,8 +30,10 @@ export interface DashboardKpis {
 // Chart-data rows carry an index signature so recharts accepts them directly.
 export interface HealthTrendPoint {
   month: string; // e.g. "Jan"
-  avgHealth: number; // 0–100
-  [key: string]: string | number;
+  // null when no predictions were recorded that month (real gap, not 0%) —
+  // recharts breaks the line there instead of drawing a false zero.
+  avgHealth: number | null; // 0–100
+  [key: string]: string | number | null;
 }
 
 export interface TicketTrendPoint {
@@ -42,10 +50,16 @@ export interface HealthDistBucket {
   [key: string]: string | number;
 }
 
+/**
+ * Maintenance spend for a month, split by whether the work was planned.
+ *
+ * Both figures are money already spent. The planned/unplanned split matches
+ * the downtime chart, so the two charts read the same way.
+ */
 export interface CostTrendPoint {
   month: string;
-  estimated: number; // raw amount (LKR)
-  actual: number | null;
+  planned: number;   // raw amount (LKR)
+  unplanned: number; // raw amount (LKR)
   [key: string]: string | number | null;
 }
 
@@ -119,7 +133,7 @@ export interface AdminDashboardData {
   aiSummary: string | null;
   // False when aiSummary is the deterministic KPI-derived fallback string
   // rather than real LLM output — lets the UI avoid claiming
-  // "XGBoost · BERT · RAG / High confidence" for plain templated text.
+  // "AI-Generated / High confidence" for plain templated text.
   aiSummaryIsGenerated: boolean;
   aiInsights: DashboardInsight[];
 }

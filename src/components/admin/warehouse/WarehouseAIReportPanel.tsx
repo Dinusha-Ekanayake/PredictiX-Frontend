@@ -33,6 +33,7 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
 } from "recharts";
 import WarehouseSurvivalAnalysis from "./WarehouseSurvivalAnalysis";
+import type { SurvivalSummary } from "@/lib/warehouseService";
 
 /**
  * WarehouseAIReportPanel
@@ -107,7 +108,9 @@ interface Ctx {
   ticket_trend_direction?: string;
   total_users?: number; active_users?: number; inactive_users?: number;
   admin_users?: number; standard_users?: number;
-  survival_summary?: any;
+  /** Typed rather than `any` so the watchlist rows below are checked — an
+      untyped payload made every `.map()` callback an implicit any. */
+  survival_summary?: SurvivalSummary;
 }
 
 export interface ReportData {
@@ -524,8 +527,13 @@ export default function WarehouseAIReportPanel({
                     </div>
                   )}
                 </div>
-                <SectionDivider label="AI Component & Failure Summary" />
-                <AIBlock text={ai.critical_assets_summary} />
+                {/* A "critical_assets_summary" block used to be rendered here.
+                    The report agent emits exactly five sections — insight_summary,
+                    risk_analysis, maintenance_intelligence, pattern_and_trend and
+                    conclusion (app/agents/report_agents.py) — and never that one,
+                    so the block was always empty and its divider rendered a
+                    heading over nothing. The risk narrative above already comes
+                    from risk_analysis. */}
               </div>
             )}
           </div>
@@ -795,6 +803,7 @@ export default function WarehouseAIReportPanel({
               <SectionHeader
                 icon={HeartPulse} accent={P.teal} collapsed={s6Collapsed} onToggle={toggleS6}
                 title="6. Asset component survival analysis"
+                subtitle="Weibull AFT per-component risk · Expected failures · Soonest-failing watchlist"
               />
               {!s6Collapsed && (
                 <div className="px-6 py-5 space-y-5">
@@ -824,15 +833,6 @@ export default function WarehouseAIReportPanel({
                                   </span>
                                 </td>
                               </tr>
-                              {/* Inject AI Summary if available in data.ai_sections.asset_summaries, though currently the report builder generates them dynamically */}
-                              {data.ai_sections?.asset_summaries?.[w.asset] && (
-                                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/20">
-                                  <td colSpan={4} className="px-3 py-3 text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
-                                    <span className="font-bold text-violet-600 dark:text-violet-400 mr-1">AI Summary:</span>
-                                    {data.ai_sections.asset_summaries[w.asset]}
-                                  </td>
-                                </tr>
-                              )}
                             </React.Fragment>
                           ))}
                         </tbody>

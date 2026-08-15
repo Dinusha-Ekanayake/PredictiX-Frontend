@@ -35,6 +35,12 @@ export interface WarehouseSummaryData {
 export interface SurvivalComponentSummary {
   component: string;
   avg_rul_days: number | null;
+  /** mean P(component fails within 7 / 30 days) over the scored assets */
+  avg_fail_prob_7d: number;
+  avg_fail_prob_30d: number;
+  /** sum of those probabilities — an expected failure count, not a headcount */
+  expected_failures_7d: number;
+  expected_failures_30d: number;
   /** count of scored assets whose component fails within 7 / 30 days */
   at_risk_7d: number;
   at_risk_30d: number;
@@ -175,31 +181,6 @@ export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
   } catch (error) {
     console.error('[ERROR] Failed to fetch warehouse summary:', error);
     throw error;
-  }
-}
-
-/**
- * Fetch critical assets for warehouse table
- */
-export async function getCriticalAssets() {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/assets/?status=at_risk`,
-      {
-        method: 'GET',
-        headers: authHeaders(),
-        cache: 'no-store',
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch critical assets: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching critical assets:', error);
-    return [];
   }
 }
 

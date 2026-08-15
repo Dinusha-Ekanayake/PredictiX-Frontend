@@ -29,6 +29,7 @@ import AddUserDialog from "@/components/admin/users/AddUserDialog";
 import type { NewUser } from "@/components/admin/users/AddUserDialog";
 import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
+import AssignAssetToUserDialog from "@/components/admin/users/AssignAssetToUserDialog";
 import EditUserDialog from "@/components/admin/users/EditUserDialog";
 import { toast } from "@/lib/customToast";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -64,7 +65,7 @@ type AssignedAsset = {
   name: string;
   category: string;
   location: string;
-  healthPercent: number;
+  healthPercent: number | null;
 };
 
 type ChartEntry = {
@@ -414,7 +415,10 @@ export default function AdminUsersPage() {
           name: a.name,
           category: a.category ?? a.asset_type ?? "General",
           location: a.location,
-          healthPercent: Math.round(a.healthPercent),
+          // Null means the asset has no completed prediction. Math.round(null)
+          // is 0, which would render as "0% health" — a worse lie than the
+          // missing value it stands in for.
+          healthPercent: a.healthPercent != null ? Math.round(a.healthPercent) : null,
         }))
       );
     } catch (err) {
@@ -430,6 +434,42 @@ export default function AdminUsersPage() {
   function handleNavigateToAsset(assetId: string) {
     setAssetsUser(null);
     router.push(`/admin/assets?assetId=${assetId}`);
+  }
+
+  /**
+   * Keep the table's per-user assignment count in step after an unassign.
+   * The dialog owns the asset list it renders; this only corrects the count
+   * shown in the row behind it, which would otherwise stay stale until reload.
+   */
+  function handleAssetUnassigned(assetId: string) {
+    setAssignedAssets((prev) => prev.filter((a) => (a.asset_id ?? a.id) !== assetId));
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === assetsUser?.id
+          ? { ...u, assignedAssets: Math.max(0, (u.assignedAssets ?? 0) - 1) }
+          : u
+      )
+    );
+  }
+
+  // Assign dialog for the user currently shown in the assets dialog.
+  const [assigningFor, setAssigningFor] = React.useState<UserItem | null>(null);
+
+  /**
+   * Reload the person's assets after an assignment and correct the row count.
+   * Refetching rather than appending keeps health and location consistent with
+   * what the server actually holds.
+   */
+  async function handleAssetAssigned() {
+    const user = assigningFor;
+    setAssigningFor(null);
+    if (!user) return;
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === user.id ? { ...u, assignedAssets: (u.assignedAssets ?? 0) + 1 } : u
+      )
+    );
+    if (assetsUser?.id === user.id) await handleViewAssets(user);
   }
 
   if (isLoading) {
@@ -665,6 +705,20 @@ export default function AdminUsersPage() {
         onUserUpdated={handleUserUpdated}
       />
 
+      {/* Assign an asset to the person whose assets are open */}
+      {assigningFor && (
+        <AssignAssetToUserDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setAssigningFor(null);
+          }}
+          userId={assigningFor.id}
+          userName={assigningFor.name}
+          alreadyAssignedIds={assignedAssets.map((a) => a.asset_id ?? a.id)}
+          onAssigned={handleAssetAssigned}
+        />
+      )}
+
       {/* View Assigned Assets Dialog */}
       <ViewAssignedAssetsDialog
         userName={assetsUser?.name ?? ""}
@@ -675,6 +729,8 @@ export default function AdminUsersPage() {
           if (!open) setAssetsUser(null);
         }}
         onNavigateToAsset={handleNavigateToAsset}
+        onUnassigned={handleAssetUnassigned}
+        onAssignAnother={assetsUser ? () => setAssigningFor(assetsUser) : undefined}
         onBackToDetails={
           assetsUser
             ? () => {

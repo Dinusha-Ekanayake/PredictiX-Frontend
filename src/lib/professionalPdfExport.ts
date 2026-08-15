@@ -12,6 +12,8 @@
  *   §7 Conclusion (final KPI summary + executive closing)
  */
 
+import { HEALTH_GOOD } from "@/lib/healthBands";
+
 // ══════════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
 // ══════════════════════════════════════════════════════════════════
@@ -717,7 +719,11 @@ export function generateProfessionalHTML(data: ReportData): string {
   const medT   = fmt(_prioMap['medium'] ?? td.mediumPriorityTickets);
   const lowT   = fmt(_prioMap['low'] ?? td.lowPriorityTickets);
 
-  const healthyAssets  = s.healthScoreDistribution.filter(h => !h.bucket.includes('Below') && parseFloat(h.bucket) >= 80).reduce((sum, h) => sum + h.count, 0);
+  // Assets in the "good" band or better, using the shared cut-off from
+  // @/lib/healthBands.
+  // Buckets are labelled "N-M%" or "Below N%", so parseFloat gives the lower
+  // bound and NaN for the "Below" bucket, which drops out of the comparison.
+  const healthyAssets  = s.healthScoreDistribution.filter(h => !h.bucket.includes('Below') && parseFloat(h.bucket) >= HEALTH_GOOD).reduce((sum, h) => sum + h.count, 0);
   const degradedAssets = s.healthScoreDistribution.find(h => h.bucket.includes('Below'))?.count || 0;
   const healthyPct     = totalAssets > 0 ? Math.round(healthyAssets / totalAssets * 100) : 0;
   void degradedAssets; // computed for context, not directly rendered
@@ -814,7 +820,9 @@ export function generateProfessionalHTML(data: ReportData): string {
 
     ${kpiGrid4(
       kpiCard('Total Fleet Assets', fmtN(totalAssets), `${fmtN(activeA)} active`, C.teal),
-      kpiCard('Fleet Health Score', `${healthFleet}%`, `${healthyPct}% assets ≥80%`, healthFleet >= 70 ? C.green : C.orange),
+      // Caption reads from the same constant as the filter above, so the two
+      // cannot drift apart.
+      kpiCard('Fleet Health Score', `${healthFleet}%`, `${healthyPct}% assets ≥${HEALTH_GOOD}%`, healthFleet >= HEALTH_GOOD ? C.green : C.orange),
       kpiCard('Avg Failure Prob.', `${failProb}%`, 'AI model', C.orange),
       kpiCard('Critical Assets', fmtN(critCount), `${Math.round(critCount / Math.max(totalAssets, 1) * 100)}% of fleet`, C.red),
     )}

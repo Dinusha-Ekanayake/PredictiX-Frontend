@@ -81,11 +81,13 @@ export default function NewTicketDialog({
   const [assetId, setAssetId] = React.useState("");
   const [assets, setAssets] = React.useState<Asset[]>([]);
   const [assetsLoading, setAssetsLoading] = React.useState(false);
+  const [assetsLoadFailed, setAssetsLoadFailed] = React.useState(false);
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [assignedTo, setAssignedTo] = React.useState("");
   const [fetchedUsers, setFetchedUsers] = React.useState<UserItem[]>([]);
   const [usersLoading, setUsersLoading] = React.useState(false);
+  const [usersLoadFailed, setUsersLoadFailed] = React.useState(false);
   // Prefer the parent's already-loaded list; fall back to this dialog's own fetch.
   const users = usersProp ?? fetchedUsers;
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -176,17 +178,23 @@ export default function NewTicketDialog({
   React.useEffect(() => {
     if (open) {
       if (presetAssetId) setAssetId(presetAssetId);
-      setAssetsLoading(true);
+      setAssetsLoading(true); setAssetsLoadFailed(false);
       apiGet<Asset[]>("/assets/dropdown")
         .then((d) => setAssets(d ?? []))
-        .catch(() => {})
+        .catch(() => {
+          setAssetsLoadFailed(true);
+          toast.error("Couldn't load assets", { description: "The asset list failed to load. You can still create the ticket without linking an asset, or try reopening this dialog." });
+        })
         .finally(() => setAssetsLoading(false));
 
       if (!usersProp) {
-        setUsersLoading(true);
+        setUsersLoading(true); setUsersLoadFailed(false);
         listUsers()
           .then((d) => setFetchedUsers(d ?? []))
-          .catch(() => {})
+          .catch(() => {
+            setUsersLoadFailed(true);
+            toast.error("Couldn't load users", { description: "The user list failed to load. You can still create the ticket without assigning it, or try reopening this dialog." });
+          })
           .finally(() => setUsersLoading(false));
       }
       return;
@@ -194,6 +202,7 @@ export default function NewTicketDialog({
     const t = setTimeout(() => {
       setAssetId(""); setTitle(""); setDescription(""); setPriority(""); setCategory("");
       setAssignedTo(""); setIsSubmitting(false); setAssets([]); setFetchedUsers([]);
+      setAssetsLoadFailed(false); setUsersLoadFailed(false);
       setAssetSummary(null); setTicketSummary(null); setAi({ status: "idle" }); setFile(null);
     }, 200);
     return () => clearTimeout(t);
@@ -265,7 +274,7 @@ export default function NewTicketDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-160 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Plus className="h-5 w-5" />
@@ -298,6 +307,12 @@ export default function NewTicketDialog({
                 )}
               </select>
             )}
+            {assetsLoadFailed && !lockAsset && (
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                Failed to load the asset list — you can still submit without one.
+              </p>
+            )}
           </div>
 
           {/* Asset Summary */}
@@ -325,7 +340,7 @@ export default function NewTicketDialog({
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[110px] resize-vertical outline-none focus:ring-2 focus:ring-ring"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-27.5 resize-vertical outline-none focus:ring-2 focus:ring-ring"
               placeholder="Describe the issue — AI will analyze this to suggest category and priority"
               disabled={isSubmitting}
             />
@@ -446,6 +461,12 @@ export default function NewTicketDialog({
                 <option value="">Select a user (optional)</option>
                 {users.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
               </select>
+            )}
+            {usersLoadFailed && (
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                Failed to load the user list — you can still submit without an assignee.
+              </p>
             )}
           </div>
 

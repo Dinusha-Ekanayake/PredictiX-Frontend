@@ -46,7 +46,6 @@ const PRIORITY_COLORS = {
 
 const CATEGORY_COLORS = {
   Electrical: "#04dfefff", // Cyan
-  Software: "#ec1e85ff",   // Pink
 };
 
 const PRIORITY_VALS = {
@@ -54,6 +53,97 @@ const PRIORITY_VALS = {
   Medium: 2,
   Low: 1,
 };
+
+// Custom shape to render grid counts as centered badges with active status gradients and hover effects
+function CustomGridNode(props: any) {
+  const { cx, cy, payload } = props;
+  // Hooks run before any early return, so the hook order is identical on
+  // every render. Recharts renders this via `shape={<CustomGridNode />}`,
+  // which makes it a real component as far as React is concerned.
+  const [hovered, setHovered] = React.useState(false);
+
+  if (!cx || !cy) return null;
+
+  const count = payload.count || 0;
+  const xVal = payload.x;
+
+  let startColor = "#475569";
+  let endColor = "#1e293b";
+  let glowColor = "rgba(0, 0, 0, 0.5)";
+  let textFill = "#64748b";
+  let strokeColor = "#334155";
+
+  if (count > 0) {
+    textFill = "#ffffff";
+    strokeColor = "#ffffff";
+    if (xVal === 1) { // Open
+      startColor = "#f87171";
+      endColor = "#dc2626";
+      glowColor = "rgba(239, 68, 68, 0.6)";
+    } else if (xVal === 2) { // In Progress
+      startColor = "#fbbf24";
+      endColor = "#ea580c";
+      glowColor = "rgba(249, 115, 22, 0.6)";
+    } else if (xVal === 3) { // Resolved
+      startColor = "#fde047";
+      endColor = "#ca8a04";
+      glowColor = "rgba(234, 179, 8, 0.6)";
+    } else if (xVal === 4) { // Closed
+      startColor = "#4ade80";
+      endColor = "#16a34a";
+      glowColor = "rgba(34, 197, 94, 0.6)";
+    }
+  }
+
+  const gradId = `badgeGrad-${xVal}-${count > 0 ? "active" : "inactive"}`;
+  const shadowId = `badgeShadow-${xVal}-${count > 0 ? "active" : "inactive"}`;
+
+  return (
+    <g
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        transform: hovered ? "scale(1.15)" : "scale(1)",
+        transformOrigin: `${cx}px ${cy}px`,
+        transition: "transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+        cursor: count > 0 ? "pointer" : "default"
+      }}
+    >
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={startColor} />
+          <stop offset="100%" stopColor={endColor} />
+        </linearGradient>
+        <filter id={shadowId} x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy={hovered ? 5 : 3} stdDeviation={hovered ? 4 : 2} floodColor={glowColor} floodOpacity={count > 0 ? 0.8 : 0.4} />
+        </filter>
+      </defs>
+      <rect
+        x={cx - 24}
+        y={cy - 14}
+        width={48}
+        height={28}
+        rx={14}
+        fill={`url(#${gradId})`}
+        stroke={strokeColor}
+        strokeWidth={hovered ? 2 : 1.5}
+        filter={`url(#${shadowId})`}
+      />
+      <text
+        x={cx}
+        y={cy + 4.5}
+        textAnchor="middle"
+        fill={textFill}
+        fontSize={13}
+        fontWeight="bold"
+        style={{ pointerEvents: "none" }}
+      >
+        {count}
+      </text>
+    </g>
+  );
+}
+
 
 export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   const [data, setData] = useState<TicketData[]>([]);
@@ -149,8 +239,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
 
   const techQueueData = Object.values(techQueueCounts)
     .filter((tech) => tech.name !== "Unassigned")
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 10);
+    .sort((a, b) => b.total - a.total);
 
   // 4. Process data for 4x3 Status vs Category Grid Counts
   const gridCountsData = React.useMemo(() => {
@@ -275,92 +364,6 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
       );
     }
     return null;
-  };
-
-  // Custom shape to render grid counts as centered badges with active status gradients and hover effects
-  const CustomGridNode = (props: any) => {
-    const { cx, cy, payload } = props;
-    if (!cx || !cy) return null;
-
-    const count = payload.count || 0;
-    const xVal = payload.x;
-    const [hovered, setHovered] = React.useState(false);
-
-    let startColor = "#475569";
-    let endColor = "#1e293b";
-    let glowColor = "rgba(0, 0, 0, 0.5)";
-    let textFill = "#64748b";
-    let strokeColor = "#334155";
-
-    if (count > 0) {
-      textFill = "#ffffff";
-      strokeColor = "#ffffff";
-      if (xVal === 1) { // Open
-        startColor = "#f87171";
-        endColor = "#dc2626";
-        glowColor = "rgba(239, 68, 68, 0.6)";
-      } else if (xVal === 2) { // In Progress
-        startColor = "#fbbf24";
-        endColor = "#ea580c";
-        glowColor = "rgba(249, 115, 22, 0.6)";
-      } else if (xVal === 3) { // Resolved
-        startColor = "#fde047";
-        endColor = "#ca8a04";
-        glowColor = "rgba(234, 179, 8, 0.6)";
-      } else if (xVal === 4) { // Closed
-        startColor = "#4ade80";
-        endColor = "#16a34a";
-        glowColor = "rgba(34, 197, 94, 0.6)";
-      }
-    }
-
-    const gradId = `badgeGrad-${xVal}-${count > 0 ? "active" : "inactive"}`;
-    const shadowId = `badgeShadow-${xVal}-${count > 0 ? "active" : "inactive"}`;
-
-    return (
-      <g
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{
-          transform: hovered ? "scale(1.15)" : "scale(1)",
-          transformOrigin: `${cx}px ${cy}px`,
-          transition: "transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-          cursor: count > 0 ? "pointer" : "default"
-        }}
-      >
-        <defs>
-          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={startColor} />
-            <stop offset="100%" stopColor={endColor} />
-          </linearGradient>
-          <filter id={shadowId} x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy={hovered ? 5 : 3} stdDeviation={hovered ? 4 : 2} floodColor={glowColor} floodOpacity={count > 0 ? 0.8 : 0.4} />
-          </filter>
-        </defs>
-        <rect
-          x={cx - 24}
-          y={cy - 14}
-          width={48}
-          height={28}
-          rx={14}
-          fill={`url(#${gradId})`}
-          stroke={strokeColor}
-          strokeWidth={hovered ? 2 : 1.5}
-          filter={`url(#${shadowId})`}
-        />
-        <text
-          x={cx}
-          y={cy + 4.5}
-          textAnchor="middle"
-          fill={textFill}
-          fontSize={13}
-          fontWeight="bold"
-          style={{ pointerEvents: "none" }}
-        >
-          {count}
-        </text>
-      </g>
-    );
   };
 
   // Custom shape to render 3D vertical bars (isometric cuboid)
@@ -641,13 +644,13 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
       </div>
 
       {/* Technician Queue Depth (Horizontal Bar Chart) */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col lg:col-span-2 h-[480px]">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col lg:col-span-2 h-[700px]">
         <div className="mb-2">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-200">
             <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Technician Workload
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Top 10 maintenance technicians by active ticket workload.
+            Active tickets assigned to each maintenance technician.
           </p>
         </div>
         <div className="flex-1 w-full min-h-0">

@@ -49,9 +49,22 @@ export interface CreateUserPayload {
   status: UserStatus;
   password?: string;        // ← added
 }
+const USERS_PAGE_SIZE = 1000;
 
 export async function listUsers(): Promise<UserItem[]> {
-  return apiGet<UserItem[]>("/users/");
+  const all: UserItem[] = [];
+  let offset = 0;
+
+  while (true) {
+    const page = await apiGet<UserItem[]>(
+      `/users/?limit=${USERS_PAGE_SIZE}&offset=${offset}`
+    );
+    all.push(...page);
+    if (page.length < USERS_PAGE_SIZE) break; // last page
+    offset += USERS_PAGE_SIZE;
+  }
+
+  return all;
 }
 
 export async function createUser(

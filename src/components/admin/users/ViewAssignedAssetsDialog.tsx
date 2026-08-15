@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Box, MapPin, ExternalLink, Loader2, UserMinus } from "lucide-react";
+import { Box, MapPin, ExternalLink, Loader2, UserMinus, Plus } from "lucide-react";
 import { toast } from "@/lib/customToast";
 import { unassignAsset } from "@/lib/userService";
 import { healthBadgeClass, formatHealth } from "@/lib/healthBands";
@@ -45,6 +45,11 @@ type Props = {
    * when a handler is supplied.
    */
   onUnassigned?: (assetId: string) => void;
+  /**
+   * Opens the asset picker. Omit it to hide the assign action, which is how
+   * a read-only view of someone's assets is rendered.
+   */
+  onAssignAnother?: () => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -52,9 +57,8 @@ type Props = {
 // ---------------------------------------------------------------------------
 
 function HealthBadge({ percent }: { percent: number | null }) {
-  // Bands come from the shared definition rather than being re-derived here.
-  // The old local 80/60 split could never render green — health scores top out
-  // at 79 across the fleet — and a null score printed "Health: null%".
+  // Bands and colours come from @/lib/healthBands. A null score renders as a
+  // dash rather than a number.
   return (
     <Badge
       variant="outline"
@@ -163,6 +167,7 @@ export default function ViewAssignedAssetsDialog({
   onBackToDetails,
   onNavigateToAsset,
   onUnassigned,
+  onAssignAnother,
 }: Props) {
   const [assets, setAssets] = React.useState<AssetItem[]>(initialAssets);
   const [removingId, setRemovingId] = React.useState<string | null>(null);
@@ -213,9 +218,15 @@ export default function ViewAssignedAssetsDialog({
             Loading assigned assets…
           </p>
         ) : assets.length === 0 ? (
-          <p className="py-6 text-center text-muted-foreground">
-            No assets currently assigned.
-          </p>
+          <div className="py-6 text-center">
+            <p className="text-muted-foreground">No assets currently assigned.</p>
+            {onAssignAnother && (
+              <Button className="mt-3" size="sm" onClick={onAssignAnother}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Assign an asset
+              </Button>
+            )}
+          </div>
         ) : (
           <div className="grid gap-3 pt-1">
             {assets.map((asset) => (
@@ -228,6 +239,13 @@ export default function ViewAssignedAssetsDialog({
               />
             ))}
           </div>
+        )}
+
+        {onAssignAnother && assets.length > 0 && (
+          <Button variant="outline" className="mt-1 w-full" onClick={onAssignAnother}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Assign another asset
+          </Button>
         )}
 
         {onBackToDetails && (

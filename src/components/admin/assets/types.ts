@@ -1,6 +1,9 @@
-// ─── AssetListItem (from AssetListOut — trimmed projection for the list view) ──
-// GET /assets/ returns only these fields (not the full Asset below) so the
-// list page doesn't transfer/parse 34 columns per row for ~1000+ rows.
+/**
+ * One row in the assets list, as returned by `GET /assets/`.
+ *
+ * A smaller version of {@link Asset}. The list can show ~1000 rows, so the
+ * endpoint sends only the columns the table and filters actually use.
+ */
 export type AssetListItem = {
   id: string;
   asset_code: string;
@@ -20,23 +23,25 @@ export type AssetListItem = {
   };
 };
 
+/** Headline counts for the assets summary cards, scoped to the caller's warehouse. */
 export type AssetStats = {
   total: number;
   operational: number;
   maintenance: number;
   critical: number;
   offline: number;
-  // null when no asset in scope has a completed PdM prediction yet — real
-  // "no data" state, not a fabricated 0%/estimate.
+  /** Mean health score, or null when no asset in scope has been scored yet. */
   avgHealth: number | null;
-  // How many of `total` assets avgHealth is actually averaged over.
+  /** How many of `total` assets `avgHealth` is averaged over. */
   avgHealthScoredCount: number;
 };
 
+/** Counts already grouped by the backend, ready for the analytics charts. */
 export type AssetAnalytics = {
   statusDistribution: { name: string; value: number }[];
   healthDistribution: { name: string; value: number }[];
   vehicleTypeDistribution: { name: string; value: number }[];
+  /** Lowest-health assets, for the "needs attention" list. */
   topAtRisk: {
     id: string;
     asset_name: string;
@@ -45,8 +50,12 @@ export type AssetAnalytics = {
   }[];
 };
 
-// ─── Asset (from models.py Asset + AssetOut schema) ───────────────────────────
-// Full shape — only returned by GET /assets/{id} (single-asset detail).
+/**
+ * A single asset in full, as returned by `GET /assets/{id}`.
+ *
+ * Mirrors the backend `AssetOut` schema. Note it carries no `created_at` /
+ * `updated_at`, because the endpoint does not return them.
+ */
 export type Asset = {
   id: string;
   asset_code: string;
@@ -61,8 +70,7 @@ export type Asset = {
   manufacture_year: number | null;
   registration_number: string | null;
   vin: string | null;
-  // Warehouse parking bay, "<zone>-<bay>" e.g. "A-012". Unique per warehouse;
-  // null when the vehicle has no assigned bay.
+  /** Parking bay as `"<zone>-<bay>"` (e.g. `"A-012"`), unique per warehouse. */
   parking_slot: string | null;
   status: string;                  // "active" | "inactive" | "under_maintenance" | "critical" | "decommissioned"
   health_band: string | null;      // "excellent" | "good" | "moderate" | "poor" | "critical"
@@ -84,27 +92,28 @@ export type Asset = {
   make_model: string | null;
   maintenance_priority: string | null;
   service_provider_type: string | null;
-  // Custom metadata
+  /** Free-form metadata. `image_url` is the legacy single-image field. */
   meta?: {
-    image_url?: string; // Legacy
+    image_url?: string;
     images?: string[];
     [key: string]: any;
   };
-  // NOTE: AssetOut (app/schemas/asset.py) does not return created_at/
-  // updated_at — this type previously claimed both as always-present
-  // strings, which nothing actually reads today, but which would have
-  // been `undefined` at runtime for any code that started trusting them.
 };
 
-// ─── PDM Batch Prediction (from GET /batch-predictions/{asset_id}) ─────────────
-// Single source of truth for an asset's PdM state: classifier + regressor +
-// health score + cost estimate + the decision layer that reconciles them
-// into one tier. Populated by the daily scheduler and by "Refresh now"
-// (POST /batch-predictions/run/{asset_id}) — both write the same row, so
-// there is exactly one place the UI reads predictions from.
+/** Overall result for an asset. `conflict` means the models disagreed. */
 export type PredictionTier = "urgent" | "watch" | "healthy" | "conflict";
+
+/** How sure the due date is, which decides how the UI words it. */
 export type PredictionDisplayMode = "date" | "soft_estimate" | "horizon";
 
+/**
+ * An asset's current PdM state, from `GET /batch-predictions/{asset_id}`.
+ *
+ * Holds the classifier, regressor, health score and cost estimate, plus the
+ * decision layer that combines them into one {@link PredictionTier}. The daily
+ * job and the "Refresh now" button both write this same row, so it is the only
+ * place the UI reads predictions from.
+ */
 export type BatchPrediction = {
   id: string;
   asset_id: string;
@@ -124,7 +133,8 @@ export type BatchPrediction = {
   run_duration_ms: number | null;
   status: string;
   error_message: string | null;
-  // Decision layer (app.ai.services.pdm_decision_service.build_decision)
+
+  // Decision layer: combines the model outputs into one recommendation.
   model_version: string | null;
   tier: PredictionTier | null;
   agreement: boolean | null;
@@ -134,7 +144,7 @@ export type BatchPrediction = {
   horizon_saturated: boolean | null;
 };
 
-// ─── Maintenance Event (from MaintenanceEventOut) ──────────────────────────────
+/** One completed or scheduled service against an asset. */
 export type MaintenanceEvent = {
   id: string;
   asset_id: string;
@@ -152,7 +162,7 @@ export type MaintenanceEvent = {
   notes: string | null;
 };
 
-// ─── Ticket (from models.py Ticket) ───────────────────────────────────────────
+/** A maintenance ticket, optionally linked to an asset. */
 export type Ticket = {
   id: string;
   ticket_number: string;
@@ -173,7 +183,7 @@ export type Ticket = {
   resolved_at: string | null;
 };
 
-// ─── Asset Assignment (from AssetAssignmentOut) ────────────────────────────────
+/** A record of an asset being assigned to a user. Inactive once unassigned. */
 export type AssetAssignment = {
   id: string;
   asset_id: string;
@@ -183,14 +193,19 @@ export type AssetAssignment = {
   unassigned_at: string | null;
   is_active: boolean;
   notes: string | null;
+  /** Resolved by the API. Null when the referenced profile no longer exists. */
+  user_name: string | null;
+  user_email: string | null;
+  assigned_by_name: string | null;
 };
 
-// ─── Survival Prediction (FRSO) ────────────────────────────────────────────────
+/** One point on a component's survival curve: probability it lasts to `day`. */
 export type SurvivalCurvePoint = {
   day: number;
   survival_prob: number;
 };
 
+/** Remaining-life forecast for one component, from the Weibull AFT model. */
 export type ComponentSurvivalResponse = {
   asset_id: string;
   component: "brake" | "tire" | "battery" | "oil" | "hydraulic";
@@ -200,18 +215,21 @@ export type ComponentSurvivalResponse = {
   p90_days: number;
   fail_prob_7d: number;
   fail_prob_30d: number;
-  // True if median/p10/p90 were clamped to the model's trained horizon —
-  // the raw prediction extrapolated beyond it, so treat the shown value as
-  // "beyond the model's reliable range", not a precise day count.
+  /**
+   * True when the day counts hit the limit of what the model was trained on.
+   * Read them as "further out than this", not as an exact number of days.
+   */
   horizon_capped: boolean;
   curve: SurvivalCurvePoint[];
 };
 
+/** Sent instead of a forecast when one component could not be scored. */
 export type ComponentSurvivalError = {
   component: "brake" | "tire" | "battery" | "oil" | "hydraulic";
   error: string;
 };
 
+/** Per-component remaining life for one asset, plus whichever fails soonest. */
 export type AssetSurvivalResponse = {
   asset_id: string;
   horizon_days: number;
@@ -221,15 +239,10 @@ export type AssetSurvivalResponse = {
   components: (ComponentSurvivalResponse | ComponentSurvivalError)[];
 };
 
-// ─── Combined asset detail view (assembled in the service layer) ───────────────
-// componentRul comes from GET /survival/{asset_id} — the trained per-
-// component Weibull AFT survival models (app.ai.services.survival_service),
-// same models used for the warehouse report. Previously backed by a much
-// weaker per-asset OLS trend on 1-4 sensor readings
-// (app.ai.services.asset_component_rul_service, now deprecated); replaced
-// since that method degrades to a guessed flat decay rate whenever an
-// asset's reading history is thin — the common case — while the survival
-// model needs only a single current snapshot.
+/**
+ * Everything the asset detail panel shows. The service layer fetches it from
+ * several endpoints so the component only makes one call.
+ */
 export type AssetDetail = {
   asset: Asset;
   prediction: BatchPrediction | null;
@@ -239,8 +252,7 @@ export type AssetDetail = {
   assignments: AssetAssignment[];
 };
 
-// ─── Filter state used by the toolbar ─────────────────────────────────────────
-// sort_by matches GET /assets/'s sort_column_map exactly (app/routers/assets.py).
+/** Columns the list can be sorted by. Must match the keys the backend accepts. */
 export type AssetSortBy =
   | "created_at"
   | "updated_at"
@@ -255,6 +267,7 @@ export type AssetSortBy =
   | "criticality_score"
   | "payload_capacity_kg";
 
+/** Current toolbar filter and sort state, sent as query params to `GET /assets/`. */
 export type AssetFilters = {
   query: string;
   status: string;        // "all" | actual status values

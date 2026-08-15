@@ -59,20 +59,30 @@ export default function TicketDetailsCharts({
   const [assetTickets, setAssetTickets] = useState<any[]>([]);
   const [loadingAsset, setLoadingAsset] = useState(false);
 
-  // Load other tickets for the same asset
+  // Load other tickets for the same asset.
+  //
+  // State is set inside the async body rather than synchronously in the effect,
+  // which would trigger a cascading render. The cancelled flag stops a slow
+  // response from an earlier asset overwriting a newer one.
   useEffect(() => {
     if (!assetId) return;
-    setLoadingAsset(true);
-    apiGet<any[]>(`/tickets/?asset_id=${assetId}`)
-      .then((data) => {
-        setAssetTickets(data || []);
-      })
-      .catch((err) => {
-        console.error("Failed to load asset tickets:", err);
-      })
-      .finally(() => {
-        setLoadingAsset(false);
-      });
+    let cancelled = false;
+
+    (async () => {
+      setLoadingAsset(true);
+      try {
+        const data = await apiGet<any[]>(`/tickets/?asset_id=${assetId}`);
+        if (!cancelled) setAssetTickets(data || []);
+      } catch (err) {
+        if (!cancelled) console.error("Failed to load asset tickets:", err);
+      } finally {
+        if (!cancelled) setLoadingAsset(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [assetId, ticketId]);
 
   // 1. Process State Durations

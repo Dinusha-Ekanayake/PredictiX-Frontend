@@ -88,14 +88,37 @@ export async function deleteUser(
  */
 export async function unassignAsset(assetId: string): Promise<void> {
   const res = await apiFetch(`/assets/${assetId}/assign`, { method: "PATCH" });
-  if (!res.ok) {
-    let detail = `Failed to unassign asset (HTTP ${res.status})`;
-    try {
-      const body = await res.json();
-      if (body?.detail) detail = String(body.detail);
-    } catch {
-      // Non-JSON error body — keep the status-based message.
-    }
-    throw new Error(detail);
+  if (!res.ok) throw new Error(await assignmentError(res, "unassign"));
+}
+
+/**
+ * Assign an asset to a user.
+ *
+ * Admin only. The server checks the asset is in the caller's warehouse, that
+ * the assignee exists, is active, and belongs to the same warehouse, then
+ * records the change in the assignment history.
+ *
+ * Reassigning an already-assigned asset is allowed and closes the previous
+ * assignment; the caller does not need to unassign first.
+ */
+export async function assignAsset(
+  assetId: string,
+  userId: string,
+  notes?: string,
+): Promise<void> {
+  const params = new URLSearchParams({ assigned_to: userId });
+  if (notes?.trim()) params.set("notes", notes.trim());
+  const res = await apiFetch(`/assets/${assetId}/assign?${params}`, { method: "PATCH" });
+  if (!res.ok) throw new Error(await assignmentError(res, "assign"));
+}
+
+/** Pull the server's own message out of a failed assignment response. */
+async function assignmentError(res: Response, verb: string): Promise<string> {
+  try {
+    const body = await res.json();
+    if (body?.detail) return String(body.detail);
+  } catch {
+    // Non-JSON error body: fall through to the status-based message.
   }
+  return `Failed to ${verb} asset (HTTP ${res.status})`;
 }

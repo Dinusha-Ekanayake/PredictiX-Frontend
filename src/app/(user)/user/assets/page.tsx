@@ -17,9 +17,7 @@ import type { AssetListItem } from "@/components/admin/assets/types";
 import UserAssetDetailsDialog from "@/components/user/assets/UserAssetDetailsDialog";
 import { healthColor } from "@/lib/healthBands";
 
-// healthColor now comes from @/lib/healthBands. The local version used a
-// >= 80 green cut-off that no asset could reach (scores top out at 79), so
-// every card on this page rendered amber or red regardless of condition.
+/** Days until a date. Negative when it has already passed, null when unset. */
 function daysUntil(d: string | null) {
   return d ? Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000) : null;
 }
@@ -37,6 +35,7 @@ type Row = {
   assigned: boolean;
 };
 
+/** Assets page for non-admin users, listing only the assets assigned to them. */
 export default function UserAssetsPage() {
   const [mine, setMine] = React.useState<UserAssetData[]>([]);
   const [loadingMine, setLoadingMine] = React.useState(true);

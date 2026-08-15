@@ -116,21 +116,47 @@ for (const [label, g] of rows) {
 
 console.log("-".repeat(66));
 
-// Zero tests is a broken run, not a passing one. Without this a misconfigured
-// reporter or a bad path reports "ALL PASSING" while verifying nothing.
-const ran = totals.pass + totals.fail + totals.skip;
+// The report's own totals are authoritative. The per-file breakdown above is
+// only for presentation, and has occasionally come back empty even on a run
+// that passed, which previously reported "NO TESTS RAN" for a healthy suite.
+const reported = {
+  pass: report.numPassedTests ?? 0,
+  fail: report.numFailedTests ?? 0,
+  skip: (report.numPendingTests ?? 0) + (report.numTodoTests ?? 0),
+  total: report.numTotalTests ?? 0,
+};
+
+const grouped = totals.pass + totals.fail + totals.skip;
+if (reported.total > 0 && grouped !== reported.total) {
+  console.log(
+    `${pad("(ungrouped)", 32)}${num(reported.pass - totals.pass, 6)}` +
+    `${num(reported.fail - totals.fail, 6)}${num(reported.skip - totals.skip, 6)}   PASS`,
+  );
+  console.log("-".repeat(66));
+}
+
+// Zero tests is a broken run, not a passing one: a misconfigured reporter or a
+// bad path must never report success while verifying nothing.
 const verdict =
-  ran === 0 ? "NO TESTS RAN" : totals.fail === 0 ? "ALL PASSING" : "FAILURES PRESENT";
+  reported.total === 0
+    ? "NO TESTS RAN"
+    : reported.fail === 0
+      ? "ALL PASSING"
+      : "FAILURES PRESENT";
 
 console.log(
-  `${pad("TOTAL", 32)}${num(totals.pass, 6)}${num(totals.fail, 6)}${num(totals.skip, 6)}` +
-  `   ${verdict}`,
+  `${pad("TOTAL", 32)}${num(reported.pass, 6)}${num(reported.fail, 6)}` +
+  `${num(reported.skip, 6)}   ${verdict}`,
 );
 
-if (ran === 0) {
+if (reported.total === 0) {
   console.error("\nNo tests were executed. Treating this as a failure.");
+  console.error(`vitest exit status: ${result.status}`);
+  console.error((result.stderr || "").split("\n").slice(-8).join("\n"));
   process.exit(1);
 }
+
+totals = reported;
 
 // Surface the failing case names so a red run is actionable without rerunning.
 if (totals.fail > 0) {

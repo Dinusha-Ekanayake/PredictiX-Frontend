@@ -90,10 +90,7 @@ function CTip({ active, payload, label, fmt }: { active?: boolean; payload?: Arr
   );
 }
 
-// Cut-offs now live in @/lib/healthBands, which mirrors
-// app/services/health_bands.py — the backend remains the source of truth. They
-// were defined here, and separately inside other components, which is how the
-// UI ended up with three different health scales at once.
+// Cut-offs come from @/lib/healthBands so every screen bands a score alike.
 function ScoreBar({ score }: { score: number }) {
   const c = healthColor(score);
   const tc = healthTextClass(score);
@@ -178,9 +175,8 @@ export default function AdminDashboardPage() {
   // warehouse) — previously indistinguishable from a genuine alarming 0%.
   const hasPredictions = k?.hasPredictionData ?? false;
 
-  // Cost coverage. Older backends don't send the count at all, so treat a
-  // missing value as "fully covered" rather than showing every deployment a
-  // scary partial-data warning it has no way to act on.
+  // Cost coverage. A missing count means an older backend, so treat it as
+  // fully covered rather than warning about data the user cannot act on.
   const costedAssets = k?.estMaintenanceCostAssetCount ?? (k?.totalAssets ?? 0);
   const costIsPartial = !!k && costedAssets < k.totalAssets;
   const costSubLabel = !k
@@ -205,10 +201,8 @@ export default function AdminDashboardPage() {
     // rolling 30-day figure (pdm_batch_predictions holds one current
     // estimate per asset, not a time-bounded window), so the label no
     // longer claims "30 days".
-    // The cost model stores NULL for assets it cannot score instead of
-    // guessing, so this sum can cover fewer assets than the fleet. When it
-    // does, the sub-label says so — otherwise a partial total is
-    // indistinguishable from a genuinely cheaper fleet.
+    // Unscored assets contribute nothing to the sum, so it can cover fewer
+    // assets than the fleet. The sub-label says so when it does.
     { label: "Est. Maint. Cost", value: k ? (costedAssets > 0 ? fmtCompact(k.estMaintenanceCost) : "—") : "—", sub: costSubLabel, icon: Wrench, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", accent: "text-slate-600 dark:text-slate-400" },
   ];
 

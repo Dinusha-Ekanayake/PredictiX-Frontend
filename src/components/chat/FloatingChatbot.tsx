@@ -72,9 +72,9 @@ function CopyActionButton({ label, textToCopy }: { label: string; textToCopy: st
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/60 dark:border-violet-600/60 bg-violet-50 dark:bg-violet-900/40 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-800/60 transition-all duration-200 hover:shadow-sm"
+      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 shadow-sm"
     >
-      {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+      {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3 text-muted-foreground" />}
       {copied ? "Copied!" : label}
     </button>
   );
@@ -539,7 +539,7 @@ export default function FloatingChatbot() {
                           setDraft(chip);
                           setTimeout(() => inputRef.current?.focus(), 50);
                         }}
-                        className="rounded-full border border-violet-300/50 dark:border-violet-700/50 bg-violet-50/80 dark:bg-violet-900/30 px-3 py-1 text-xs text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-800/50 transition-colors"
+                        className="rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 hover:border-muted-foreground/30 transition-all duration-200"
                       >
                         {chip}
                       </button>
@@ -555,10 +555,10 @@ export default function FloatingChatbot() {
                     >
                       <div
                         className={cn(
-                          "max-w-[88%] rounded-2xl px-3 py-2.5 text-sm shadow-sm",
+                          "max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm",
                           message.role === "user"
-                            ? "rounded-br-md bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white"
-                            : "rounded-bl-md border border-border/70 bg-card text-foreground dark:bg-slate-800/80"
+                            ? "rounded-tr-sm bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-medium"
+                            : "rounded-tl-sm border border-border/60 bg-muted/40 dark:bg-muted/10 text-foreground"
                         )}
                       >
                         {/* Message body */}
@@ -633,9 +633,9 @@ export default function FloatingChatbot() {
                                     onClick={() => {
                                       router.push(btn.path);
                                     }}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/60 dark:border-violet-600/60 bg-violet-50 dark:bg-violet-900/40 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-800/60 transition-all duration-200 hover:shadow-sm"
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 shadow-sm"
                                   >
-                                    <ArrowRight className="size-3" />
+                                    <ArrowRight className="size-3 text-muted-foreground" />
                                     {btn.label}
                                   </button>
                                 );
@@ -740,17 +740,16 @@ export default function FloatingChatbot() {
       <button
         type="button"
         className={cn(
-          "pointer-events-auto group absolute bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full border border-white/20 text-white",
-          "bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500",
-          "shadow-[0_10px_30px_-10px_rgba(124,58,237,0.6)]",
-          "cursor-pointer hover:scale-105 transition-all duration-300 ease-out"
+          "pointer-events-auto group absolute bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full border border-border bg-gradient-to-br from-indigo-600 to-violet-600 text-white",
+          "shadow-[0_8px_30px_rgb(79,70,229,0.3)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.5)]",
+          "cursor-pointer hover:scale-105 hover:shadow-[0_12px_30px_rgb(79,70,229,0.4)] transition-all duration-300 ease-out"
         )}
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label={isOpen ? "Close chatbot" : "Open chatbot"}
       >
         <span className="sr-only">Sidekick</span>
         <span className="pointer-events-none absolute inset-0 rounded-full bg-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-violet-400/40 to-sky-400/40 blur-md opacity-60" />
+        <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-indigo-400/20 to-violet-400/20 blur-md opacity-60" />
         {isOpen ? (
           <X className="relative size-6 drop-shadow-sm" />
         ) : (

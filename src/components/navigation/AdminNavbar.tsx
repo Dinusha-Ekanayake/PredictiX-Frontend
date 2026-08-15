@@ -12,7 +12,6 @@ import {
   Users,
   Menu,
   CircleHelp,
-  BookOpen,
 } from "lucide-react";
 
 import PredictiXLogo from "@/components/brand/PredictiXLogo";
@@ -51,7 +50,6 @@ const NAV = [
   { href: "/admin/assets", label: "Assets", icon: Boxes },
   { href: "/admin/warehouse", label: "Warehouse", icon: Warehouse },
   { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/knowledge-base", label: "Knowledge Base", icon: BookOpen },
 ] as const;
 
 function isActive(pathname: string, href: string) {

@@ -643,72 +643,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
         </div>
       </div>
 
-      {/* Technician Queue Depth (Horizontal Bar Chart) */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col lg:col-span-2 h-[700px]">
-        <div className="mb-2">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-200">
-            <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Technician Workload
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Active tickets assigned to each maintenance technician.
-          </p>
-        </div>
-        <div className="flex-1 w-full min-h-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={techQueueData}
-              layout="vertical"
-              margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
-            >
-              <defs>
-                <linearGradient id="techLowGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#4ff409ff" />
-                  <stop offset="100%" stopColor="#97f079ff" />
-                </linearGradient>
-                <linearGradient id="techMediumGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#f4e408ff" />
-                  <stop offset="100%" stopColor="#e3bd70ff" />
-                </linearGradient>
-                <linearGradient id="techHighGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#b70505ff" />
-                  <stop offset="100%" stopColor="#eb6e6eff" />
-                </linearGradient>
-                <filter id="techShadow" x="-10%" y="-10%" width="120%" height="120%">
-                  <feDropShadow dx="2" dy="0" stdDeviation="2" floodColor="#000000" floodOpacity="0.4" />
-                </filter>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={true} horizontal={false} />
-              <XAxis
-                type="number"
-                stroke="#737373"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(val) => Math.floor(val).toString()}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                stroke="#737373"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-                width={90}
-                interval={0}
-                tickFormatter={formatName}
-              />
-              <Tooltip cursor={{ fill: '#262626', opacity: 0.3 }} content={<CustomTechTooltip />} />
-              <Bar dataKey="Low" stackId="a" fill="url(#techLowGrad)" shape={<Custom3DHorizontalBar />} barSize={9} />
-              <Bar dataKey="Medium" stackId="a" fill="url(#techMediumGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />
-              <Bar dataKey="High" stackId="a" fill="url(#techHighGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />
-              <Legend verticalAlign="bottom" height={24} iconType="circle" iconSize={8} formatter={renderLegendText} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
       {/* Ticket Category vs. Status Scatter (9-Square style Grid) */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col h-[350px]">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col lg:col-span-2 h-[350px]">
         <div className="mb-2">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-200">
             <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Category vs. Status

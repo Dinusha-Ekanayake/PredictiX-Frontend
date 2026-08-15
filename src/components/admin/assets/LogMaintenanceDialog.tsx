@@ -25,6 +25,7 @@ type Props = {
   onSaved: () => void;
 };
 
+/** Dialog for recording a completed service against an asset. */
 export default function LogMaintenanceDialog({ open, onOpenChange, asset, onSaved }: Props) {
   const [submitting, setSubmitting] = React.useState(false);
   const [form, setForm] = React.useState({

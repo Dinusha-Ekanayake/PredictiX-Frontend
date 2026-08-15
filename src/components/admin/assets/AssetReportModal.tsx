@@ -72,10 +72,12 @@ async function safeJson(res: Response | null): Promise<any> {
   try { return await res.json(); } catch { return null; }
 }
 
-/** Like safeJson, but also returns *why* it failed (status + response body)
- *  instead of silently discarding that information — used for the cost
- *  endpoint specifically, since its failures have been repeatedly invisible
- *  without manually checking the Network tab or backend logs. */
+/**
+ * Like {@link safeJson}, but also reports why the request failed.
+ *
+ * Used for the cost endpoint, whose failures are otherwise invisible without
+ * opening the Network tab.
+ */
 async function safeJsonWithError(res: Response | null): Promise<{ data: any; error?: string }> {
   if (!res) return { data: null, error: "Request failed to reach the server (network error)." };
   if (!res.ok) {
@@ -95,6 +97,7 @@ async function safeJsonWithError(res: Response | null): Promise<{ data: any; err
   }
 }
 
+/** Modal that gathers an asset's data and downloads it as a PDF report. */
 export default function AssetReportModal({ isOpen, onClose, assetId, assetName }: Props) {
   const [loading, setLoading]       = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
@@ -118,28 +121,22 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const asset = await assetRes.json();
         const fleet = await safeJson(fleetRes) ?? {};
 
-        // ── Step 2: all asset-level data in parallel ───────────
-        // Prediction data comes solely from /batch-predictions/{id} — the
-        // single source of truth populated by the daily scheduler and the
-        // "Run AI" trigger (app.ai.services.batch_prediction_service). The
-        // old on-demand /predictions/failure|cost endpoints are no longer
-        // the asset detail page's data source and are not queried here.
+        // Step 2: fetch all asset-level data at once. Predictions come only
+        // from /batch-predictions/{id}, which the nightly job and the "Run AI"
+        // button both write.
         const [
           batchPredRes, costPredRes,
           maintRes, ticketRes, sensorRes,
           warehouseRes, deptRes,
         ] = await Promise.all([
           apiFetch(`/batch-predictions/${assetId}`).catch(() => null),
-          // breakdown-cost-v4.0 — separate endpoint, flat response shape
-          // (top_drivers with relative_impact/direction — see Step 7b below)
+          // Cost model has its own endpoint and a flat response shape.
+          // See step 7b below for how its drivers are read.
           apiFetch(`/predictions/cost/${assetId}`).catch(() => null),
           apiFetch(`/maintenance?asset_id=${assetId}&limit=50`).catch(() => null),
           apiFetch(`/tickets?asset_id=${assetId}&limit=20`).catch(() => null),
-          // The real route is path-based, not query-param based — this
-          // previously hit /sensor-readings?asset_id=… which doesn't
-          // exist (405), so the report's Sensor Snapshot section was
-          // always empty. The endpoint has no limit param of its own
-          // (always returns up to 50, newest first); sensorList[0]
+          // Path-based route, not a query param. It takes no limit and
+          // always returns up to 50 readings, newest first, so sensorList[0]
           // below already takes just the latest reading from that.
           apiFetch(`/sensor-readings/asset/${assetId}`).catch(() => null),
           asset.warehouse_id
@@ -180,13 +177,9 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const risk_level       = latestPred?.risk_level       ?? undefined;
         const days_until_maint = latestPred?.predicted_days_until_maintenance ?? null;
         const pred_maint_date  = latestPred?.predicted_maintenance_date ?? null;
-        // top_explanations comes from reg_model.shap_top_factors() in
-        // batch_prediction_service.py. That function's exact return shape
-        // wasn't available to confirm, so this normalizes defensively:
-        // it may arrive as a flat {feature: value} map (old assumption) or —
-        // more likely, matching the list-of-dicts pattern used elsewhere in
-        // that file (e.g. contributing_factors: [{feature, impact}]) — as an
-        // array of objects. Common magnitude key names are all checked.
+        // top_explanations can arrive either as a flat {feature: value} map
+        // or as an array of objects, so normalise both into a map. The
+        // magnitude key varies by source, hence the list of names checked.
         const rawTopExpl = latestPred?.top_explanations;
         let top_explanations: Record<string, number> | undefined;
         if (Array.isArray(rawTopExpl)) {
@@ -202,19 +195,14 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         }
 
         const est_cost = latestPred?.estimated_cost_lkr ?? undefined;
-        // /batch-predictions/{id} already carries these — unused until now,
-        // used as the fallback for cost_lower/cost_upper below.
+        // Fallbacks for cost_lower / cost_upper when the cost endpoint fails.
         const batch_min_cost = latestPred?.min_cost_lkr != null ? Number(latestPred.min_cost_lkr) : undefined;
         const batch_max_cost = latestPred?.max_cost_lkr != null ? Number(latestPred.max_cost_lkr) : undefined;
 
-        // ── Step 7b: breakdown-cost-v4.0 — GET /predictions/cost/{asset_id} ──
-        // Response shape is FLAT — matches predict_breakdown_cost()'s actual
-        // return dict (app/ai/models/cost_estimation_model/breakdown_cost_model.py)
-        // exactly. There is NO extra_data wrapper and NO confidence_lower/upper —
-        // those only existed in the v4 docs' aspirational sample response, not
-        // in the real code. top_drivers carries relative_impact (0-100%, share
-        // of total |SHAP|) + direction — never a raw LKR shap value, and sv_log
-        // is log1p-space and intentionally not returned for display.
+        // Step 7b: cost model output, falling back to the values already on
+        // the batch prediction. The response is flat, with no wrapper object.
+        // top_drivers gives relative_impact as a percentage share and a
+        // direction, not a rupee amount.
         const cost_estimate      = costPred?.predicted_cost_lkr != null ? Number(costPred.predicted_cost_lkr) : est_cost;
         const cost_lower         = costPred?.pi_80_lower_lkr    != null ? Number(costPred.pi_80_lower_lkr)    : batch_min_cost;
         const cost_upper         = costPred?.pi_80_upper_lkr    != null ? Number(costPred.pi_80_upper_lkr)    : batch_max_cost;
@@ -229,8 +217,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
               direction: d.direction === "increases" ? "increases" as const : "decreases" as const,
             }))
           : [];
-        // Bundle-level accuracy stats — real numbers for whichever model
-        // version is actually loaded, never a hardcoded guess.
+        // Accuracy stats for the model version actually loaded on the server.
         const cost_test_r2      = costPred?.test_r2       != null ? Number(costPred.test_r2)       : undefined;
         const cost_test_mae     = costPred?.test_mae_lkr  != null ? Number(costPred.test_mae_lkr)  : undefined;
         const cost_test_medae   = costPred?.test_medae_lkr!= null ? Number(costPred.test_medae_lkr): undefined;
@@ -321,11 +308,8 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
             predicted_failures:   kpis.predictedFailures  ?? 0,
             est_maintenance_cost: kpis.estMaintenanceCost ?? 0,
             health_distribution:  healthDist,
-            // status/vehicle distribution previously required fetching all
-            // ~1500 assets on every modal open just to compute counts that
-            // no report section or PDF page ever reads (assetPdfExport.ts
-            // declares the fields but never renders them) — left empty
-            // rather than paying that cost for dead output.
+            // Left empty on purpose. The PDF declares these fields but never
+            // renders them, and filling them meant loading every asset.
             status_distribution:  [],
             vehicle_distribution: [],
             top_risk_assets:      topRisk.map((r: any) => ({
@@ -360,10 +344,8 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
     const filename = `Asset_Report_${reportData.assetCode}.pdf`;
 
     const attemptServerRender = async (): Promise<void> => {
-      // Re-read the token fresh at call time rather than relying on a value
-      // captured earlier — if it was stale/expired when the modal opened,
-      // a fresh read (or a refreshed token if the auth layer rotates it in
-      // the background) may succeed without the person doing anything.
+      // Read the token at call time, not when the modal opened. If it has
+      // since been refreshed, this picks up the new one automatically.
       const token = getAccessToken();
       await downloadAssetPDFServer(
         reportData,
@@ -381,11 +363,8 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
       const isAuthFailure = msg.includes("401") || msg.includes("403");
 
       if (isAuthFailure) {
-        // Don't silently degrade to the print fallback here — that produces
-        // a worse PDF (browser header/footer, no pagination) AND masks the
-        // real problem (an expired/missing session), which is exactly what
-        // made this failure mode hard to diagnose. Tell the person plainly
-        // what's wrong and what to do instead.
+        // Don't fall back to the print dialog on an auth failure. It makes a
+        // worse PDF and hides the real cause, which is an expired session.
         toast.error("Your session has expired", {
           description: "Please refresh the page and sign in again, then retry Download PDF.",
         });
@@ -393,10 +372,8 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         return;
       }
 
-      // Non-auth failure (e.g. playwright not installed on the server yet,
-      // network error, server 500) — the print-dialog fallback still makes
-      // sense here since it's unrelated to auth and can still produce a
-      // usable (if less polished) PDF.
+      // Any other failure (server error, network) can still fall back to the
+      // print dialog, which produces a usable if less polished PDF.
       try {
         downloadAssetPDF(reportData, filename);
         toast.success("Report opened — choose 'Save as PDF', and turn off 'Headers and footers' in More settings for a clean export");

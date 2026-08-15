@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Bell, Info, AlertTriangle, AlertCircle, Trash2, CheckCircle2 } from "lucide-react";
+import { Bell, Trash2, CheckCircle2, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   fetchNotifications,
@@ -11,26 +11,26 @@ import {
   type NotificationOut
 } from "@/lib/api/notificationsApi";
 import { toast } from "@/lib/customToast";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/hooks/useAuth";
 import { getAccessToken, logout } from "@/lib/authService";
 
-function timeAgo(dateString: string) {
-  const date = new Date(dateString);
-  const now = new Date();
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+import NotificationDetailDialog from "./NotificationDetailDialog";
+import NotificationHistoryDialog from "./NotificationHistoryDialog";
+import {
+  EmptyNotifications,
+  priorityIcon,
+  priorityOf,
+  priorityRowBg,
+  timeAgo,
+} from "./notificationUi";
 
-  if (seconds < 60) return "Just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  
-  return date.toLocaleDateString();
-}
+/**
+ * How many notifications the dropdown itself holds. The dropdown is a quick
+ * glance at what is recent; everything older is reachable through the history
+ * window, which pages the same endpoint.
+ */
+const BELL_LIMIT = 30;
 
 export default function NotificationBell() {
   const [open, setOpen] = React.useState(false);
@@ -38,11 +38,17 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = React.useState<NotificationOut[]>([]);
   const [loading, setLoading] = React.useState(true);
 
+  // Single-notification window (full title + full message).
+  const [selected, setSelected] = React.useState<NotificationOut | null>(null);
+  const [detailOpen, setDetailOpen] = React.useState(false);
+  // Full paged history window.
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+
   const unreadCount = notifications.filter(n => n.status === "unread").length;
 
   const loadNotifications = React.useCallback(async () => {
     try {
-      const data = await fetchNotifications();
+      const data = await fetchNotifications({ limit: BELL_LIMIT });
       setNotifications(data);
     } catch (err) {
       console.error("Failed to load notifications", err);
@@ -139,6 +145,12 @@ export default function NotificationBell() {
       };
     }, [userId]);
 
+  // Both windows are portalled to <body>, so they are "outside" the dropdown's
+  // container and Escape inside them also bubbles here. Without this guard,
+  // opening a notification would close the dropdown underneath it, and one
+  // Escape would dismiss the dialog and the dropdown together.
+  const dialogOpen = detailOpen || historyOpen;
+
   // Close on outside click
   React.useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -146,18 +158,18 @@ export default function NotificationBell() {
         setOpen(false);
       }
     }
-    if (open) document.addEventListener("mousedown", handleOutside);
+    if (open && !dialogOpen) document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
-  }, [open]);
+  }, [open, dialogOpen]);
 
   // Close on Escape
   React.useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    if (open) document.addEventListener("keydown", handleKey);
+    if (open && !dialogOpen) document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [open]);
+  }, [open, dialogOpen]);
 
   const handleMarkAsRead = async (id: string, currentStatus: string) => {
     if (currentStatus === "read") return;
@@ -188,9 +200,8 @@ export default function NotificationBell() {
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); // Prevent marking as read when deleting
-    
+  /** Shared by the row's trash icon, the detail window and the history window. */
+  const deleteById = React.useCallback(async (id: string) => {
     // Optimistic update
     setNotifications(prev => prev.filter(n => n.id !== id));
     try {
@@ -200,26 +211,22 @@ export default function NotificationBell() {
       toast.error("Failed to delete notification");
       loadNotifications();
     }
+  }, [loadNotifications]);
+
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); // Prevent marking as read when deleting
+    deleteById(id);
   };
 
-  const getPriorityIcon = (priority: string) => {
-    switch (priority) {
-      case "critical": return <AlertCircle className="w-5 h-5 text-red-500" />;
-      case "high": return <AlertTriangle className="w-5 h-5 text-orange-500" />;
-      case "medium": return <Info className="w-5 h-5 text-yellow-500" />;
-      default: return <Info className="w-5 h-5 text-blue-500" />;
-    }
-  };
-
-  const getPriorityBg = (priority: string, status: string) => {
-    if (status === "read") return "bg-slate-50 dark:bg-slate-900/50 opacity-70";
-    
-    switch (priority) {
-      case "critical": return "bg-red-50 dark:bg-red-500/10";
-      case "high": return "bg-orange-50 dark:bg-orange-500/10";
-      case "medium": return "bg-yellow-50 dark:bg-yellow-500/10";
-      default: return "bg-blue-50 dark:bg-blue-500/10";
-    }
+  /**
+   * Open one notification in its own window. Reading it marks it read, which is
+   * applied to the copy handed to the dialog too so the "Unread" badge does not
+   * linger on a notification the user is actively looking at.
+   */
+  const handleOpenNotification = (notification: NotificationOut) => {
+    setSelected({ ...notification, status: "read" });
+    setDetailOpen(true);
+    handleMarkAsRead(notification.id, notification.status);
   };
 
   return (
@@ -277,30 +284,37 @@ export default function NotificationBell() {
           )}
         </div>
 
-        <ScrollArea className="h-[350px] overflow-y-auto">
+        {/* Scrolls on its own. A viewport-relative ceiling keeps the panel from
+            running off the bottom of short screens, where a fixed pixel height
+            would push the history link out of reach. */}
+        <div className="max-h-[min(60vh,420px)] overflow-y-auto overscroll-contain">
           {loading && notifications.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Loading notifications...</div>
           ) : notifications.length === 0 ? (
-            <div className="p-8 flex flex-col items-center justify-center text-center">
-              <div className="bg-slate-100 dark:bg-white/5 rounded-full p-3 mb-3">
-                <Bell className="w-6 h-6 text-slate-400" />
-              </div>
-              <p className="text-sm font-medium text-slate-900 dark:text-white">All caught up!</p>
-              <p className="text-xs text-muted-foreground mt-1">You have no new notifications.</p>
-            </div>
+            <EmptyNotifications />
           ) : (
             <div className="flex flex-col">
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  onClick={() => handleMarkAsRead(notification.id, notification.status)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open notification: ${notification.title}`}
+                  onClick={() => handleOpenNotification(notification)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleOpenNotification(notification);
+                    }
+                  }}
                   className={cn(
                     "flex gap-3 p-4 border-b border-slate-100 dark:border-white/5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors relative group",
-                    getPriorityBg(notification.meta?.priority || "low", notification.status)
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
+                    priorityRowBg(priorityOf(notification), notification.status)
                   )}
                 >
                   <div className="flex-shrink-0 mt-0.5">
-                    {getPriorityIcon(notification.meta?.priority || "low")}
+                    {priorityIcon(priorityOf(notification))}
                   </div>
                   <div className="flex-1 min-w-0 pr-6">
                     <p className={cn(
@@ -316,16 +330,17 @@ export default function NotificationBell() {
                       {timeAgo(notification.created_at)}
                     </p>
                   </div>
-                  
+
                   {/* Delete button (shows on hover) */}
                   <button
+                    type="button"
                     onClick={(e) => handleDelete(e, notification.id)}
-                    className="absolute top-3 right-3 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-500 transition-all"
-                    title="Delete notification"
+                    className="absolute top-3 right-3 p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-500 transition-all"
+                    aria-label={`Delete notification: ${notification.title}`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
-                  
+
                   {/* Unread dot */}
                   {notification.status === "unread" && (
                     <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-violet-500 group-hover:opacity-0 transition-opacity" />
@@ -334,16 +349,39 @@ export default function NotificationBell() {
               ))}
             </div>
           )}
-        </ScrollArea>
-        
-        {notifications.length > 0 && (
-          <div className="p-2 border-t border-slate-100 dark:border-white/10 text-center">
-             <span className="text-[10px] text-muted-foreground/60">
-              Only showing recent notifications
-            </span>
-          </div>
-        )}
+        </div>
+
+        <div className="p-2 border-t border-slate-100 dark:border-white/10">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full h-8 text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:text-violet-400 dark:hover:text-violet-300 dark:hover:bg-violet-500/10"
+            onClick={() => {
+              setOpen(false);
+              setHistoryOpen(true);
+            }}
+          >
+            <History className="w-3.5 h-3.5 mr-1.5" />
+            View full notification history
+          </Button>
+        </div>
       </div>
+
+      {/* One notification, in full. Opened from either the dropdown or the
+          history window, so there is a single instance rather than two. */}
+      <NotificationDetailDialog
+        notification={selected}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onDelete={deleteById}
+      />
+
+      <NotificationHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        onSelect={handleOpenNotification}
+        onDelete={deleteById}
+      />
     </div>
   );
 }

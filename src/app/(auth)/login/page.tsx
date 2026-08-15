@@ -41,11 +41,16 @@ import { supabase } from "@/lib/supabaseBrowserClient";
 
 // ─── Shared Components ────────────────────────────────────────────────────────
 
+/** Support address shown on the login screen. Single source of truth — the
+    displayed text and the clipboard copy previously hardcoded it separately,
+    so editing one would have silently left the other stale. */
+const SUPPORT_EMAIL = "neuromindspredictix@gmail.com";
+
 function AdminContactDialog() {
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText("neuromindspredictix@gmail.com");
+    navigator.clipboard.writeText(SUPPORT_EMAIL);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -66,9 +71,12 @@ function AdminContactDialog() {
             If you're having trouble logging in or need to reset your password, please contact our support team at the email below.
           </p>
           <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-border dark:bg-muted">
-            <span className="text-sm font-medium text-slate-900 dark:text-foreground select-all">
-              neuromindspredictix@gmail.com
-            </span>
+            <a
+              href={`mailto:${SUPPORT_EMAIL}`}
+              className="text-sm font-medium text-slate-900 underline-offset-2 select-all hover:underline dark:text-foreground"
+            >
+              {SUPPORT_EMAIL}
+            </a>
             <Button variant="ghost" size="icon" onClick={handleCopy} className="h-8 w-8 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
               {copied ? (
                 <Check className="h-4 w-4 text-green-500 transition-all scale-110" />
@@ -382,13 +390,41 @@ export default function LoginPage() {
                     </Button>
 
 
-                    {/* Dev credentials hint */}
+                    {/* Demo credentials hint.
+                        Every warehouse has a matching demo pair — swap "colombo"
+                        for "badulla" or "galle" in the address to sign in against
+                        that site. Staff accounts follow
+                        firstname.department@lankalogix.com (departments: log,
+                        elec, sft, mech, adm) with the password user@123, or
+                        admin@123 for warehouse administrators. */}
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-border dark:bg-muted dark:text-muted-foreground">
-                      <div className="font-medium text-slate-800 dark:text-foreground mb-1">Dev accounts</div>
-                      <div><span className="font-medium">Super Admin:</span> super.admin1@lankalogix.lk / super</div>
-                      <div><span className="font-medium">Admin:</span> anjali.warnakulasuriya.adm1@lankalogix.lk / admin</div>
-                      <div><span className="font-medium">User:</span> nuwan.gunasekara.tra1@lankalogix.lk / user</div>
-                      <div className="mt-1 text-slate-500">Other seeded accounts: <span className="font-mono">Predictix@123</span></div>
+                      <div className="font-medium text-slate-800 dark:text-foreground mb-1.5">Demo accounts</div>
+                      <div className="space-y-1.5">
+                        <div>
+                          <span className="font-medium">Super Admin</span>
+                          <div className="font-mono break-all text-slate-500 dark:text-muted-foreground/80">
+                            demosuperadmin@lankalogix.com / superadmin@123
+                          </div>
+                        </div>
+                        <div>
+                          <span className="font-medium">Admin</span>
+                          <div className="font-mono break-all text-slate-500 dark:text-muted-foreground/80">
+                            demoadmincolombo.adm@lankalogix.com / demoadmin@123
+                          </div>
+                        </div>
+                        <div>
+                          <span className="font-medium">User</span>
+                          <div className="font-mono break-all text-slate-500 dark:text-muted-foreground/80">
+                            demousercolombo.adm@lankalogix.com / demouser@123
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-slate-500 dark:text-muted-foreground/70">
+                        Badulla and Galle have the same pair — replace{" "}
+                        <span className="font-mono">colombo</span> with{" "}
+                        <span className="font-mono">badulla</span> or{" "}
+                        <span className="font-mono">galle</span>.
+                      </div>
                     </div>
 
                     <div className="flex flex-col items-center gap-1 mt-4">

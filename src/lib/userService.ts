@@ -2,7 +2,7 @@
  * User Service (admin)
  * CRUD for the admin Users management screen.
  */
-import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/apiClient";
+import { apiGet, apiPost, apiPut, apiDelete, apiFetch } from "@/lib/apiClient";
 
 export type UserRole = "admin" | "user";
 export type UserStatus = "active" | "inactive";
@@ -31,7 +31,7 @@ export interface UserAssignedAsset {
   category: string | null;
   location: string;
   status: string;
-  healthPercent: number;
+  healthPercent: number | null;
   nextServiceDate: string | null;
 }
 
@@ -77,4 +77,25 @@ export async function deleteUser(
   userId: string
 ): Promise<{ message: string; id: string }> {
   return apiDelete<{ message: string; id: string }>(`/users/${userId}`);
+}
+
+/**
+ * Clear an asset's assignee.
+ *
+ * `PATCH /assets/{id}/assign` sets `assigned_to` from the query parameter of
+ * the same name; omitting it is how that endpoint expresses "unassign". It is
+ * admin-only and warehouse-scope-checked server-side.
+ */
+export async function unassignAsset(assetId: string): Promise<void> {
+  const res = await apiFetch(`/assets/${assetId}/assign`, { method: "PATCH" });
+  if (!res.ok) {
+    let detail = `Failed to unassign asset (HTTP ${res.status})`;
+    try {
+      const body = await res.json();
+      if (body?.detail) detail = String(body.detail);
+    } catch {
+      // Non-JSON error body — keep the status-based message.
+    }
+    throw new Error(detail);
+  }
 }

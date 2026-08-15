@@ -138,6 +138,15 @@ export async function updateUser(userId: string, data: Partial<UserItemOut>): Pr
   return apiPut<UserItemOut>(`/users/${userId}`, data);
 }
 
-export async function getTeamMembers(): Promise<TeamMemberData[]> {
-  return apiGet<TeamMemberData[]>("/profiles/me/colleagues");
+/**
+ * Colleagues in the current user's department.
+ *
+ * Pass `limit` when you only need a preview — the dashboard's "My Team" card
+ * shows eight, and unbounded this returns the whole department (measured at
+ * 519 people / 150 KB for one Colombo driver). Omit it for the team directory,
+ * which searches across the full list client-side.
+ */
+export async function getTeamMembers(limit?: number): Promise<TeamMemberData[]> {
+  const query = limit != null ? `?limit=${limit}` : "";
+  return apiGet<TeamMemberData[]>(`/profiles/me/colleagues${query}`);
 }

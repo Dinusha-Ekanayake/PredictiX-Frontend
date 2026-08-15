@@ -64,7 +64,7 @@ type AssignedAsset = {
   name: string;
   category: string;
   location: string;
-  healthPercent: number;
+  healthPercent: number | null;
 };
 
 type ChartEntry = {
@@ -414,7 +414,10 @@ export default function AdminUsersPage() {
           name: a.name,
           category: a.category ?? a.asset_type ?? "General",
           location: a.location,
-          healthPercent: Math.round(a.healthPercent),
+          // Null means the asset has no completed prediction. Math.round(null)
+          // is 0, which would render as "0% health" — a worse lie than the
+          // missing value it stands in for.
+          healthPercent: a.healthPercent != null ? Math.round(a.healthPercent) : null,
         }))
       );
     } catch (err) {
@@ -430,6 +433,22 @@ export default function AdminUsersPage() {
   function handleNavigateToAsset(assetId: string) {
     setAssetsUser(null);
     router.push(`/admin/assets?assetId=${assetId}`);
+  }
+
+  /**
+   * Keep the table's per-user assignment count in step after an unassign.
+   * The dialog owns the asset list it renders; this only corrects the count
+   * shown in the row behind it, which would otherwise stay stale until reload.
+   */
+  function handleAssetUnassigned(assetId: string) {
+    setAssignedAssets((prev) => prev.filter((a) => (a.asset_id ?? a.id) !== assetId));
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === assetsUser?.id
+          ? { ...u, assignedAssets: Math.max(0, (u.assignedAssets ?? 0) - 1) }
+          : u
+      )
+    );
   }
 
   if (isLoading) {
@@ -675,6 +694,7 @@ export default function AdminUsersPage() {
           if (!open) setAssetsUser(null);
         }}
         onNavigateToAsset={handleNavigateToAsset}
+        onUnassigned={handleAssetUnassigned}
         onBackToDetails={
           assetsUser
             ? () => {

@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
+import { healthColor, healthTextClass } from "@/lib/healthBands";
 import {
   getAdminDashboard,
   type AdminDashboardData,
@@ -89,9 +90,13 @@ function CTip({ active, payload, label, fmt }: { active?: boolean; payload?: Arr
   );
 }
 
+// Cut-offs now live in @/lib/healthBands, which mirrors
+// app/services/health_bands.py — the backend remains the source of truth. They
+// were defined here, and separately inside other components, which is how the
+// UI ended up with three different health scales at once.
 function ScoreBar({ score }: { score: number }) {
-  const c = score < 40 ? "#ef4444" : score < 70 ? "#f59e0b" : "#10b981";
-  const tc = score < 40 ? "text-rose-600 dark:text-rose-400" : score < 70 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
+  const c = healthColor(score);
+  const tc = healthTextClass(score);
   return (
     <div className="flex items-center gap-2 shrink-0">
       <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
@@ -172,6 +177,20 @@ export default function AdminDashboardPage() {
   // of a false "0%"/"0" when no PdM predictions have run yet (brand-new
   // warehouse) — previously indistinguishable from a genuine alarming 0%.
   const hasPredictions = k?.hasPredictionData ?? false;
+
+  // Cost coverage. Older backends don't send the count at all, so treat a
+  // missing value as "fully covered" rather than showing every deployment a
+  // scary partial-data warning it has no way to act on.
+  const costedAssets = k?.estMaintenanceCostAssetCount ?? (k?.totalAssets ?? 0);
+  const costIsPartial = !!k && costedAssets < k.totalAssets;
+  const costSubLabel = !k
+    ? "LKR · current estimate"
+    : costedAssets === 0
+      ? "No assets could be costed"
+      : costIsPartial
+        ? `LKR · ${costedAssets} of ${k.totalAssets} assets costed`
+        : "LKR · current estimate";
+
   const kpiCards = [
     { label: "Total Assets", value: k ? String(k.totalAssets) : "—", sub: "Fleet-wide", icon: Package, iconBg: "bg-violet-100 dark:bg-violet-500/15", iconColor: "text-violet-600 dark:text-violet-400", accent: "text-violet-600 dark:text-violet-400" },
     { label: "Critical Alerts", value: k ? String(k.criticalAlerts) : "—", sub: "Require action now", icon: Flame, iconBg: "bg-rose-100 dark:bg-rose-500/15", iconColor: "text-rose-600 dark:text-rose-400", accent: "text-rose-600 dark:text-rose-400" },
@@ -186,7 +205,11 @@ export default function AdminDashboardPage() {
     // rolling 30-day figure (pdm_batch_predictions holds one current
     // estimate per asset, not a time-bounded window), so the label no
     // longer claims "30 days".
-    { label: "Est. Maint. Cost", value: k ? fmtCompact(k.estMaintenanceCost) : "—", sub: "LKR · current estimate", icon: Wrench, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", accent: "text-slate-600 dark:text-slate-400" },
+    // The cost model stores NULL for assets it cannot score instead of
+    // guessing, so this sum can cover fewer assets than the fleet. When it
+    // does, the sub-label says so — otherwise a partial total is
+    // indistinguishable from a genuinely cheaper fleet.
+    { label: "Est. Maint. Cost", value: k ? (costedAssets > 0 ? fmtCompact(k.estMaintenanceCost) : "—") : "—", sub: costSubLabel, icon: Wrench, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", accent: "text-slate-600 dark:text-slate-400" },
   ];
 
   const healthTrend = data?.healthTrend ?? [];
@@ -401,8 +424,11 @@ export default function AdminDashboardPage() {
                         <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => fmtCompact(v)} />
                         <Tooltip content={<CTip fmt={(v) => `LKR ${fmtCompact(v)}`} />} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="estimated" name="Estimated" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
-                        <Bar dataKey="actual" name="Actual" fill="#06b6d4" radius={[3, 3, 0, 0]} />
+                        {/* Planned vs unplanned spend, same classification as
+                            the downtime chart below. Reactive spend is the
+                            figure a maintenance operation is managed against. */}
+                        <Bar dataKey="planned" name="Planned" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="unplanned" name="Unplanned" fill="#ef4444" radius={[3, 3, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -459,7 +485,9 @@ export default function AdminDashboardPage() {
 
             <Card className="p-4">
               <SectionTitle>{downtimeByMonth ? "Downtime Trend" : "Downtime by Warehouse"}</SectionTitle>
-              <SectionSub>{downtimeByMonth ? "Planned vs unplanned hours — last 6 months" : "Planned vs unplanned hours — this month"}</SectionSub>
+              {/* The warehouse-grouped branch applies no date filter at all, so
+                  it is an all-time total — it previously claimed "this month". */}
+              <SectionSub>{downtimeByMonth ? "Planned vs unplanned hours — last 6 months" : "Planned vs unplanned hours — all time"}</SectionSub>
               {/* Height sized for 6 categories at ~35px/row so every YAxis tick has
                   room to render — Recharts silently drops category labels that
                   don't fit rather than shrinking them, which was dropping every
@@ -467,12 +495,14 @@ export default function AdminDashboardPage() {
               <div className="mt-3" style={{ height: 230, minHeight: 230 }}>
                 {downtime.length === 0 ? <EmptyRow>No downtime data.</EmptyRow> : (
                   <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
-                    {/* Planned hours are routinely 1-2 orders of magnitude larger
-                        than unplanned hours, so on a shared linear axis the
-                        unplanned bars rendered as an invisible sliver (#98).
-                        minPointSize floors every non-zero bar to a visible
-                        pixel size, and the value labels make the exact hours
-                        readable regardless of how short the bar itself is. */}
+                    {/* The two series can differ by an order of magnitude, so on
+                        a shared linear axis the smaller one rendered as an
+                        invisible sliver (#98). minPointSize floors every
+                        non-zero bar to a visible pixel size, and the value
+                        labels make the exact hours readable regardless of how
+                        short the bar itself is. (The old note here claimed
+                        planned always dwarfs unplanned — that was an artefact
+                        of planned being computed as a constant 0.) */}
                     <BarChart data={downtime} layout="vertical" margin={{ top: 0, right: 28, left: 36, bottom: 0 }} barGap={3}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} horizontal={false} />
                       <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
@@ -577,7 +607,7 @@ export default function AdminDashboardPage() {
             </button>
           </div>
           <div className="overflow-x-auto">
-            <div className="min-w-[600px]">
+            <div className="min-w-150">
               <div className="grid grid-cols-[1fr_auto_auto_auto_auto] bg-muted/40 border-b border-slate-200 dark:border-slate-700">
                 {["Ticket", "Asset", "Priority", "Status", "Assigned"].map((h) => (
                   <div key={h} className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{h}</div>

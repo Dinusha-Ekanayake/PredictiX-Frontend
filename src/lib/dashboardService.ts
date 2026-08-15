@@ -16,6 +16,13 @@ export interface DashboardKpis {
   fleetHealth: number; // 0–100
   predictedFailures: number;
   estMaintenanceCost: number; // raw amount (LKR)
+  // How many assets estMaintenanceCost is summed from. The cost model stores
+  // NULL for assets it cannot score rather than guessing, so when this is
+  // below totalAssets the figure is a partial total and must be labelled as
+  // one — a silently smaller number reads as a cheaper fleet.
+  // Optional: a backend deployed before this field existed omits it, and the
+  // UI treats "absent" as fully covered rather than as zero coverage.
+  estMaintenanceCostAssetCount?: number;
   // False for a brand-new warehouse with zero PdM predictions run yet —
   // distinguishes "no data" from a genuine (alarming) 0% fleet health.
   hasPredictionData: boolean;
@@ -44,10 +51,18 @@ export interface HealthDistBucket {
   [key: string]: string | number;
 }
 
+/**
+ * Maintenance spend for a month, split by whether the work was planned.
+ *
+ * Was previously `estimated` / `actual`, which described a budget-vs-outturn
+ * comparison the backend cannot produce (no budget is stored) and whose
+ * `estimated` series was always 0. Both figures here are money already spent;
+ * the split matches the downtime chart so the two read consistently.
+ */
 export interface CostTrendPoint {
   month: string;
-  estimated: number; // raw amount (LKR)
-  actual: number | null;
+  planned: number;   // raw amount (LKR)
+  unplanned: number; // raw amount (LKR)
   [key: string]: string | number | null;
 }
 

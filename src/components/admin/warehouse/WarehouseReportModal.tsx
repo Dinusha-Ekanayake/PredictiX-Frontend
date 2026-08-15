@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { downloadProfessionalPDF } from "@/lib/professionalPdfExport";
 import WarehouseSurvivalAnalysis from "./WarehouseSurvivalAnalysis";
+import type { SurvivalSummary } from "@/lib/warehouseService";
 
 
 // ── Palette ──────────────────────────────────────────────
@@ -88,16 +89,12 @@ interface Ctx {
   avg_resolution_hours?: number;
   avg_resolution_days?: number;
   mttr_by_priority?: { priority: string; avg_hours: number }[];
-  // FRSO survival analysis (Weibull AFT) aggregated over critical assets
-  survival_summary?: {
-    assets_analyzed: number;
-    horizon_days: number;
-    currency?: string;
-    expected_spend_7d?: number;
-    expected_spend_30d?: number;
-    component_summary: { component: string; avg_rul_days: number | null; avg_fail_prob_7d?: number; avg_fail_prob_30d?: number; expected_failures_7d?: number; expected_failures_30d?: number; at_risk_7d: number; at_risk_30d: number; assets_scored: number }[];
-    watchlist: { asset: string; component: string; rul_days: number | null; risk: string }[];
-  } | null;
+  // FRSO survival analysis (Weibull AFT) aggregated over critical assets.
+  // Uses the shared type rather than re-declaring the shape inline — the
+  // duplicate had drifted from the real response (it marked avg_fail_prob_*
+  // optional when the backend always sends them, and omitted `assets` and
+  // `generated_at` entirely).
+  survival_summary?: SurvivalSummary | null;
 }
 
 interface MaintenanceScheduleItem {

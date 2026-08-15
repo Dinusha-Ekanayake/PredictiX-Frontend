@@ -274,7 +274,7 @@ export default function NewTicketDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-160 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Plus className="h-5 w-5" />
@@ -340,7 +340,7 @@ export default function NewTicketDialog({
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[110px] resize-vertical outline-none focus:ring-2 focus:ring-ring"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-27.5 resize-vertical outline-none focus:ring-2 focus:ring-ring"
               placeholder="Describe the issue — AI will analyze this to suggest category and priority"
               disabled={isSubmitting}
             />

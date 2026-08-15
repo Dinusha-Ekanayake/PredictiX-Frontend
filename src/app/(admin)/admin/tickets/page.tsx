@@ -75,9 +75,11 @@ export default function AdminTicketsPage() {
   const [selectedTicket, setSelectedTicket] = React.useState<Ticket | null>(null);
 
   const [query, setQuery] = React.useState("");
-  const [debouncedQuery, setDebouncedQuery] = React.useState("");
+  const [appliedQuery, setAppliedQuery] = React.useState("");
   const [selectedStatus, setSelectedStatus] = React.useState("all");
   const [selectedPriority, setSelectedPriority] = React.useState("all");
+  const [sortBy, setSortBy] = React.useState("created_at");
+  const [sortDir, setSortDir] = React.useState("asc");
   const [users, setUsers] = React.useState<UserItem[]>([]);
 
   // ── Deep-link support: ?ticket_id=<uuid> (e.g. from the dashboard's
@@ -104,7 +106,8 @@ export default function AdminTicketsPage() {
 
   React.useEffect(() => {
     const role = window.localStorage.getItem("predictix.user.role");
-    setIsAdmin(role === "admin" || role === "ADMIN");
+    const r = (role || "").toLowerCase();
+    setIsAdmin(r === "admin" || r === "superadmin" || r === "super_admin");
     listUsers()
       .then(setUsers)
       .catch((err) => console.error("Failed to load users:", err));
@@ -134,19 +137,13 @@ export default function AdminTicketsPage() {
     refreshStatusCounts();
   }, [refreshStatusCounts]);
 
-  // Debounce search input
-  React.useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 400);
-    return () => clearTimeout(t);
-  }, [query]);
-
   // Reset and reload when filters change
   React.useEffect(() => {
     setPage(0);
     setTickets([]);
     loadPage(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery, selectedStatus, selectedPriority]);
+  }, [appliedQuery, selectedStatus, selectedPriority, sortBy, sortDir]);
 
   async function loadPage(pageNum: number, reset: boolean) {
     if (pageNum === 0) setIsLoading(true);
@@ -155,9 +152,11 @@ export default function AdminTicketsPage() {
     try {
       const { tickets: rows, total: t } = await fetchTickets(
         pageNum,
-        debouncedQuery,
+        appliedQuery,
         selectedStatus,
-        selectedPriority
+        selectedPriority,
+        sortBy,
+        sortDir
       );
       setTotal(t);
       setTickets(rows);
@@ -349,14 +348,44 @@ export default function AdminTicketsPage() {
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm p-4">
         <div className="flex w-full items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-60">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <button
+              type="button"
+              onClick={() => setAppliedQuery(query)}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer z-10"
+            >
+              <Search className="h-4 w-4" />
+            </button>
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tickets by title, description…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setAppliedQuery(query);
+                }
+              }}
+              placeholder="Search tickets by title, ticket number, description…"
               className="pl-9 h-10 bg-background/60 dark:bg-slate-900/60"
             />
           </div>
+
+          <Select
+            value={`${sortBy}_${sortDir}`}
+            onValueChange={(v) => {
+              const [by, dir] = v.split("_");
+              setSortBy(by);
+              setSortDir(dir);
+            }}
+          >
+            <SelectTrigger className="w-44 h-10 bg-background/60 dark:bg-slate-900/60">
+              <SelectValue placeholder="Sort By" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_at_asc">Oldest First</SelectItem>
+              <SelectItem value="created_at_desc">Newest First</SelectItem>
+              <SelectItem value="title_asc">Name (A-Z)</SelectItem>
+              <SelectItem value="title_desc">Name (Z-A)</SelectItem>
+            </SelectContent>
+          </Select>
 
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v)}>
@@ -402,15 +431,18 @@ export default function AdminTicketsPage() {
               <Filter className="h-4 w-4" />
             </Button>
 
-            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "") && (
+            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "" || appliedQuery.trim() !== "" || sortBy !== "created_at" || sortDir !== "asc") && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-10 text-muted-foreground hover:text-foreground hover:bg-muted/50 px-3 flex items-center gap-1.5"
                 onClick={() => {
                   setQuery("");
+                  setAppliedQuery("");
                   setSelectedStatus("all");
                   setSelectedPriority("all");
+                  setSortBy("created_at");
+                  setSortDir("asc");
                 }}
               >
                 <XCircle className="h-4 w-4" />

@@ -63,6 +63,8 @@ interface AISections {
   maintenance_intelligence?: string;
   pattern_and_trend?: string;
   conclusion?: string;
+  critical_assets_summary?: string;
+  asset_summaries?: Record<string, string>;
 }
 
 interface CriticalAsset {
@@ -129,9 +131,9 @@ interface Props {
 const SECTION_STYLE = "rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden";
 
 function SectionHeader({
-  icon: Icon, title, subtitle, accent, collapsed, onToggle,
+  icon: Icon, title, subtitle = "", accent, collapsed, onToggle,
 }: {
-  icon: React.ElementType; title: string; subtitle: string;
+  icon: React.ElementType; title: string; subtitle?: string;
   accent: string; collapsed: boolean; onToggle: () => void;
 }) {
   return (
@@ -819,7 +821,7 @@ export default function WarehouseAIReportPanel({
                           </tr>
                         </thead>
                         <tbody>
-                          {ctx.survival_summary!.watchlist!.map((w) => (
+                          {ctx.survival_summary!.watchlist!.map((w: any) => (
                             <React.Fragment key={w.asset}>
                               <tr className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
                                 <td className="py-2 pr-3 font-mono font-bold text-rose-600">{w.asset}</td>

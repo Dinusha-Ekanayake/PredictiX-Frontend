@@ -46,7 +46,6 @@ const PRIORITY_COLORS = {
 
 const CATEGORY_COLORS = {
   Electrical: "#04dfefff", // Cyan
-  Software: "#ec1e85ff",   // Pink
 };
 
 const PRIORITY_VALS = {

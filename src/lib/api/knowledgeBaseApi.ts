@@ -10,6 +10,7 @@ export interface KBArticle {
   title: string;
   content: string;
   category: string | null;
+  source: string | null;
   tags: string[] | null;
   is_active: boolean;
   created_by: string | null;
@@ -21,6 +22,7 @@ export interface KBArticleCreate {
   title: string;
   content: string;
   category?: string;
+  source?: string;
   tags?: string[];
 }
 
@@ -28,6 +30,7 @@ export interface KBArticleUpdate {
   title?: string;
   content?: string;
   category?: string;
+  source?: string;
   tags?: string[];
   is_active?: boolean;
 }

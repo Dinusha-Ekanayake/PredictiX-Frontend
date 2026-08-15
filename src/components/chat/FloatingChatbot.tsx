@@ -132,7 +132,6 @@ function RecordSummaryWidget({ payload }: { payload: any }) {
           const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
           const textValue = String(value);
           let displayValue: React.ReactNode = textValue;
-
           // Badge formatting for common statuses
           if (key === "status" || key === "priority" || key === "role") {
             const isGood = textValue === "active" || textValue === "resolved" || textValue === "admin";

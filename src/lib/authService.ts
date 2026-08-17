@@ -3,6 +3,8 @@
  * Handles login, token storage, and session management.
  */
 
+import { invalidateMyProfile } from "@/lib/api/userProfileApi";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -200,6 +202,10 @@ export function logout(): void {
   if (typeof window === "undefined") return;
   for (const key of AUTH_STORAGE_KEYS) localStorage.removeItem(key);
   clearCachedWarehouseData();
+  // The profile cache lives in module memory, not localStorage, so clearing
+  // storage alone would leave the previous account's name and role readable by
+  // whoever signs in next.
+  invalidateMyProfile();
 }
 
 /** True if a JWT is present in localStorage. */

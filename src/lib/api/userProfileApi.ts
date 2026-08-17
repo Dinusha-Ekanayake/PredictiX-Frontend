@@ -56,8 +56,45 @@ export type TeamMemberData = {
   status: string;
 };
 
+/**
+ * The caller's own profile, de-duplicated across components.
+ *
+ * The navbar and the page body both need it, so every screen used to issue two
+ * identical /profiles/me requests. Against Supabase that is a real cost: the
+ * endpoint takes ~850ms, and the two run in parallel competing for the same
+ * connection pool.
+ *
+ * In-flight requests share one promise, and the resolved value is reused for a
+ * short window so a navigation does not refetch immediately. The window is
+ * deliberately small because the profile carries role and status, and a stale
+ * one must not outlive a deactivation for long.
+ */
+const PROFILE_TTL_MS = 30_000;
+let profileCache: { at: number; data: UserProfileData } | null = null;
+let profileInFlight: Promise<UserProfileData> | null = null;
+
 export async function fetchMyProfile(): Promise<UserProfileData> {
-  return apiGet<UserProfileData>("/profiles/me");
+  if (profileCache && Date.now() - profileCache.at < PROFILE_TTL_MS) {
+    return profileCache.data;
+  }
+  if (profileInFlight) return profileInFlight;
+
+  profileInFlight = apiGet<UserProfileData>("/profiles/me")
+    .then((data) => {
+      profileCache = { at: Date.now(), data };
+      return data;
+    })
+    .finally(() => {
+      profileInFlight = null;
+    });
+  return profileInFlight;
+}
+
+/** Drop the cached profile. Call after anything that changes it, and on sign-out
+ *  so the next account does not read the previous one's profile. */
+export function invalidateMyProfile(): void {
+  profileCache = null;
+  profileInFlight = null;
 }
 
 export async function updateMyProfile(data: {
@@ -72,7 +109,11 @@ export async function updateMyProfile(data: {
     compactView?: boolean;
   };
 }): Promise<UserProfileData> {
-  return apiPut<UserProfileData>("/profiles/me", data);
+  const updated = await apiPut<UserProfileData>("/profiles/me", data);
+  // Seed the cache with the server's response rather than clearing it, so the
+  // next read is both fresh and free.
+  profileCache = { at: Date.now(), data: updated };
+  return updated;
 }
 
 export async function fetchMyAssets(): Promise<UserAssetData[]> {

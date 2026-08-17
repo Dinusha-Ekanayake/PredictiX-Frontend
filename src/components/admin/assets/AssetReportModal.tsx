@@ -22,17 +22,32 @@ type Props = {
   assetName?: string;
 };
 
+/** Icon colour that goes with each KPI accent tint.
+ *
+ * The tints are translucent, so they read as a pale wash on a light surface.
+ * A white icon on top of that is invisible, which is why each accent names its
+ * own icon colour with a light and a dark value instead. */
+const KPI_ICON_FOR_ACCENT: Record<string, string> = {
+  "bg-red-500/15":    "text-red-600 dark:text-red-400",
+  "bg-orange-500/15": "text-orange-600 dark:text-orange-400",
+  "bg-violet-500/15": "text-violet-600 dark:text-violet-400",
+  "bg-amber-500/15":  "text-amber-600 dark:text-amber-400",
+  "bg-teal-500/15":   "text-teal-600 dark:text-teal-400",
+};
+
+const TEAL_ICON = "text-teal-600 dark:text-teal-400";
+
 function KpiCard({ icon: Icon, label, value, accent }: {
   icon: React.ElementType; label: string; value: string; accent?: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/8 bg-white/4 px-4 py-3 flex items-center gap-3">
+    <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 flex items-center gap-3">
       <div className={cn("rounded-lg p-2", accent ?? "bg-teal-500/15")}>
-        <Icon className={cn("h-4 w-4", accent ? "text-white/70" : "text-teal-400")} />
+        <Icon className={cn("h-4 w-4", accent ? (KPI_ICON_FOR_ACCENT[accent] ?? TEAL_ICON) : TEAL_ICON)} />
       </div>
       <div>
-        <div className="text-[10px] text-white/50 font-medium uppercase tracking-wider">{label}</div>
-        <div className="text-base font-bold leading-tight">{value}</div>
+        <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{label}</div>
+        <div className="text-base font-bold leading-tight text-foreground">{value}</div>
       </div>
     </div>
   );
@@ -40,9 +55,9 @@ function KpiCard({ icon: Icon, label, value, accent }: {
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between py-2 border-b border-white/6 last:border-0">
-      <span className="text-[12px] text-white/50">{label}</span>
-      <span className="text-[12px] font-medium text-white/90 text-right max-w-[55%]">{value}</span>
+    <div className="flex items-start justify-between py-2 border-b border-border/70 last:border-0">
+      <span className="text-[12px] text-muted-foreground">{label}</span>
+      <span className="text-[12px] font-medium text-foreground text-right max-w-[55%]">{value}</span>
     </div>
   );
 }
@@ -52,14 +67,14 @@ function Section({ title, icon: Icon, children }: {
 }) {
   const [open, setOpen] = React.useState(true);
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/3 overflow-hidden">
+    <div className="rounded-2xl border border-border bg-muted/25 overflow-hidden">
       <button onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/4 transition-colors">
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/60 transition-colors">
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-teal-500/15 p-2"><Icon className="h-4 w-4 text-teal-400" /></div>
-          <span className="text-sm font-semibold">{title}</span>
+          <div className="rounded-lg bg-teal-500/15 p-2"><Icon className={cn("h-4 w-4", TEAL_ICON)} /></div>
+          <span className="text-sm font-semibold text-foreground">{title}</span>
         </div>
-        <span className={cn("text-white/30 transition-transform duration-200", !open && "rotate-180")}>▲</span>
+        <span className={cn("text-muted-foreground transition-transform duration-200", !open && "rotate-180")}>▲</span>
       </button>
       {open && <div className="px-5 pb-5 pt-1">{children}</div>}
     </div>
@@ -394,40 +409,40 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-sm p-4 pt-8">
-      <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0d1117] shadow-2xl shadow-black/60 mb-8">
+      <div className="relative w-full max-w-4xl rounded-2xl border border-border bg-card text-card-foreground shadow-2xl shadow-black/30 dark:shadow-black/60 mb-8">
 
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 rounded-t-2xl border-b border-white/8 bg-[#0d1117]/95 backdrop-blur-sm px-6 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 rounded-t-2xl border-b border-border bg-card/95 backdrop-blur-sm px-6 py-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="rounded-xl bg-teal-500/15 p-2.5 shrink-0">
-              <FileText className="h-5 w-5 text-teal-400" />
+              <FileText className={cn("h-5 w-5", TEAL_ICON)} />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base font-bold truncate">
+                <h2 className="text-base font-bold truncate text-foreground">
                   {reportData?.assetName ?? assetName ?? "Asset Performance Report"}
                 </h2>
                 {reportData?.assetCode && reportData.assetCode !== "—" && (
-                  <span className="text-[11px] font-mono text-white/40 bg-white/6 px-2 py-0.5 rounded-full shrink-0">
+                  <span className="text-[11px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0">
                     {reportData.assetCode}
                   </span>
                 )}
               </div>
-              <p className="text-[12px] text-white/40 mt-0.5">
+              <p className="text-[12px] text-muted-foreground mt-0.5">
                 {new Date().toLocaleDateString("en-GB", { day:"2-digit", month:"long", year:"numeric" })}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button variant="outline" size="sm"
-              className="h-9 rounded-xl gap-1.5 text-xs border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20"
+              className="h-9 rounded-xl gap-1.5 text-xs border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300 hover:bg-teal-500/20"
               onClick={handleDownloadPDF} disabled={generating || loading || !reportData}>
               {generating
                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Generating…</>
                 : <><Download className="h-3.5 w-3.5" />PDF</>}
             </Button>
             <Button variant="ghost" size="sm"
-              className="h-9 w-9 rounded-xl p-0 text-white/40 hover:text-white hover:bg-white/8"
+              className="h-9 w-9 rounded-xl p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
               onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -439,16 +454,16 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
 
           {loading && (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-teal-400" />
-              <p className="text-sm text-white/50">Loading asset data from database…</p>
+              <Loader2 className={cn("h-8 w-8 animate-spin", TEAL_ICON)} />
+              <p className="text-sm text-muted-foreground">Loading asset data from database…</p>
             </div>
           )}
 
           {error && !loading && (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-              <AlertTriangle className="h-8 w-8 text-red-400" />
-              <p className="text-sm font-medium text-red-400">Failed to load asset data</p>
-              <p className="text-xs text-white/40">{error}</p>
+              <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">Failed to load asset data</p>
+              <p className="text-xs text-muted-foreground">{error}</p>
             </div>
           )}
 
@@ -504,9 +519,9 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
                     ["Total Cost",    `LKR ${reportData.maintenanceMetrics.total_cost.toLocaleString()}`],
                     ["Downtime",      `${reportData.maintenanceMetrics.total_downtime_hours}h`],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-xl border border-white/8 bg-white/4 p-3">
-                      <div className="text-[10px] text-white/40 uppercase tracking-wider">{label}</div>
-                      <div className="text-sm font-bold mt-1">{value}</div>
+                    <div key={label} className="rounded-xl border border-border bg-muted/40 p-3">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</div>
+                      <div className="text-sm font-bold mt-1 text-foreground">{value}</div>
                     </div>
                   ))}
                 </div>
@@ -517,13 +532,13 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     ["Total",         String(reportData.ticketMetrics.total_tickets),          ""],
-                    ["Open",          String(reportData.ticketMetrics.open_tickets),           "text-amber-400"],
-                    ["High Priority", String(reportData.ticketMetrics.high_priority_tickets),  "text-red-400"],
-                    ["Closed",        String(reportData.ticketMetrics.closed_tickets),         "text-emerald-400"],
+                    ["Open",          String(reportData.ticketMetrics.open_tickets),           "text-amber-600 dark:text-amber-400"],
+                    ["High Priority", String(reportData.ticketMetrics.high_priority_tickets),  "text-red-600 dark:text-red-400"],
+                    ["Closed",        String(reportData.ticketMetrics.closed_tickets),         "text-emerald-600 dark:text-emerald-400"],
                   ].map(([label, value, color]) => (
-                    <div key={label} className="rounded-xl border border-white/8 bg-white/4 p-3 text-center">
-                      <div className="text-[10px] text-white/40 uppercase tracking-wider">{label}</div>
-                      <div className={cn("text-2xl font-bold mt-1", color || "text-white")}>{value}</div>
+                    <div key={label} className="rounded-xl border border-border bg-muted/40 p-3 text-center">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</div>
+                      <div className={cn("text-2xl font-bold mt-1", color || "text-foreground")}>{value}</div>
                     </div>
                   ))}
                 </div>
@@ -532,12 +547,12 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
               {/* AI Insights */}
               <Section title="4. AI Insights" icon={Bot}>
                 <div className="flex items-start gap-3 rounded-xl border border-teal-500/20 bg-teal-500/5 p-4">
-                  <Bot className="h-5 w-5 text-teal-400 shrink-0 mt-0.5" />
+                  <Bot className={cn("h-5 w-5 shrink-0 mt-0.5", TEAL_ICON)} />
                   <div className="space-y-1">
-                    <p className="text-sm font-medium text-teal-300">
+                    <p className="text-sm font-medium text-teal-700 dark:text-teal-300">
                       {reportData.health_score != null ? "AI Analysis Available" : "No Prediction Data Yet"}
                     </p>
-                    <p className="text-[12px] text-white/50 leading-relaxed">
+                    <p className="text-[12px] text-muted-foreground leading-relaxed">
                       {reportData.insights.executive_summary}
                     </p>
                   </div>
@@ -547,9 +562,9 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
               {/* Download CTA */}
               <div className="flex items-center justify-between rounded-2xl border border-teal-500/20 bg-teal-500/5 px-6 py-4">
                 <div>
-                  <p className="text-sm font-semibold text-teal-300">Ready to export full report</p>
-                  <p className="text-[12px] text-white/40 mt-0.5">
-                    Includes fleet overview, charts, sensor data, maintenance logs & AI insights
+                  <p className="text-sm font-semibold text-teal-700 dark:text-teal-300">Ready to export full report</p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
+                    Includes fleet overview, charts, sensor data, maintenance logs &amp; AI insights
                   </p>
                 </div>
                 <Button className="h-10 rounded-xl px-5 gap-2 bg-teal-600 hover:bg-teal-500 text-white font-semibold shrink-0"

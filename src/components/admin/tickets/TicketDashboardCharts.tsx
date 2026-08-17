@@ -304,8 +304,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   const CustomBarTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="mb-1 text-sm font-semibold text-slate-200">{label}</p>
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="mb-1 text-sm font-semibold text-foreground">{label}</p>
           <p className="text-sm font-medium" style={{ color: payload[0].payload.fill }}>
             Number of Tickets : {payload[0].value}
           </p>
@@ -319,8 +319,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   const CustomPieTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
             <span
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: payload[0].payload.fill }}
@@ -338,12 +338,12 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="mb-1.5 text-sm font-semibold text-slate-200">{label}</p>
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="mb-1.5 text-sm font-semibold text-foreground">{label}</p>
           <p className="text-xs font-medium text-rose-500">High Priority: {data.High}</p>
           <p className="text-xs font-medium text-amber-500">Medium Priority: {data.Medium}</p>
           <p className="text-xs font-medium text-emerald-500">Low Priority: {data.Low}</p>
-          <p className="text-sm font-semibold text-violet-400 mt-1 border-t border-slate-800 pt-1">
+          <p className="text-sm font-semibold text-violet-600 dark:text-violet-400 mt-1 border-t border-border pt-1">
             Total Active Tickets: {data.total}
           </p>
         </div>
@@ -357,9 +357,9 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     if (active && payload && payload.length) {
       const item = payload[0].payload;
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="text-sm font-bold text-slate-200">{item.category} &bull; {item.status}</p>
-          <p className="text-xs text-slate-400 mt-1">Ticket Count: <span className="font-semibold text-white">{item.count} tickets</span></p>
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="text-sm font-bold text-foreground">{item.category} &bull; {item.status}</p>
+          <p className="text-xs text-muted-foreground mt-1">Ticket Count: <span className="font-semibold text-foreground">{item.count} tickets</span></p>
         </div>
       );
     }
@@ -555,7 +555,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                 axisLine={false}
                 tickFormatter={(val) => Math.floor(val).toString()}
               />
-              <Tooltip cursor={{ fill: '#262626', opacity: 0.5 }} content={<CustomBarTooltip />} />
+              <Tooltip cursor={{ fill: 'currentColor', opacity: 0.08 }} content={<CustomBarTooltip />} />
               <Bar dataKey="count" shape={<Custom3DBar />}>
                 {categoryChartData.map((entry, index) => {
                   let cellFill = "url(#cyanGrad)";
@@ -697,7 +697,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                 interval={0}
                 tickFormatter={formatName}
               />
-              <Tooltip cursor={{ fill: '#262626', opacity: 0.3 }} content={<CustomTechTooltip />} />
+              <Tooltip cursor={{ fill: 'currentColor', opacity: 0.08 }} content={<CustomTechTooltip />} />
               <Bar dataKey="Low" stackId="a" fill="url(#techLowGrad)" shape={<Custom3DHorizontalBar />} barSize={9} />
               <Bar dataKey="Medium" stackId="a" fill="url(#techMediumGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />
               <Bar dataKey="High" stackId="a" fill="url(#techHighGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />

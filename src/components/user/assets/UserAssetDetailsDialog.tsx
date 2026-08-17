@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import AssetDetailsPanel, { AssetDetailsSkeleton } from "@/components/admin/assets/AssetDetailsPanel";
 import { getAssetDetail } from "@/components/admin/assets/assetService";
 import type { AssetDetail } from "@/components/admin/assets/types";
+import { fetchWarehouseOptions } from "@/lib/api/userProfileApi";
 
 /** Read-only asset detail dialog shown to non-admin users. */
 export default function UserAssetDetailsDialog({
@@ -22,6 +23,21 @@ export default function UserAssetDetailsDialog({
   const [detail, setDetail] = React.useState<AssetDetail | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // AssetDetailsPanel maps warehouse_id to a name through these; without them
+  // it falls back to rendering the raw UUID in the Warehouse field.
+  const [warehouseOptions, setWarehouseOptions] = React.useState<
+    { value: string; label: string }[]
+  >([]);
+
+  React.useEffect(() => {
+    if (!open || warehouseOptions.length) return;
+    let cancelled = false;
+    fetchWarehouseOptions()
+      .then((rows) => { if (!cancelled) setWarehouseOptions(rows); })
+      // A missing name is cosmetic: the panel still renders, just with the id.
+      .catch(() => { /* keep the fallback */ });
+    return () => { cancelled = true; };
+  }, [open, warehouseOptions.length]);
 
   React.useEffect(() => {
     if (!open || !assetId) {
@@ -76,6 +92,7 @@ export default function UserAssetDetailsDialog({
                 onDelete={undefined}
                 onEdit={undefined}
                 readOnly={true}
+                warehouseOptions={warehouseOptions}
               />
             </div>
           ) : null}

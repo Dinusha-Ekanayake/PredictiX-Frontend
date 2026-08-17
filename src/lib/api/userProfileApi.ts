@@ -130,6 +130,20 @@ export async function fetchWarehouses(): Promise<string[]> {
   return rows.map((w) => (typeof w === "string" ? w : w.name ?? "")).filter(Boolean);
 }
 
+/**
+ * Warehouses as id/name pairs.
+ *
+ * fetchWarehouses throws the ids away, so it cannot turn an asset's
+ * warehouse_id into a name. Any view that renders an asset needs that mapping,
+ * otherwise the detail panel falls back to printing the raw UUID.
+ */
+export async function fetchWarehouseOptions(): Promise<{ value: string; label: string }[]> {
+  const rows = await apiGet<Array<{ id?: string; name?: string }>>("/warehouses/");
+  return rows
+    .filter((w) => w?.id && w?.name)
+    .map((w) => ({ value: String(w.id), label: String(w.name) }));
+}
+
 export async function fetchUserAssets(userId: string): Promise<UserAssetData[]> {
   return apiGet<UserAssetData[]>(`/users/${userId}/assets`);
 }

@@ -1,13 +1,34 @@
 # PredictiX — Frontend
 
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Tailwind](https://img.shields.io/badge/Tailwind-v4-06B6D4?logo=tailwindcss&logoColor=white)
+![Vercel](https://img.shields.io/badge/deployed-Vercel-000000?logo=vercel&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-69%20passing-brightgreen)
+
 > AI-powered predictive maintenance and fleet/asset management dashboard for industrial operations.
 
 PredictiX is a role-based Next.js web application for fleet operations and maintenance teams. It surfaces AI-generated failure predictions, cost forecasts, component RUL (remaining useful life) estimates, and health scores from the PredictiX backend, alongside asset management, a ticketing system with AI categorisation/prioritisation, warehouse operations, and an AI chatbot — all behind role-based access control (User / Admin / Super Admin).
 
 ---
 
+## Live Deployment
+
+| Environment | URL |
+|---|---|
+| Production | [predicti-x-frontend.vercel.app](https://predicti-x-frontend.vercel.app) |
+| Preview | [predicti-x-frontend-dinusha-ekanayakes-projects.vercel.app](https://predicti-x-frontend-dinusha-ekanayakes-projects.vercel.app) |
+
+Deployed on Vercel, connected to the repository — every push builds a preview, and `main`
+promotes to production. The API host is supplied at build time as `NEXT_PUBLIC_API_URL`; it is
+never committed. The companion API lives in the [`PredictiX_Backend`](../predictix_backend) repository.
+
+---
+
 ## Table of Contents
 
+- [Live Deployment](#live-deployment)
 - [Overview](#overview)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
@@ -22,6 +43,7 @@ PredictiX is a role-based Next.js web application for fleet operations and maint
 - [Environment Variables](#environment-variables)
 - [Component Architecture](#component-architecture)
 - [Theming](#theming)
+- [Testing](#testing)
 - [Scripts](#scripts)
 
 ---
@@ -35,6 +57,58 @@ PredictiX serves three roles, each with a distinct layout and route group:
 - **Super Admin** — the same admin capabilities as Admin, but selects which warehouse to operate in at login (a two-step login flow), and can switch between warehouses.
 
 All fleet-wide and warehouse-scoped data the backend serves is automatically scoped to the caller's active warehouse — a regular Admin always sees their own warehouse; a Super Admin sees whichever warehouse they selected at login.
+
+### Where the app sits
+
+```mermaid
+graph LR
+    subgraph BROWSER["BROWSER"]
+        APP["Next.js App Router<br/>React 19 · Tailwind v4"]
+        LS["localStorage<br/>JWT · role · active warehouse"]
+        APP <--> LS
+    end
+
+    subgraph EDGE["VERCEL"]
+        SSR["Server components<br/>+ static routes"]
+        MW["proxy.ts<br/>route protection"]
+    end
+
+    API["PredictiX API<br/>FastAPI on EC2"]
+    SB["Supabase<br/>attachments · realtime"]
+
+    APP --> MW --> SSR
+    APP -->|"apiClient.ts<br/>Bearer JWT"| API
+    APP -->|"attachments,<br/>notification bell"| SB
+
+    style MW fill:#0F4C5C,color:#fff
+    style API fill:#E6F1F4,stroke:#0F4C5C,stroke-width:2px
+```
+
+### Login and role routing
+
+Super Admins choose a warehouse before they receive a usable token, so a two-step exchange
+exists on that path only.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as Login page
+    participant API as POST /auth/login
+
+    U->>A: email + password
+    A->>API: credentials
+    alt Super Admin
+        API-->>A: requires_warehouse_selection + selection_token
+        A->>U: choose a warehouse
+        U->>A: selection
+        A->>API: POST /auth/login/select-warehouse
+        API-->>A: access_token scoped to that warehouse
+    else Admin or User
+        API-->>A: access_token
+    end
+    A->>A: store token, role, warehouse
+    A->>U: redirect to /admin/* or /user/*
+```
 
 ---
 
@@ -165,7 +239,7 @@ predictix_frontend/
 - Realtime notification bell (Supabase/WebSocket-backed) with unread counts and mark-as-read.
 - Per-user notification preferences.
 
-### Warehouse Operations *(owned separately — not modified by this session's work)*
+### Warehouse Operations
 - Multi-warehouse overview, predictive maintenance schedule, AI-generated warehouse insight cards.
 - AI-generated warehouse report (Groq-backed RAG) with PDF export.
 
@@ -370,7 +444,7 @@ All `NEXT_PUBLIC_` variables are exposed to the browser bundle. Never put secret
 | `AssetDetailsPanel` | Slide-in panel: predictions, cost, component RUL, maintenance history, tickets, assignments |
 | `AssetFormDialog` | Create/edit asset form |
 
-### Warehouse *(not modified by this session)*
+### Warehouse
 | Component | Purpose |
 |---|---|
 | Warehouse overview cards, maintenance schedule, asset insights, AI report modal | Multi-warehouse operations and AI-generated PDF reports |
@@ -388,6 +462,33 @@ All `NEXT_PUBLIC_` variables are exposed to the browser bundle. Never put secret
 
 ---
 
+## Testing
+
+Vitest with Testing Library, in a jsdom environment. 69 tests across six groups.
+
+```bash
+npm test              # per-group pass/fail table
+npm run test:list     # the same, listing every case
+npm run test:coverage # with a coverage report
+npm run test:watch    # watch mode
+npm run test:raw      # vitest directly, no table
+```
+
+| Group | Tests | Covers |
+|---|---|---|
+| Unit: health bands | 26 | banding thresholds, colours, the no-score case |
+| Unit: auth session | 14 | token storage, role reads, sign-out clearing every key |
+| Unit: asset helpers | 8 | deriving displayed health from a prediction |
+| Component: assigned assets | 14 | the assigned-assets dialog |
+| Test plan: theme | 4 | light/dark switching and persistence |
+| Test plan: navigation | 3 | every navbar link resolving to a real route |
+
+The runner treats vitest's own exit code as the authority on pass/fail and retries reading the
+JSON report, because the reporter's write races process exit on Windows. A zero-test run is
+reported as a failure, never as success.
+
+---
+
 ## Scripts
 
 | Script | Command | Description |
@@ -396,3 +497,5 @@ All `NEXT_PUBLIC_` variables are exposed to the browser bundle. Never put secret
 | Build | `npm run build` | Production build |
 | Start | `npm start` | Start production server |
 | Lint | `npm run lint` | Run ESLint checks |
+| Test | `npm test` | Vitest suite with a per-group results table |
+| Typecheck | `npx tsc --noEmit` | Type check without emitting |

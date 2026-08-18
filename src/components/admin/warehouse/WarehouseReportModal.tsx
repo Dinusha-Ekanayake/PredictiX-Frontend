@@ -1111,7 +1111,7 @@ function ReportStep({
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
-                      {["Asset", "Predicted (wks)", "Scheduled (wks)", "Gap (wks)", "Status"].map(h => (
+                      {["Asset", "Predicted (days)", "Scheduled (days)", "Gap (days)", "Status"].map(h => (
                         <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -1119,7 +1119,7 @@ function ReportStep({
                   <tbody>
                     {maintenanceSchedule.slice(0, 15).map((r, i) => {
                       const gap = r.predicted - r.scheduled;
-                      const isOverdue = gap < -2;
+                      const isOverdue = gap < -14;
                       const isDue = gap < 0 && !isOverdue;
                       const gapColor = isOverdue ? P.rose : isDue ? P.amber : P.emerald;
                       const statusLabel = isOverdue ? '⚠ Overdue' : isDue ? 'Due Soon' : 'On Track';

@@ -1170,10 +1170,10 @@ export function generateProfessionalHTML(data: ReportData): string {
         ${msch.length > 18 ? `Showing the 18 most urgent of ${fmtN(msch.length)} assets.` : ''}
       </p>
       ${lightTable(
-        ['Asset', 'Predicted (wks)', 'Scheduled (wks)', 'Gap (wks)', 'Status'],
+        ['Asset', 'Predicted (days)', 'Scheduled (days)', 'Gap (days)', 'Status'],
         msch.slice(0, 18).map(r => {
           const gap = r.predicted - r.scheduled;
-          const status = gap < -2 ? '⚠ Overdue' : gap < 0 ? 'Due Soon' : 'On Track';
+          const status = gap < -14 ? '⚠ Overdue' : gap < 0 ? 'Due Soon' : 'On Track';
           return [
             r.asset,
             r.predicted.toFixed(1),

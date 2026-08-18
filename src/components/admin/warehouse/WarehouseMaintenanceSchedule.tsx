@@ -42,7 +42,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                   </span>
                 </div>
                 <span className="font-bold text-slate-900 dark:text-white font-mono">
-                  {entry.value} wks
+                  {Math.round(entry.value)} days
                 </span>
               </div>
             );

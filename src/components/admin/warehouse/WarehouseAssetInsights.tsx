@@ -202,18 +202,18 @@ export function HealthScoreDistributionCard({ data: externalData }: { data?: any
   const total = data.reduce((s, d) => s + d.count, 0) || 1;
 
   const HEALTH_COLOR: Record<string, string> = {
-    "90-100%": "#10b981",
-    "80-89%": "#6366f1",
-    "70-79%": "#f59e0b",
-    "60-69%": "#f97316",
+    "90–100%": "#10b981",
+    "80–89%": "#6366f1",
+    "70–79%": "#f59e0b",
+    "60–69%": "#f97316",
     "< 60%": "#ef4444",
   };
 
   const BAND_LABEL: Record<string, string> = {
-    "90-100%": "Excellent",
-    "80-89%": "Good",
-    "70-79%": "Moderate",
-    "60-69%": "Poor",
+    "90–100%": "Excellent",
+    "80–89%": "Good",
+    "70–79%": "Moderate",
+    "60–69%": "Poor",
     "< 60%": "Critical",
   };
 
@@ -225,16 +225,16 @@ export function HealthScoreDistributionCard({ data: externalData }: { data?: any
 
   return (
     <Card className="rounded-2xl">
-      <CardHeader className="pb-0">
+      <CardHeader className="pb-4">
         <CardTitle className="text-sm font-semibold">Health Band Distribution</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-4 mt-2">
-          <div style={{ height: 140, width: 140, flexShrink: 0 }}>
+        <div className="flex items-center gap-6 mt-2 h-[260px]">
+          <div style={{ height: 180, width: 180, flexShrink: 0 }}>
             <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
               <PieChart>
-                <Pie data={pieData} dataKey="value" innerRadius={38} outerRadius={58}
-                  paddingAngle={2} startAngle={90} endAngle={-270}>
+                <Pie data={pieData} dataKey="value" innerRadius={55} outerRadius={85}
+                  paddingAngle={3} startAngle={90} endAngle={-270} stroke="none">
                   {pieData.map((d, i) => <Cell key={i} fill={d.color} strokeWidth={0} />)}
                 </Pie>
                 <Tooltip 

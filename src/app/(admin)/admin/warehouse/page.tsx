@@ -13,9 +13,7 @@ import { MonthlyTicketVolumeCard } from "@/components/admin/warehouse/WarehouseT
 import WarehouseDepartmentsOverview, {
   type DepartmentOverviewRow,
 } from "@/components/admin/warehouse/WarehouseDepartmentsOverview";
-import WarehouseTicketsByDepartment, {
-  type TicketsByDepartmentRow,
-} from "@/components/admin/warehouse/WarehouseTicketsByDepartment";
+
 import { getMaintenanceSchedule } from "@/lib/warehouseService";
 import { getAccessToken } from "@/lib/authService";
 
@@ -201,10 +199,9 @@ export default function WarehousePage() {
         <WarehouseMaintenanceSchedule data={maintenanceSchedule} />
       </div>
 
-      {/* ── Departments Overview + Ticket Load by Department ── */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* ── Departments Overview ── */}
+      <div className="w-full">
         <WarehouseDepartmentsOverview departments={departments} isLoading={refreshing && departments.length === 0} />
-        <WarehouseTicketsByDepartment data={ticketsByDepartment} isLoading={refreshing && ticketsByDepartment.length === 0} />
       </div>
 
       <div className="h-20" />

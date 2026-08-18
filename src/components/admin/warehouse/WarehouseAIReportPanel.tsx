@@ -813,7 +813,7 @@ export default function WarehouseAIReportPanel({
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b border-slate-100 dark:border-slate-800">
-                            {["Asset", "Component", "Median RUL (days)", "Risk"].map((h) => (
+                            {["Asset", "Component", "Next Maintenance Day", "Risk"].map((h) => (
                               <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
                             ))}
                           </tr>

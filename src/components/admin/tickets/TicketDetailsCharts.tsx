@@ -84,7 +84,6 @@ export default function TicketDetailsCharts({
       cancelled = true;
     };
   }, [assetId, ticketId]);
-
   // 1. Process State Durations
   const durationData = React.useMemo(() => {
     const states = {
@@ -147,10 +146,10 @@ export default function TicketDetailsCharts({
     return assetTickets
       .map((t: any) => {
         const createdTime = new Date(t.created_at).getTime();
-        const endTime = t.resolved_at || t.closed_at 
+        const endTime = t.resolved_at || t.closed_at
           ? new Date(t.resolved_at || t.closed_at).getTime()
           : new Date().getTime();
-        
+
         const resolutionDays = Math.max(0, parseFloat(((endTime - createdTime) / (1000 * 60 * 60 * 24)).toFixed(1)));
         const prio = (t.priority || "medium").toLowerCase();
 
@@ -233,23 +232,23 @@ export default function TicketDetailsCharts({
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 15, right: 15, bottom: 5, left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                <XAxis 
-                  type="number" 
-                  dataKey="createdDate" 
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis
+                  type="number"
+                  dataKey="createdDate"
                   name="Date"
                   domain={["auto", "auto"]}
                   tickFormatter={(t) => new Date(t).toLocaleDateString()}
-                  stroke="#737373" 
+                  stroke="#737373"
                   fontSize={10}
                   tickLine={false}
                 />
-                <YAxis 
-                  type="number" 
-                  dataKey="resolutionTime" 
-                  name="Resolution Days" 
+                <YAxis
+                  type="number"
+                  dataKey="resolutionTime"
+                  name="Resolution Days"
                   unit="d"
-                  stroke="#737373" 
+                  stroke="#737373"
                   fontSize={11}
                   tickLine={false}
                 />
@@ -257,8 +256,8 @@ export default function TicketDetailsCharts({
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomScatterTooltip />} />
                 <Scatter name="Asset Tickets" data={scatterData}>
                   {scatterData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
+                    <Cell
+                      key={`cell-${index}`}
                       fill={entry.fill}
                       stroke={entry.id === ticketId ? "#8b5cf6" : "none"} // Highlight current ticket border
                       strokeWidth={entry.id === ticketId ? 2 : 0}

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { notFound } from "next/navigation";
 import { Plus, Search, BookOpen, Edit, Trash2, Eye, EyeOff, X, Loader2, Tag, Calendar, FileText, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PageHero from "@/components/common/PageHero";
@@ -16,6 +17,8 @@ import {
 } from "@/lib/api/knowledgeBaseApi";
 
 export default function KnowledgeBasePage() {
+  notFound();
+  return null;
   const [articles, setArticles] = React.useState<KBArticle[]>([]);
   const [categories, setCategories] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);

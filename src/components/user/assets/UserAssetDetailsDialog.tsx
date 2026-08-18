@@ -9,6 +9,7 @@ import AssetDetailsPanel, { AssetDetailsSkeleton } from "@/components/admin/asse
 import { getAssetDetail } from "@/components/admin/assets/assetService";
 import type { AssetDetail } from "@/components/admin/assets/types";
 
+/** Read-only asset detail dialog shown to non-admin users. */
 export default function UserAssetDetailsDialog({
   assetId,
   open,

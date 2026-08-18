@@ -36,8 +36,8 @@ export interface SurvivalComponentSummary {
   component: string;
   avg_rul_days: number | null;
   /** mean P(component fails within 7 / 30 days) over the scored assets */
-  avg_fail_prob_7d: number;
-  avg_fail_prob_30d: number;
+  avg_fail_prob_7d?: number;
+  avg_fail_prob_30d?: number;
   /** sum of those probabilities — an expected failure count, not a headcount */
   expected_failures_7d: number;
   expected_failures_30d: number;

@@ -94,7 +94,7 @@ export interface ListTicketsParams {
   search?: string;
   date_from?: string;
   date_to?: string;
-  sort_by?: "created_at" | "updated_at" | "priority" | "status" | "ticket_number";
+  sort_by?: "created_at" | "updated_at" | "priority" | "status" | "ticket_number" | "title" | "name";
   sort_dir?: "asc" | "desc";
   page?: number;
   page_size?: number;

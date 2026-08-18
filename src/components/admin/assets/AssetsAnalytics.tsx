@@ -65,6 +65,7 @@ function PieLegendItem({ color, label, count, pct }: {
   );
 }
 
+/** Charts summarising status, health and vehicle type across the fleet. */
 export default function AssetsAnalytics({
   analytics,
   loading,

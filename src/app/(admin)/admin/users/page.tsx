@@ -29,6 +29,7 @@ import AddUserDialog from "@/components/admin/users/AddUserDialog";
 import type { NewUser } from "@/components/admin/users/AddUserDialog";
 import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
+import AssignAssetToUserDialog from "@/components/admin/users/AssignAssetToUserDialog";
 import EditUserDialog from "@/components/admin/users/EditUserDialog";
 import { toast } from "@/lib/customToast";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -451,6 +452,26 @@ export default function AdminUsersPage() {
     );
   }
 
+  // Assign dialog for the user currently shown in the assets dialog.
+  const [assigningFor, setAssigningFor] = React.useState<UserItem | null>(null);
+
+  /**
+   * Reload the person's assets after an assignment and correct the row count.
+   * Refetching rather than appending keeps health and location consistent with
+   * what the server actually holds.
+   */
+  async function handleAssetAssigned() {
+    const user = assigningFor;
+    setAssigningFor(null);
+    if (!user) return;
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === user.id ? { ...u, assignedAssets: (u.assignedAssets ?? 0) + 1 } : u
+      )
+    );
+    if (assetsUser?.id === user.id) await handleViewAssets(user);
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
@@ -684,6 +705,20 @@ export default function AdminUsersPage() {
         onUserUpdated={handleUserUpdated}
       />
 
+      {/* Assign an asset to the person whose assets are open */}
+      {assigningFor && (
+        <AssignAssetToUserDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setAssigningFor(null);
+          }}
+          userId={assigningFor.id}
+          userName={assigningFor.name}
+          alreadyAssignedIds={assignedAssets.map((a) => a.asset_id ?? a.id)}
+          onAssigned={handleAssetAssigned}
+        />
+      )}
+
       {/* View Assigned Assets Dialog */}
       <ViewAssignedAssetsDialog
         userName={assetsUser?.name ?? ""}
@@ -695,6 +730,7 @@ export default function AdminUsersPage() {
         }}
         onNavigateToAsset={handleNavigateToAsset}
         onUnassigned={handleAssetUnassigned}
+        onAssignAnother={assetsUser ? () => setAssigningFor(assetsUser) : undefined}
         onBackToDetails={
           assetsUser
             ? () => {

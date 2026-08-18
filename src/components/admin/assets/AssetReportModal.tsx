@@ -4,7 +4,7 @@ import * as React from "react";
 import {
   X, Download, FileText, Loader2,
   Activity, AlertTriangle, Wrench, Bot, Shield,
-  DollarSign, Ticket, BarChart3,
+  DollarSign, Ticket, BarChart3, TrendingDown, TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/customToast";
@@ -127,7 +127,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const [
           batchPredRes, costPredRes,
           maintRes, ticketRes, sensorRes,
-          warehouseRes, deptRes,
+          warehouseRes, deptRes, survivalRes,
         ] = await Promise.all([
           apiFetch(`/batch-predictions/${assetId}`).catch(() => null),
           // Cost model has its own endpoint and a flat response shape.
@@ -145,6 +145,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
           asset.department_id
             ? apiFetch(`/departments/${asset.department_id}`).catch(() => null)
             : Promise.resolve(null),
+          apiFetch(`/survival/${assetId}`).catch(() => null),
         ]);
 
         // ── Step 3: parse all responses ────────────────────────
@@ -155,6 +156,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const sensorList  = await safeJson(sensorRes) ?? [];
         const warehouse   = await safeJson(warehouseRes);
         const dept        = await safeJson(deptRes);
+        const survival    = await safeJson(survivalRes);
 
         // ── Step 4: resolve prediction ──────────────────────────
         const latestPred = (Array.isArray(batchPred) ? batchPred[0] : batchPred) ?? null;
@@ -285,6 +287,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
           currency: "LKR",
           top_explanations,
           sensor: sensor ?? undefined,
+          survival: survival,
           maintenance: mArr,
           maintenanceMetrics: {
             total_events:        mArr.length,
@@ -529,8 +532,128 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
                 </div>
               </Section>
 
+              {/* Top Risk Factors */}
+              {reportData.top_explanations && Object.keys(reportData.top_explanations).length > 0 && (
+                <Section title="4. Top Risk Factors" icon={AlertTriangle}>
+                  <div className="rounded-xl border border-white/8 bg-white/4 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] font-semibold text-white/40 uppercase tracking-widest">Top Risk Factors (SHAP)</div>
+                      <div className="flex items-center gap-3 text-[10px] text-white/40">
+                        <span className="flex items-center gap-1">
+                          <TrendingDown className="h-3 w-3 text-red-400" /> Sooner
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <TrendingUp className="h-3 w-3 text-emerald-400" /> Later
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {(() => {
+                        const entries = Object.entries(reportData.top_explanations!);
+                        const maxVal = Math.max(...entries.map(([_, val]) => Math.abs(val)), 1);
+                        return entries.map(([feature, raw], i) => {
+                          const impact = Math.abs(raw);
+                          const pct = Math.round((impact / maxVal) * 100);
+                          const label = feature.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                          const isUrgent = raw < 0;
+                          const barColor = isUrgent ? "bg-red-500/80" : "bg-emerald-500/80";
+                          const textColor = isUrgent ? "text-red-400" : "text-emerald-400";
+                          const DirIcon = isUrgent ? TrendingDown : TrendingUp;
+                          return (
+                            <div key={i} className="space-y-0.5">
+                              <div className="flex justify-between items-center text-[11px]">
+                                <span className="text-white/70 font-medium truncate">{label}</span>
+                                <span className={cn("flex items-center gap-1 text-xs font-mono shrink-0 ml-2", textColor)}>
+                                  <DirIcon className="h-3 w-3" />
+                                  {raw > 0 ? "+" : ""}{raw.toFixed(2)}d
+                                </span>
+                              </div>
+                              <div className="h-2 rounded-full bg-white/8 overflow-hidden">
+                                <div className={cn("h-full rounded-full transition-all duration-700", barColor)} style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+                </Section>
+              )}
+
+              {/* Survival Analysis */}
+              {reportData.survival && (
+                <Section title="5. Component Survival Analysis" icon={Activity}>
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+                      <p className="text-sm font-medium text-red-400">Critical Risk: {reportData.survival.soonest_component.charAt(0).toUpperCase() + reportData.survival.soonest_component.slice(1)}</p>
+                      <p className="text-[12px] text-white/50 mt-1">Predicted median RUL: {reportData.survival.soonest_median_days} days.</p>
+                    </div>
+                    <div className="space-y-4">
+                      <p className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">7-Day & 30-Day Failure Risk</p>
+                      {reportData.survival.components.sort((a,b) => (b.fail_prob_30d||0)-(a.fail_prob_30d||0)).map(c => (
+                        <div key={c.component} className="space-y-2">
+                          <div className="flex justify-between text-xs text-white/70">
+                            <span className="capitalize">{c.component}</span>
+                            <span>{c.fail_prob_30d != null ? Math.round(c.fail_prob_30d * 100) : 0}% (30d)</span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden relative">
+                            <div className="absolute top-0 left-0 h-full bg-teal-500/30" style={{ width: `${c.fail_prob_30d != null ? c.fail_prob_30d * 100 : 0}%` }} />
+                            <div className="absolute top-0 left-0 h-full bg-teal-500" style={{ width: `${c.fail_prob_7d != null ? c.fail_prob_7d * 100 : 0}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Section>
+              )}
+
+              {/* Cost Estimate */}
+              <Section title="6. Maintenance Cost Estimate" icon={DollarSign}>
+                {reportData.estimated_cost == null ? (
+                  <div className="rounded-xl border border-white/8 bg-white/4 p-4 space-y-2">
+                    <div className="text-[10px] font-semibold text-white/40 uppercase tracking-widest">Maintenance Cost Estimate</div>
+                    <div className="text-sm font-medium text-white/70">Estimate unavailable</div>
+                    <div className="text-[11px] text-white/40 leading-relaxed">
+                      The cost estimation model could not score this asset. No approximate
+                      figure is shown in its place — retry after the next prediction run.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-white/8 bg-white/4 p-4 space-y-3">
+                    <div className="space-y-3">
+                      <div className="text-3xl font-bold tabular-nums">
+                        LKR {reportData.estimated_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div className="space-y-2">
+                        {[
+                          { label: "Minimum", value: reportData.cost_lower, color: "bg-emerald-500" },
+                          { label: "Estimated", value: reportData.estimated_cost, color: "bg-violet-500" },
+                          { label: "Maximum", value: reportData.cost_upper, color: "bg-red-500" },
+                        ].map(({ label, value, color }) => {
+                          const max = Number(reportData.cost_upper) || 1;
+                          const pct = Math.min(100, Math.round((Number(value) / max) * 100));
+                          return (
+                            <div key={label} className="space-y-0.5">
+                              <div className="flex justify-between text-[11px] text-white/70">
+                                <span>{label}</span>
+                                <span className="font-mono font-medium">
+                                  LKR {value != null ? Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}
+                                </span>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </Section>
+
               {/* AI Insights */}
-              <Section title="4. AI Insights" icon={Bot}>
+              <Section title="7. AI Insights" icon={Bot}>
                 <div className="flex items-start gap-3 rounded-xl border border-teal-500/20 bg-teal-500/5 p-4">
                   <Bot className="h-5 w-5 text-teal-400 shrink-0 mt-0.5" />
                   <div className="space-y-1">

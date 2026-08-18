@@ -63,6 +63,15 @@ export interface AssetReportData {
     recommendations?: {critical:string[];high:string[];medium:string[]};
     conclusion?: string;
   };
+  survival?: {
+    soonest_component: string;
+    soonest_median_days: number | null;
+    components: Array<{
+      component: string;
+      fail_prob_7d: number | null;
+      fail_prob_30d: number | null;
+    }>;
+  };
 }
 
 // ── Palette ───────────────────────────────────────────────────────────────────
@@ -131,6 +140,49 @@ function svgVBar(data:Array<{name:string;count:number}>,colors:string[],w=460,h=
       <text x="${x+bw/2}" y="${h-3}" text-anchor="middle" font-size="7.5" fill="${C.textLight}">${d.name.replace(/_/g," ").slice(0,10)}</text>`;
   }).join("");
   return`<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">${grid}${bars}</svg>`;
+}
+
+// ── SVG Grouped Vertical Bar (Component Failure Risk) ────────────────────────
+function svgGroupedVBar(data:Array<{name:string;val1:number;val2:number}>, w=460, h=165):string{
+  if(!data.length)return"";
+  const colors:Record<string,[string,string]> = {
+    "Tire": ["#fde68a", "#f59e0b"],
+    "Battery": ["#a7f3d0", "#10b981"],
+    "Hydraulic": ["#ddd6fe", "#8b5cf6"],
+    "Oil": ["#bae6fd", "#0ea5e9"],
+    "Brake": ["#fecaca", "#ef4444"],
+  };
+  const defaultCols = ["#e2e8f0", "#94a3b8"];
+  const mx = Math.max(20, ...data.flatMap(d=>[d.val1,d.val2]));
+  const yMax = Math.ceil(mx/20)*20;
+  const ch = h - 38;
+  const grid = [0, yMax/2, yMax].map(v=>{
+    const y = ch - (v/yMax)*ch + 6;
+    return `<text x="25" y="${y+3}" text-anchor="end" font-size="8" fill="${C.textLight}">${v}%</text><line x1="30" y1="${y}" x2="${w}" y2="${y}" stroke="${C.border}" stroke-width="1" stroke-dasharray="2,2"/>`;
+  }).join("");
+  const gap = (w - 30) / Math.max(1, data.length);
+  const bw = Math.min(22, (gap * 0.4));
+  const innerGap = 2;
+  const bars = data.map((d,i)=>{
+    const col = colors[d.name] || defaultCols;
+    const xBase = 30 + i*gap + gap/2 - bw - innerGap/2;
+    const h1 = Math.max(0, (d.val1/yMax)*ch); const y1 = ch - h1 + 6;
+    const h2 = Math.max(0, (d.val2/yMax)*ch); const y2 = ch - h2 + 6;
+    return `
+      <rect x="${xBase}" y="${y1}" width="${bw}" height="${h1}" fill="${col[0]}" rx="2"/>
+      <text x="${xBase+bw/2}" y="${y1-3}" text-anchor="middle" font-size="7.5" fill="${C.textMid}" font-weight="600">${d.val1.toFixed(1)}%</text>
+      <rect x="${xBase+bw+innerGap}" y="${y2}" width="${bw}" height="${h2}" fill="${col[1]}" rx="2"/>
+      <text x="${xBase+bw+innerGap+bw/2}" y="${y2-3}" text-anchor="middle" font-size="7.5" fill="${col[1]}" font-weight="700">${d.val2.toFixed(1)}%</text>
+      <text x="${30+i*gap+gap/2}" y="${h-16}" text-anchor="middle" font-size="9" fill="${C.textDark}" font-weight="600">${d.name}</text>
+    `;
+  }).join("");
+  const legend = `
+    <rect x="${w/2 - 44}" y="${h - 6}" width="8" height="8" fill="${C.border}" rx="1"/>
+    <text x="${w/2 - 32}" y="${h - 0.5}" font-size="8" fill="${C.textMid}">30-day risk</text>
+    <rect x="${w/2 + 20}" y="${h - 6}" width="8" height="8" fill="${C.slate}" rx="1"/>
+    <text x="${w/2 + 32}" y="${h - 0.5}" font-size="8" fill="${C.textMid}">7-day risk</text>
+  `;
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">${grid}${bars}${legend}</svg>`;
 }
 
 // ── SVG Horizontal Bar (SHAP failure) ────────────────────────────────────────
@@ -447,7 +499,7 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
 
     ${subH("1.2 Asset Details")}
     ${infoTbl(assetRows)}
-  `,wLbl,"Asset Overview",origin,includeDomFooter?{pageNum:1,total:4}:undefined);
+  `,wLbl,"Asset Overview",origin,includeDomFooter?{pageNum:1,total:5}:undefined);
 
   // ── PAGE 2: HEALTH, RISK & COST ESTIMATION ───────────────────────────────────────
   // Build SHAP data - normalise to 0-100% regardless of input format
@@ -565,7 +617,7 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
     ${recBlock("Medium",recs.medium,C.sky)}
     ${!recs.critical.length&&!recs.high.length&&!recs.medium.length
       ?hlBox("RECOMMENDATIONS","No specific recommendations. Run AI prediction for asset-specific guidance.",C.slate):""}
-  `,wLbl,"Health, Risk & Cost Estimation",origin,includeDomFooter?{pageNum:2,total:4}:undefined);
+  `,wLbl,"Health, Risk & Cost Estimation",origin,includeDomFooter?{pageNum:2,total:5}:undefined);
 
   // ── PAGE 3: SENSOR + MAINTENANCE ──────────────────────────────────
   const sRows:[string,string][]=sensor?[
@@ -600,18 +652,8 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
     m.downtime_hours?`${m.downtime_hours}h`:"-",
   ]);
 
-  const ticketRows=tickets.slice(0,8).map(t=>{
-    const pri=(t.priority||"").toLowerCase();
-    const pc=pri==="high"?C.rose:pri==="medium"?C.amber:C.emerald;
-    return[fmt(t.ticket_number),fmt(String(t.title??"-").slice(0,55)),
-      `<span style="color:${pc};font-weight:700">${cap(fmt(t.priority))}</span>`,
-      cap(fmt(t.status)),fmtDate(t.created_at)];
-  });
-
   const maintDonut=maintenanceMetrics.total_events>0
     ?svgDonut([{name:"Preventive",count:maintenanceMetrics.preventive_count},{name:"Corrective",count:maintenanceMetrics.corrective_count}],[C.emerald,C.rose],90):"";
-  const ticketDonut=ticketMetrics.total_tickets>0
-    ?svgDonut([{name:"Open",count:ticketMetrics.open_tickets},{name:"High Pri.",count:ticketMetrics.high_priority_tickets},{name:"Closed",count:ticketMetrics.closed_tickets}],[C.rose,C.amber,C.emerald],90):"";
 
   const p5=page(`
     ${secH("3","Sensor Data & Maintenance","Latest readings and maintenance history")}
@@ -634,11 +676,22 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
     ${maintDonut?chartBox("MAINTENANCE TYPE BREAKDOWN",maintDonut,"Figure 3.2 - Preventive vs corrective events"):""}
     ${maintenance.length?`${subH("3.4 Recent Maintenance Events")}${dataTbl(["Date","Type","Description",`Cost (${cur})`,"Downtime"],maintRows,"Figure 3.3 - Most recent maintenance events")}`
       :hlBox("MAINTENANCE HISTORY","No maintenance events recorded.",C.slate)}
-  `,wLbl,"Sensor & Maintenance",origin,includeDomFooter?{pageNum:3,total:4}:undefined);
+  `,wLbl,"Sensor & Maintenance",origin,includeDomFooter?{pageNum:3,total:5}:undefined);
 
-  // ── PAGE 4: TICKETS + INSIGHTS ────────────────────────────────────────────
+  // ── PAGE 4: TICKETS ───────────────────────────────────────────────────────
+  const ticketRows=tickets.slice(0,8).map(t=>{
+    const pri=(t.priority||"").toLowerCase();
+    const pc=pri==="high"?C.rose:pri==="medium"?C.amber:C.emerald;
+    return[fmt(t.ticket_number),fmt(String(t.title??"-").slice(0,55)),
+      `<span style="color:${pc};font-weight:700">${cap(fmt(t.priority))}</span>`,
+      cap(fmt(t.status)),fmtDate(t.created_at)];
+  });
+
+  const ticketDonut=ticketMetrics.total_tickets>0
+    ?svgDonut([{name:"Open",count:ticketMetrics.open_tickets},{name:"High Pri.",count:ticketMetrics.high_priority_tickets},{name:"Closed",count:ticketMetrics.closed_tickets}],[C.rose,C.amber,C.emerald],90):"";
+
   const p6=page(`
-    ${secH("4","Ticket Management & Insights","Support tickets · Conclusion")}
+    ${secH("4","Ticket Management & Insights","Support tickets and survival analysis")}
 
     ${subH("4.1 Ticket Summary")}
     ${infoTbl([
@@ -651,8 +704,22 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
     ${tickets.length?`${subH("4.2 Recent Tickets")}${dataTbl(["Ticket ID","Title","Priority","Status","Created"],ticketRows,"Figure 4.2 - Most recent support tickets")}`
       :hlBox("TICKET HISTORY","No tickets raised for this asset.",C.slate)}
 
-    ${insights.conclusion?`${subH("4.3 Conclusion")}${hlBox("EXECUTIVE CONCLUSION",esc(insights.conclusion),C.teal)}`:""}
-  `,wLbl,"Tickets & Insights",origin,includeDomFooter?{pageNum:4,total:4}:undefined);
+    ${data.survival?`${subH("4.3 FRSO Component Survival Analysis")}
+      ${hlBox("CRITICAL RISK", `The ${esc(cap(data.survival.soonest_component))} system has the lowest predicted survival (${data.survival.soonest_median_days} days median RUL).`, C.rose)}
+      ${chartBox("7-DAY & 30-DAY COMPONENT FAILURE RISK", 
+        svgGroupedVBar(data.survival.components.map(c => ({
+          name: esc(cap(c.component)),
+          val1: c.fail_prob_30d != null ? Math.round(c.fail_prob_30d * 1000) / 10 : 0,
+          val2: c.fail_prob_7d != null ? Math.round(c.fail_prob_7d * 1000) / 10 : 0
+        }))), 
+        "Figure 4.3 - Weibull AFT Component Failure Probability")}
+    `:""}
+  `,wLbl,"Tickets & Insights",origin,includeDomFooter?{pageNum:4,total:5}:undefined);
+
+  // ── PAGE 5: CONCLUSION ────────────────────────────────────────────────────
+  const p7=page(`
+    ${insights.conclusion?`${subH("4.4 Conclusion")}${hlBox("EXECUTIVE CONCLUSION",esc(insights.conclusion),C.teal)}`:""}
+  `,wLbl,"Tickets & Insights",origin,includeDomFooter?{pageNum:5,total:5}:undefined);
 
   return`<!DOCTYPE html>
 <html lang="en">
@@ -662,7 +729,7 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
   <title>Asset Report - ${esc(data.assetName)}</title>
   <style>${CSS}</style>
 </head>
-<body>${cover}${p3}${p4}${p5}${p6}</body>
+<body>${cover}${p3}${p4}${p5}${p6}${p7}</body>
 </html>`;
 }
 

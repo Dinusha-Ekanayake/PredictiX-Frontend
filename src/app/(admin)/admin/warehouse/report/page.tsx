@@ -664,7 +664,6 @@ export default function WarehouseReportPage() {
                     </h4>
                     <div className="space-y-2">
                       {Object.entries(ctx.ticket_category_breakdown)
-                        .filter(([cat]) => cat !== 'Uncategorized')
                         .sort(([, a], [, b]) => b - a)
                         .slice(0, 5)
                         .map(([cat, count], i) => (

@@ -4,7 +4,8 @@ import * as React from "react";
 import {
   X, Download, FileText, Loader2, RefreshCw,
   Activity, AlertTriangle, Wrench, Bot, Shield,
-  DollarSign, Ticket, BarChart3,
+  DollarSign, Ticket, BarChart3, TrendingUp, TrendingDown,
+  Gauge, Lightbulb, HeartPulse,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/customToast";
@@ -141,7 +142,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         // the asset detail page's data source and are not queried here.
         const [
           batchPredRes, costPredRes,
-          maintRes, ticketRes, sensorRes,
+          maintRes, ticketRes, sensorRes, survivalRes,
           warehouseRes, deptRes, assetListRes,
         ] = await Promise.all([
           authFetch(`${API_URL}/batch-predictions/${assetId}`).catch(() => null),
@@ -151,6 +152,10 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
           authFetch(`${API_URL}/maintenance?asset_id=${assetId}&limit=50`).catch(() => null),
           authFetch(`${API_URL}/tickets?asset_id=${assetId}&limit=20`).catch(() => null),
           authFetch(`${API_URL}/sensor-readings?asset_id=${assetId}&limit=1`).catch(() => null),
+          // Weibull AFT survival analysis — component-level failure probability
+          // (7d/30d) and remaining-useful-life. Separate model/router from the
+          // PdM batch predictions above.
+          authFetch(`${API_URL}/api/v1/survival/${assetId}`).catch(() => null),
           asset.warehouse_id
             ? authFetch(`${API_URL}/warehouses/${asset.warehouse_id}`).catch(() => null)
             : Promise.resolve(null),
@@ -167,6 +172,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const maintList   = await safeJson(maintRes) ?? [];
         const ticketList  = await safeJson(ticketRes) ?? [];
         const sensorList  = await safeJson(sensorRes) ?? [];
+        const survivalRaw = await safeJson(survivalRes);
         const warehouse   = await safeJson(warehouseRes);
         const dept        = await safeJson(deptRes);
         const allAssets   = await safeJson(assetListRes) ?? [];
@@ -230,6 +236,42 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         } else if (rawTopExpl && typeof rawTopExpl === "object") {
           top_explanations = rawTopExpl as Record<string, number>;
         }
+
+        // Signed day-delta version of the same SHAP data, confirmed by the
+        // Predictive Insights panel: positive = pushes maintenance date
+        // LATER (improves outlook), negative = pushes it SOONER (worsens
+        // outlook) — not a 0-100% importance score as previously assumed.
+        const top_risk_factors = top_explanations
+          ? Object.entries(top_explanations)
+              .map(([feature, days_impact]) => ({ feature, days_impact: Number(days_impact) }))
+              .filter(f => !isNaN(f.days_impact))
+              .sort((a, b) => Math.abs(b.days_impact) - Math.abs(a.days_impact))
+              .slice(0, 5)
+          : undefined;
+
+        // Already computed by batch_prediction_service.py's decision layer
+        // (build_decision()) and stored on the batch-predictions row, but
+        // was never read here until now.
+        const recommended_action: string | undefined = latestPred?.recommended_action ?? undefined;
+
+        // Weibull AFT survival analysis (separate model/router) — component-
+        // level 7d/30d failure probability and remaining-useful-life.
+        // Response shape per the implementation plan: { soonest_component,
+        // soonest_median_days, components: [{component, fail_prob_7d,
+        // fail_prob_30d}, ...] }. Component name key isn't 100% confirmed,
+        // so both `component` and `name` are checked defensively.
+        const survival = survivalRaw ? {
+          soonest_component: survivalRaw.soonest_component ?? undefined,
+          soonest_median_days: survivalRaw.soonest_median_days != null ? Number(survivalRaw.soonest_median_days) : undefined,
+          components: Array.isArray(survivalRaw.components)
+            ? survivalRaw.components.map((c: any) => ({
+                component: String(c.component ?? c.name ?? "—"),
+                fail_prob_7d: Number(c.fail_prob_7d ?? 0),
+                fail_prob_30d: Number(c.fail_prob_30d ?? 0),
+                median_days: c.median_days != null ? Number(c.median_days) : undefined,
+              }))
+            : [],
+        } : undefined;
 
         const est_cost = latestPred?.estimated_cost_lkr ?? undefined;
         // /batch-predictions/{id} already carries these — unused until now,
@@ -327,6 +369,9 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
           cost_error: costError,
           currency: "LKR",
           top_explanations,
+          top_risk_factors,
+          recommended_action,
+          survival,
           sensor: sensor ?? undefined,
           maintenance: mArr,
           maintenanceMetrics: {
@@ -579,18 +624,187 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
 
               {/* Predictive Insights */}
               <Section title="4. Predictive Insights" icon={Bot}>
-                <div className="flex items-start gap-3 rounded-xl border border-teal-500/20 bg-teal-500/5 p-4">
-                  <Bot className="h-5 w-5 text-teal-500 dark:text-teal-400 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-teal-600 dark:text-teal-300">
-                      {reportData.health_score != null ? "AI Analysis Available" : "No Prediction Data Yet"}
-                    </p>
-                    <p className="text-[12px] text-slate-600 dark:text-white/50 leading-relaxed">
-                      {reportData.insights.executive_summary}
-                    </p>
+                <div className="space-y-4">
+                  {/* Health Score + Failure Risk Profile */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-white/4 p-4">
+                      <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2">Health Score</div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-3xl font-bold text-slate-900 dark:text-white">
+                          {hs != null ? hs : "—"}<span className="text-sm font-normal text-slate-400 dark:text-white/30">/100</span>
+                        </div>
+                        <div className="flex-1 space-y-1.5">
+                          {([
+                            ["Brake", reportData.sensor?.brake_health_pct],
+                            ["Tire", reportData.sensor?.tire_health_pct],
+                            ["Battery", reportData.sensor?.battery_health_pct],
+                            ["Oil", reportData.sensor?.oil_life_pct],
+                            ["Hydraulic", reportData.sensor?.hydraulic_health_pct],
+                          ] as [string, any][]).filter(([,v]) => v != null).map(([label, v]) => {
+                            const pct = Number(v);
+                            const color = pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
+                            return (
+                              <div key={label} className="flex items-center gap-2">
+                                <span className="text-[10px] w-14 text-slate-500 dark:text-white/40">{label}</span>
+                                <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/8 overflow-hidden">
+                                  <div className={cn("h-full rounded-full", color)} style={{ width: `${Math.min(100, pct)}%` }} />
+                                </div>
+                                <span className="text-[10px] w-9 text-right text-slate-500 dark:text-white/40">{pct}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-white/4 p-4">
+                      <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mb-2">Failure Risk Profile</div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl font-bold text-slate-900 dark:text-white">{fp != null ? `${fp}%` : "—"}</span>
+                        {rl && (
+                          <span className={cn("text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full",
+                            rl.toLowerCase() === "critical" || rl.toLowerCase() === "high" ? "bg-red-500/15 text-red-500 dark:text-red-400" :
+                            rl.toLowerCase() === "medium" ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" :
+                            "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400")}>
+                            {rl}
+                          </span>
+                        )}
+                      </div>
+                      {reportData.days_until_maintenance != null && (
+                        <p className="text-[11px] text-slate-500 dark:text-white/40">
+                          Estimated within ~{reportData.days_until_maintenance} days
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Top Risk Factors */}
+                  {reportData.top_risk_factors && reportData.top_risk_factors.length > 0 && (
+                    <div className="rounded-xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-white/4 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Top Risk Factors</span>
+                        <span className="text-[9px] text-slate-400 dark:text-white/30">↘ Sooner &nbsp;·&nbsp; ↗ Later</span>
+                      </div>
+                      <div className="space-y-2">
+                        {reportData.top_risk_factors.map((f) => {
+                          const isWorse = f.days_impact < 0;
+                          return (
+                            <div key={f.feature} className="flex items-center justify-between text-[12px]">
+                              <span className="text-slate-600 dark:text-white/60 capitalize">{f.feature.replace(/_/g, " ")}</span>
+                              <span className={cn("font-semibold flex items-center gap-1",
+                                isWorse ? "text-red-500 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")}>
+                                {isWorse ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+                                {isWorse ? "−" : "+"}{Math.abs(f.days_impact).toFixed(2)}d
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AI Recommendation */}
+                  {reportData.recommended_action && (
+                    <div className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                      <Lightbulb className="h-5 w-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-amber-600 dark:text-amber-300">AI Recommendation</p>
+                        <p className="text-[12px] text-slate-600 dark:text-white/50 leading-relaxed">{reportData.recommended_action}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Maintenance Cost Estimate */}
+                  {reportData.estimated_cost != null && (
+                    <div className="rounded-xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-white/4 p-4">
+                      <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider mb-1">Maintenance Cost Estimate</div>
+                      <div className="text-2xl font-bold text-slate-900 dark:text-white mb-3">LKR {reportData.estimated_cost.toLocaleString()}</div>
+                      <div className="space-y-1.5">
+                        {([
+                          ["Minimum", reportData.cost_lower, "bg-emerald-500"],
+                          ["Estimated", reportData.estimated_cost, "bg-violet-500"],
+                          ["Maximum", reportData.cost_upper, "bg-red-500"],
+                        ] as [string, number | undefined, string][]).filter(([,v]) => v != null).map(([label, v, color]) => {
+                          const max = reportData.cost_upper || reportData.estimated_cost || 1;
+                          const pct = Math.min(100, ((v as number) / max) * 100);
+                          return (
+                            <div key={label} className="flex items-center gap-2">
+                              <span className="text-[10px] w-16 text-slate-500 dark:text-white/40">{label}</span>
+                              <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/8 overflow-hidden">
+                                <div className={cn("h-full rounded-full", color)} style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-[10px] w-20 text-right text-slate-500 dark:text-white/40">LKR {(v as number).toLocaleString()}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-start gap-3 rounded-xl border border-teal-500/20 bg-teal-500/5 p-4">
+                    <Bot className="h-5 w-5 text-teal-500 dark:text-teal-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-teal-600 dark:text-teal-300">
+                        {reportData.health_score != null ? "AI Analysis Available" : "No Prediction Data Yet"}
+                      </p>
+                      <p className="text-[12px] text-slate-600 dark:text-white/50 leading-relaxed">
+                        {reportData.insights.executive_summary}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </Section>
+
+              {/* Component Survival Analysis */}
+              {reportData.survival && reportData.survival.components.length > 0 && (
+                <Section title="5. Component Survival Analysis" icon={HeartPulse}>
+                  {reportData.survival.soonest_component && (
+                    <div className="flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-4 mb-4">
+                      <Gauge className="h-5 w-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-red-600 dark:text-red-300">Most Immediate Risk</p>
+                        <p className="text-[12px] text-slate-600 dark:text-white/50">
+                          <span className="font-semibold capitalize">{reportData.survival.soonest_component.replace(/_/g, " ")}</span> is the soonest-failing component
+                          {reportData.survival.soonest_median_days != null && (
+                            <> — predicted median remaining useful life: <span className="font-semibold">{Math.round(reportData.survival.soonest_median_days)} days</span></>
+                          )}.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {reportData.survival.components.map((c) => {
+                      const p7 = c.fail_prob_7d * 100, p30 = c.fail_prob_30d * 100;
+                      const col7 = p7 >= 50 ? "bg-red-500" : p7 >= 25 ? "bg-amber-500" : "bg-emerald-500";
+                      const col30 = p30 >= 50 ? "bg-red-500" : p30 >= 25 ? "bg-amber-500" : "bg-emerald-500";
+                      return (
+                        <div key={c.component} className="rounded-xl border border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-white/4 p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[12px] font-semibold capitalize text-slate-900 dark:text-white">{c.component.replace(/_/g, " ")}</span>
+                            {c.median_days != null && <span className="text-[10px] text-slate-500 dark:text-white/40">{Math.round(c.median_days)}d RUL</span>}
+                          </div>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] w-8 text-slate-400 dark:text-white/30">7d</span>
+                              <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/8 overflow-hidden">
+                                <div className={cn("h-full rounded-full", col7)} style={{ width: `${Math.min(100, p7)}%` }} />
+                              </div>
+                              <span className="text-[10px] w-10 text-right text-slate-500 dark:text-white/40">{p7.toFixed(1)}%</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] w-8 text-slate-400 dark:text-white/30">30d</span>
+                              <div className="flex-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/8 overflow-hidden">
+                                <div className={cn("h-full rounded-full", col30)} style={{ width: `${Math.min(100, p30)}%` }} />
+                              </div>
+                              <span className="text-[10px] w-10 text-right text-slate-500 dark:text-white/40">{p30.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
 
               {/* Download CTA */}
               <div className="flex items-center justify-between rounded-2xl border border-teal-500/20 bg-teal-500/5 px-6 py-4">

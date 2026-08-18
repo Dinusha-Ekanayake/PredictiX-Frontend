@@ -36,6 +36,21 @@ export interface AssetReportData {
    *  Per the model docs: "Never display sv_log directly — it is in log-ratio space." */
   cost_drivers?: Array<{feature:string;value:string;relative_impact:number;direction:"increases"|"decreases"}>;
   currency?: string; top_explanations?: Record<string,number>;
+  /** Signed day-delta version of the failure SHAP data (confirmed shape,
+   *  not the 0-100% importance previously assumed): positive = pushes the
+   *  predicted maintenance date LATER (improves outlook), negative = pushes
+   *  it SOONER (worsens outlook). */
+  top_risk_factors?: Array<{feature:string; days_impact:number}>;
+  /** From batch_prediction_service.py's decision layer (build_decision()) —
+   *  e.g. "Inspect soon — estimated within ~97 days". */
+  recommended_action?: string;
+  /** Weibull AFT survival analysis (separate model/router from PdM batch
+   *  predictions) — component-level 7d/30d failure probability. */
+  survival?: {
+    soonest_component?: string;
+    soonest_median_days?: number;
+    components: Array<{component:string; fail_prob_7d:number; fail_prob_30d:number; median_days?:number}>;
+  };
   ai_narrative?: string;
   sensor?: {
     recorded_at?: string; tire_health_pct?: string|number; brake_health_pct?: string|number;
@@ -74,27 +89,9 @@ const C = {
   border:"#e5e7eb", bg:"#f9fafb", white:"#ffffff",
 };
 
-// This report's HTML is rendered two ways: server-side via Playwright with
-// JS disabled (safe from script execution either way), and — as a fallback
-// whenever that fails for any reason — client-side in a live iframe with
-// full JavaScript enabled (downloadAssetPDF below). Every string on this
-// page ultimately traces back to some free-text field a user can set
-// (asset name/description/make/model, a maintenance note, a ticket
-// title…), so nothing gets interpolated into the HTML without going
-// through this first. Un-escaped interpolation here was a stored-XSS
-// hole: a ticket title of "<script>…</script>" would execute in
-// whichever admin's browser later opened that asset's report.
-function esc(v:any):string{
-  return String(v)
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;")
-    .replace(/'/g,"&#39;");
-}
-function fmt(v:any,fb="—"):string{return(v==null||v===""||v==="—")?fb:esc(v);}
-function fmtCost(v:number,cur="LKR"):string{return`${esc(cur)} ${Number(v).toLocaleString()}`;}
-function fmtDate(v:any):string{return v?esc(String(v).slice(0,10)):"—";}
+function fmt(v:any,fb="—"):string{return(v==null||v===""||v==="—")?fb:String(v);}
+function fmtCost(v:number,cur="LKR"):string{return`${cur} ${Number(v).toLocaleString()}`;}
+function fmtDate(v:any):string{return v?String(v).slice(0,10):"—";}
 function cap(s:string):string{return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
 
 // ── PredictiX Logo — uses actual icon from public/logo/ ─────────────────────
@@ -170,7 +167,54 @@ function svgCostBars(drivers:Array<{feature:string;value:string;relative_impact:
   return`<svg viewBox="0 0 ${w} ${totalH}" width="100%" height="${totalH}">${bars}</svg>`;
 }
 
-// ── Donut chart ───────────────────────────────────────────────────────────────
+// ── SVG Day-Impact Bars (signed day-deltas, confirmed shape) ─────────────────
+// Positive = pushes maintenance date LATER (improves outlook, green).
+// Negative = pushes it SOONER (worsens outlook, red). NOT a 0-100% score.
+function svgDayImpactBars(items:Array<{feature:string;days_impact:number}>,w=440):string{
+  if(!items.length)return"";
+  const maxAbs=Math.max(...items.map(d=>Math.abs(d.days_impact)))||1;
+  const bH=19,gap=6,lW=190,totalH=items.length*(bH+gap);
+  const bars=items.map((d,i)=>{
+    const isWorse=d.days_impact<0;
+    const col=isWorse?C.rose:C.emerald;
+    const bw=Math.max(3,(Math.abs(d.days_impact)/maxAbs)*(w-lW-60));
+    const y=i*(bH+gap);
+    const lbl=d.feature.replace(/_/g," ").replace(/pct/gi,"%").replace(/\b\w/g,c=>c.toUpperCase()).slice(0,26);
+    const sign=isWorse?"−":"+";
+    return`<text x="${lW-5}" y="${y+bH*0.72}" text-anchor="end" font-size="9.5" fill="${C.textMid}">${lbl}</text>
+      <rect x="${lW}" y="${y}" width="${bw.toFixed(1)}" height="${bH}" rx="2" fill="${col}"/>
+      <text x="${lW+bw+5}" y="${y+bH*0.72}" font-size="9.5" fill="${col}" font-weight="700">${isWorse?"↘":"↗"} ${sign}${Math.abs(d.days_impact).toFixed(2)}d</text>`;
+  }).join("");
+  return`<svg viewBox="0 0 ${w} ${totalH}" width="100%" height="${totalH}">${bars}</svg>`;
+}
+
+// ── SVG Survival Component Bars (7d / 30d failure probability) ──────────────
+function svgSurvivalBars(components:Array<{component:string;fail_prob_7d:number;fail_prob_30d:number}>,w=440):string{
+  if(!components.length)return"";
+  const bH=16,gap=5,lW=110,rowH=(bH+gap)*2+10,totalH=components.length*rowH;
+  const rows=components.map((c,i)=>{
+    const y0=i*rowH;
+    const p7=Math.max(0,Math.min(100,c.fail_prob_7d*100));
+    const p30=Math.max(0,Math.min(100,c.fail_prob_30d*100));
+    const bw7=Math.max(2,(p7/100)*(w-lW-55));
+    const bw30=Math.max(2,(p30/100)*(w-lW-55));
+    const col7=p7>=50?C.rose:p7>=25?C.amber:C.emerald;
+    const col30=p30>=50?C.rose:p30>=25?C.amber:C.emerald;
+    const label=c.component.replace(/_/g," ").replace(/\b\w/g,ch=>ch.toUpperCase());
+    return`<text x="${lW-8}" y="${y0+bH*0.75}" text-anchor="end" font-size="9.5" font-weight="700" fill="${C.textDark}">${label}</text>
+      <text x="0" y="${y0+bH*0.75}" font-size="7.5" fill="${C.textLight}">7d</text>
+      <rect x="${lW}" y="${y0}" width="${w-lW-55}" height="${bH}" rx="2" fill="${C.border}"/>
+      <rect x="${lW}" y="${y0}" width="${bw7.toFixed(1)}" height="${bH}" rx="2" fill="${col7}"/>
+      <text x="${lW+(w-lW-55)+5}" y="${y0+bH*0.75}" font-size="8.5" fill="${col7}" font-weight="700">${p7.toFixed(1)}%</text>
+      <text x="0" y="${y0+bH+gap+bH*0.75}" font-size="7.5" fill="${C.textLight}">30d</text>
+      <rect x="${lW}" y="${y0+bH+gap}" width="${w-lW-55}" height="${bH}" rx="2" fill="${C.border}"/>
+      <rect x="${lW}" y="${y0+bH+gap}" width="${bw30.toFixed(1)}" height="${bH}" rx="2" fill="${col30}"/>
+      <text x="${lW+(w-lW-55)+5}" y="${y0+bH+gap+bH*0.75}" font-size="8.5" fill="${col30}" font-weight="700">${p30.toFixed(1)}%</text>`;
+  }).join("");
+  return`<svg viewBox="0 0 ${w} ${totalH}" width="100%" height="${totalH}">${rows}</svg>`;
+}
+
+
 function svgDonut(data:Array<{name:string;count:number}>,colors:string[],size=100):string{
   const total=data.reduce((s,d)=>s+d.count,0);
   if(!total)return`<p style="color:${C.textLight};font-size:10px">No data</p>`;
@@ -232,7 +276,7 @@ function hlBox(label:string,body:string,color=C.teal):string{
 
 function riskBadge(level:string):string{
   const col:Record<string,string>={Low:C.emerald,Medium:C.amber,High:C.rose,Critical:"#dc2626"};
-  return`<span style="display:inline-block;padding:1px 7px;border-radius:3px;font-size:9px;font-weight:700;color:white;background:${col[level]||C.slate}">${esc(level)}</span>`;
+  return`<span style="display:inline-block;padding:1px 7px;border-radius:3px;font-size:9px;font-weight:700;color:white;background:${col[level]||C.slate}">${level}</span>`;
 }
 
 function secH(num:string,title:string,sub=""):string{
@@ -250,17 +294,19 @@ function subH(title:string):string{
 }
 
 // ── Page wrapper: header + content + footer (no browser chrome) ───────────────
-function page(content:string,warehouse:string,section:string,origin="",footerInfo?:{pageNum:number;total:number}):string{
-  // footerInfo is only passed for the browser print-dialog fallback path
-  // (downloadAssetPDF) — that path never reaches the server, so Playwright's
-  // repeating footer template (reports.py) never runs for it, and without
-  // this the fallback PDF would have no footer at all. The primary
-  // server-rendered path (downloadAssetPDFServer / generateAssetReportHtml)
-  // omits footerInfo so only Playwright's footer shows there — never both.
+function page(content:string,warehouse:string,section:string,origin="",footerInfo?:{current:number;total:number}):string{
+  // footerInfo is only passed for the print-dialog fallback path. It's
+  // rendered as a normal in-flow flex child (NOT position:fixed) — a fixed
+  // element's interaction with Chromium's print pagination proved
+  // unreliable in practice (it was spawning phantom near-blank pages
+  // around the cover and the final page). A normal flex child carries zero
+  // pagination risk at the cost of only appearing once per topic rather
+  // than once per physical page — an explicit, deliberate trade-off:
+  // zero risk of blank pages beats perfect footer repetition here.
   const footerHtml = footerInfo ? `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 16px;background:${C.tealLight};border-top:1px solid ${C.tealBorder};flex-shrink:0">
         <span style="font-size:7.5px;color:${C.textLight}">PredictiX AI Platform &nbsp;·&nbsp; Asset Performance Report &nbsp;·&nbsp; Confidential &nbsp;·&nbsp; © Predictix 2026</span>
-        <span style="font-size:7.5px;color:${C.textLight}">Page ${footerInfo.pageNum} of ${footerInfo.total}</span>
+        <span style="font-size:7.5px;color:${C.textLight}">Page ${footerInfo.current} of ${footerInfo.total}</span>
       </div>` : "";
   return`<div class="page">
     <!-- inner border frame -->
@@ -273,7 +319,6 @@ function page(content:string,warehouse:string,section:string,origin="",footerInf
         </div>
         <span style="font-size:8.5px;color:${C.textLight}">${section}</span>
       </div>
-      <!-- page body — see footerInfo above for why the footer is conditional -->
       <div style="padding:14px 18px;flex:1">${content}</div>${footerHtml}
     </div>
   </div>`;
@@ -293,7 +338,8 @@ function sensorBars(fields:Array<{name:string;value:number;color:string}>,w=440)
 }
 
 // ── CSS — proper margins, no browser chrome ───────────────────────────────────
-const CSS=`
+function buildCss():string{
+  return`
   @page {
     size: A4 portrait;
     margin: 14mm 13mm 13mm 13mm;
@@ -307,10 +353,15 @@ const CSS=`
   .page {
     page-break-after: always;
     background: white;
-    /* No fixed height/overflow here anymore — a topic's content can now
-       naturally overflow onto additional physical pages instead of being
-       silently clipped once it grows past one sheet's worth of content
-       (e.g. once real cost-model data fills out Health/Risk/Cost). */
+    /* No fixed height/overflow — a topic's content can overflow onto
+       additional physical pages instead of being silently clipped once it
+       grows past one sheet's worth of content. This value MUST match the
+       @page margin above (297mm - 14mm top - 13mm bottom) — a previous
+       version briefly varied this by footer type and let the two drift out
+       of sync, which caused near-full pages to overflow the real printable
+       area and spawn a spurious blank extra page. Keeping this constant
+       (no more per-footer-type variation) removes that failure mode
+       entirely rather than requiring the math to stay in sync by hand. */
     min-height: calc(297mm - 27mm);
   }
   .page:last-child { page-break-after: auto; }
@@ -323,6 +374,7 @@ const CSS=`
     @page { margin: 14mm 13mm 13mm 13mm; }
   }
 `;
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  MAIN GENERATOR
@@ -341,7 +393,6 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
   // tracked here, since a topic can now span a variable number of physical
   // pages depending on content length.
 
-  const shapCols=[C.teal,"#3b82f6",C.amber,C.violet,C.orange,"#db2777",C.emerald,C.rose];
 
   // ── PAGE 1: COVER ──────────────────────────────────────────────────────────
   const cover=`<div class="page" style="background:white;height:calc(297mm - 27mm);display:flex;flex-direction:column">
@@ -361,17 +412,17 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
       <!-- report card -->
       <div style="border:1px solid ${C.tealBorder};border-radius:8px;padding:24px 40px;background:${C.tealLight};max-width:400px;width:100%;margin-bottom:26px">
         <div style="font-size:9px;font-weight:700;color:${C.teal};letter-spacing:1.8px;text-transform:uppercase;margin-bottom:10px">Asset Performance Report</div>
-        <h1 style="font-size:22px;font-weight:800;color:${C.textDark};line-height:1.2;margin-bottom:5px">${esc(data.assetName)}</h1>
-        <div style="font-size:12px;color:${C.textLight};margin-bottom:0">${esc(data.warehouseName)}</div>
+        <h1 style="font-size:22px;font-weight:800;color:${C.textDark};line-height:1.2;margin-bottom:5px">${data.assetName}</h1>
+        <div style="font-size:12px;color:${C.textLight};margin-bottom:0">${data.warehouseName}</div>
       </div>
 
       <!-- meta -->
       <div style="font-size:10.5px;color:${C.textLight};margin-bottom:3px">
-        Report Generated: <strong style="color:${C.textDark}">${esc(data.reportDate)}</strong>
+        Report Generated: <strong style="color:${C.textDark}">${data.reportDate}</strong>
       </div>
       <div style="font-size:10.5px;color:${C.textLight};margin-bottom:16px">
-        Asset Code: <strong style="color:${C.textDark}">${esc(data.assetCode)}</strong>
-        &nbsp;·&nbsp; Make / Model: <strong style="color:${C.textDark}">${esc([asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"—")}</strong>
+        Asset Code: <strong style="color:${C.textDark}">${data.assetCode}</strong>
+        &nbsp;·&nbsp; Make / Model: <strong style="color:${C.textDark}">${[asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"—"}</strong>
       </div>
       <div style="display:inline-block;border:1px solid ${C.amber};color:${C.amber};font-size:8.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;padding:3px 14px;border-radius:3px">Confidential</div>
     </div>
@@ -404,16 +455,16 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
 
   const assetRows:[string,string][]=[
     ["Asset Code",          fmt(data.assetCode)],
-    ["Asset Type",         esc([asset.asset_type,asset.vehicle_type].filter(Boolean).join(" · ")||"—")],
-    ["Make / Model",       esc([asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"—")],
+    ["Asset Type",         [asset.asset_type,asset.vehicle_type].filter(Boolean).join(" · ")||"—"],
+    ["Make / Model",       [asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"—"],
     ["Status",              cap(fmt(asset.status))],
     ["Health Band",         cap(fmt(asset.health_band))],
     ["Criticality Score",   fmt(asset.criticality_score)],
     ["Fuel Type",           fmt(asset.fuel_type)],
-    ["Current Mileage",     asset.current_mileage?`${esc(asset.current_mileage)} km`:"—"],
+    ["Current Mileage",     asset.current_mileage?`${asset.current_mileage} km`:"—"],
     ["Vehicle Role",        fmt(asset.vehicle_role)],
-    ["Vehicle Age",         asset.vehicle_age_years?`${esc(asset.vehicle_age_years)} yrs`:"—"],
-    ["Payload Capacity",    asset.payload_capacity_kg?`${esc(asset.payload_capacity_kg)} kg`:"—"],
+    ["Vehicle Age",         asset.vehicle_age_years?`${asset.vehicle_age_years} yrs`:"—"],
+    ["Payload Capacity",    asset.payload_capacity_kg?`${asset.payload_capacity_kg} kg`:"—"],
     ["Purchase Date",       fmtDate(asset.purchase_date)],
     ["Warranty Expiry",     fmtDate(asset.warranty_expiry_date)],
     ["Last Service",        fmtDate(asset.last_service_date)],
@@ -447,54 +498,36 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
 
     ${subH("1.2 Asset Details")}
     ${infoTbl(assetRows)}
-  `,wLbl,"Asset Overview",origin,includeDomFooter?{pageNum:1,total:4}:undefined);
+  `,wLbl,"Asset Overview",origin,includeDomFooter?{current:1,total:4}:undefined);
 
   // ── PAGE 2: HEALTH, RISK & COST ESTIMATION ───────────────────────────────────────
-  // Build SHAP data — normalise to 0-100% regardless of input format
-  const shapData=(()=>{
-    const raw=data.top_explanations;
-    if(!raw||typeof raw!=="object") return [];
-    const entries=Object.entries(raw);
-    if(!entries.length) return [];
-    // Check if keys are numeric indices (bad format) — skip if so
-    const allNumeric=entries.every(([k])=>!isNaN(Number(k)));
-    if(allNumeric) return []; // no named features — show "no data"
-    // Values may be 0-1 or already 0-100; normalise to sum=100 so each
-    // factor's pct is its share of total impact (dividing by the max
-    // instead of the sum would inflate every factor toward the top one
-    // and the bars would never actually add up to 100%).
-    const vals=entries.map(([,v])=>Math.abs(Number(v)));
-    const total=vals.reduce((a,b)=>a+b,0)||1;
-    return entries
-      .map(([name,val],i)=>({
-        name:esc(name.replace(/_/g," ").replace(/pct/g,"%").replace(/\w/g,c=>c.toUpperCase())),
-        pct:Math.round((vals[i]/total)*100*10)/10,
-      }))
-      .sort((a,b)=>b.pct-a.pct)
-      .slice(0,8);
-  })();
+  const topRiskFactors = data.top_risk_factors || [];
 
-  // Escaped once here (feature/value are the only free-text-derived fields
-  // on a cost driver) rather than at each of the two places that read them
-  // below (the SVG bar chart and the data table), so neither can be missed.
-  const costDrivers=(data.cost_drivers||[]).map(d=>({
-    ...d,
-    feature:esc(d.feature),
-    value:esc(d.value),
-  }));
+  const costDrivers=data.cost_drivers||[];
 
   const recBlock=(level:string,items:string[],col:string)=>
-    items.length?`<div class="no-break" style="break-inside:avoid;page-break-inside:avoid">${hlBox(level+" PRIORITY",items.map(r=>`• ${esc(r)}`).join("<br/>"),col)}</div>`:"";
+    items.length?`<div class="no-break" style="break-inside:avoid;page-break-inside:avoid">${hlBox(level+" PRIORITY",items.map(r=>`• ${r}`).join("<br/>"),col)}</div>`:"";
 
   const p4=page(`
-    ${secH("2","Health, Risk Analysis & Cost Estimation",`Key factors · ${esc(data.cost_model_version||"AI Cost Model")}`)}
+    ${secH("2","Health, Risk Analysis & Cost Estimation",`Key factors · ${data.cost_model_version||"AI Cost Model"}`)}
 
     ${subH("2.1 Failure Prediction — Key Risk Factors")}
-    ${shapData.length
-      ?`${chartBox("KEY FACTORS DRIVING FAILURE RISK",svgHBar(shapData,shapCols,430),"Figure 2.1 — Relative importance of each factor, normalised to 100%")}
-        ${dataTbl(["Factor","Relative Importance"],shapData.map(d=>[d.name,`${d.pct}%`]),
-          "Figure 2.2 — Factors ranked by influence on failure risk")}`
+    ${topRiskFactors.length
+      ?`${chartBox("KEY FACTORS SHIFTING PREDICTED MAINTENANCE DATE",svgDayImpactBars(topRiskFactors,430),
+          "Figure 2.1 — Signed impact in days · green ↗ pushes maintenance date later (improves outlook) · red ↘ pushes it sooner (worsens outlook)")}
+        ${dataTbl(["Factor","Days Impact","Effect"],topRiskFactors.map(d=>{
+          const isWorse=d.days_impact<0;
+          const col=isWorse?C.rose:C.emerald;
+          const sign=isWorse?"−":"+";
+          return[
+            d.feature.replace(/_/g," "),
+            `<span style="color:${col};font-weight:700">${sign}${Math.abs(d.days_impact).toFixed(2)}d</span>`,
+            `<span style="color:${col}">${isWorse?"↘ Sooner (worse)":"↗ Later (better)"}</span>`,
+          ];
+        }), "Figure 2.2 — Factors ranked by influence on the predicted maintenance date")}`
       :hlBox("RISK FACTOR DATA NOT AVAILABLE","Run the AI prediction engine to generate risk factor scores.",C.amber)}
+
+    ${data.recommended_action?hlBox("AI RECOMMENDATION",data.recommended_action,C.teal):""}
 
     ${subH("2.2 Explanation of Your Estimated Cost")}
     ${costDrivers.length?`
@@ -509,12 +542,12 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
         return hlBox("HOW TO READ THIS",
           `These are the factors that influenced this cost estimate the most, shown as their share of total impact (0–100%) rather than a direct LKR amount.<br/>
            Red bars = factors that push cost above the fleet average &nbsp;|&nbsp; Green bars = factors that pull cost below the fleet average.<br/>
-           Model: ${esc(data.cost_model_version||"AI Cost Model")} · Target: cost in the next 30 days given current health${statSuffix}`,
+           Model: ${data.cost_model_version||"AI Cost Model"} · Target: cost in the next 30 days given current health${statSuffix}`,
           C.amber);
       })()}
       ${chartBox("COST DRIVERS — RELATIVE IMPORTANCE",
         svgCostBars(costDrivers,430),
-        `Figure 2.3 — ${esc(data.cost_model_version||"AI Cost Model")} relative importance of each cost factor · red = increases estimate · green = decreases estimate`)}
+        `Figure 2.3 — ${data.cost_model_version||"AI Cost Model"} relative importance of each cost factor · red = increases estimate · green = decreases estimate`)}
       ${dataTbl(
         ["Feature","Current Value","Relative Impact","Effect"],
         costDrivers.map(d=>{
@@ -527,7 +560,7 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
             `<span style="color:${col}">${isUp?"▲ Increases cost":"▼ Decreases cost"}</span>`,
           ];
         }),
-        `Figure 2.4 — Top cost factors ranked by relative importance (${esc(data.cost_model_version||"AI Cost Model")})`
+        `Figure 2.4 — Top cost factors ranked by relative importance (${data.cost_model_version||"AI Cost Model"})`
       )}
       <div class="no-break" style="border:1px solid ${C.border};border-radius:5px;overflow:hidden;margin-bottom:12px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr">
@@ -549,23 +582,50 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
       </div>
     `:hlBox("COST MODEL DATA NOT AVAILABLE",
         data.cost_error
-          ? `The cost prediction request failed: <strong>${esc(data.cost_error)}</strong>. Contact your system administrator with this message.`
+          ? `The cost prediction request failed: <strong>${data.cost_error}</strong>. Contact your system administrator with this message.`
           : "Run the cost prediction model to generate a cost breakdown.",
         C.amber)}
 
     ${insights.executive_summary?`${subH("2.3 AI Executive Summary")}${hlBox("AI ANALYSIS",
-      esc(String(insights.executive_summary).slice(0,350)+(String(insights.executive_summary).length>350?"…":"")),
+      String(insights.executive_summary).slice(0,350)+(String(insights.executive_summary).length>350?"…":""),
       C.teal)}`:""}
     ${insights.ai_narrative&&insights.ai_narrative!==insights.executive_summary&&insights.ai_narrative.length>5?
-      hlBox("AI NARRATIVE",esc(String(insights.ai_narrative).slice(0,250)),C.sky):""}
+      hlBox("AI NARRATIVE",String(insights.ai_narrative).slice(0,250),C.sky):""}
 
-    ${subH("2.4 Recommendations")}
+    ${subH("2.4 Component Survival Analysis")}
+    ${data.survival && data.survival.components.length ? `
+      ${data.survival.soonest_component ? hlBox(
+        "MOST IMMEDIATE RISK",
+        `<strong>${data.survival.soonest_component.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase())}</strong> is the soonest-failing component${
+          data.survival.soonest_median_days!=null ? ` — predicted median remaining useful life: <strong>${Math.round(data.survival.soonest_median_days)} days</strong>` : ""
+        }.`,
+        C.rose,
+      ) : ""}
+      ${chartBox("COMPONENT FAILURE PROBABILITY — 7 DAY vs 30 DAY",
+        svgSurvivalBars(data.survival.components,430),
+        "Figure 2.5 — Weibull AFT survival model · probability each component fails within 7 or 30 days")}
+      ${dataTbl(["Component","7-Day Fail Prob.","30-Day Fail Prob.","Median RUL"],
+        data.survival.components.map(c=>{
+          const p7=c.fail_prob_7d*100, p30=c.fail_prob_30d*100;
+          const col7=p7>=50?C.rose:p7>=25?C.amber:C.emerald;
+          const col30=p30>=50?C.rose:p30>=25?C.amber:C.emerald;
+          return[
+            c.component.replace(/_/g," ").replace(/\b\w/g,ch=>ch.toUpperCase()),
+            `<span style="color:${col7};font-weight:700">${p7.toFixed(1)}%</span>`,
+            `<span style="color:${col30};font-weight:700">${p30.toFixed(1)}%</span>`,
+            c.median_days!=null?`${Math.round(c.median_days)}d`:"—",
+          ];
+        }),
+        "Figure 2.6 — Per-component failure risk and remaining useful life")}
+    `:hlBox("SURVIVAL ANALYSIS NOT AVAILABLE","Component-level survival data could not be retrieved for this asset.",C.slate)}
+
+    ${subH("2.5 Recommendations")}
     ${recBlock("Critical",recs.critical,C.rose)}
     ${recBlock("High",recs.high,C.amber)}
     ${recBlock("Medium",recs.medium,C.sky)}
     ${!recs.critical.length&&!recs.high.length&&!recs.medium.length
       ?hlBox("RECOMMENDATIONS","No specific recommendations. Run AI prediction for asset-specific guidance.",C.slate):""}
-  `,wLbl,"Health, Risk & Cost Estimation",origin,includeDomFooter?{pageNum:2,total:4}:undefined);
+  `,wLbl,"Health, Risk & Cost Estimation",origin,includeDomFooter?{current:2,total:4}:undefined);
 
   // ── PAGE 3: SENSOR + MAINTENANCE ──────────────────────────────────
   const sRows:[string,string][]=sensor?[
@@ -620,9 +680,9 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
     ${sRows.length?infoTbl(sRows)
       :hlBox("SENSOR STATUS","No sensor readings available. Connect asset to the PredictiX monitoring system.",C.slate)}
 
-    ${sensorHealthFields.length?`${subH("3.2 Component Health Levels")}${chartBox("COMPONENT HEALTH",sensorBars(sensorHealthFields,430),"Figure 3.1 — Component health as percentage")}` :""}
+    ${sensorHealthFields.length?chartBox("COMPONENT HEALTH",sensorBars(sensorHealthFields,430),"Figure 3.1 — Component health as percentage") :""}
 
-    ${subH("3.3 Maintenance Summary")}
+    ${subH("3.2 Maintenance Summary")}
     ${infoTbl([
       ["Total Events",       String(maintenanceMetrics.total_events)],
       ["Preventive Events",  String(maintenanceMetrics.preventive_count)],
@@ -632,9 +692,9 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
       ["Avg Cost / Event",   maintenanceMetrics.total_events?fmtCost(Math.round(maintenanceMetrics.total_cost/maintenanceMetrics.total_events),cur):"—"],
     ])}
     ${maintDonut?chartBox("MAINTENANCE TYPE BREAKDOWN",maintDonut,"Figure 3.2 — Preventive vs corrective events"):""}
-    ${maintenance.length?`${subH("3.4 Recent Maintenance Events")}${dataTbl(["Date","Type","Description",`Cost (${cur})`,"Downtime"],maintRows,"Figure 3.3 — Most recent maintenance events")}`
+    ${maintenance.length?`${subH("3.3 Recent Maintenance Events")}${dataTbl(["Date","Type","Description",`Cost (${cur})`,"Downtime"],maintRows,"Figure 3.3 — Most recent maintenance events")}`
       :hlBox("MAINTENANCE HISTORY","No maintenance events recorded.",C.slate)}
-  `,wLbl,"Sensor & Maintenance",origin,includeDomFooter?{pageNum:3,total:4}:undefined);
+  `,wLbl,"Sensor & Maintenance",origin,includeDomFooter?{current:3,total:4}:undefined);
 
   // ── PAGE 4: TICKETS + INSIGHTS ────────────────────────────────────────────
   const p6=page(`
@@ -651,16 +711,16 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
     ${tickets.length?`${subH("4.2 Recent Tickets")}${dataTbl(["Ticket ID","Title","Priority","Status","Created"],ticketRows,"Figure 4.2 — Most recent support tickets")}`
       :hlBox("TICKET HISTORY","No tickets raised for this asset.",C.slate)}
 
-    ${insights.conclusion?`${subH("4.3 Conclusion")}${hlBox("EXECUTIVE CONCLUSION",esc(insights.conclusion),C.teal)}`:""}
-  `,wLbl,"Tickets & Insights",origin,includeDomFooter?{pageNum:4,total:4}:undefined);
+    ${insights.conclusion?`${subH("4.3 Conclusion")}${hlBox("EXECUTIVE CONCLUSION",insights.conclusion,C.teal)}`:""}
+  `,wLbl,"Tickets & Insights",origin,includeDomFooter?{current:4,total:4}:undefined);
 
   return`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Asset Report — ${esc(data.assetName)}</title>
-  <style>${CSS}</style>
+  <title>Asset Report — ${data.assetName}</title>
+  <style>${buildCss()}</style>
 </head>
 <body>${cover}${p3}${p4}${p5}${p6}</body>
 </html>`;

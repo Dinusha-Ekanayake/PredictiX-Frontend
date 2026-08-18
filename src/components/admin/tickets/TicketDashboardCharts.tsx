@@ -46,6 +46,7 @@ const PRIORITY_COLORS = {
 
 const CATEGORY_COLORS = {
   Electrical: "#04dfefff", // Cyan
+  Software: "#ec1e85ff",   // Pink
 };
 
 const PRIORITY_VALS = {
@@ -53,97 +54,6 @@ const PRIORITY_VALS = {
   Medium: 2,
   Low: 1,
 };
-
-// Custom shape to render grid counts as centered badges with active status gradients and hover effects
-function CustomGridNode(props: any) {
-  const { cx, cy, payload } = props;
-  // Hooks run before any early return, so the hook order is identical on
-  // every render. Recharts renders this via `shape={<CustomGridNode />}`,
-  // which makes it a real component as far as React is concerned.
-  const [hovered, setHovered] = React.useState(false);
-
-  if (!cx || !cy) return null;
-
-  const count = payload.count || 0;
-  const xVal = payload.x;
-
-  let startColor = "#475569";
-  let endColor = "#1e293b";
-  let glowColor = "rgba(0, 0, 0, 0.5)";
-  let textFill = "#64748b";
-  let strokeColor = "#334155";
-
-  if (count > 0) {
-    textFill = "#ffffff";
-    strokeColor = "#ffffff";
-    if (xVal === 1) { // Open
-      startColor = "#f87171";
-      endColor = "#dc2626";
-      glowColor = "rgba(239, 68, 68, 0.6)";
-    } else if (xVal === 2) { // In Progress
-      startColor = "#fbbf24";
-      endColor = "#ea580c";
-      glowColor = "rgba(249, 115, 22, 0.6)";
-    } else if (xVal === 3) { // Resolved
-      startColor = "#fde047";
-      endColor = "#ca8a04";
-      glowColor = "rgba(234, 179, 8, 0.6)";
-    } else if (xVal === 4) { // Closed
-      startColor = "#4ade80";
-      endColor = "#16a34a";
-      glowColor = "rgba(34, 197, 94, 0.6)";
-    }
-  }
-
-  const gradId = `badgeGrad-${xVal}-${count > 0 ? "active" : "inactive"}`;
-  const shadowId = `badgeShadow-${xVal}-${count > 0 ? "active" : "inactive"}`;
-
-  return (
-    <g
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        transform: hovered ? "scale(1.15)" : "scale(1)",
-        transformOrigin: `${cx}px ${cy}px`,
-        transition: "transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-        cursor: count > 0 ? "pointer" : "default"
-      }}
-    >
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={startColor} />
-          <stop offset="100%" stopColor={endColor} />
-        </linearGradient>
-        <filter id={shadowId} x="-30%" y="-30%" width="160%" height="160%">
-          <feDropShadow dx="0" dy={hovered ? 5 : 3} stdDeviation={hovered ? 4 : 2} floodColor={glowColor} floodOpacity={count > 0 ? 0.8 : 0.4} />
-        </filter>
-      </defs>
-      <rect
-        x={cx - 24}
-        y={cy - 14}
-        width={48}
-        height={28}
-        rx={14}
-        fill={`url(#${gradId})`}
-        stroke={strokeColor}
-        strokeWidth={hovered ? 2 : 1.5}
-        filter={`url(#${shadowId})`}
-      />
-      <text
-        x={cx}
-        y={cy + 4.5}
-        textAnchor="middle"
-        fill={textFill}
-        fontSize={13}
-        fontWeight="bold"
-        style={{ pointerEvents: "none" }}
-      >
-        {count}
-      </text>
-    </g>
-  );
-}
-
 
 export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   const [data, setData] = useState<TicketData[]>([]);
@@ -238,7 +148,6 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   }, {} as Record<string, { name: string; High: number; Medium: number; Low: number; total: number }>);
 
   const techQueueData = Object.values(techQueueCounts)
-    .filter((tech) => tech.name !== "Unassigned")
     .sort((a, b) => b.total - a.total);
 
   // 4. Process data for 4x3 Status vs Category Grid Counts
@@ -366,6 +275,92 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     return null;
   };
 
+  // Custom shape to render grid counts as centered badges with active status gradients and hover effects
+  const CustomGridNode = (props: any) => {
+    const { cx, cy, payload } = props;
+    if (!cx || !cy) return null;
+
+    const count = payload.count || 0;
+    const xVal = payload.x;
+    const [hovered, setHovered] = React.useState(false);
+
+    let startColor = "#475569";
+    let endColor = "#1e293b";
+    let glowColor = "rgba(0, 0, 0, 0.5)";
+    let textFill = "#64748b";
+    let strokeColor = "#334155";
+
+    if (count > 0) {
+      textFill = "#ffffff";
+      strokeColor = "#ffffff";
+      if (xVal === 1) { // Open
+        startColor = "#f87171";
+        endColor = "#dc2626";
+        glowColor = "rgba(239, 68, 68, 0.6)";
+      } else if (xVal === 2) { // In Progress
+        startColor = "#fbbf24";
+        endColor = "#ea580c";
+        glowColor = "rgba(249, 115, 22, 0.6)";
+      } else if (xVal === 3) { // Resolved
+        startColor = "#fde047";
+        endColor = "#ca8a04";
+        glowColor = "rgba(234, 179, 8, 0.6)";
+      } else if (xVal === 4) { // Closed
+        startColor = "#4ade80";
+        endColor = "#16a34a";
+        glowColor = "rgba(34, 197, 94, 0.6)";
+      }
+    }
+
+    const gradId = `badgeGrad-${xVal}-${count > 0 ? "active" : "inactive"}`;
+    const shadowId = `badgeShadow-${xVal}-${count > 0 ? "active" : "inactive"}`;
+
+    return (
+      <g
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          transform: hovered ? "scale(1.15)" : "scale(1)",
+          transformOrigin: `${cx}px ${cy}px`,
+          transition: "transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+          cursor: count > 0 ? "pointer" : "default"
+        }}
+      >
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={startColor} />
+            <stop offset="100%" stopColor={endColor} />
+          </linearGradient>
+          <filter id={shadowId} x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy={hovered ? 5 : 3} stdDeviation={hovered ? 4 : 2} floodColor={glowColor} floodOpacity={count > 0 ? 0.8 : 0.4} />
+          </filter>
+        </defs>
+        <rect
+          x={cx - 24}
+          y={cy - 14}
+          width={48}
+          height={28}
+          rx={14}
+          fill={`url(#${gradId})`}
+          stroke={strokeColor}
+          strokeWidth={hovered ? 2 : 1.5}
+          filter={`url(#${shadowId})`}
+        />
+        <text
+          x={cx}
+          y={cy + 4.5}
+          textAnchor="middle"
+          fill={textFill}
+          fontSize={13}
+          fontWeight="bold"
+          style={{ pointerEvents: "none" }}
+        >
+          {count}
+        </text>
+      </g>
+    );
+  };
+
   // Custom shape to render 3D vertical bars (isometric cuboid)
   const Custom3DBar = (props: any) => {
     const { x, y, width, height, fill } = props;
@@ -480,36 +475,12 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     );
   };
 
-  const formatName = (name: string) => {
-    if (!name) return "";
-    const parts = name.trim().split(/\s+/);
-    if (parts.length < 2) {
-      return name.length > 14 ? name.slice(0, 12) + "..." : name;
-    }
-    const firstName = parts[0];
-    const secondName = parts[1];
-    const combined = `${firstName} ${secondName}`;
-    if (combined.length <= 14) {
-      return combined;
-    }
-    const shortSecond = secondName.slice(0, 3);
-    return `${firstName} ${shortSecond}...`;
-  };
-
   const renderLegendText = (value: string, entry: any) => {
-    return <span className="text-sm font-medium text-slate-700 dark:text-slate-300 ml-1">{value}</span>;
+    return <span className="text-sm font-medium text-slate-300 ml-1">{value}</span>;
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
-      <style>{`
-        .recharts-cartesian-axis-tick text {
-          fill: #475569 !important;
-        }
-        .dark .recharts-cartesian-axis-tick text {
-          fill: #94a3b8 !important;
-        }
-      `}</style>
       {/* Category Bar Chart */}
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col h-[350px]">
         <div className="mb-2">
@@ -520,8 +491,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
             Number of tickets by category from Supabase.
           </p>
         </div>
-        <div className="flex-1 w-full min-h-[250px]">
-          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+        <div className="flex-1 w-full min-h-0">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={categoryChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
@@ -533,8 +504,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                   <stop offset="100%" stopColor="#506591ff" />
                 </linearGradient>
                 <linearGradient id="pinkGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#ec4899" />
-                  <stop offset="100%" stopColor="#be185d" />
+                  <stop offset="0%" stopColor="#a90356ff" />
+                  <stop offset="100%" stopColor="#987382ff" />
                 </linearGradient>
                 <filter id="barShadow" x="-10%" y="-10%" width="120%" height="120%">
                   <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.4" />
@@ -579,10 +550,17 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
             Current ticket distribution by priority from Supabase.
           </p>
         </div>
-        <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
-          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+        <div className="flex-1 w-full min-h-0 flex items-center justify-center">
+          <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Tooltip content={<CustomPieTooltip />} />
+              <Legend
+                verticalAlign="bottom"
+                height={36}
+                iconType="square"
+                formatter={renderLegendText}
+                wrapperStyle={{ paddingTop: "10px" }}
+              />
               <Pie
                 data={priorityChartData}
                 cx="50%"
@@ -615,9 +593,9 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                   if (entry.name === "Low") cellFill = "url(#pieLowGrad)";
                   else if (entry.name === "High") cellFill = "url(#pieHighGrad)";
                   return (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={cellFill} 
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={cellFill}
                       filter="url(#pieShadow)"
                     />
                   );
@@ -634,7 +612,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
             if (entry.name === "Low") color = PRIORITY_COLORS.Low;
             else if (entry.name === "High") color = PRIORITY_COLORS.High;
             return (
-              <div key={index} className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
+              <div key={index} className="flex items-center gap-1.5 text-xs text-slate-300">
                 <span className="w-3 h-3 rounded" style={{ backgroundColor: color }} />
                 <span>{entry.name}: {entry.value}</span>
               </div>
@@ -643,72 +621,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
         </div>
       </div>
 
-      {/* Technician Queue Depth (Horizontal Bar Chart) */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col lg:col-span-2 h-[700px]">
-        <div className="mb-2">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-200">
-            <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Technician Workload
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Active tickets assigned to each maintenance technician.
-          </p>
-        </div>
-        <div className="flex-1 w-full min-h-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={techQueueData}
-              layout="vertical"
-              margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
-            >
-              <defs>
-                <linearGradient id="techLowGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#4ff409ff" />
-                  <stop offset="100%" stopColor="#97f079ff" />
-                </linearGradient>
-                <linearGradient id="techMediumGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#f4e408ff" />
-                  <stop offset="100%" stopColor="#e3bd70ff" />
-                </linearGradient>
-                <linearGradient id="techHighGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#b70505ff" />
-                  <stop offset="100%" stopColor="#eb6e6eff" />
-                </linearGradient>
-                <filter id="techShadow" x="-10%" y="-10%" width="120%" height="120%">
-                  <feDropShadow dx="2" dy="0" stdDeviation="2" floodColor="#000000" floodOpacity="0.4" />
-                </filter>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={true} horizontal={false} />
-              <XAxis
-                type="number"
-                stroke="#737373"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(val) => Math.floor(val).toString()}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                stroke="#737373"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-                width={90}
-                interval={0}
-                tickFormatter={formatName}
-              />
-              <Tooltip cursor={{ fill: '#262626', opacity: 0.3 }} content={<CustomTechTooltip />} />
-              <Bar dataKey="Low" stackId="a" fill="url(#techLowGrad)" shape={<Custom3DHorizontalBar />} barSize={9} />
-              <Bar dataKey="Medium" stackId="a" fill="url(#techMediumGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />
-              <Bar dataKey="High" stackId="a" fill="url(#techHighGrad)" shape={<Custom3DHorizontalBar />} barSize={18} />
-              <Legend verticalAlign="bottom" height={24} iconType="circle" iconSize={8} formatter={renderLegendText} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
       {/* Ticket Category vs. Status Scatter (9-Square style Grid) */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col h-[350px]">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 flex flex-col lg:col-span-2 h-[350px]">
         <div className="mb-2">
           <h3 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-200">
             <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" /> Category vs. Status

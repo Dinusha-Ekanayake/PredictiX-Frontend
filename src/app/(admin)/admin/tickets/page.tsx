@@ -60,7 +60,8 @@ function AnimatedCounter({ value }: { value: number }) {
 
 export default function AdminTicketsPage() {
   const [isAdmin, setIsAdmin] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [initialLoading, setInitialLoading] = React.useState(true);
+  const [isTableLoading, setIsTableLoading] = React.useState(false);
   const [hasError, setHasError] = React.useState(false);
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
   const [total, setTotal] = React.useState(0);
@@ -140,14 +141,18 @@ export default function AdminTicketsPage() {
   // Reset and reload when filters change
   React.useEffect(() => {
     setPage(0);
-    setTickets([]);
-    loadPage(0, true);
+    loadPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appliedQuery, selectedStatus, selectedPriority, sortBy, sortDir]);
 
-  async function loadPage(pageNum: number, reset: boolean) {
-    if (pageNum === 0) setIsLoading(true);
-    else setLoadingMore(true);
+  async function loadPage(pageNum: number) {
+    if (initialLoading) {
+      // First load handled by initialLoading
+    } else if (pageNum === 0) {
+      setIsTableLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
 
     try {
       const { tickets: rows, total: t } = await fetchTickets(
@@ -168,17 +173,18 @@ export default function AdminTicketsPage() {
         description: err instanceof Error ? err.message : undefined,
       });
     } finally {
-      setIsLoading(false);
+      setInitialLoading(false);
+      setIsTableLoading(false);
       setLoadingMore(false);
     }
   }
 
   function handleNextPage() {
-    loadPage(page + 1, false);
+    loadPage(page + 1);
   }
 
   function handlePrevPage() {
-    if (page > 0) loadPage(page - 1, false);
+    if (page > 0) loadPage(page - 1);
   }
 
   function handleTicketCreated(ticket: Ticket) {
@@ -225,7 +231,7 @@ export default function AdminTicketsPage() {
   const hasMore = (page + 1) * PAGE_SIZE < total;
   const hasPrev = page > 0;
 
-  if (isLoading) {
+  if (initialLoading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
         <PredictiXLoader label="Loading tickets…" />
@@ -459,9 +465,13 @@ export default function AdminTicketsPage() {
       </p>
 
       {/* ══ Ticket list ══════════════════════════════════════════════════════ */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5">
-        <div className="flex flex-col gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-        {tickets.length === 0 ? (
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 min-h-[260px] relative">
+        {isTableLoading ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <Loader2 className="size-6 text-violet-500 animate-spin" />
+            <p className="text-xs font-medium text-muted-foreground">Updating tickets list…</p>
+          </div>
+        ) : tickets.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card p-10 text-center">
             <div className="rounded-full bg-violet-100 dark:bg-violet-500/15 p-3">
               <TicketIcon className="size-5 text-violet-500" />
@@ -472,8 +482,9 @@ export default function AdminTicketsPage() {
             </p>
           </div>
         ) : (
-          tickets.map((t) => {
-            const priorityAccent =
+          <div className="flex flex-col gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+            {tickets.map((t) => {
+              const priorityAccent =
               t.priority === "High"
                 ? "from-rose-500 to-rose-600"
                 : t.priority === "Medium"
@@ -563,9 +574,9 @@ export default function AdminTicketsPage() {
                 </div>
               </div>
             );
-          })
+          })}
+          </div>
         )}
-        </div>
       </div>
 
       {/* Pagination */}

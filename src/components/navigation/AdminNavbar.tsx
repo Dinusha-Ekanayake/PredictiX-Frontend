@@ -12,7 +12,6 @@ import {
   Users,
   Menu,
   CircleHelp,
-  BookOpen,
 } from "lucide-react";
 
 import PredictiXLogo from "@/components/brand/PredictiXLogo";

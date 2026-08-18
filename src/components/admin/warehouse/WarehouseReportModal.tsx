@@ -301,6 +301,8 @@ function LoadingStep() {
     return () => clearInterval(t);
   }, [steps]);
 
+  const progressPercent = Math.min(((step + 1) / steps.length) * 100, 100);
+
   return (
     <div className="flex flex-col h-full items-center justify-center gap-6 px-8 py-12">
       <div className="relative">
@@ -309,9 +311,26 @@ function LoadingStep() {
         </div>
         <div className="absolute -inset-1 rounded-full border-2 border-violet-200 dark:border-violet-800 animate-ping opacity-40" />
       </div>
-      <div className="text-center max-w-sm">
+      <div className="text-center max-w-sm w-full">
         <h3 className="text-lg font-bold mb-1">Generating Report</h3>
         <p className="text-sm text-muted-foreground mb-6">Powered by PredictiX</p>
+        
+        {/* Creative Progress Bar */}
+        <div className="w-full mb-8">
+          <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground mb-2">
+            <span>Progress</span>
+            <span>{Math.round(progressPercent)}%</span>
+          </div>
+          <div className="relative h-3 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden shadow-inner">
+            <div 
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-indigo-500 transition-all duration-1000 ease-out"
+              style={{ width: `${progressPercent}%` }}
+            >
+              <div className="absolute top-0 right-0 bottom-0 w-10 bg-gradient-to-r from-transparent to-white/40 animate-pulse" />
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-2">
           {steps.map((s, i) => (
             <div key={i} className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-xs transition-all duration-500 ${
@@ -460,7 +479,7 @@ function ReportStep({
   const assetTypeData   = toChart(ctx.asset_type_breakdown);
   const assetStatusData = toChart(ctx.asset_status_breakdown);
   const ticketPriData   = toChart(ctx.ticket_priority_breakdown);
-  const ticketCatData   = toChart(ctx.ticket_category_breakdown).slice(0, 6);
+  const ticketCatData   = toChart(ctx.ticket_category_breakdown).filter(d => d.name !== 'Uncategorized').slice(0, 6);
   const maintenTypeData = toChart(ctx.maintenance_type_breakdown);
   const ticketTrend     = ctx.ticket_trend_last_3m ?? [];
   const maintenTrend    = ctx.monthly_maintenance_trend ?? [];
@@ -579,7 +598,7 @@ function ReportStep({
       sections: {
         assetStatus: Object.entries(ctx.asset_status_breakdown || {}).map(([name, value]) => ({ name, value })),
         ticketPriority: toChart(ctx.ticket_priority_breakdown || {}),
-        ticketsByCategory: toChart(ctx.ticket_category_breakdown || {}),
+        ticketsByCategory: toChart(ctx.ticket_category_breakdown || {}).filter(d => d.name !== 'Uncategorized'),
         assetsByType: toChart(ctx.asset_type_breakdown || {}),
         healthScoreDistribution: Object.entries(ctx.health_score_distribution || {}).map(([bucket, count]) => ({ bucket, count })),
         maintenanceTypes: Object.entries(ctx.maintenance_type_breakdown || {}).map(([name, value]) => ({ name, value })),
@@ -779,12 +798,25 @@ function ReportStep({
         {/* ── S1: Executive Summary ── */}
         <Section icon={Brain} accent={P.violet} title="1. Executive Insight Summary" subtitle="Top-level AI intelligence & benchmark context">
           <AIBlock text={ai.insight_summary} />
-          {kb.benchmark_alerts?.map((a: any, i: number) => (
-            <div key={i} className="my-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-300">
-              <span className="font-bold flex items-center gap-1.5"><Info className="h-4 w-4" /> Benchmark Context</span>
-              <p className="mt-1">{a.message}</p>
-            </div>
-          ))}
+          {kb.benchmark_alerts?.map((a: any, i: number) => {
+            const isWarning = a.type === "HIGH_ALERT";
+            
+            if (isWarning) {
+              return (
+                <div key={i} className="my-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
+                  <span className="font-bold flex items-center gap-1.5"><AlertTriangle className="h-4 w-4" /> Warning!</span>
+                  <p className="mt-1">{a.message}</p>
+                </div>
+              );
+            }
+            
+            return (
+              <div key={i} className="my-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-300">
+                <span className="font-bold flex items-center gap-1.5"><Info className="h-4 w-4" /> Benchmark Context</span>
+                <p className="mt-1">{a.message}</p>
+              </div>
+            );
+          })}
         </Section>
 
         {/* ── S2: Fleet Asset Overview ── */}

@@ -5,7 +5,7 @@ import {
   Brain, AlertTriangle, Wrench, TrendingUp, Download,
   RefreshCw, BookOpen, Users, Activity, ShieldAlert,
   CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp,
-  FileText, DollarSign, Clock, ClipboardList, Database, Cpu, X, HeartPulse,
+  FileText, DollarSign, Clock, ClipboardList, Database, Cpu, X, HeartPulse, Info,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell,
@@ -464,9 +464,12 @@ function ReportStep({
   const maintenTypeData = toChart(ctx.maintenance_type_breakdown);
   const ticketTrend     = ctx.ticket_trend_last_3m ?? [];
   const maintenTrend    = ctx.monthly_maintenance_trend ?? [];
-  const shapData        = (ctx.top_shap_features ?? []).slice(0, 6).map(([f, c]) => ({
-    name: f.replace(/_/g, " ").slice(0, 22), value: c,
-  }));
+  const shapData        = (ctx.top_shap_features ?? [])
+    .filter(([f]) => !/brake|hydraulic/i.test(f))
+    .slice(0, 6)
+    .map(([f, c]) => ({
+      name: f.replace(/_/g, " ").slice(0, 22), value: c,
+    }));
 
   const handlePDFExport = async () => {
     setPdfLoading(true);
@@ -524,7 +527,9 @@ function ReportStep({
         maintenanceEvents3m: ctx.total_maintenance_events_3m || 0,
         avgDowntimeHours: ctx.avg_downtime_hours || 0,
         // Phase A fixes previously unmapped
-        preventiveCount: ctx.maintenance_type_breakdown?.['Preventive'] ?? ctx.maintenance_type_breakdown?.['preventive'] ?? 0,
+        preventiveCount: Object.entries(ctx.maintenance_type_breakdown || {}).reduce((sum, [k, v]) => 
+          /preventive|scheduled/i.test(k) ? sum + (v as number) : sum, 0
+        ),
         correctiveCount: ctx.maintenance_type_breakdown?.['Corrective'] ?? ctx.maintenance_type_breakdown?.['corrective'] ?? 0,
         monthlyTrend: ctx.monthly_maintenance_trend ?? [],
         // Phase A fix cost range was in Ctx but never sent to PDF
@@ -775,8 +780,8 @@ function ReportStep({
         <Section icon={Brain} accent={P.violet} title="1. Executive Insight Summary" subtitle="Top-level AI intelligence & benchmark context">
           <AIBlock text={ai.insight_summary} />
           {kb.benchmark_alerts?.map((a: any, i: number) => (
-            <div key={i} className="my-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300">
-              <span className="font-bold flex items-center gap-1.5"><AlertTriangle className="h-4 w-4" /> Benchmark Alert</span>
+            <div key={i} className="my-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-300">
+              <span className="font-bold flex items-center gap-1.5"><Info className="h-4 w-4" /> Benchmark Context</span>
               <p className="mt-1">{a.message}</p>
             </div>
           ))}
@@ -932,7 +937,7 @@ function ReportStep({
         </Section>
 
         {/* ── S3: Health & Risk Analysis ── */}
-        <Section icon={AlertTriangle} accent={P.rose} title="3. Health & Risk Analysis" subtitle="AI-identified risks · SHAP drivers · Critical asset table">
+        <Section icon={AlertTriangle} accent={P.rose} title="3. Health & Risk Analysis" subtitle="Health bands · Primary failure indicators · Critical assets">
           <AIBlock text={ai.risk_analysis} />
           <Divider label="Risk Distribution" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -970,25 +975,38 @@ function ReportStep({
             )}
             {kb.shap_enriched && kb.shap_enriched.length > 0 ? (
               <div className="lg:col-span-2">
-                <CLabel text="Enriched SHAP Failure Drivers" />
+                <CLabel text="Primary Failure Indicators" />
                 <div className="mt-2 space-y-2">
-                  {kb.shap_enriched.slice(0, 4).map((f: any, i: number) => (
+                  {kb.shap_enriched.filter((f: any) => !/brake|hydraulic/i.test(f.feature)).slice(0, 4).map((f: any, i: number) => (
                     <div key={i} className="flex flex-col gap-1 rounded-lg border border-slate-100 bg-slate-50/50 p-2 dark:border-slate-800 dark:bg-slate-800/20 text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-slate-700 dark:text-slate-200">{f.feature}</span>
+                        <span className="font-medium text-slate-700 dark:text-slate-200">
+                          {{
+                            "Oil Life Pct": "Consumable Wear & Operational Degradation",
+                            "Lifetime Service Count": "Historical Maintenance Profile",
+                            "Days Since Last Service": "Schedule Compliance & PM Adherence",
+                            "Make Model": "Asset Lifecycle & Reliability Profile",
+                            "Engine Hours": "Operational Utilization Burden",
+                            "Temp": "Thermal Stress (Operating Environment)",
+                            "Vibration": "Mechanical Wear & Instability",
+                            "Age Days": "Asset Capital Depreciation (Age)"
+                          }[f.feature as string] || f.feature}
+                        </span>
                         <span className="font-bold text-rose-600">{f.impact_pct}%</span>
                       </div>
-                      <div className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
-                        <span><span className="font-semibold text-amber-600">Threshold:</span> {f.kb_threshold}</span>
-                        <span><span className="font-semibold text-emerald-600">Action:</span> {f.action}</span>
-                      </div>
+                      {f.kb_threshold && f.kb_threshold !== 'See OEM manual' && (
+                        <div className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+                          <span><span className="font-semibold text-amber-600">Threshold:</span> {f.kb_threshold}</span>
+                          <span><span className="font-semibold text-emerald-600">Action:</span> {f.action}</span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             ) : shapData.length > 0 ? (
               <div>
-                <CLabel text="Top SHAP Failure Drivers" />
+                <CLabel text="Top Failure Indicators" />
                 <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={200}>
                   <BarChart data={shapData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                     <XAxis type="number" tick={{ fontSize: 10 }} />
@@ -1317,7 +1335,7 @@ function ReportStep({
                       title="Select all"
                     />
                   </th>
-                  {["Asset", "Component", "Median RUL (days)", "Risk"].map((h) => (
+                  {["Asset", "Component", "Next Maintenance Day", "Risk"].map((h) => (
                     <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -1364,7 +1382,7 @@ function ReportStep({
         </Section>
 
         {/* ── S7: Recommendations ── */}
-        <Section icon={ShieldAlert} accent={P.emerald} title="7. Recommendations" subtitle="Data-driven prescriptive actions">
+        <Section icon={ShieldAlert} accent={P.emerald} title="7. Recommendations" subtitle="Business impact · Operational readiness · Compliance">
           {kb.recommendations ? (
             <div className="grid gap-4">
               {kb.recommendations.critical?.length > 0 && (

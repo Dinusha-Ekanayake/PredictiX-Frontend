@@ -159,11 +159,16 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
   const totalFailures7d = component_summary.reduce((s, c) => s + (c.at_risk_7d || 0), 0);
   const highestRiskComp = [...active.data].sort((a, b) => b.avgPct - a.avgPct)[0];
 
-  const tireRisk = component_summary.find(c => c.component.toLowerCase() === "tire")?.at_risk_7d || 0;
-  const batteryRisk = component_summary.find(c => c.component.toLowerCase() === "battery")?.at_risk_7d || 0;
-  const hydraulicRisk = component_summary.find(c => c.component.toLowerCase() === "hydraulic")?.at_risk_7d || 0;
-  const oilRisk = component_summary.find(c => c.component.toLowerCase() === "oil")?.at_risk_7d || 0;
-  const brakeRisk = component_summary.find(c => c.component.toLowerCase() === "brake")?.at_risk_7d || 0;
+  const getRisk = (comp: string) => {
+    const c = component_summary.find((x) => x.component.toLowerCase() === comp);
+    return active.key === "7d" ? c?.at_risk_7d || 0 : c?.at_risk_30d || 0;
+  };
+
+  const tireRisk = getRisk("tire");
+  const batteryRisk = getRisk("battery");
+  const hydraulicRisk = getRisk("hydraulic");
+  const oilRisk = getRisk("oil");
+  const brakeRisk = getRisk("brake");
 
   return (
     <Card className="rounded-2xl overflow-hidden border-teal-100/60 dark:border-teal-900/30 h-full flex flex-col p-0 gap-0">
@@ -279,7 +284,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right text-lg font-bold text-teal-500 dark:text-teal-400">{fmtMoney(expected_spend_7d)}</TableCell>
+                  <TableCell className="text-right text-lg font-bold text-teal-500 dark:text-teal-400">{fmtMoney(active.totalCost)}</TableCell>
                 </TableRow>
 
                 {/* Highest Risk Component */}
@@ -307,7 +312,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
                       </div>
                       <div>
                         <div className="font-semibold text-slate-900 dark:text-slate-100">Tire Component Risk</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤7d</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤{active.key}</div>
                       </div>
                     </div>
                   </TableCell>
@@ -323,7 +328,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
                       </div>
                       <div>
                         <div className="font-semibold text-slate-900 dark:text-slate-100">Battery Component Risk</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤7d</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤{active.key}</div>
                       </div>
                     </div>
                   </TableCell>
@@ -339,7 +344,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
                       </div>
                       <div>
                         <div className="font-semibold text-slate-900 dark:text-slate-100">Hydraulic Component Risk</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤7d</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤{active.key}</div>
                       </div>
                     </div>
                   </TableCell>
@@ -355,7 +360,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
                       </div>
                       <div>
                         <div className="font-semibold text-slate-900 dark:text-slate-100">Oil Component Risk</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤7d</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤{active.key}</div>
                       </div>
                     </div>
                   </TableCell>
@@ -371,7 +376,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
                       </div>
                       <div>
                         <div className="font-semibold text-slate-900 dark:text-slate-100">Brake Component Risk</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤7d</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">assets at risk ≤{active.key}</div>
                       </div>
                     </div>
                   </TableCell>
@@ -380,14 +385,6 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
               </TableBody>
             </Table>
           </div>
-
-          <p className="text-[11px] text-muted-foreground mt-4 leading-relaxed">
-            The Component Failure Risk chart dynamically filters your fleet data. For the {active.label} view, 
-            the average failure probability bars only factor in assets with an estimated Remaining Useful Life (RUL) of 
-            ≤ {active.key.replace("d", " days")}. This highly-targeted logic isolates true high-risk assets rather than 
-            diluting the percentages with healthy vehicles.
-          </p>
-
         </div>
       </CardContent>
     </Card>

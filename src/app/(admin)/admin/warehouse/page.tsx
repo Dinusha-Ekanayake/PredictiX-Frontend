@@ -13,9 +13,7 @@ import { MonthlyTicketVolumeCard } from "@/components/admin/warehouse/WarehouseT
 import WarehouseDepartmentsOverview, {
   type DepartmentOverviewRow,
 } from "@/components/admin/warehouse/WarehouseDepartmentsOverview";
-import WarehouseTicketsByDepartment, {
-  type TicketsByDepartmentRow,
-} from "@/components/admin/warehouse/WarehouseTicketsByDepartment";
+
 import { getMaintenanceSchedule } from "@/lib/warehouseService";
 import { getAccessToken } from "@/lib/authService";
 
@@ -55,12 +53,10 @@ export default function WarehousePage() {
   async function fetchData() {
     setRefreshing(true);
     try {
-      // Fetch summary, maintenance schedule, and departments overview in parallel
-      const [summaryRes, scheduleData, deptRes, survivalRes] = await Promise.allSettled([
+      // Step 1: Fast queries
+      const [summaryRes, deptRes] = await Promise.allSettled([
         authedGet("/warehouse-dashboard/summary"),
-        getMaintenanceSchedule(),
         authedGet("/warehouse-dashboard/departments-overview"),
-        getSurvivalAnalysis(),
       ]);
 
       if (summaryRes.status === "fulfilled" && summaryRes.value.ok) {
@@ -71,12 +67,6 @@ export default function WarehousePage() {
         }
         setData(null);
       }
-
-      setSurvivalData(survivalRes.status === "fulfilled" ? survivalRes.value : null);
-
-      setMaintenanceSchedule(
-        scheduleData.status === "fulfilled" ? scheduleData.value : []
-      );
 
       if (deptRes.status === "fulfilled" && deptRes.value.ok) {
         const deptJson = await deptRes.value.json();
@@ -89,6 +79,20 @@ export default function WarehousePage() {
         setDepartments([]);
         setTicketsByDepartment([]);
       }
+      
+      // Instantly unblock UI so top half loads
+      setInitialLoad(false);
+
+      // Step 2: Heavy queries
+      const [scheduleData, survivalRes] = await Promise.allSettled([
+        getMaintenanceSchedule(),
+        getSurvivalAnalysis(),
+      ]);
+
+      setSurvivalData(survivalRes.status === "fulfilled" ? survivalRes.value : null);
+      setMaintenanceSchedule(
+        scheduleData.status === "fulfilled" ? scheduleData.value : []
+      );
     } finally {
       setRefreshing(false);
       setInitialLoad(false);
@@ -195,16 +199,15 @@ export default function WarehousePage() {
       {/* ── Monthly Ticket Volume (Full Width) ── */}
       <MonthlyTicketVolumeCard data={data?.monthlyTicketVolume} />
 
-      {/* ── Component Survival Risk & Maintenance Schedule ── */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <WarehouseSurvivalAnalysis data={survivalData} isLoading={refreshing && !survivalData} />
-        <WarehouseMaintenanceSchedule data={maintenanceSchedule} />
+      {/* ── Departments Overview ── */}
+      <div className="w-full">
+        <WarehouseDepartmentsOverview departments={departments} isLoading={refreshing && departments.length === 0} />
       </div>
 
-      {/* ── Departments Overview + Ticket Load by Department ── */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <WarehouseDepartmentsOverview departments={departments} isLoading={refreshing && departments.length === 0} />
-        <WarehouseTicketsByDepartment data={ticketsByDepartment} isLoading={refreshing && ticketsByDepartment.length === 0} />
+      {/* ── Component Survival Risk & Maintenance Schedule ── */}
+      <div className="grid gap-4 lg:grid-cols-2 mt-6">
+        <WarehouseSurvivalAnalysis data={survivalData} isLoading={refreshing && !survivalData} />
+        <WarehouseMaintenanceSchedule data={maintenanceSchedule} isLoading={refreshing && maintenanceSchedule.length === 0} />
       </div>
 
       <div className="h-20" />

@@ -9,15 +9,13 @@ import {
   ExternalLink,
   Loader2,
   MessageCircle,
-  Mic,
-  MicOff,
   SendHorizontal,
   Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn, generateUUID } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -195,15 +193,8 @@ export default function FloatingChatbot() {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSending, setIsSending] = React.useState(false);
   const [draft, setDraft] = React.useState("");
-  const [interimDraft, setInterimDraft] = React.useState("");
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
-
-  // Speech Recognition
-  const [isListening, setIsListening] = React.useState(false);
-  const isListeningRef = React.useRef(false);
-  const [speechSupported, setSpeechSupported] = React.useState(true);
-  const recognitionRef = React.useRef<any>(null);
 
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const messageEndRef = React.useRef<HTMLDivElement | null>(null);
@@ -261,7 +252,7 @@ export default function FloatingChatbot() {
       setMessages((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: "assistant",
           text: `🚨 **Critical Alert!**\n\n${payload.title}\n${payload.message}`,
           createdAt: Date.now(),
@@ -272,84 +263,6 @@ export default function FloatingChatbot() {
     window.addEventListener("proactive_alert", handleProactiveAlert);
     return () => window.removeEventListener("proactive_alert", handleProactiveAlert);
   }, []);
-
-  // Speech Recognition Setup
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        
-        recognition.onresult = (event: any) => {
-          let finalTranscript = "";
-          let interimTranscript = "";
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            } else {
-              interimTranscript += event.results[i][0].transcript;
-            }
-          }
-          if (finalTranscript) {
-            setDraft((prev) => (prev ? prev + " " + finalTranscript.trim() : finalTranscript.trim()));
-          }
-          setInterimDraft(interimTranscript);
-        };
-
-        recognition.onerror = (event: any) => {
-          if (event.error !== "no-speech" && event.error !== "network") {
-            console.error("Speech recognition error", event.error);
-            setIsListening(false);
-            isListeningRef.current = false;
-          } else if (event.error === "network") {
-            console.warn("Speech recognition network error, will retry...");
-          }
-        };
-
-        recognition.onend = () => {
-          if (isListeningRef.current) {
-            setTimeout(() => {
-              if (isListeningRef.current) {
-                try {
-                  recognition.start();
-                } catch (e) {
-                  console.error("Failed to restart speech recognition", e);
-                  setIsListening(false);
-                  isListeningRef.current = false;
-                }
-              }
-            }, 300);
-          } else {
-            setIsListening(false);
-            setInterimDraft("");
-          }
-        };
-
-        recognitionRef.current = recognition;
-      } else {
-        setSpeechSupported(false);
-      }
-    }
-  }, []);
-
-  const toggleListening = () => {
-    if (!recognitionRef.current) return;
-    if (isListeningRef.current) {
-      isListeningRef.current = false;
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      isListeningRef.current = true;
-      try {
-        recognitionRef.current.start();
-      } catch (e) {
-        console.warn("Already started");
-      }
-      setIsListening(true);
-    }
-  };
 
   // Auto-scroll on new messages
   React.useEffect(() => {
@@ -365,7 +278,7 @@ export default function FloatingChatbot() {
 
     setIsSending(true);
     const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       role: "user",
       text,
       createdAt: Date.now(),
@@ -429,7 +342,7 @@ export default function FloatingChatbot() {
       setMessages((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: "assistant",
           text: replyText || "I'm sorry, I couldn't generate a response.",
           createdAt: Date.now(),
@@ -459,7 +372,7 @@ export default function FloatingChatbot() {
       setMessages((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: "assistant",
           text: friendlyMessage,
           createdAt: Date.now(),
@@ -673,46 +586,14 @@ export default function FloatingChatbot() {
               <div className="flex items-center gap-2">
                 <Input
                   ref={inputRef}
-                  value={draft + (draft && interimDraft ? " " : "") + interimDraft}
-                  onChange={(e) => {
-                    setDraft(e.target.value);
-                    setInterimDraft("");
-                  }}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
                   placeholder="Ask a question..."
                   aria-label="Chatbot message input"
                   className="h-10 text-sm"
                   disabled={isSending}
                   maxLength={500}
                 />
-                
-                {speechSupported && (
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="outline"
-                    aria-label="Toggle voice input"
-                    onClick={toggleListening}
-                    disabled={isSending}
-                    className={cn(
-                      "shrink-0 transition-all duration-300 relative h-10 w-10",
-                      isListening ? "border-violet-500 bg-violet-50 text-violet-600 w-[72px] hover:bg-violet-100 dark:bg-violet-900/30 dark:text-violet-400" : ""
-                    )}
-                  >
-                    {isListening ? (
-                      <div className="flex items-center gap-1.5 w-full justify-center">
-                        <Mic className="size-5" />
-                        <div className="flex items-center gap-0.5 h-4">
-                          <span className="w-0.5 h-full bg-current animate-[pulse_0.75s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '0ms' }} />
-                          <span className="w-0.5 h-2/3 bg-current animate-[pulse_0.6s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '150ms' }} />
-                          <span className="w-0.5 h-full bg-current animate-[pulse_0.9s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '300ms' }} />
-                          <span className="w-0.5 h-1/2 bg-current animate-[pulse_0.5s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '450ms' }} />
-                        </div>
-                      </div>
-                    ) : (
-                      <MicOff className="size-5 text-muted-foreground" />
-                    )}
-                  </Button>
-                )}
 
                 <Button
                   type="submit"

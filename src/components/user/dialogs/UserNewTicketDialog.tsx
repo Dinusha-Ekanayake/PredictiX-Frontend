@@ -24,6 +24,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "@/lib/customToast";
+import { generateUUID } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -246,7 +247,7 @@ export default function UserNewTicketDialog({
 
       if (file && supabase) {
         const fileExt = file.name.split(".").pop();
-        const fileName = `${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+        const fileName = `${Date.now()}-${generateUUID()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from("ticket-attachments")
           .upload(fileName, file);

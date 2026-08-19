@@ -15,6 +15,7 @@
 import * as React from "react";
 import { AlertCircle, Bot, Loader2, Plus, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "@/lib/customToast";
+import { generateUUID } from "@/lib/utils";
 
 import {
   Dialog,
@@ -233,7 +234,7 @@ export default function NewTicketDialog({
 
       if (file && supabase) {
         const fileExt = file.name.split(".").pop();
-        const fileName = `${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+        const fileName = `${Date.now()}-${generateUUID()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from("ticket-attachments")
           .upload(fileName, file);

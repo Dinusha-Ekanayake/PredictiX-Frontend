@@ -39,7 +39,7 @@ import { getAssetDetail } from "@/components/admin/assets/assetService";
 import type { AssetDetail } from "@/components/admin/assets/types";
 import type { UserItem } from "@/lib/userService";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn, generateUUID } from "@/lib/utils";
 
 type Props = {
   open: boolean;
@@ -227,7 +227,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
       
       // Append a new status history log dynamically so the Audit Log updates instantly!
       const newLog = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         ticket_id: ticket.id,
         old_status: prev,
         new_status: newStatus,
@@ -315,7 +315,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     setUploadingImage(true);
     try {
       const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+      const fileName = `${Date.now()}-${generateUUID()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
         .from("ticket-attachments")
         .upload(fileName, file);

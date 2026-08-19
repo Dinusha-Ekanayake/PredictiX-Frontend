@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn, generateUUID } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -261,7 +261,7 @@ export default function FloatingChatbot() {
       setMessages((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: "assistant",
           text: `🚨 **Critical Alert!**\n\n${payload.title}\n${payload.message}`,
           createdAt: Date.now(),
@@ -365,7 +365,7 @@ export default function FloatingChatbot() {
 
     setIsSending(true);
     const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       role: "user",
       text,
       createdAt: Date.now(),
@@ -429,7 +429,7 @@ export default function FloatingChatbot() {
       setMessages((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: "assistant",
           text: replyText || "I'm sorry, I couldn't generate a response.",
           createdAt: Date.now(),
@@ -459,7 +459,7 @@ export default function FloatingChatbot() {
       setMessages((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: "assistant",
           text: friendlyMessage,
           createdAt: Date.now(),

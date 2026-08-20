@@ -170,8 +170,8 @@ export default function TicketDetailsCharts({
   const CustomTimelineTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="text-xs font-semibold text-slate-400 mb-1.5">State Durations:</p>
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="text-xs font-semibold text-muted-foreground mb-1.5">State Durations:</p>
           {payload.map((p: any, idx: number) => {
             if (p.value === 0) return null;
             return (
@@ -193,14 +193,14 @@ export default function TicketDetailsCharts({
       const dateStr = new Date(item.createdDate).toLocaleDateString();
       const isCurrent = item.id === ticketId;
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md max-w-xs">
-          <p className="text-sm font-bold text-slate-200 truncate flex items-center gap-1.5">
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md max-w-xs">
+          <p className="text-sm font-bold text-foreground truncate flex items-center gap-1.5">
             {isCurrent && <span className="h-2 w-2 rounded-full bg-violet-500 animate-pulse" />}
             {item.title}
           </p>
-          <p className="text-xs text-slate-400 mt-1">Date Created: <span className="text-white">{dateStr}</span></p>
-          <p className="text-xs text-slate-400">Priority: <span className="font-semibold" style={{ color: item.fill }}>{item.priority}</span></p>
-          <p className="text-xs text-slate-400">Resolution Time: <span className="font-semibold text-white">{item.resolutionTime} days</span></p>
+          <p className="text-xs text-muted-foreground mt-1">Date Created: <span className="text-foreground">{dateStr}</span></p>
+          <p className="text-xs text-muted-foreground">Priority: <span className="font-semibold" style={{ color: item.fill }}>{item.priority}</span></p>
+          <p className="text-xs text-muted-foreground">Resolution Time: <span className="font-semibold text-foreground">{item.resolutionTime} days</span></p>
           {isCurrent && <p className="text-[10px] text-violet-400 font-semibold mt-1">★ Current Ticket</p>}
         </div>
       );
@@ -232,7 +232,7 @@ export default function TicketDetailsCharts({
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 15, right: 15, bottom: 5, left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   type="number"
                   dataKey="createdDate"

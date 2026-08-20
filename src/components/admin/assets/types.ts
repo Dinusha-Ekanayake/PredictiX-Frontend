@@ -240,6 +240,26 @@ export type AssetSurvivalResponse = {
 };
 
 /**
+ * One month of recorded operation. Any measure may be null when that month's
+ * reading did not carry it, so a chart must skip a null rather than plot zero.
+ */
+export type UsagePoint = {
+  period: string;
+  operating_hours: number | null;
+  idle_hours: number | null;
+  distance_km: number | null;
+  days_since_last_service: number | null;
+  downtime_hours_90d: number | null;
+};
+
+/** Recorded operating history for one asset, oldest point first. */
+export type AssetUsageHistory = {
+  asset_id: string;
+  months: number;
+  points: UsagePoint[];
+};
+
+/**
  * Everything the asset detail panel shows. The service layer fetches it from
  * several endpoints so the component only makes one call.
  */
@@ -247,6 +267,7 @@ export type AssetDetail = {
   asset: Asset;
   prediction: BatchPrediction | null;
   componentRul: AssetSurvivalResponse | null;
+  usageHistory: AssetUsageHistory | null;
   maintenanceEvents: MaintenanceEvent[];
   tickets: Ticket[];
   assignments: AssetAssignment[];

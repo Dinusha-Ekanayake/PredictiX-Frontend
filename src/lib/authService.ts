@@ -3,6 +3,8 @@
  * Handles login, token storage, and session management.
  */
 
+import { invalidateMyProfile } from "@/lib/api/userProfileApi";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -43,7 +45,7 @@ export interface StoredUser {
 
 // ─── API calls ────────────────────────────────────────────────────────────────
 
-/** Step 1 — email + password only. Role is detected by the backend. */
+/** Step 1, email + password only. Role is detected by the backend. */
 export async function login(email: string, password: string): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
@@ -59,7 +61,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
   return response.json();
 }
 
-/** Step 2 (super_admin only) — exchange selection_token + warehouse_id for a full JWT. */
+/** Step 2 (super_admin only), exchange selection_token + warehouse_id for a full JWT. */
 export async function selectWarehouse(
   selectionToken: string,
   warehouseId: string,
@@ -84,12 +86,12 @@ export async function selectWarehouse(
  * inference call doesn't pay the ~20-60s cold-start penalty.
  *
  * No auth required (there's no session yet when this fires from the login
- * page) and callers never await the result — a slow/failed ping must never
+ * page) and callers never await the result, a slow/failed ping must never
  * block or affect the login flow.
  */
 export function warmupInferenceSpace(): void {
   fetch(`${API_BASE_URL}/warmup/inference-space`, { method: "POST" }).catch(() => {
-    // Intentionally silent — warmup is best-effort and must never surface an error.
+    // Intentionally silent, warmup is best-effort and must never surface an error.
   });
 }
 
@@ -130,7 +132,7 @@ export function storeAuthSession(data: LoginResponse): void {
     localStorage.setItem("predictix.avatar_url", data.avatar_url);
   }
 
-  // Any snapshot still on this device belongs to the previous session — a
+  // Any snapshot still on this device belongs to the previous session, a
   // different person, or the same super admin on a different warehouse. Drop it
   // so the chatbot cannot answer the new session from the old one's data. The
   // pages that own these caches repopulate them on their next load.
@@ -178,10 +180,10 @@ const AUTH_STORAGE_KEYS = [
  * These are not decoration: FloatingChatbot reads them and sends them to the
  * agent as `frontend_context`, so whatever is here becomes the material the
  * assistant answers from. They must be cleared whenever the viewer or the
- * viewed warehouse changes — previously logout() cleared only the identity keys
- * above, so on a shared machine the next person to sign in got the previous
- * admin's figures in their chatbot context, and a super admin switching sites
- * kept answering from the warehouse they had just left.
+ * viewed warehouse changes. Clearing only the identity keys above would leave
+ * them behind, so on a shared machine the next person to sign in would get the
+ * previous admin's figures in their chatbot context, and a super admin
+ * switching sites would keep answering from the warehouse they just left.
  */
 export const CACHED_DATA_STORAGE_KEYS = [
   "predictix.cached_dashboard_data",
@@ -200,6 +202,10 @@ export function logout(): void {
   if (typeof window === "undefined") return;
   for (const key of AUTH_STORAGE_KEYS) localStorage.removeItem(key);
   clearCachedWarehouseData();
+  // The profile cache lives in module memory, not localStorage, so clearing
+  // storage alone would leave the previous account's name and role readable by
+  // whoever signs in next.
+  invalidateMyProfile();
 }
 
 /** True if a JWT is present in localStorage. */

@@ -32,11 +32,11 @@ import NotificationBell from "@/components/navigation/NotificationBell";
 import { useUser } from "@/hooks/useAuth";
 import { fetchMyProfile } from "@/lib/api/userProfileApi";
 
-// Real stored/API role values are lowercase ("admin" | "super_admin" |
+// Stored and API role values are lowercase ("admin" | "super_admin" |
 // "user"); ProfileDropdownUser expects the uppercase display variants.
-// A blind `as "ADMIN" | "USER"` cast previously dropped SUPER_ADMIN
-// silently — any super_admin's role string became a TypeScript lie that
-// happened to fall through to "User" everywhere ProfileDropdown checked it.
+// The mapping is explicit rather than a cast: a cast to "ADMIN" | "USER"
+// admits no SUPER_ADMIN, so that role would type-check while falling through
+// to "User" everywhere ProfileDropdown reads it.
 function normalizeRole(raw: string | undefined | null): "ADMIN" | "SUPER_ADMIN" | "USER" {
   const upper = (raw || "").toUpperCase();
   if (upper === "SUPER_ADMIN") return "SUPER_ADMIN";

@@ -416,7 +416,7 @@ export default function AdminUsersPage() {
           category: a.category ?? a.asset_type ?? "General",
           location: a.location,
           // Null means the asset has no completed prediction. Math.round(null)
-          // is 0, which would render as "0% health" — a worse lie than the
+          // is 0, which would render as "0% health", a worse lie than the
           // missing value it stands in for.
           healthPercent: a.healthPercent != null ? Math.round(a.healthPercent) : null,
         }))
@@ -577,7 +577,7 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      {/* Users table — click any row to open View Details */}
+      {/* Users table, click any row to open View Details */}
       <Card className="rounded-2xl">
         <CardContent className="p-0">
           <div className="overflow-x-auto">

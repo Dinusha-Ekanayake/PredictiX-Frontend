@@ -224,7 +224,7 @@ export default function AssetsAnalytics({
           <CardContent className="space-y-2">
             {atRisk.length === 0 ? (
               <div className="flex flex-col items-center py-6 gap-2">
-                <ShieldAlert className="h-7 w-7 text-emerald-400" />
+                <ShieldAlert className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
                 <p className="text-xs text-muted-foreground">No critical or poor assets</p>
               </div>
             ) : (

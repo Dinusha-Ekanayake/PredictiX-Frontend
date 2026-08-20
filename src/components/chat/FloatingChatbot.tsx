@@ -530,7 +530,7 @@ export default function FloatingChatbot() {
                           <RecordSummaryWidget payload={message.widgetData} />
                         )}
 
-                        {/* Action Buttons — rendered as clickable nav buttons */}
+                        {/* Action Buttons, rendered as clickable nav buttons */}
                         {message.role === "assistant" &&
                           message.actionButtons &&
                           message.actionButtons.length > 0 && (

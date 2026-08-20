@@ -127,7 +127,7 @@ export interface TicketPreviewResponse {
   predicted_priority: string | null;
   predicted_category: string | null;
   ticket_summary: string | null;
-  /** Per-model error messages — populated when a prediction failed. */
+  /** Per-model error messages, populated when a prediction failed. */
   errors: Record<string, string>;
 }
 

@@ -213,8 +213,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   const CustomBarTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="mb-1 text-sm font-semibold text-slate-200">{label}</p>
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="mb-1 text-sm font-semibold text-foreground">{label}</p>
           <p className="text-sm font-medium" style={{ color: payload[0].payload.fill }}>
             Number of Tickets : {payload[0].value}
           </p>
@@ -228,8 +228,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   const CustomPieTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
             <span
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: payload[0].payload.fill }}
@@ -247,8 +247,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="mb-1.5 text-sm font-semibold text-slate-200">{label}</p>
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="mb-1.5 text-sm font-semibold text-foreground">{label}</p>
           <p className="text-xs font-medium text-rose-500">High Priority: {data.High}</p>
           <p className="text-xs font-medium text-amber-500">Medium Priority: {data.Medium}</p>
           <p className="text-xs font-medium text-emerald-500">Low Priority: {data.Low}</p>
@@ -266,8 +266,8 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     if (active && payload && payload.length) {
       const item = payload[0].payload;
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="text-sm font-bold text-slate-200">{item.category} &bull; {item.status}</p>
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="text-sm font-bold text-foreground">{item.category} &bull; {item.status}</p>
           <p className="text-xs text-slate-400 mt-1">Ticket Count: <span className="font-semibold text-white">{item.count} tickets</span></p>
         </div>
       );
@@ -278,11 +278,15 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
   // Custom shape to render grid counts as centered badges with active status gradients and hover effects
   const CustomGridNode = (props: any) => {
     const { cx, cy, payload } = props;
+    // Hooks run before any early return: React matches them by call order, so
+    // a node that bails out on a missing coordinate would shift every later
+    // node's state by one.
+    const [hovered, setHovered] = React.useState(false);
+
     if (!cx || !cy) return null;
 
     const count = payload.count || 0;
     const xVal = payload.x;
-    const [hovered, setHovered] = React.useState(false);
 
     let startColor = "#475569";
     let endColor = "#1e293b";
@@ -511,7 +515,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                   <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.4" />
                 </filter>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={true} horizontal={true} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={true} horizontal={true} />
               <XAxis
                 dataKey="name"
                 stroke="#737373"
@@ -526,7 +530,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
                 axisLine={false}
                 tickFormatter={(val) => Math.floor(val).toString()}
               />
-              <Tooltip cursor={{ fill: '#262626', opacity: 0.5 }} content={<CustomBarTooltip />} />
+              <Tooltip cursor={{ fill: 'currentColor', opacity: 0.08 }} content={<CustomBarTooltip />} />
               <Bar dataKey="count" shape={<Custom3DBar />}>
                 {categoryChartData.map((entry, index) => {
                   let cellFill = "url(#cyanGrad)";
@@ -634,27 +638,27 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
         <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 20, right: 20, bottom: 5, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
 
               {/* Column 1 backgrounds: Open (Red risk profile) */}
-              <ReferenceArea x1={0.5} x2={1.5} y1={0.5} y2={1.5} fill="#fb0505ff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={0.5} x2={1.5} y1={1.5} y2={2.5} fill="#f60c0cff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={0.5} x2={1.5} y1={2.5} y2={3.5} fill="#f50a0aff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={0.5} x2={1.5} y1={0.5} y2={1.5} fill="#fb0505ff" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
+              <ReferenceArea x1={0.5} x2={1.5} y1={1.5} y2={2.5} fill="#f60c0cff" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
+              <ReferenceArea x1={0.5} x2={1.5} y1={2.5} y2={3.5} fill="#f50a0aff" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
 
               {/* Column 2 backgrounds: In Progress (Orange risk profile) */}
-              <ReferenceArea x1={1.5} x2={2.5} y1={0.5} y2={1.5} fill="#f97316" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={1.5} x2={2.5} y1={1.5} y2={2.5} fill="#f97316" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={1.5} x2={2.5} y1={2.5} y2={3.5} fill="#f97316" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={1.5} x2={2.5} y1={0.5} y2={1.5} fill="#f97316" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
+              <ReferenceArea x1={1.5} x2={2.5} y1={1.5} y2={2.5} fill="#f97316" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
+              <ReferenceArea x1={1.5} x2={2.5} y1={2.5} y2={3.5} fill="#f97316" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
 
               {/* Column 3 backgrounds: Resolved (Yellow risk profile) */}
-              <ReferenceArea x1={2.5} x2={3.5} y1={0.5} y2={1.5} fill="#f5f10bff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={2.5} x2={3.5} y1={1.5} y2={2.5} fill="#eab308" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={2.5} x2={3.5} y1={2.5} y2={3.5} fill="#eab308" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={2.5} x2={3.5} y1={0.5} y2={1.5} fill="#f5f10bff" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
+              <ReferenceArea x1={2.5} x2={3.5} y1={1.5} y2={2.5} fill="#eab308" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
+              <ReferenceArea x1={2.5} x2={3.5} y1={2.5} y2={3.5} fill="#eab308" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
 
               {/* Column 4 backgrounds: Closed (Green risk profile) */}
-              <ReferenceArea x1={3.5} x2={4.5} y1={0.5} y2={1.5} fill="#07f00fff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={3.5} x2={4.5} y1={1.5} y2={2.5} fill="#07f70bff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
-              <ReferenceArea x1={3.5} x2={4.5} y1={2.5} y2={3.5} fill="#13f407ff" fillOpacity={0.22} stroke="#262626" strokeWidth={1} />
+              <ReferenceArea x1={3.5} x2={4.5} y1={0.5} y2={1.5} fill="#07f00fff" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
+              <ReferenceArea x1={3.5} x2={4.5} y1={1.5} y2={2.5} fill="#07f70bff" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
+              <ReferenceArea x1={3.5} x2={4.5} y1={2.5} y2={3.5} fill="#13f407ff" fillOpacity={0.22} stroke="var(--border)" strokeWidth={1} />
 
               <XAxis
                 type="number"

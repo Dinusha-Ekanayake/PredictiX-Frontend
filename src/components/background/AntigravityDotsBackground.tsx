@@ -20,10 +20,10 @@ type Props = {
   /** radius around cursor that wakes up the dots */
   influenceRadius?: number;
 
-  /** how many dots are visible when cursor is FAR (0.02–0.12 is typical) */
+  /** how many dots are visible when cursor is FAR (0.02, 0.12 is typical) */
   baseVisibility?: number;
 
-  /** how many blue accent dots (0–0.35). Higher = more blue pop near cursor */
+  /** how many blue accent dots (0, 0.35). Higher = more blue pop near cursor */
   blueBoost?: number;
 };
 
@@ -288,10 +288,10 @@ export default function AntigravityDotsBackground({
 //   /** radius around cursor that wakes up the dots */
 //   influenceRadius?: number;
 
-//   /** how many dots are visible when cursor is FAR (0.02–0.12 is typical) */
+//   /** how many dots are visible when cursor is FAR (0.02, 0.12 is typical) */
 //   baseVisibility?: number;
 
-//   /** how many blue accent dots (0–0.35). Higher = more blue pop near cursor */
+//   /** how many blue accent dots (0, 0.35). Higher = more blue pop near cursor */
 //   blueBoost?: number;
 // };
 

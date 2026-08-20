@@ -550,15 +550,15 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
               {/* Top Risk Factors */}
               {reportData.top_explanations && Object.keys(reportData.top_explanations).length > 0 && (
                 <Section title="4. Top Risk Factors" icon={AlertTriangle}>
-                  <div className="rounded-xl border border-white/8 bg-white/4 p-4 space-y-3">
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="text-[10px] font-semibold text-white/40 uppercase tracking-widest">Top Risk Factors (SHAP)</div>
-                      <div className="flex items-center gap-3 text-[10px] text-white/40">
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Top Risk Factors (SHAP)</div>
+                      <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <TrendingDown className="h-3 w-3 text-red-400" /> Sooner
+                          <TrendingDown className="h-3 w-3 text-red-600 dark:text-red-400" /> Sooner
                         </span>
                         <span className="flex items-center gap-1">
-                          <TrendingUp className="h-3 w-3 text-emerald-400" /> Later
+                          <TrendingUp className="h-3 w-3 text-emerald-600 dark:text-emerald-400" /> Later
                         </span>
                       </div>
                     </div>
@@ -572,18 +572,18 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
                           const label = feature.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
                           const isUrgent = raw < 0;
                           const barColor = isUrgent ? "bg-red-500/80" : "bg-emerald-500/80";
-                          const textColor = isUrgent ? "text-red-400" : "text-emerald-400";
+                          const textColor = isUrgent ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400";
                           const DirIcon = isUrgent ? TrendingDown : TrendingUp;
                           return (
                             <div key={i} className="space-y-0.5">
                               <div className="flex justify-between items-center text-[11px]">
-                                <span className="text-white/70 font-medium truncate">{label}</span>
+                                <span className="text-foreground font-medium truncate">{label}</span>
                                 <span className={cn("flex items-center gap-1 text-xs font-mono shrink-0 ml-2", textColor)}>
                                   <DirIcon className="h-3 w-3" />
                                   {raw > 0 ? "+" : ""}{raw.toFixed(2)}d
                                 </span>
                               </div>
-                              <div className="h-2 rounded-full bg-white/8 overflow-hidden">
+                              <div className="h-2 rounded-full bg-muted overflow-hidden">
                                 <div className={cn("h-full rounded-full transition-all duration-700", barColor)} style={{ width: `${pct}%` }} />
                               </div>
                             </div>
@@ -600,18 +600,18 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
                 <Section title="5. Component Survival Analysis" icon={Activity}>
                   <div className="space-y-4">
                     <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-                      <p className="text-sm font-medium text-red-400">Critical Risk: {reportData.survival.soonest_component.charAt(0).toUpperCase() + reportData.survival.soonest_component.slice(1)}</p>
-                      <p className="text-[12px] text-white/50 mt-1">Predicted median RUL: {reportData.survival.soonest_median_days} days.</p>
+                      <p className="text-sm font-medium text-red-600 dark:text-red-400">Critical Risk: {reportData.survival.soonest_component.charAt(0).toUpperCase() + reportData.survival.soonest_component.slice(1)}</p>
+                      <p className="text-[12px] text-muted-foreground mt-1">Predicted median RUL: {reportData.survival.soonest_median_days} days.</p>
                     </div>
                     <div className="space-y-4">
-                      <p className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">7-Day & 30-Day Failure Risk</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">7-Day & 30-Day Failure Risk</p>
                       {reportData.survival.components.sort((a,b) => (b.fail_prob_30d||0)-(a.fail_prob_30d||0)).map(c => (
                         <div key={c.component} className="space-y-2">
-                          <div className="flex justify-between text-xs text-white/70">
+                          <div className="flex justify-between text-xs text-foreground">
                             <span className="capitalize">{c.component}</span>
                             <span>{c.fail_prob_30d != null ? Math.round(c.fail_prob_30d * 100) : 0}% (30d)</span>
                           </div>
-                          <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden relative">
+                          <div className="h-2 w-full rounded-full bg-muted overflow-hidden relative">
                             <div className="absolute top-0 left-0 h-full bg-teal-500/30" style={{ width: `${c.fail_prob_30d != null ? c.fail_prob_30d * 100 : 0}%` }} />
                             <div className="absolute top-0 left-0 h-full bg-teal-500" style={{ width: `${c.fail_prob_7d != null ? c.fail_prob_7d * 100 : 0}%` }} />
                           </div>
@@ -625,16 +625,16 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
               {/* Cost Estimate */}
               <Section title="6. Maintenance Cost Estimate" icon={DollarSign}>
                 {reportData.estimated_cost == null ? (
-                  <div className="rounded-xl border border-white/8 bg-white/4 p-4 space-y-2">
-                    <div className="text-[10px] font-semibold text-white/40 uppercase tracking-widest">Maintenance Cost Estimate</div>
-                    <div className="text-sm font-medium text-white/70">Estimate unavailable</div>
-                    <div className="text-[11px] text-white/40 leading-relaxed">
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-2">
+                    <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Maintenance Cost Estimate</div>
+                    <div className="text-sm font-medium text-foreground">Estimate unavailable</div>
+                    <div className="text-[11px] text-muted-foreground leading-relaxed">
                       The cost estimation model could not score this asset. No approximate
                       figure is shown in its place — retry after the next prediction run.
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-white/8 bg-white/4 p-4 space-y-3">
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-3">
                     <div className="space-y-3">
                       <div className="text-3xl font-bold tabular-nums">
                         LKR {reportData.estimated_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -649,13 +649,13 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
                           const pct = Math.min(100, Math.round((Number(value) / max) * 100));
                           return (
                             <div key={label} className="space-y-0.5">
-                              <div className="flex justify-between text-[11px] text-white/70">
+                              <div className="flex justify-between text-[11px] text-foreground">
                                 <span>{label}</span>
                                 <span className="font-mono font-medium">
                                   LKR {value != null ? Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}
                                 </span>
                               </div>
-                              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                                 <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
                               </div>
                             </div>

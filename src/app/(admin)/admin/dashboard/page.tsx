@@ -45,8 +45,7 @@ const STA: Record<TicketStatus, string> = {
 };
 
 // 5 health bands (Excellent..Critical) + a neutral gray for the "No Data"
-// band (assets with no completed prediction yet) appended by the backend —
-// keep it visually distinct from every real band, not a wrapped-around reuse.
+// band (assets with no completed prediction yet) appended by the backend, // keep it visually distinct from every real band, not a wrapped-around reuse.
 const DIST_COLORS = ["#10b981", "#6366f1", "#f59e0b", "#f97316", "#ef4444", "#94a3b8"];
 
 const INSIGHT_STYLE: Record<InsightTone, { icon: React.ElementType; color: string; bg: string }> = {
@@ -233,7 +232,7 @@ export default function AdminDashboardPage() {
     // No time horizon is applied, so the sub-label states the threshold rather
     // than a window.
     { label: "Predicted Failures", value: k ? (hasPredictions ? String(k.predictedFailures) : "—") : "—", sub: hasPredictions ? "≥ 50% failure probability" : "No predictions yet", icon: Brain, iconBg: "bg-sky-100 dark:bg-sky-500/15", iconColor: "text-sky-600 dark:text-sky-400", accent: "text-sky-600 dark:text-sky-400" },
-    // Sum of the current per-asset cost estimate across the fleet — not a
+    // Sum of the current per-asset cost estimate across the fleet, not a
     // rolling 30-day figure (pdm_batch_predictions holds one current
     // estimate per asset, not a time-bounded window), so the label no
     // longer claims "30 days".
@@ -254,7 +253,7 @@ export default function AdminDashboardPage() {
   );
   const dist = data?.healthDistribution ?? [];
   // The backend always returns the 5 fixed bands (Excellent..Critical) even
-  // with zero predictions, each at count: 0 — so dist.length is never 0 for
+  // with zero predictions, each at count: 0, so dist.length is never 0 for
   // a brand-new warehouse. distTotalRaw (before the `|| 1` div-by-zero
   // guard) is what actually distinguishes "no data" from "data, all zero".
   const distTotalRaw = dist.reduce((s, d) => s + d.count, 0);
@@ -561,7 +560,7 @@ export default function AdminDashboardPage() {
                   variant is an all-time total. The label reflects which is shown. */}
               <SectionSub>{downtimeByMonth ? "Planned vs unplanned hours — last 6 months" : "Planned vs unplanned hours — all time"}</SectionSub>
               {/* Height sized for 6 categories at ~35px/row so every YAxis tick has
-                  room to render — Recharts silently drops category labels that
+                  room to render. Recharts silently drops category labels that
                   don't fit rather than shrinking them, which was dropping every
                   other month at the previous, tighter height. */}
               <div className="mt-3" style={{ height: 230, minHeight: 230 }}>
@@ -573,7 +572,7 @@ export default function AdminDashboardPage() {
                         non-zero bar to a visible pixel size, and the value
                         labels make the exact hours readable regardless of how
                         short the bar itself is. (The old note here claimed
-                        planned always dwarfs unplanned — that was an artefact
+                        planned always dwarfs unplanned, that was an artefact
                         of planned being computed as a constant 0.) */}
                     <BarChart data={downtime} layout="vertical" margin={{ top: 0, right: 28, left: 36, bottom: 0 }} barGap={3}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} horizontal={false} />
@@ -708,12 +707,12 @@ export default function AdminDashboardPage() {
         </Card>
 
         {/* ══ Operational summary banner ════════════════════════════════════ */}
-        {/* Deliberately not called "AI ..." — the backend deterministically
+        {/* Deliberately not called "AI ...", the backend deterministically
             builds this from real KPI data (see admin_dashboard.py), it never
             calls an LLM for it. aiSummaryIsGenerated is kept in the API
             contract as a forward-compat hook (a cheap daily-batch real-AI
             upgrade is a known possible follow-up), but it's permanently
-            false today, so there's nothing to branch on here — showing a
+            false today, so there's nothing to branch on here, showing a
             single honest badge instead of dead either/or UI. */}
         {data?.aiSummary && (
           <div className="rounded-xl border border-violet-200 dark:border-violet-500/20 bg-linear-to-br from-violet-50 to-indigo-50/60 dark:from-violet-500/10 dark:to-transparent dark:bg-white/2 p-5">

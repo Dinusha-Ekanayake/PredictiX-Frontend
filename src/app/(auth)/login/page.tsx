@@ -41,7 +41,7 @@ import { supabase } from "@/lib/supabaseBrowserClient";
 
 // ─── Shared Components ────────────────────────────────────────────────────────
 
-/** Support address shown on the login screen. Single source of truth — the
+/** Support address shown on the login screen. Single source of truth, the
     displayed text and the clipboard copy previously hardcoded it separately,
     so editing one would have silently left the other stale. */
 const SUPPORT_EMAIL = "neuromindspredictix@gmail.com";
@@ -109,7 +109,7 @@ function BackgroundBlobs() {
         className="absolute -bottom-56 -right-56 rounded-full bg-white/70 blur-[160px] float-slow-3 dark:hidden"
         style={{ height: 900, width: 225 }}
       />
-      {/* Dark mode blobs — subtle, matches true-black OLED theme */}
+      {/* Dark mode blobs, subtle, matches true-black OLED theme */}
       <div
         className="hidden dark:block absolute -top-56 -left-56 rounded-full bg-sky-400/5 blur-[160px] float-slow-1"
         style={{ height: 225, width: 225 }}
@@ -160,7 +160,7 @@ export default function LoginPage() {
 
   // Wake the AI inference Space as soon as the login page is visited, so it's
   // warm by the time the user's first ticket-categorization/priority call
-  // happens post-login. Fire-and-forget — never blocks rendering or login.
+  // happens post-login. Fire-and-forget, never blocks rendering or login.
   React.useEffect(() => {
     warmupInferenceSpace();
   }, []);
@@ -308,7 +308,7 @@ export default function LoginPage() {
       <div className="relative z-20 mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-4 py-12">
         <div className="grid w-full grid-cols-1 items-center gap-12 lg:grid-cols-2">
 
-          {/* Left — hero text */}
+          {/* Left, hero text */}
           <section className="hidden lg:flex flex-col justify-center">
             <PredictiXLogo size={72} />
             <h2 className="mt-10 text-4xl font-semibold leading-tight tracking-tight text-slate-900 dark:text-foreground">
@@ -321,7 +321,7 @@ export default function LoginPage() {
             </p>
           </section>
 
-          {/* Right — login card */}
+          {/* Right, login card */}
           <section className="flex items-center justify-center">
             <Card className="w-full max-w-md rounded-3xl border border-slate-200 bg-white/90 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card/80">
               <CardHeader className="space-y-3">
@@ -391,7 +391,7 @@ export default function LoginPage() {
 
 
                     {/* Demo credentials hint.
-                        Every warehouse has a matching demo pair — swap "colombo"
+                        Every warehouse has a matching demo pair, swap "colombo"
                         for "badulla" or "galle" in the address to sign in against
                         that site. Staff accounts follow
                         firstname.department@lankalogix.com (departments: log,

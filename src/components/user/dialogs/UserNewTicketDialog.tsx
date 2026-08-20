@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Create-ticket dialog — User role.
+ * Create-ticket dialog. User role.
  *
  * Flow:
  *  1. User fills in title + description (and optionally selects an asset).
- *  2. After a short debounce (1.2s) the AI runs automatically — category
+ *  2. After a short debounce (1.2s) the AI runs automatically, category
  *     and priority fields populate with a spinner while it runs.
  *  3. Create Ticket is disabled until the AI has returned (or failed).
  *  4. User can change the CATEGORY but NOT the priority (it is read-only).
@@ -452,9 +452,9 @@ export default function UserNewTicketDialog({
                 )}
               </div>
 
-              {/* AI results: category + priority — both AI-suggested and editable */}
+              {/* AI results: category + priority, both AI-suggested and editable */}
               <div className="grid grid-cols-2 gap-3">
-                {/* Category — user CAN change */}
+                {/* Category, user CAN change */}
                 <div>
                   <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-violet-500" />
@@ -478,7 +478,7 @@ export default function UserNewTicketDialog({
                   <p className="text-xs text-muted-foreground mt-1">AI-suggested — you can change it</p>
                 </div>
 
-                {/* Priority — user CAN change */}
+                {/* Priority, user CAN change */}
                 <div>
                   <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-violet-500" />

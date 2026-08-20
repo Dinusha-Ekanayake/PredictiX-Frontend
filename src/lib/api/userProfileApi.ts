@@ -59,10 +59,10 @@ export type TeamMemberData = {
 /**
  * The caller's own profile, de-duplicated across components.
  *
- * The navbar and the page body both need it, so every screen used to issue two
- * identical /profiles/me requests. Against Supabase that is a real cost: the
- * endpoint takes ~850ms, and the two run in parallel competing for the same
- * connection pool.
+ * The navbar and the page body both need it, so without sharing, every screen
+ * issues two identical /profiles/me requests. Against Supabase that is a real
+ * cost: the endpoint takes ~850ms, and the two run in parallel competing for
+ * the same connection pool.
  *
  * In-flight requests share one promise, and the resolved value is reused for a
  * short window so a navigation does not refetch immediately. The window is
@@ -196,7 +196,7 @@ export async function updateUser(userId: string, data: Partial<UserItemOut>): Pr
 /**
  * Colleagues in the current user's department.
  *
- * Pass `limit` when you only need a preview — the dashboard's "My Team" card
+ * Pass `limit` when you only need a preview, the dashboard's "My Team" card
  * shows eight, and unbounded this returns the whole department (measured at
  * 519 people / 150 KB for one Colombo driver). Omit it for the team directory,
  * which searches across the full list client-side.

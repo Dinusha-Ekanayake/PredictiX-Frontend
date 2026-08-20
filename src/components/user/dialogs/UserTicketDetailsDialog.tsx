@@ -5,7 +5,7 @@
  *
  * Loads the full ticket from GET /user/tickets/{id}, lets the owner edit
  * title / description / priority (PUT /user/tickets/{id}), and lists +
- * posts comments. No delete button, no status transition controls — those
+ * posts comments. No delete button, no status transition controls, those
  * are admin-only.
  */
 
@@ -105,7 +105,7 @@ export default function UserTicketDetailsDialog({
   // Prefer the parent's already-loaded list; fall back to this dialog's own fetch.
   const users = usersProp ?? fetchedUsers;
 
-  // Edit form state — local until saved.
+  // Edit form state, local until saved.
   const [editTitle, setEditTitle] = React.useState("");
   const [editDescription, setEditDescription] = React.useState("");
   const [editPriority, setEditPriority] = React.useState<string>("");

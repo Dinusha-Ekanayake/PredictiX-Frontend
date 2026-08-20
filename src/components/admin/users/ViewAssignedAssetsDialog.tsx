@@ -41,7 +41,7 @@ type Props = {
   /**
    * Called after an asset is successfully unassigned, so the caller can keep
    * its own state (the per-user assignment count in the users table) in step.
-   * Omit it to render the dialog read-only — the Remove action only appears
+   * Omit it to render the dialog read-only, the Remove action only appears
    * when a handler is supplied.
    */
   onUnassigned?: (assetId: string) => void;

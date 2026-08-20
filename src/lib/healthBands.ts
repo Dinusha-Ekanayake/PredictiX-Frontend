@@ -64,7 +64,7 @@ export function healthBadgeClass(score: number | null | undefined): string {
   return "border-emerald-500/40 text-emerald-400";
 }
 
-/** "72%" or "—" when there is no score to show. */
+/** "72%" or ", " when there is no score to show. */
 export function formatHealth(score: number | null | undefined): string {
   return score == null ? "—" : `${Math.round(score)}%`;
 }

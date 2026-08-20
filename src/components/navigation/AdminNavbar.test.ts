@@ -1,5 +1,5 @@
 /**
- * Test plan case NS-08 — navigate between main application areas.
+ * Test plan case NS-08, navigate between main application areas.
  *
  * A browser test would prove a click paints a page, which needs a running
  * server. What can be proved without one, and is the failure that actually

@@ -1,5 +1,5 @@
 /**
- * Test plan case NS-07 — switch light/dark theme.
+ * Test plan case NS-07, switch light/dark theme.
  *
  * The backend has no say in this: the theme is a client preference that
  * next-themes writes to localStorage and applies as a class on <html>. So the

@@ -739,23 +739,12 @@ export function generateProfessionalHTML(data: ReportData): string {
   const benchmarkAlert = kb.benchmark_alerts?.find(a => a.type === 'BENCHMARK');
   const highAlert      = kb.benchmark_alerts?.find(a => a.type === 'HIGH_ALERT');
 
-  const featureNameMap: Record<string, string> = {
-    "Oil Life Pct": "Consumable Wear & Operational Degradation",
-    "Lifetime Service Count": "Historical Maintenance Profile",
-    "Days Since Last Service": "Schedule Compliance & PM Adherence",
-    "Make Model": "Asset Lifecycle & Reliability Profile",
-    "Engine Hours": "Operational Utilization Burden",
-    "Temp": "Thermal Stress (Operating Environment)",
-    "Vibration": "Mechanical Wear & Instability",
-    "Age Days": "Asset Capital Depreciation (Age)"
-  };
-
   // SHAP data: prefer KB enriched, fallback to raw shapFeatures
   const shapSource: Array<{ feature: string; impact_pct: number; kb_threshold: string; action: string }> =
     (kb.shap_enriched?.length
-      ? kb.shap_enriched.map((f: any) => ({ ...f, feature: featureNameMap[f.feature] || f.feature }))
+      ? kb.shap_enriched
       : (data.shapFeatures || []).map((f) => ({
-          feature: featureNameMap[f.feature] || f.feature,
+          feature: f.feature,
           impact_pct: Math.round((f.importance / Math.max(...(data.shapFeatures || []).map(x => x.importance), 1)) * 100 * 10) / 10,
           kb_threshold: '-',
           action: '-',

@@ -1013,16 +1013,7 @@ function ReportStep({
                     <div key={i} className="flex flex-col gap-1 rounded-lg border border-slate-100 bg-slate-50/50 p-2 dark:border-slate-800 dark:bg-slate-800/20 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-slate-700 dark:text-slate-200">
-                          {{
-                            "Oil Life Pct": "Consumable Wear & Operational Degradation",
-                            "Lifetime Service Count": "Historical Maintenance Profile",
-                            "Days Since Last Service": "Schedule Compliance & PM Adherence",
-                            "Make Model": "Asset Lifecycle & Reliability Profile",
-                            "Engine Hours": "Operational Utilization Burden",
-                            "Temp": "Thermal Stress (Operating Environment)",
-                            "Vibration": "Mechanical Wear & Instability",
-                            "Age Days": "Asset Capital Depreciation (Age)"
-                          }[f.feature as string] || f.feature}
+                          {f.feature}
                         </span>
                         <span className="font-bold text-rose-600">{f.impact_pct}%</span>
                       </div>

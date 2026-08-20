@@ -9,8 +9,9 @@ import {
   WifiOff,
   Activity,
 } from "lucide-react";
-import type { Asset } from "./types";
+import type { AssetStats } from "./types";
 
+/** One KPI tile: a label, a big value, and an optional caption. */
 function SummaryCard({
   label,
   value,
@@ -44,62 +45,63 @@ function SummaryCard({
   );
 }
 
+/**
+ * Row of KPI tiles above the assets list.
+ *
+ * Shows skeletons on the first load, then the counts for the current warehouse.
+ */
 export default function AssetsSummary({
-  assets,
+  stats,
+  loading,
 }: {
-  assets: Asset[];
+  stats: AssetStats | null;
+  loading?: boolean;
 }) {
-  const total = assets.length;
+  const total = stats?.total ?? 0;
+  const operational = stats?.operational ?? 0;
+  const maintenance = stats?.maintenance ?? 0;
+  const critical = stats?.critical ?? 0;
+  const offline = stats?.offline ?? 0;
+  // Null, not 0, when nothing has been scored yet. Shown as "No data" below.
+  const avgHealth = stats?.avgHealth ?? null;
+  const scoredCount = stats?.avgHealthScoredCount ?? 0;
 
-  // Status counts — backend uses lowercase strings
-  const operational = assets.filter(
-    (a) => a.status === "active" || a.status === "operational",
-  ).length;
-  const maintenance = assets.filter(
-    (a) => a.status === "maintenance" || a.status === "in_maintenance",
-  ).length;
-  const critical = assets.filter((a) => a.health_band === "critical").length;
-  const offline = assets.filter(
-    (a) => a.status === "inactive" || a.status === "retired" || a.status === "offline",
-  ).length;
-
-  // Average health from health_band mapping (no prediction data here to keep summary fast)
-  const bandScore: Record<string, number> = {
-    excellent: 90, good: 72, moderate: 52, poor: 30, critical: 12,
-  };
-  const avgHealth =
-    total > 0
-      ? Math.round(
-          assets.reduce((s, a) => {
-            const hs =
-              a.health_band ? (bandScore[a.health_band.toLowerCase()] ?? 50) : 50;
-            return s + hs;
-          }, 0) / total,
-        )
-      : 0;
+  if (loading && !stats) {
+    return (
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card p-4 h-[92px] animate-pulse" />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
       <SummaryCard
         label="Total Assets"
         value={total}
-        sub="All warehouses"
+        sub="This warehouse"
         icon={<Boxes className="h-4 w-4" />}
         accentClass="bg-slate-100"
         iconClass="text-slate-600 dark:text-slate-300"
       />
       <SummaryCard
         label="Avg. Health"
-        value={`${avgHealth}%`}
-        sub="Fleet average"
+        value={avgHealth != null ? `${avgHealth}%` : "No data"}
+        sub={avgHealth != null ? `AI-predicted · ${scoredCount} of ${total} assets` : "No predictions yet"}
         icon={<Activity className="h-4 w-4" />}
         accentClass="bg-blue-50"
         iconClass="text-blue-600 dark:text-blue-400"
       />
+      {/* Operational, Maintenance and Offline count asset status. Critical Band
+          counts health instead. An asset can be active and in the critical band
+          at once, so these tiles do not add up to Total Assets. The captions on
+          each tile say which of the two it is reading. */}
       <SummaryCard
         label="Operational"
         value={operational}
-        sub={`${total ? Math.round((operational / total) * 100) : 0}% of fleet`}
+        sub={`Status: active (${total ? Math.round((operational / total) * 100) : 0}%)`}
         icon={<CheckCircle2 className="h-4 w-4" />}
         accentClass="bg-emerald-50"
         iconClass="text-emerald-600 dark:text-emerald-400"
@@ -107,7 +109,7 @@ export default function AssetsSummary({
       <SummaryCard
         label="Maintenance"
         value={maintenance}
-        sub="In progress"
+        sub="Status: under maintenance"
         icon={<Wrench className="h-4 w-4" />}
         accentClass="bg-amber-50"
         iconClass="text-amber-600 dark:text-amber-400"
@@ -115,7 +117,7 @@ export default function AssetsSummary({
       <SummaryCard
         label="Critical Band"
         value={critical}
-        sub="Health critical"
+        sub="Health band (independent of status)"
         icon={<AlertTriangle className="h-4 w-4" />}
         accentClass="bg-red-50"
         iconClass="text-red-600 dark:text-red-400"
@@ -123,7 +125,7 @@ export default function AssetsSummary({
       <SummaryCard
         label="Offline"
         value={offline}
-        sub="Inactive / retired"
+        sub="Status: inactive / decommissioned"
         icon={<WifiOff className="h-4 w-4" />}
         accentClass="bg-slate-100"
         iconClass="text-slate-500 dark:text-slate-400"

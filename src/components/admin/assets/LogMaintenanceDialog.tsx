@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { Loader2, Wrench } from "lucide-react";
 
 import {
@@ -25,6 +25,7 @@ type Props = {
   onSaved: () => void;
 };
 
+/** Dialog for recording a completed service against an asset. */
 export default function LogMaintenanceDialog({ open, onOpenChange, asset, onSaved }: Props) {
   const [submitting, setSubmitting] = React.useState(false);
   const [form, setForm] = React.useState({

@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { Search, Filter, AlertTriangle, CheckCircle, AlertCircle, RefreshCw, XCircle, Loader2, Ticket as TicketIcon, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import NewTicketDialog from "@/components/admin/dialogs/NewTicketDialog";
 import TicketDetailsDialog from "@/components/admin/dialogs/TicketDetailsDialog";
+import TicketDashboardCharts from "@/components/admin/tickets/TicketDashboardCharts";
 import {
   Select,
   SelectTrigger,
@@ -19,19 +21,53 @@ import {
 } from "@/components/ui/select";
 import {
   fetchTickets,
+  fetchTicketById,
   fetchTicketStatusCounts,
   deleteTicket,
   type Ticket,
 } from "@/lib/ticketService";
 import { listUsers, type UserItem } from "@/lib/userService";
 
+function AnimatedCounter({ value }: { value: number }) {
+  const [count, setCount] = React.useState(0);
+
+  React.useEffect(() => {
+    let start = 0;
+    const end = value;
+    if (start === end) return;
+    
+    // Total animation duration 1.5s
+    const totalDuration = 1500;
+    const incrementTime = 30; // ms per frame
+    const steps = totalDuration / incrementTime;
+    const increment = end / steps;
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= end) {
+        setCount(end);
+        clearInterval(timer);
+      } else {
+        setCount(Math.floor(start));
+      }
+    }, incrementTime);
+
+    return () => clearInterval(timer);
+  }, [value]);
+
+  return <>{count}</>;
+}
+
 export default function AdminTicketsPage() {
   const [isAdmin, setIsAdmin] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [initialLoading, setInitialLoading] = React.useState(true);
+  const [isTableLoading, setIsTableLoading] = React.useState(false);
+  const [hasError, setHasError] = React.useState(false);
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(0);
   const [loadingMore, setLoadingMore] = React.useState(false);
+  const [chartRefreshTrigger, setChartRefreshTrigger] = React.useState(0);
 
   const [statusCounts, setStatusCounts] = React.useState<Record<string, number>>({ open: 0, "in-progress": 0, resolved: 0, closed: 0 });
 
@@ -40,14 +76,39 @@ export default function AdminTicketsPage() {
   const [selectedTicket, setSelectedTicket] = React.useState<Ticket | null>(null);
 
   const [query, setQuery] = React.useState("");
-  const [debouncedQuery, setDebouncedQuery] = React.useState("");
+  const [appliedQuery, setAppliedQuery] = React.useState("");
   const [selectedStatus, setSelectedStatus] = React.useState("all");
   const [selectedPriority, setSelectedPriority] = React.useState("all");
+  const [sortBy, setSortBy] = React.useState("created_at");
+  const [sortDir, setSortDir] = React.useState("asc");
   const [users, setUsers] = React.useState<UserItem[]>([]);
+
+  // ── Deep-link support: ?ticket_id=<uuid> (e.g. from the dashboard's
+  // Latest Tickets list, or AssetDetailsPanel's Tickets tab) opens that
+  // ticket's detail dialog directly. Fetched once on mount, independent
+  // of whatever page/filter the paginated list is currently showing.
+  const searchParams = useSearchParams();
+  const deepLinkTicketId = searchParams.get("ticket_id");
+
+  React.useEffect(() => {
+    if (!deepLinkTicketId) return;
+    
+    fetchTicketById(deepLinkTicketId)
+      .then((t) => {
+        setSelectedTicket(t);
+        setDetailOpen(true);
+      })
+      .catch((err) => {
+        toast.error("Couldn't open ticket", {
+          description: err instanceof Error ? err.message : "Ticket not found or not accessible.",
+        });
+      });
+  }, [deepLinkTicketId]);
 
   React.useEffect(() => {
     const role = window.localStorage.getItem("predictix.user.role");
-    setIsAdmin(role === "admin" || role === "ADMIN");
+    const r = (role || "").toLowerCase();
+    setIsAdmin(r === "admin" || r === "superadmin" || r === "super_admin");
     listUsers()
       .then(setUsers)
       .catch((err) => console.error("Failed to load users:", err));
@@ -62,7 +123,14 @@ export default function AdminTicketsPage() {
   }, [users]);
 
   const refreshStatusCounts = React.useCallback(() => {
-    fetchTicketStatusCounts().then(setStatusCounts).catch(() => {});
+    fetchTicketStatusCounts()
+      .then((data) => {
+        setStatusCounts(data);
+        setHasError(false);
+      })
+      .catch(() => {
+        setHasError(true);
+      });
   }, []);
 
   // Load global status counts (not affected by filters)
@@ -70,62 +138,67 @@ export default function AdminTicketsPage() {
     refreshStatusCounts();
   }, [refreshStatusCounts]);
 
-  // Debounce search input
-  React.useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 400);
-    return () => clearTimeout(t);
-  }, [query]);
-
   // Reset and reload when filters change
   React.useEffect(() => {
     setPage(0);
-    setTickets([]);
-    loadPage(0, true);
+    loadPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery, selectedStatus, selectedPriority]);
+  }, [appliedQuery, selectedStatus, selectedPriority, sortBy, sortDir]);
 
-  async function loadPage(pageNum: number, reset: boolean) {
-    if (pageNum === 0) setIsLoading(true);
-    else setLoadingMore(true);
+  async function loadPage(pageNum: number) {
+    if (initialLoading) {
+      // First load handled by initialLoading
+    } else if (pageNum === 0) {
+      setIsTableLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
 
     try {
       const { tickets: rows, total: t } = await fetchTickets(
         pageNum,
-        debouncedQuery,
+        appliedQuery,
         selectedStatus,
-        selectedPriority
+        selectedPriority,
+        sortBy,
+        sortDir
       );
       setTotal(t);
-      setTickets((prev) => {
-        const next = reset ? rows : [...prev, ...rows];
-        const unique = new Map(next.map(t => [t.id, t]));
-        return Array.from(unique.values());
-      });
+      setTickets(rows);
       setPage(pageNum);
+      setHasError(false);
     } catch (err) {
+      setHasError(true);
       toast.error("Failed to load tickets", {
         description: err instanceof Error ? err.message : undefined,
       });
     } finally {
-      setIsLoading(false);
+      setInitialLoading(false);
+      setIsTableLoading(false);
       setLoadingMore(false);
     }
   }
 
-  function handleLoadMore() {
-    loadPage(page + 1, false);
+  function handleNextPage() {
+    loadPage(page + 1);
+  }
+
+  function handlePrevPage() {
+    if (page > 0) loadPage(page - 1);
   }
 
   function handleTicketCreated(ticket: Ticket) {
     setTickets((prev) => [ticket, ...prev]);
     setTotal((t) => t + 1);
     refreshStatusCounts();
+    setChartRefreshTrigger((c) => c + 1);
   }
 
   function handleTicketUpdated(updated: Ticket) {
     setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
     if (selectedTicket?.id === updated.id) setSelectedTicket(updated);
     refreshStatusCounts();
+    setChartRefreshTrigger((c) => c + 1);
   }
 
   async function handleDeleteTicket(id: string) {
@@ -137,6 +210,7 @@ export default function AdminTicketsPage() {
       setDetailOpen(false);
       toast.success("Ticket deleted");
       refreshStatusCounts();
+      setChartRefreshTrigger((c) => c + 1);
     } catch (err) {
       toast.error("Failed to delete ticket", {
         description: err instanceof Error ? err.message : undefined,
@@ -153,9 +227,11 @@ export default function AdminTicketsPage() {
     }
   };
 
-  const hasMore = tickets.length < total;
+  const PAGE_SIZE = 10;
+  const hasMore = (page + 1) * PAGE_SIZE < total;
+  const hasPrev = page > 0;
 
-  if (isLoading) {
+  if (initialLoading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
         <PredictiXLoader label="Loading tickets…" />
@@ -193,10 +269,17 @@ export default function AdminTicketsPage() {
               <p className="text-[12px] text-muted-foreground leading-tight max-w-sm">
                 Track, assign and resolve customer-reported issues and AI-flagged alerts.
               </p>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 shrink-0">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live
-              </span>
+              {hasError ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 dark:bg-red-500/15 border border-red-200 dark:border-red-500/25 px-2.5 py-0.5 text-[10px] font-semibold text-red-700 dark:text-red-300 shrink-0">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                  Offline
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/25 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 shrink-0">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live
+                </span>
+              )}
             </div>
           </div>
 
@@ -219,18 +302,96 @@ export default function AdminTicketsPage() {
         </div>
       </div>
 
+
+      {/* ══ Status stat tiles ════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { key: "open", label: "Open", value: statusCounts.open || 0, icon: AlertCircle, iconBg: "bg-rose-100 dark:bg-rose-500/15", iconColor: "text-rose-600 dark:text-rose-400", ring: "ring-rose-400", accent: "text-rose-600 dark:text-rose-400" },
+          { key: "in-progress", label: "In Progress", value: statusCounts["in-progress"] || 0, icon: RefreshCw, iconBg: "bg-amber-100 dark:bg-amber-500/15", iconColor: "text-amber-600 dark:text-amber-400", ring: "ring-amber-400", accent: "text-amber-600 dark:text-amber-400" },
+          { key: "resolved", label: "Resolved", value: statusCounts.resolved || 0, icon: CheckCircle, iconBg: "bg-emerald-100 dark:bg-emerald-500/15", iconColor: "text-emerald-600 dark:text-emerald-400", ring: "ring-emerald-400", accent: "text-emerald-600 dark:text-emerald-400" },
+          { key: "closed", label: "Closed", value: statusCounts.closed || 0, icon: XCircle, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", ring: "ring-slate-400", accent: "text-slate-600 dark:text-slate-400" },
+        ].map((s) => {
+          const Icon = s.icon;
+          const active = selectedStatus === s.key;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setSelectedStatus(active ? "all" : s.key)}
+              className={cn(
+                "group rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm p-4 text-left transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
+                active && `ring-2 ${s.ring} border-transparent`
+              )}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", s.iconBg)}>
+                  <Icon className={cn("h-4 w-4", s.iconColor)} />
+                </div>
+                {active && (
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-400">
+                    Filtered
+                  </span>
+                )}
+              </div>
+              <p className={cn("text-[22px] font-semibold tracking-tight leading-none", s.accent)}>
+                <AnimatedCounter value={s.value} />
+              </p>
+              <p className="mt-1.5 text-[12px] font-medium text-foreground">{s.label}</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                {totalAll > 0 ? `${Math.round((s.value / totalAll) * 100)}% of total` : "—"}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ══ Charts ═══════════════════════════════════════════════════════════ */}
+      <div className="pt-2">
+        <TicketDashboardCharts refreshTrigger={chartRefreshTrigger} />
+      </div>
+
       {/* ══ Search + filters ═════════════════════════════════════════════════ */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm p-4">
         <div className="flex w-full items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-60">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <button
+              type="button"
+              onClick={() => setAppliedQuery(query)}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer z-10"
+            >
+              <Search className="h-4 w-4" />
+            </button>
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tickets by title, description…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setAppliedQuery(query);
+                }
+              }}
+              placeholder="Search tickets by title, ticket number, description…"
               className="pl-9 h-10 bg-background/60 dark:bg-slate-900/60"
             />
           </div>
+
+          <Select
+            value={`${sortBy}_${sortDir}`}
+            onValueChange={(v) => {
+              const [by, dir] = v.split("_");
+              setSortBy(by);
+              setSortDir(dir);
+            }}
+          >
+            <SelectTrigger className="w-44 h-10 bg-background/60 dark:bg-slate-900/60">
+              <SelectValue placeholder="Sort By" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_at_asc">Oldest First</SelectItem>
+              <SelectItem value="created_at_desc">Newest First</SelectItem>
+              <SelectItem value="title_asc">Name (A-Z)</SelectItem>
+              <SelectItem value="title_desc">Name (Z-A)</SelectItem>
+            </SelectContent>
+          </Select>
 
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v)}>
@@ -275,48 +436,27 @@ export default function AdminTicketsPage() {
             <Button variant="ghost" size="sm" className="h-10">
               <Filter className="h-4 w-4" />
             </Button>
+
+            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "" || appliedQuery.trim() !== "" || sortBy !== "created_at" || sortDir !== "asc") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 text-muted-foreground hover:text-foreground hover:bg-muted/50 px-3 flex items-center gap-1.5"
+                onClick={() => {
+                  setQuery("");
+                  setAppliedQuery("");
+                  setSelectedStatus("all");
+                  setSelectedPriority("all");
+                  setSortBy("created_at");
+                  setSortDir("asc");
+                }}
+              >
+                <XCircle className="h-4 w-4" />
+                Clear all
+              </Button>
+            )}
           </div>
         </div>
-      </div>
-
-      {/* ══ Status stat tiles ════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { key: "open", label: "Open", value: statusCounts.open || 0, icon: AlertCircle, iconBg: "bg-rose-100 dark:bg-rose-500/15", iconColor: "text-rose-600 dark:text-rose-400", ring: "ring-rose-400", accent: "text-rose-600 dark:text-rose-400" },
-          { key: "in-progress", label: "In Progress", value: statusCounts["in-progress"] || 0, icon: RefreshCw, iconBg: "bg-amber-100 dark:bg-amber-500/15", iconColor: "text-amber-600 dark:text-amber-400", ring: "ring-amber-400", accent: "text-amber-600 dark:text-amber-400" },
-          { key: "resolved", label: "Resolved", value: statusCounts.resolved || 0, icon: CheckCircle, iconBg: "bg-emerald-100 dark:bg-emerald-500/15", iconColor: "text-emerald-600 dark:text-emerald-400", ring: "ring-emerald-400", accent: "text-emerald-600 dark:text-emerald-400" },
-          { key: "closed", label: "Closed", value: statusCounts.closed || 0, icon: XCircle, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", ring: "ring-slate-400", accent: "text-slate-600 dark:text-slate-400" },
-        ].map((s) => {
-          const Icon = s.icon;
-          const active = selectedStatus === s.key;
-          return (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => setSelectedStatus(active ? "all" : s.key)}
-              className={cn(
-                "group rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm p-4 text-left transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
-                active && `ring-2 ${s.ring} border-transparent`
-              )}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", s.iconBg)}>
-                  <Icon className={cn("h-4 w-4", s.iconColor)} />
-                </div>
-                {active && (
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-400">
-                    Filtered
-                  </span>
-                )}
-              </div>
-              <p className={cn("text-[22px] font-semibold tracking-tight leading-none", s.accent)}>{s.value}</p>
-              <p className="mt-1.5 text-[12px] font-medium text-foreground">{s.label}</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                {totalAll > 0 ? `${Math.round((s.value / totalAll) * 100)}% of total` : "—"}
-              </p>
-            </button>
-          );
-        })}
       </div>
 
       {/* Total count */}
@@ -325,8 +465,13 @@ export default function AdminTicketsPage() {
       </p>
 
       {/* ══ Ticket list ══════════════════════════════════════════════════════ */}
-      <div className="flex flex-col gap-3">
-        {tickets.length === 0 ? (
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 min-h-[260px] relative">
+        {isTableLoading ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <Loader2 className="size-6 text-violet-500 animate-spin" />
+            <p className="text-xs font-medium text-muted-foreground">Updating tickets list…</p>
+          </div>
+        ) : tickets.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card p-10 text-center">
             <div className="rounded-full bg-violet-100 dark:bg-violet-500/15 p-3">
               <TicketIcon className="size-5 text-violet-500" />
@@ -337,17 +482,32 @@ export default function AdminTicketsPage() {
             </p>
           </div>
         ) : (
-          tickets.map((t) => {
-            const priorityAccent =
+          <div className="flex flex-col gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+            {tickets.map((t) => {
+              const priorityAccent =
               t.priority === "High"
                 ? "from-rose-500 to-rose-600"
                 : t.priority === "Medium"
                 ? "from-amber-500 to-amber-600"
                 : "from-emerald-500 to-emerald-600";
+
+            const s = (t.status || "").toLowerCase();
+            const statusBorder =
+              s === "open"
+                ? "border-rose-500/30 dark:border-rose-500/25 hover:border-rose-500 dark:hover:border-rose-500/60"
+                : s === "in-progress" || s === "in_progress"
+                ? "border-amber-500/30 dark:border-amber-500/25 hover:border-amber-500 dark:hover:border-amber-500/60"
+                : s === "resolved"
+                ? "border-emerald-500/30 dark:border-emerald-500/25 hover:border-emerald-500 dark:hover:border-emerald-500/60"
+                : "border-slate-500/30 dark:border-slate-500/25 hover:border-slate-500 dark:hover:border-slate-500/60";
+
             return (
               <div
                 key={t.id}
-                className="group relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-card p-4 pl-5 cursor-pointer transition-all duration-200 hover:border-violet-300/70 dark:hover:border-violet-500/40 hover:shadow-md hover:-translate-y-0.5"
+                className={cn(
+                  "group relative shrink-0 overflow-hidden rounded-xl border bg-card p-4 pl-5 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
+                  statusBorder
+                )}
                 onClick={() => { setSelectedTicket(t); setDetailOpen(true); }}
               >
                 {/* Left accent bar (priority colour) */}
@@ -393,7 +553,7 @@ export default function AdminTicketsPage() {
 
                     <div className="mt-3 flex items-center gap-3 flex-wrap">
                       <Badge className={cn(categoryClass(t.predicted_category ?? t.final_category), "font-medium")}>
-                        {t.predicted_category ?? t.final_category ?? "General"}
+                        {t.predicted_category ?? t.final_category ?? "Mechanical"}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
                         Created {t.opened_at ? new Date(t.opened_at).toLocaleDateString() : new Date(t.created_at).toLocaleDateString()}
@@ -402,45 +562,59 @@ export default function AdminTicketsPage() {
                   </div>
 
                   <div className="ml-2 shrink-0 flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap">
-                    <span className="text-[10px] uppercase tracking-wide">Assigned</span>
                     {t.assigned_to ? (
-                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300 font-medium">{userMap.get(t.assigned_to) ?? t.assigned_to.slice(0, 8)}</Badge>
+                      <>
+                        <span className="text-[10px] uppercase tracking-wide">Assigned</span>
+                        <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300 font-medium">{userMap.get(t.assigned_to) ?? t.assigned_to.slice(0, 8)}</Badge>
+                      </>
                     ) : (
-                      <span className="italic">Unassigned</span>
+                      <span className="italic mt-1 text-slate-500 dark:text-slate-500">Unassigned</span>
                     )}
                   </div>
                 </div>
               </div>
             );
-          })
+          })}
+          </div>
         )}
       </div>
 
-      {/* Load more */}
-      {hasMore && (
-        <div className="flex justify-center pt-2">
+      {/* Pagination */}
+      {(hasMore || hasPrev) && (
+        <div className="flex justify-between items-center pt-2">
           <Button
             variant="outline"
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            className="min-w-40"
+            onClick={handlePrevPage}
+            disabled={loadingMore || !hasPrev}
+            className="min-w-32"
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {page + 1}
+          </span>
+          <Button
+            variant="outline"
+            onClick={handleNextPage}
+            disabled={loadingMore || !hasMore}
+            className="min-w-32"
           >
             {loadingMore ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading…</>
             ) : (
-              `Load More (${total - tickets.length} remaining)`
+              "Next"
             )}
           </Button>
         </div>
       )}
 
-      <NewTicketDialog open={open} onOpenChange={setOpen} onCreated={handleTicketCreated} />
+      <NewTicketDialog open={open} onOpenChange={setOpen} onCreated={handleTicketCreated} users={users} />
       <TicketDetailsDialog
         ticket={selectedTicket}
         open={detailOpen}
         onOpenChange={(v) => setDetailOpen(v)}
-        onDelete={isAdmin ? handleDeleteTicket : undefined}
-        onUpdated={isAdmin ? handleTicketUpdated : undefined}
+        onDelete={handleDeleteTicket}
+        onUpdated={handleTicketUpdated}
         isAdmin={isAdmin}
         users={users}
       />

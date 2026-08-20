@@ -1,16 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-
-function getAuthHeaders() {
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("token") ||
-        localStorage.getItem("predictix.access_token")
-      : null;
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
+import { apiGet, apiPost, apiPut } from "@/lib/apiClient";
 
 export type UserProfileData = {
   id: string;
@@ -68,17 +56,45 @@ export type TeamMemberData = {
   status: string;
 };
 
+/**
+ * The caller's own profile, de-duplicated across components.
+ *
+ * The navbar and the page body both need it, so without sharing, every screen
+ * issues two identical /profiles/me requests. Against Supabase that is a real
+ * cost: the endpoint takes ~850ms, and the two run in parallel competing for
+ * the same connection pool.
+ *
+ * In-flight requests share one promise, and the resolved value is reused for a
+ * short window so a navigation does not refetch immediately. The window is
+ * deliberately small because the profile carries role and status, and a stale
+ * one must not outlive a deactivation for long.
+ */
+const PROFILE_TTL_MS = 30_000;
+let profileCache: { at: number; data: UserProfileData } | null = null;
+let profileInFlight: Promise<UserProfileData> | null = null;
+
 export async function fetchMyProfile(): Promise<UserProfileData> {
-  const res = await fetch(`${API_URL}/profiles/me`, {
-    headers: getAuthHeaders(),
-  });
-  
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || `HTTP ${res.status}`);
+  if (profileCache && Date.now() - profileCache.at < PROFILE_TTL_MS) {
+    return profileCache.data;
   }
-  
-  return res.json();
+  if (profileInFlight) return profileInFlight;
+
+  profileInFlight = apiGet<UserProfileData>("/profiles/me")
+    .then((data) => {
+      profileCache = { at: Date.now(), data };
+      return data;
+    })
+    .finally(() => {
+      profileInFlight = null;
+    });
+  return profileInFlight;
+}
+
+/** Drop the cached profile. Call after anything that changes it, and on sign-out
+ *  so the next account does not read the previous one's profile. */
+export function invalidateMyProfile(): void {
+  profileCache = null;
+  profileInFlight = null;
 }
 
 export async function updateMyProfile(data: {
@@ -93,44 +109,19 @@ export async function updateMyProfile(data: {
     compactView?: boolean;
   };
 }): Promise<UserProfileData> {
-  const res = await fetch(`${API_URL}/profiles/me`, {
-    method: "PUT",
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
-  
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || `HTTP ${res.status}`);
-  }
-  
-  return res.json();
+  const updated = await apiPut<UserProfileData>("/profiles/me", data);
+  // Seed the cache with the server's response rather than clearing it, so the
+  // next read is both fresh and free.
+  profileCache = { at: Date.now(), data: updated };
+  return updated;
 }
 
 export async function fetchMyAssets(): Promise<UserAssetData[]> {
-  const res = await fetch(`${API_URL}/profiles/me/assets`, {
-    headers: getAuthHeaders(),
-  });
-  
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || `HTTP ${res.status}`);
-  }
-  
-  return res.json();
+  return apiGet<UserAssetData[]>("/profiles/me/assets");
 }
 
 export async function fetchMyStats(): Promise<UserStatsData> {
-  const res = await fetch(`${API_URL}/profiles/me/stats`, {
-    headers: getAuthHeaders(),
-  });
-  
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || `HTTP ${res.status}`);
-  }
-  
-  return res.json();
+  return apiGet<UserStatsData>("/profiles/me/stats");
 }
 
 export type UserItemOut = {
@@ -149,98 +140,68 @@ export type UserItemOut = {
 };
 
 export async function fetchAllUsers(): Promise<UserItemOut[]> {
-  const res = await fetch(`${API_URL}/users/`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.error || "Failed to fetch users");
-  }
-  return res.json();
+  return apiGet<UserItemOut[]>("/users/");
 }
 
 export async function addUser(user: Omit<UserItemOut, "assignedAssets"> & { assignedAssets?: number }): Promise<UserItemOut> {
-  const res = await fetch(`${API_URL}/users/`, {
-    method: "POST",
-    headers: {
-      ...getAuthHeaders(),
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      name: user.name,
-      email: user.email,
-      address: user.address,
-      contactNumber: user.contactNumber,
-      warehouse: user.warehouse,
-      role: user.role,
-      department: user.department,
-      status: user.status
-    }),
+  return apiPost<UserItemOut>("/users/", {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    name: user.name,
+    email: user.email,
+    address: user.address,
+    contactNumber: user.contactNumber,
+    warehouse: user.warehouse,
+    role: user.role,
+    department: user.department,
+    status: user.status,
   });
-  
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.error || "Failed to create user");
-  }
-  return res.json();
 }
 
 export async function fetchDepartments(): Promise<string[]> {
-  const res = await fetch(`${API_URL}/departments/`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to fetch departments");
-  const rows: Array<{ name?: string } | string> = await res.json();
+  const rows = await apiGet<Array<{ name?: string } | string>>("/departments/");
   // Endpoint returns Department objects; surface just the names.
   return rows.map((d) => (typeof d === "string" ? d : d.name ?? "")).filter(Boolean);
 }
 
 export async function fetchWarehouses(): Promise<string[]> {
-  const res = await fetch(`${API_URL}/warehouses/`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to fetch warehouses");
-  const rows: Array<{ name?: string } | string> = await res.json();
+  const rows = await apiGet<Array<{ name?: string } | string>>("/warehouses/");
   // Endpoint returns Warehouse objects; surface just the names.
   return rows.map((w) => (typeof w === "string" ? w : w.name ?? "")).filter(Boolean);
 }
 
+/**
+ * Warehouses as id/name pairs.
+ *
+ * fetchWarehouses throws the ids away, so it cannot turn an asset's
+ * warehouse_id into a name. Any view that renders an asset needs that mapping,
+ * otherwise the detail panel falls back to printing the raw UUID.
+ */
+export async function fetchWarehouseOptions(): Promise<{ value: string; label: string }[]> {
+  const rows = await apiGet<Array<{ id?: string; name?: string }>>("/warehouses/");
+  return rows
+    .filter((w) => w?.id && w?.name)
+    .map((w) => ({ value: String(w.id), label: String(w.name) }));
+}
+
 export async function fetchUserAssets(userId: string): Promise<UserAssetData[]> {
-  const res = await fetch(`${API_URL}/users/${userId}/assets`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to fetch user assets");
-  return res.json();
+  return apiGet<UserAssetData[]>(`/users/${userId}/assets`);
 }
 
 export async function updateUser(userId: string, data: Partial<UserItemOut>): Promise<UserItemOut> {
-  const res = await fetch(`${API_URL}/users/${userId}`, {
-    method: "PUT",
-    headers: {
-      ...getAuthHeaders(),
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Failed to update user");
-  }
-  return res.json();
+  return apiPut<UserItemOut>(`/users/${userId}`, data);
 }
 
-export async function getTeamMembers(): Promise<TeamMemberData[]> {
-  const res = await fetch(`${API_URL}/profiles/me/colleagues`, {
-    method: "GET",
-    headers: getAuthHeaders(),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Failed to fetch team members");
-  }
-  return res.json();
+/**
+ * Colleagues in the current user's department.
+ *
+ * Pass `limit` when you only need a preview, the dashboard's "My Team" card
+ * shows eight, and unbounded this returns the whole department (measured at
+ * 519 people / 150 KB for one Colombo driver). Omit it for the team directory,
+ * which searches across the full list client-side.
+ */
+export async function getTeamMembers(limit?: number): Promise<TeamMemberData[]> {
+  const query = limit != null ? `?limit=${limit}` : "";
+  return apiGet<TeamMemberData[]>(`/profiles/me/colleagues${query}`);
 }

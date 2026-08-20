@@ -17,7 +17,7 @@ import {
   Mail,
   FileQuestion,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 
 import AdminNavbar from "@/components/navigation/AdminNavbar";
 import UserNavbar from "@/components/navigation/UserNavbar";
@@ -137,7 +137,7 @@ function FaqCard({
     >
       {/* ── Header row: outer is a plain div, click zone is a div[role=button] */}
       <div className="flex items-center gap-2 pr-3">
-        {/* Clickable question area — uses div+role so buttons can sit beside it */}
+        {/* Clickable question area. Uses div+role so buttons can sit beside it */}
         <div
           role="button"
           tabIndex={0}
@@ -161,7 +161,7 @@ function FaqCard({
           </span>
         </div>
 
-        {/* Right side: admin actions + chevron — siblings of the click zone, NOT inside it */}
+        {/* Right side: admin actions + chevron, siblings of the click zone, NOT inside it */}
         <div className="flex items-center gap-1 shrink-0">
           {isAdmin && (
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -204,7 +204,7 @@ function FaqCard({
             </div>
           )}
 
-          {/* Chevron — also a plain div click so it doesn't nest inside role=button */}
+          {/* Chevron, also a plain div click so it doesn't nest inside role=button */}
           <div
             onClick={() => setOpen((v) => !v)}
             className="p-2 cursor-pointer rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
@@ -219,7 +219,7 @@ function FaqCard({
         </div>
       </div>
 
-      {/* Answer panel — CSS height transition */}
+      {/* Answer panel, CSS height transition */}
       <div
         className={cn(
           "overflow-hidden transition-all duration-300",
@@ -250,7 +250,10 @@ export default function HelpDeskPage() {
 
   const [adminQuestion, setAdminQuestion] = React.useState("");
   const [adminAnswer, setAdminAnswer] = React.useState("");
+  const [adminCategory, setAdminCategory] = React.useState("general");
   const [isAdding, setIsAdding] = React.useState(false);
+
+  const [activeCategory, setActiveCategory] = React.useState<string>("all");
 
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editQuestion, setEditQuestion] = React.useState("");
@@ -278,15 +281,42 @@ export default function HelpDeskPage() {
 
   React.useEffect(() => { fetchFaqs(); }, [fetchFaqs]);
 
+  const categories = React.useMemo(() => {
+    const baseCategories = ["ticket", "asset", "user", "warehouse", "general"];
+    
+    const dynamicCats = new Set<string>(baseCategories);
+    faqItems.forEach((item) => {
+      if (item.category && item.category.trim()) {
+        dynamicCats.add(item.category.trim().toLowerCase());
+      }
+    });
+
+    const list = [{ id: "all", label: "All Topics" }];
+    dynamicCats.forEach((cat) => {
+      const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+      list.push({ id: cat, label });
+    });
+
+    return list;
+  }, [faqItems]);
+
   const filteredFaqs = React.useMemo(() => {
+    let result = faqItems;
+
+    if (activeCategory !== "all") {
+      result = result.filter((item) => item.category?.toLowerCase() === activeCategory);
+    }
+
     const q = query.trim().toLowerCase();
-    if (!q) return faqItems;
-    return faqItems.filter(
-      (item) =>
-        item.question.toLowerCase().includes(q) ||
-        item.answer.toLowerCase().includes(q)
-    );
-  }, [faqItems, query]);
+    if (q) {
+      result = result.filter(
+        (item) =>
+          item.question.toLowerCase().includes(q) ||
+          item.answer.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [faqItems, query, activeCategory]);
 
   async function handleAddFaq() {
     const question = adminQuestion.trim();
@@ -294,7 +324,11 @@ export default function HelpDeskPage() {
     if (!question || !answer) return;
     setIsAdding(true);
     try {
-      const created = await apiPost<FaqItem>("/faqs/", { question, answer });
+      const created = await apiPost<FaqItem>("/faqs/", { 
+        question, 
+        answer, 
+        category: adminCategory 
+      });
       setFaqItems((prev) => [created, ...prev]);
       setAdminQuestion("");
       setAdminAnswer("");
@@ -396,8 +430,8 @@ export default function HelpDeskPage() {
           </div>
         </div>
 
-        {/* ── Search ─────────────────────────────────────────────────────── */}
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card shadow-sm p-4">
+        {/* ── Search & Filters ───────────────────────────────────────────── */}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-card shadow-sm p-4 space-y-4">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -416,6 +450,25 @@ export default function HelpDeskPage() {
                 <X className="size-3.5" />
               </button>
             )}
+          </div>
+
+          {/* Filter Chips */}
+          <div className="flex flex-wrap items-center gap-2">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setActiveCategory(cat.id)}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors border outline-none focus-visible:ring-2 focus-visible:ring-violet-400/30",
+                  activeCategory === cat.id
+                    ? "bg-violet-600 text-white border-violet-600 shadow-sm"
+                    : "bg-transparent text-muted-foreground border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-foreground"
+                )}
+              >
+                {cat.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -565,6 +618,18 @@ export default function HelpDeskPage() {
                   aria-label="FAQ question"
                   className="bg-background/60 dark:bg-slate-900/60 rounded-xl"
                 />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Category</label>
+                <select
+                  value={adminCategory}
+                  onChange={(e) => setAdminCategory(e.target.value)}
+                  className="w-full h-10 rounded-xl border border-input bg-background/60 dark:bg-slate-900/60 px-3.5 text-sm outline-none transition-all focus-visible:border-violet-400 focus-visible:ring-2 focus-visible:ring-violet-400/30 text-foreground"
+                >
+                  {categories.filter(c => c.id !== "all").map(c => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Answer</label>

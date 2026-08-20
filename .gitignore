@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+# Written by scripts/run-tests.mjs and normally deleted again at the end of the
+# run; an interrupted run leaves it behind.
+vitest-results.json
 
 # next.js
 /.next/
@@ -44,6 +47,4 @@ next-env.d.ts
 /package-lock.json
 /package.json
 /node_modules/
-
-CLAUDE.MD
-.gitignore
+CLAUDE.md

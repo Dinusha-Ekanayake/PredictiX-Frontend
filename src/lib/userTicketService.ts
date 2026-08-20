@@ -38,7 +38,7 @@ function dbStatusFilter(s: string): string {
   return s === "in-progress" ? "in_progress" : s;
 }
 function dbCategory(c: TicketCategory): string {
-  return c === "General" ? "mechanical" : c.toLowerCase();
+  return c.toLowerCase();
 }
 
 function mapTicket(t: BackendTicket): Ticket {

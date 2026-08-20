@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseBrowserClient";
-import { apiPost } from "./apiClient";
+import { apiPost, apiGet, apiPut, apiDelete, apiFetch } from "./apiClient";
 
 // ─── FastAPI-backed ticket preview (calls POST /tickets/preview) ──────────────
 
@@ -11,6 +11,18 @@ export interface TicketAiPreview {
 
 export async function previewTicketAI(title: string, description: string): Promise<TicketAiPreview> {
   return apiPost<TicketAiPreview>("/tickets/preview", { title, description });
+}
+
+// ─── AI summaries (local ONNX Seq2Seq models via FastAPI) ────────────────────
+
+/** (Re)generate the ticket AI summary from the ticket's own fields. */
+export async function generateTicketSummaryById(ticketId: string): Promise<{ summary: string }> {
+  return apiGet<{ summary: string }>(`/ticket-summaries/by-ticket/${ticketId}`);
+}
+
+/** Generate the AI summary for the ticket's linked asset. */
+export async function generateAssetSummaryById(assetId: string): Promise<{ summary: string }> {
+  return apiGet<{ summary: string }>(`/asset-summaries/by-asset/${assetId}`);
 }
 
 // ─── FastAPI-backed admin ticket create (POST /tickets/) ──────────────────────
@@ -57,7 +69,7 @@ export async function createTicketViaApi(payload: AdminTicketCreatePayload): Pro
 
 export type TicketStatus = "open" | "in-progress" | "resolved" | "closed";
 export type TicketPriority = "High" | "Medium" | "Low";
-export type TicketCategory = "Mechanical" | "Electrical" | "Software" | "General";
+export type TicketCategory = "Mechanical" | "Electrical" | "Software";
 
 export type Ticket = {
   id: string;
@@ -70,11 +82,15 @@ export type Ticket = {
   priority: TicketPriority;
   predicted_category: string | null;
   final_category: string | null;
+  ticket_summary?: string | null;
+  asset_summary?: string | null;
   created_by: string | null;
   assigned_to: string | null;
   opened_at: string | null;
   created_at: string;
   updated_at: string;
+  resolved_at?: string | null;
+  closed_at?: string | null;
 };
 
 const PAGE_SIZE = 10;
@@ -109,11 +125,15 @@ function mapRow(row: any): Ticket {
     priority: uiPriority(row.priority),
     predicted_category: row.predicted_category,
     final_category: row.final_category,
+    ticket_summary: row.ticket_summary ?? null,
+    asset_summary: row.asset_summary ?? null,
     created_by: row.created_by,
     assigned_to: row.assigned_to,
     opened_at: row.opened_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    resolved_at: row.resolved_at,
+    closed_at: row.closed_at,
   };
 }
 
@@ -121,126 +141,96 @@ export async function fetchTickets(
   page: number,
   search: string,
   status: string,
-  priority: string
+  priority: string,
+  sortBy?: string,
+  sortDir?: string
 ): Promise<{ tickets: Ticket[]; total: number }> {
-  if (!supabase) throw new Error("Supabase not configured");
+  // Build query params for the FastAPI backend endpoint
+  const params = new URLSearchParams();
+  params.set("limit", String(PAGE_SIZE));
+  params.set("offset", String(page * PAGE_SIZE));
+  if (search.trim()) params.set("search", search.trim());
+  if (status && status !== "all") params.set("status", dbStatus(status));
+  if (priority && priority !== "all") params.set("priority", dbPriority(priority));
+  if (sortBy) params.set("sort_by", sortBy);
+  if (sortDir) params.set("sort_dir", sortDir);
 
-  const from = page * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
-
-  let query = supabase
-    .from("tickets")
-    .select("*, assets(asset_name)", { count: "exact" })
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: true });
-
-  if (search.trim()) {
-    query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+  // Call FastAPI, this uses the authenticated session and the backend DB connection
+  // which is resilient to Supabase sleeping. Response includes X-Total-Count header.
+  const resp = await apiFetch(`/tickets/paginated?${params.toString()}`);
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => resp.statusText);
+    throw new Error(`Failed to fetch tickets: ${detail}`);
   }
-  if (status && status !== "all") {
-    query = query.eq("status", dbStatus(status));
-  }
-  if (priority && priority !== "all") {
-    query = query.eq("priority", dbPriority(priority));
-  }
-
-  const { data, error, count } = await query.range(from, to);
-  if (error) throw error;
+  const json = await resp.json();
+  const rows: any[] = json.tickets ?? json ?? [];
+  const total: number = json.total ?? rows.length;
 
   return {
-    tickets: (data ?? []).map(mapRow),
-    total: count ?? 0,
+    tickets: rows.map(mapRow),
+    total,
   };
 }
 
-export async function createTicket(payload: {
-  asset_id: string | null;
-  title: string;
-  description: string;
-  priority: TicketPriority;
-  category: TicketCategory;
-  assigned_to?: string | null;
-}): Promise<Ticket> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const { data, error } = await supabase
-    .from("tickets")
-    .insert({
-      asset_id: payload.asset_id || null,
-      title: payload.title,
-      description: payload.description,
-      status: "open",
-      priority: dbPriority(payload.priority),
-      predicted_category: payload.category === "General" ? "mechanical" : payload.category.toLowerCase(),
-      assigned_to: payload.assigned_to || null,
-      opened_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .select("*, assets(asset_name)")
-    .single();
-
-  if (error) throw error;
-  return mapRow(data);
+export async function fetchTicketById(id: string): Promise<Ticket> {
+  const row = await apiGet<any>(`/tickets/${id}`);
+  return mapRow(row);
 }
 
 export async function fetchTicketStatusCounts(): Promise<Record<string, number>> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const statuses = ["open", "in_progress", "resolved", "closed"];
-  const counts: Record<string, number> = { open: 0, "in-progress": 0, resolved: 0, closed: 0 };
-
-  await Promise.all(
-    statuses.map(async (s) => {
-      const { count } = await supabase!
-        .from("tickets")
-        .select("id", { count: "exact", head: true })
-        .eq("status", s);
-      const uiKey = s === "in_progress" ? "in-progress" : s;
-      counts[uiKey] = count ?? 0;
-    })
-  );
-
-  return counts;
+  return apiGet<Record<string, number>>("/tickets/status-counts");
 }
 
+// These four go through the backend's PUT/DELETE /tickets/{id} rather than
+// writing via the Supabase client. RLS cannot be relied on here: the
+// tickets_update_creator_assignee_or_admin and tickets_delete policies both
+// have qual = 'true', so a direct client write would let any authenticated
+// user update or delete any ticket in the system. The backend enforces
+// is_admin_role()/require_admin server-side and logs the status-transition
+// history, which a direct write does not.
+
 export async function updateTicketStatus(id: string, status: TicketStatus): Promise<void> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const updates: Record<string, string> = {
-    status: dbStatus(status),
-    updated_at: new Date().toISOString(),
-  };
-  if (status === "resolved") updates.resolved_at = new Date().toISOString();
-  if (status === "closed") updates.closed_at = new Date().toISOString();
-  if (status === "in-progress") updates.reviewed_at = new Date().toISOString();
-
-  const { error } = await supabase.from("tickets").update(updates).eq("id", id);
-  if (error) throw error;
+  await apiPut(`/tickets/${id}`, { status: dbStatus(status) });
 }
 
 export async function updateTicketPriority(id: string, priority: TicketPriority): Promise<void> {
-  if (!supabase) throw new Error("Supabase not configured");
-  const { error } = await supabase
-    .from("tickets")
-    .update({ priority: dbPriority(priority), updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
+  await apiPut(`/tickets/${id}`, { priority: dbPriority(priority) });
 }
 
 export async function updateTicketAssignee(id: string, assignedTo: string | null): Promise<void> {
-  if (!supabase) throw new Error("Supabase not configured");
-  const { error } = await supabase
-    .from("tickets")
-    .update({ assigned_to: assignedTo, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
+  await apiPut(`/tickets/${id}`, { assigned_to: assignedTo });
 }
 
 export async function deleteTicket(id: string): Promise<void> {
-  if (!supabase) throw new Error("Supabase not configured");
-  const { error } = await supabase.from("tickets").delete().eq("id", id);
-  if (error) throw error;
+  await apiDelete(`/tickets/mine/${id}`);
+}
+
+export async function addTicketAttachment(
+  ticketId: string,
+  filePath: string,
+  mimeType?: string | null,
+  originalFilename?: string | null
+): Promise<void> {
+  await apiPost(`/ticket-attachments/`, {
+    ticket_id: ticketId,
+    file_path: filePath,
+    mime_type: mimeType,
+    original_filename: originalFilename,
+  });
+}
+
+export async function fetchTicketAttachments(ticketId: string): Promise<any[]> {
+  try {
+    const data = await apiGet<any[]>(`/ticket-attachments/?ticket_id=${ticketId}`);
+    return data || [];
+  } catch (err) {
+    console.error("Failed to fetch attachments via API", err);
+    return [];
+  }
+}
+
+export async function deleteTicketAttachment(attachmentId: string): Promise<void> {
+  await apiDelete(`/ticket-attachments/${attachmentId}`);
 }
 
 export type TicketHistoryEntry = {
@@ -283,22 +273,22 @@ export async function fetchTicketEnrichment(ticket: {
   if (ticket.created_by) profileIds.add(ticket.created_by);
   if (ticket.assigned_to) profileIds.add(ticket.assigned_to);
 
-  const { data: historyData, error: historyError } = await supabase
-    .from("ticket_status_history")
-    .select("id,old_status,new_status,changed_by,note,created_at")
-    .eq("ticket_id", ticket.id)
-    .order("created_at", { ascending: true });
-
-  if (historyError) throw historyError;
-
-  const historyRows = (historyData ?? []) as Array<{
+  let historyRows: Array<{
     id: string;
     old_status: string | null;
     new_status: string;
     changed_by: string | null;
     note: string | null;
     created_at: string;
-  }>;
+  }> = [];
+
+  try {
+    const data = await apiGet<any[]>(`/ticket-status-history/?ticket_id=${ticket.id}`);
+    historyRows = ((data || []) as any[]).slice().reverse();
+  } catch (err) {
+    console.error("Failed to fetch status history from backend:", err);
+  }
+
   for (const h of historyRows) {
     if (h.changed_by) profileIds.add(h.changed_by);
   }
@@ -368,3 +358,51 @@ export async function fetchTicketEnrichment(ticket: {
 
   return result;
 }
+
+export async function fetchTicketComments(ticketId: string): Promise<any[]> {
+  try {
+    const data = await apiGet<any[]>(`/ticket-comments/?ticket_id=${ticketId}`);
+    return data || [];
+  } catch (err) {
+    console.error("Failed to fetch ticket comments:", err);
+    return [];
+  }
+}
+
+export async function createTicketComment(
+  ticketId: string,
+  userId: string,
+  comment: string,
+  isInternal: boolean = false
+): Promise<any> {
+  return apiPost<any>("/ticket-comments/", {
+    ticket_id: ticketId,
+    user_id: userId,
+    comment,
+    is_internal: isInternal,
+  });
+}
+
+export async function deleteTicketComment(commentId: string): Promise<void> {
+  await apiDelete(`/ticket-comments/${commentId}`);
+}
+
+export interface AgentResponse {
+  answer: string;
+  action_buttons: Array<{ label: string; path: string }>;
+  tool_trace: Array<{ name: string; args: any; result_preview: string }>;
+  iterations: number;
+}
+
+export async function askChatbotAgent(
+  question: string,
+  history?: Array<{ role: string; content: string }>,
+  frontendContext?: any
+): Promise<AgentResponse> {
+  return apiPost<AgentResponse>("/chatbot/agent", {
+    question,
+    history,
+    frontend_context: frontendContext,
+  });
+}
+

@@ -1,28 +1,32 @@
 "use client";
 
 import * as React from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
+  ArrowRight,
   Check,
-  ChevronDown,
-  ChevronRight,
   Copy,
+  ExternalLink,
   Loader2,
   MessageCircle,
   SendHorizontal,
   Sparkles,
   Trash2,
-  Wrench,
   X,
 } from "lucide-react";
 
-import { type ChatbotSource } from "@/lib/apiClient";
-import { cn } from "@/lib/utils";
+import { cn, generateUUID } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type ActionButton = {
+  label: string;
+  path: string;
+};
 
 type ToolTraceItem = {
   name: string;
@@ -35,40 +39,18 @@ type ChatMessage = {
   role: "user" | "assistant";
   text: string;
   createdAt: number;
-  sources?: ChatbotSource[];
+  actionButtons?: ActionButton[];
   toolTrace?: ToolTraceItem[];
+  widgetType?: string;
+  widgetData?: any;
 };
 
+// ─── Config ───────────────────────────────────────────────────────────────────
+
 const CHATBOT_API_BASE =
-  process.env.NEXT_PUBLIC_CHATBOT_API_URL ||
+  process.env.NEXT_PUBLIC_CHATBOT_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
   "http://127.0.0.1:8000";
-const CHATBOT_AGENT_ENDPOINT = "/chatbot/agent";
-const CHATBOT_FALLBACK_ENDPOINTS = ["/chatbot/ask", "/chatbot", "/chatbot/message"];
-
-function extractAssistantReply(payload: unknown): string {
-  if (!payload) return "";
-  if (typeof payload === "string") return payload;
-
-  if (typeof payload === "object") {
-    const obj = payload as Record<string, unknown>;
-    const directKeys = ["reply", "response", "answer", "message", "text"];
-
-    for (const key of directKeys) {
-      const value = obj[key];
-      if (typeof value === "string" && value.trim()) {
-        return value;
-      }
-    }
-
-    if (obj.data && typeof obj.data === "object") {
-      const nested = extractAssistantReply(obj.data);
-      if (nested) return nested;
-    }
-  }
-
-  return "";
-}
 
 const AUTH_ROUTE_PREFIXES = [
   "/login",
@@ -78,11 +60,133 @@ const AUTH_ROUTE_PREFIXES = [
   "/auth",
 ];
 
-const HELPDESK_ROUTE_PREFIXES = ["/help-desk", "/admin/help-desk", "/user/help-desk"];
+function CopyActionButton({ label, textToCopy }: { label: string; textToCopy: string }) {
+  const [copied, setCopied] = React.useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard.writeText(textToCopy);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 shadow-sm"
+    >
+      {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3 text-muted-foreground" />}
+      {copied ? "Copied!" : label}
+    </button>
+  );
+}
+
+// ─── Widgets ──────────────────────────────────────────────────────────────────
+
+function AssetHealthWidget({ data }: { data: any }) {
+  if (!data) return null;
+  const isGood = data.healthScore >= 70;
+  return (
+    <div className="mt-3 overflow-hidden rounded-xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="font-semibold text-sm text-foreground">{data.name}</h4>
+        <Badge variant={isGood ? "default" : "destructive"} className="text-[10px] uppercase">
+          {data.status}
+        </Badge>
+      </div>
+      <div className="space-y-2 text-xs">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Health Score</span>
+          <span className="font-medium text-foreground">{data.healthScore}%</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Failure Prob.</span>
+          <span className="font-medium text-foreground">{(data.failureProbability * 100).toFixed(0)}%</span>
+        </div>
+        <div className="flex justify-between border-t border-border/50 pt-2">
+          <span className="text-muted-foreground">Predicted Failure</span>
+          <span className="font-medium text-red-500">{data.predictedFailureDate}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecordSummaryWidget({ payload }: { payload: any }) {
+  if (!payload || !payload.data) return null;
+  const { type, data } = payload;
+  
+  // Title mapping
+  let title = "Record Details";
+  if (type === "ticket") title = data.title || data.id;
+  if (type === "asset") title = data.asset_name || data.asset_code || data.id;
+  if (type === "user") title = data.full_name || data.email || data.id;
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm">
+      <h4 className="font-semibold text-sm text-foreground mb-3 pb-2 border-b border-border/50">{title}</h4>
+      <div className="space-y-2 text-xs">
+        {Object.entries(data).map(([key, value]) => {
+          // Skip internal or empty fields
+          if (!value || key === "id" || key.endsWith("_id")) return null;
+          
+          const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          const textValue = String(value);
+          let displayValue: React.ReactNode = textValue;
+          // Badge formatting for common statuses
+          if (key === "status" || key === "priority" || key === "role") {
+            const isGood = textValue === "active" || textValue === "resolved" || textValue === "admin";
+            const isWarn = textValue === "medium" || textValue === "in_progress" || textValue === "open";
+            const variant = isGood ? "default" : (isWarn ? "secondary" : "destructive");
+            displayValue = (
+              <Badge variant={variant as any} className="text-[10px] uppercase h-4 px-1.5 py-0 leading-none">
+                {textValue.replace(/_/g, ' ')}
+              </Badge>
+            );
+          }
+          
+          // Truncate very long text like descriptions
+          if (typeof value === "string" && value.length > 100) {
+            displayValue = value.substring(0, 100) + "...";
+          }
+
+          return (
+            <div key={key} className="flex justify-between items-start gap-4">
+              <span className="text-muted-foreground shrink-0">{formattedKey}</span>
+              <span className="font-medium text-foreground text-right">{displayValue}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Markdown-to-React renderer ───────────────────────────────────────────────
+// Renders **bold**, and newlines safely without dangerouslySetInnerHTML.
+
+function renderMarkdown(text: string): React.ReactNode[] {
+  const lines = text.split("\n");
+  return lines.map((line, li) => {
+    // Split on **bold** markers
+    const parts = line.split(/(\*\*[^*]+\*\*)/g);
+    const rendered = parts.map((part, pi) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={pi}>{part.slice(2, -2)}</strong>;
+      }
+      return <React.Fragment key={pi}>{part}</React.Fragment>;
+    });
+    return (
+      <React.Fragment key={li}>
+        {rendered}
+        {li < lines.length - 1 && <br />}
+      </React.Fragment>
+    );
+  });
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function FloatingChatbot() {
   const pathname = usePathname();
-  const isHelpDeskRoute = HELPDESK_ROUTE_PREFIXES.some((p) => pathname?.startsWith(p) ?? false);
+  const router = useRouter();
 
   const [isMounted, setIsMounted] = React.useState(false);
   const [isLoaderPresent, setIsLoaderPresent] = React.useState(false);
@@ -92,55 +196,81 @@ export default function FloatingChatbot() {
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
 
-  const [expandedTraces, setExpandedTraces] = React.useState<Record<string, boolean>>({});
-
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const messageEndRef = React.useRef<HTMLDivElement | null>(null);
 
-  const isHiddenRoute = React.useMemo(() => {
-    return AUTH_ROUTE_PREFIXES.some((prefix) => {
-      return pathname === prefix || pathname.startsWith(`${prefix}/`);
-    });
-  }, [pathname]);
+  const isHiddenRoute = React.useMemo(
+    () =>
+      AUTH_ROUTE_PREFIXES.some(
+        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+      ),
+    [pathname]
+  );
 
+  // Mount guard
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  // Detect loading overlay
   React.useEffect(() => {
     if (!isMounted) return;
-    
-    const checkLoader = () => {
+    const checkLoader = () =>
       setIsLoaderPresent(!!document.querySelector('[data-predictix-loader="true"]'));
-    };
-    
     checkLoader();
     const observer = new MutationObserver(checkLoader);
     observer.observe(document.body, { childList: true, subtree: true });
-    
     return () => observer.disconnect();
   }, [isMounted]);
 
+  // Clear chat history when returning to auth routes (e.g. logging out)
+  React.useEffect(() => {
+    if (isHiddenRoute) {
+      setMessages([]);
+    }
+  }, [isHiddenRoute]);
+
+  // Escape key to close
   React.useEffect(() => {
     if (!isOpen) return;
     inputRef.current?.focus();
-
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
     };
-
     window.addEventListener("keydown", onEscape);
-    return () => {
-      window.removeEventListener("keydown", onEscape);
-    };
+    return () => window.removeEventListener("keydown", onEscape);
   }, [isOpen]);
 
+  // Proactive Alert Listener
+  React.useEffect(() => {
+    const handleProactiveAlert = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const payload = customEvent.detail;
+      
+      setIsOpen(true);
+      
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateUUID(),
+          role: "assistant",
+          text: `🚨 **Critical Alert!**\n\n${payload.title}\n${payload.message}`,
+          createdAt: Date.now(),
+        }
+      ]);
+    };
+    
+    window.addEventListener("proactive_alert", handleProactiveAlert);
+    return () => window.removeEventListener("proactive_alert", handleProactiveAlert);
+  }, []);
+
+  // Auto-scroll on new messages
   React.useEffect(() => {
     if (!isOpen) return;
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [isSending, isOpen, messages]);
+
+  // ─── Send Message ──────────────────────────────────────────────────────────
 
   const sendMessage = async () => {
     const text = draft.trim();
@@ -148,7 +278,7 @@ export default function FloatingChatbot() {
 
     setIsSending(true);
     const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       role: "user",
       text,
       createdAt: Date.now(),
@@ -159,7 +289,7 @@ export default function FloatingChatbot() {
       content: m.text,
     }));
 
-    setMessages((current) => [...current, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setDraft("");
 
     try {
@@ -169,91 +299,84 @@ export default function FloatingChatbot() {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      let replyText = "";
-      let toolTrace: ToolTraceItem[] | undefined;
-      let sources: ChatbotSource[] | undefined;
-      let lastError = "";
+      // Retrieve cached frontend data for chatbot fallback
+      const cachedDashboard = window.localStorage.getItem("predictix.cached_dashboard_data");
+      const cachedAssetStats = window.localStorage.getItem("predictix.cached_asset_stats");
+      const cachedAssetAnalytics = window.localStorage.getItem("predictix.cached_asset_analytics");
+      
+      const frontendContext = {
+        dashboard_data: cachedDashboard ? JSON.parse(cachedDashboard) : null,
+        asset_stats: cachedAssetStats ? JSON.parse(cachedAssetStats) : null,
+        asset_analytics: cachedAssetAnalytics ? JSON.parse(cachedAssetAnalytics) : null,
+      };
 
-      // 1) Try the agentic endpoint first
-      try {
-        const response = await fetch(`${CHATBOT_API_BASE}${CHATBOT_AGENT_ENDPOINT}`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ question: text, history: historyForAgent }),
-        });
-        if (response.ok) {
-          const payload = await response.json();
-          replyText = typeof payload?.answer === "string" ? payload.answer : "";
-          if (Array.isArray(payload?.tool_trace)) {
-            toolTrace = payload.tool_trace as ToolTraceItem[];
-          }
-        } else {
-          lastError = `${response.status} ${response.statusText}`;
+      const response = await fetch(`${CHATBOT_API_BASE}/chatbot/agent`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ 
+          question: text, 
+          history: historyForAgent,
+          frontend_context: frontendContext
+        }),
+      });
+
+      if (!response.ok) {
+        const status = response.status;
+        if (status === 401 || status === 403) {
+          throw new Error("auth");
         }
-      } catch (error) {
-        lastError = error instanceof Error ? error.message : "Network error";
+        throw new Error(`server_error_${status}`);
       }
 
-      // 2) Fall back to the legacy RAG endpoints if agent didn't reply
-      if (!replyText) {
-        for (const path of CHATBOT_FALLBACK_ENDPOINTS) {
-          try {
-            const response = await fetch(`${CHATBOT_API_BASE}${path}`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({ question: text }),
-            });
-            if (!response.ok) {
-              lastError = `${response.status} ${response.statusText}`;
-              continue;
-            }
-            const payload = await response.json();
-            replyText = extractAssistantReply(payload);
-            if (Array.isArray((payload as { sources?: unknown })?.sources)) {
-              sources = (payload as { sources: ChatbotSource[] }).sources;
-            }
-            if (replyText) break;
-            lastError = "Chat endpoint returned no reply text";
-          } catch (error) {
-            lastError = error instanceof Error ? error.message : "Network error";
-          }
-        }
-      }
+      const payload = await response.json();
+      const replyText: string = typeof payload?.answer === "string" ? payload.answer : "";
+      const actionButtons: ActionButton[] = Array.isArray(payload?.action_buttons)
+        ? (payload.action_buttons as ActionButton[])
+        : [];
+      const toolTrace: ToolTraceItem[] = Array.isArray(payload?.tool_trace)
+        ? (payload.tool_trace as ToolTraceItem[])
+        : [];
+      const widgetType = payload?.widget_type;
+      const widgetData = payload?.widget_data;
 
-      if (!replyText) {
-        throw new Error(lastError || "Unable to get chatbot response");
-      }
-
-      setMessages((current) => [
-        ...current,
+      setMessages((prev) => [
+        ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: "assistant",
-          text: replyText,
+          text: replyText || "I'm sorry, I couldn't generate a response.",
           createdAt: Date.now(),
+          actionButtons,
           toolTrace,
-          sources,
+          widgetType,
+          widgetData,
         },
       ]);
     } catch (error) {
-      const isNetworkError =
-        error instanceof Error &&
-        (error.message.toLowerCase().includes("fetch") ||
-         error.message.toLowerCase().includes("network") ||
-         error.message.toLowerCase().includes("failed to connect") ||
-         error.message.toLowerCase().includes("cors"));
+      const errMsg = error instanceof Error ? error.message : String(error);
 
-      const friendlyMessage = isNetworkError
-        ? "I am sorry, but I am unable to reach the PredictiX service right now. Please verify that the backend server is running and try again."
-        : `An unexpected issue occurred: ${error instanceof Error ? error.message : String(error)}`;
+      let friendlyMessage =
+        "⚠️ I'm sorry, but I'm unable to reach the PredictiX service right now. Please verify the backend server is running and try again.";
 
-      setMessages((current) => [
-        ...current,
+      if (errMsg === "auth") {
+        friendlyMessage =
+          "🔒 It looks like your session has expired. Please log in again to continue using the assistant.";
+      } else if (errMsg.includes("server_error_429")) {
+        friendlyMessage =
+          "🛑 I've hit my token limit for right now! Please try again in a few minutes.";
+      } else if (errMsg.includes("server_error_5")) {
+        friendlyMessage =
+          "⚠️ The server encountered an error. Please try again in a moment or contact support at neuromindspredictix@gmail.com.";
+      }
+
+      setMessages((prev) => [
+        ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: "assistant",
           text: friendlyMessage,
           createdAt: Date.now(),
+          actionButtons: [],
         },
       ]);
     } finally {
@@ -261,20 +384,22 @@ export default function FloatingChatbot() {
     }
   };
 
-  const handleSourceClick = (source: ChatbotSource) => {
-    setDraft((current) => (current ? `${current} ${source.title}` : source.title));
-    inputRef.current?.focus();
-  };
-
   if (!isMounted || isHiddenRoute || isLoaderPresent) {
     return null;
   }
 
+  // ─── Render ────────────────────────────────────────────────────────────────
+
   return (
-    <div id="predictix-chatbot" className="pointer-events-none fixed inset-0 z-50" aria-hidden={false}>
+    <div
+      id="predictix-chatbot"
+      className="pointer-events-none fixed inset-0 z-50"
+      aria-hidden={false}
+    >
       {isOpen ? (
-        <div className="pointer-events-auto absolute bottom-24 right-6 w-[calc(100vw-32px)] sm:w-[380px] h-[520px] max-h-[calc(100vh-120px)]">
-          <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-md motion-reduce:transition-none">
+        <div className="pointer-events-auto absolute bottom-24 right-6 w-[calc(100vw-32px)] sm:w-[400px] h-[560px] max-h-[calc(100vh-120px)]">
+          <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-md">
+            {/* Header */}
             <div className="relative flex items-center justify-between border-b border-border/60 px-4 py-3 bg-gradient-to-r from-violet-500/10 via-fuchsia-500/5 to-sky-500/10 dark:from-violet-500/15 dark:via-fuchsia-500/10 dark:to-sky-500/15">
               <div className="flex items-center gap-2">
                 <div className="rounded-full bg-gradient-to-br from-violet-500 to-sky-500 p-1.5 text-white shadow-sm">
@@ -282,49 +407,56 @@ export default function FloatingChatbot() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    PredictiX Assistant
+                    Sidekick
                     <Sparkles className="size-3 text-violet-500" />
                   </p>
                   <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Online
+                    Online · AI Powered
                   </p>
                 </div>
               </div>
-
               <div className="flex items-center gap-1">
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  onClick={() => setMessages([])}
-                  aria-label="Clear local messages"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
                   onClick={() => setIsOpen(false)}
-                  aria-label="Collapse chatbot"
+                  aria-label="Close chatbot"
                 >
                   <X className="size-4" />
                 </Button>
               </div>
             </div>
 
-            <ScrollArea type="always" className="flex-1 px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-3 py-4 bg-gradient-to-b from-transparent to-violet-50/30 dark:to-violet-950/20 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-violet-500/20 hover:[&::-webkit-scrollbar-thumb]:bg-violet-500/40 [&::-webkit-scrollbar-thumb]:rounded-full">
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center pb-12">
-                  <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3">
-                    <Sparkles className="size-6 text-violet-500" />
+                  <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3.5">
+                    <img src="/logo/predictix-icon.svg" alt="PredictiX" className="size-8 object-contain drop-shadow-md" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-foreground">How can I help?</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Ask about assets, tickets, or maintenance.
+                    <p className="text-sm font-semibold text-foreground">How can I help you?</p>
+                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                      Ask about assets, tickets, predictions, or<br />type <strong>menu</strong> to see all capabilities.
                     </p>
+                  </div>
+                  {/* Quick action chips */}
+                  <div className="flex flex-wrap justify-center gap-2 mt-2">
+                    {["Menu", "My tickets", "Open assets", "Failure predictions"].map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => {
+                          setDraft(chip);
+                          setTimeout(() => inputRef.current?.focus(), 50);
+                        }}
+                        className="rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 hover:border-muted-foreground/30 transition-all duration-200"
+                      >
+                        {chip}
+                      </button>
+                    ))}
                   </div>
                 </div>
               ) : (
@@ -336,18 +468,27 @@ export default function FloatingChatbot() {
                     >
                       <div
                         className={cn(
-                          "max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm",
+                          "max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm",
                           message.role === "user"
-                            ? "rounded-br-md bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white"
-                            : "rounded-bl-md border border-border/70 bg-card text-foreground dark:bg-slate-800/80"
+                            ? "rounded-tr-sm bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-medium"
+                            : "rounded-tl-sm border border-border/60 bg-muted/40 dark:bg-muted/10 text-foreground"
                         )}
                       >
-                        <p className="whitespace-pre-wrap">{message.text}</p>
+                        {/* Message body */}
+                        <div className="whitespace-pre-wrap leading-relaxed">
+                          {message.role === "assistant"
+                            ? renderMarkdown(message.text)
+                            : message.text}
+                        </div>
+
+                        {/* Timestamp + Copy */}
                         <div className="mt-1.5 flex items-center justify-between gap-4">
                           <span
                             className={cn(
                               "text-[10px]",
-                              message.role === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                              message.role === "user"
+                                ? "text-primary-foreground/70"
+                                : "text-muted-foreground"
                             )}
                           >
                             {new Date(message.createdAt).toLocaleTimeString([], {
@@ -364,7 +505,7 @@ export default function FloatingChatbot() {
                                 setTimeout(() => setCopiedMessageId(null), 2000);
                               }}
                               className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors outline-none focus:ring-0"
-                              title="Copy message to clipboard"
+                              title="Copy message"
                             >
                               {copiedMessageId === message.id ? (
                                 <>
@@ -381,48 +522,64 @@ export default function FloatingChatbot() {
                           )}
                         </div>
 
-                        {message.role === "assistant" && message.sources && message.sources.length > 0 ? (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {message.sources.map((source, index) => (
-                              <button
-                                key={`${message.id}-${source.title}-${index}`}
-                                type="button"
-                                className="rounded-md"
-                                onClick={() => handleSourceClick(source)}
-                                aria-label={`Use source ${source.title}`}
-                              >
-                                <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
-                                  {source.title} - {source.category}
-                                </Badge>
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
+                        {/* Custom Widgets */}
+                        {message.role === "assistant" && message.widgetType === "ASSET_HEALTH" && (
+                          <AssetHealthWidget data={message.widgetData} />
+                        )}
+                        {message.role === "assistant" && message.widgetType === "RECORD_SUMMARY" && (
+                          <RecordSummaryWidget payload={message.widgetData} />
+                        )}
 
+                        {/* Action Buttons, rendered as clickable nav buttons */}
+                        {message.role === "assistant" &&
+                          message.actionButtons &&
+                          message.actionButtons.length > 0 && (
+                            <div className="mt-2.5 flex flex-wrap gap-2">
+                              {message.actionButtons.map((btn, i) => {
+                                if (btn.path.startsWith("copy:")) {
+                                  return <CopyActionButton key={i} label={btn.label} textToCopy={btn.path.replace("copy:", "")} />;
+                                }
+                                return (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => {
+                                      router.push(btn.path);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 shadow-sm"
+                                  >
+                                    <ArrowRight className="size-3 text-muted-foreground" />
+                                    {btn.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                       </div>
                     </div>
                   ))}
 
-                  {isSending ? (
+                  {isSending && (
                     <div className="flex justify-start">
-                      <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-sm text-foreground shadow-sm">
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="size-4 animate-spin" />
-                          <span>Thinking...</span>
+                      <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-3 py-2 text-xs text-foreground shadow-sm">
+                        <div className="flex items-center gap-1.5">
+                          <Loader2 className="size-3.5 animate-spin text-violet-500" />
+                          <span className="text-muted-foreground tracking-wide">Thinking...</span>
                         </div>
                       </div>
                     </div>
-                  ) : null}
+                  )}
 
                   <div ref={messageEndRef} />
                 </div>
               )}
-            </ScrollArea>
+            </div>
 
+            {/* Input */}
             <form
-              className="border-t border-border/60 p-3"
-              onSubmit={async (event) => {
-                event.preventDefault();
+              className="border-t border-border/60 p-3 bg-card/50"
+              onSubmit={async (e) => {
+                e.preventDefault();
                 void sendMessage();
               }}
             >
@@ -430,42 +587,58 @@ export default function FloatingChatbot() {
                 <Input
                   ref={inputRef}
                   value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
+                  onChange={(e) => setDraft(e.target.value)}
                   placeholder="Ask a question..."
-                  aria-label="Chatbot draft message"
-                  className="h-10"
+                  aria-label="Chatbot message input"
+                  className="h-10 text-sm"
                   disabled={isSending}
+                  maxLength={500}
                 />
+
                 <Button
                   type="submit"
                   size="icon-sm"
-                  aria-label="Send chatbot message"
+                  aria-label="Send message"
                   disabled={!draft.trim() || isSending}
+                  className="shrink-0"
                 >
-                  {isSending ? <Loader2 className="size-4 animate-spin" /> : <SendHorizontal className="size-4" />}
+                  {isSending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <SendHorizontal className="size-4" />
+                  )}
                 </Button>
               </div>
+              <p className="mt-1.5 text-[10px] text-center text-muted-foreground/60">
+                AI-powered · Role-scoped · Type <strong>menu</strong> for help
+              </p>
             </form>
           </Card>
         </div>
       ) : null}
 
+      {/* Floating Launch Button */}
       <button
         type="button"
         className={cn(
-          "pointer-events-auto group absolute bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full border border-white/20 text-white shadow-[0_10px_30px_-10px_rgba(124,58,237,0.6)]",
-          "bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500",
-          "cursor-pointer hover:scale-105 transition-all duration-300 ease-out",
-          isHelpDeskRoute && "animate-pulse" // Just a small bonus
+          "pointer-events-auto group absolute bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full border border-border bg-gradient-to-br from-indigo-600 to-violet-600 text-white",
+          "shadow-[0_8px_30px_rgb(79,70,229,0.3)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.5)]",
+          "cursor-pointer hover:scale-105 hover:shadow-[0_12px_30px_rgb(79,70,229,0.4)] transition-all duration-300 ease-out"
         )}
-        onClick={() => setIsOpen((current) => !current)}
-        aria-label={isOpen ? "Collapse chatbot" : "Open chatbot"}
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-label={isOpen ? "Close chatbot" : "Open chatbot"}
       >
-        <span className="sr-only">Chatbot launcher</span>
+        <span className="sr-only">Sidekick</span>
         <span className="pointer-events-none absolute inset-0 rounded-full bg-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-violet-400/40 to-sky-400/40 blur-md opacity-60" />
-        <MessageCircle className="relative size-6 drop-shadow-sm" />
-        <Sparkles className="absolute -top-1 -right-1 size-3 text-white/90 drop-shadow" />
+        <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-indigo-400/20 to-violet-400/20 blur-md opacity-60" />
+        {isOpen ? (
+          <X className="relative size-6 drop-shadow-sm" />
+        ) : (
+          <>
+            <MessageCircle className="relative size-6 drop-shadow-sm" />
+            <Sparkles className="absolute -top-1 -right-1 size-3 text-white/90 drop-shadow" />
+          </>
+        )}
       </button>
     </div>
   );

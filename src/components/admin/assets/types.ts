@@ -1,4 +1,61 @@
-// ─── Asset (from models.py Asset + AssetOut schema) ───────────────────────────
+/**
+ * One row in the assets list, as returned by `GET /assets/`.
+ *
+ * A smaller version of {@link Asset}. The list can show ~1000 rows, so the
+ * endpoint sends only the columns the table and filters actually use.
+ */
+export type AssetListItem = {
+  id: string;
+  asset_code: string;
+  asset_name: string;
+  asset_type: string;
+  vehicle_type: string | null;
+  make: string | null;
+  model: string | null;
+  manufacture_year: number | null;
+  status: string;
+  health_band: string | null;
+  warehouse_id: string;
+  meta?: {
+    image_url?: string;
+    images?: string[];
+    [key: string]: any;
+  };
+};
+
+/** Headline counts for the assets summary cards, scoped to the caller's warehouse. */
+export type AssetStats = {
+  total: number;
+  operational: number;
+  maintenance: number;
+  critical: number;
+  offline: number;
+  /** Mean health score, or null when no asset in scope has been scored yet. */
+  avgHealth: number | null;
+  /** How many of `total` assets `avgHealth` is averaged over. */
+  avgHealthScoredCount: number;
+};
+
+/** Counts already grouped by the backend, ready for the analytics charts. */
+export type AssetAnalytics = {
+  statusDistribution: { name: string; value: number }[];
+  healthDistribution: { name: string; value: number }[];
+  vehicleTypeDistribution: { name: string; value: number }[];
+  /** Lowest-health assets, for the "needs attention" list. */
+  topAtRisk: {
+    id: string;
+    asset_name: string;
+    asset_code: string;
+    health_band: string | null;
+  }[];
+};
+
+/**
+ * A single asset in full, as returned by `GET /assets/{id}`.
+ *
+ * Mirrors the backend `AssetOut` schema. Note it carries no `created_at` /
+ * `updated_at`, because the endpoint does not return them.
+ */
 export type Asset = {
   id: string;
   asset_code: string;
@@ -13,7 +70,9 @@ export type Asset = {
   manufacture_year: number | null;
   registration_number: string | null;
   vin: string | null;
-  status: string;                  // "active" | "inactive" | "retired" | "maintenance"
+  /** Parking bay as `"<zone>-<bay>"` (e.g. `"A-012"`), unique per warehouse. */
+  parking_slot: string | null;
+  status: string;                  // "active" | "inactive" | "under_maintenance" | "critical" | "decommissioned"
   health_band: string | null;      // "excellent" | "good" | "moderate" | "poor" | "critical"
   criticality_score: number | null;
   purchase_date: string | null;
@@ -28,43 +87,64 @@ export type Asset = {
   vehicle_age_years: number | null;
   lifetime_service_count: number | null;
   lifetime_breakdown_count: number | null;
-  // Custom metadata
+  fuel_type: string | null;
+  transmission: string | null;
+  make_model: string | null;
+  maintenance_priority: string | null;
+  service_provider_type: string | null;
+  /** Free-form metadata. `image_url` is the legacy single-image field. */
   meta?: {
-    image_url?: string; // Legacy
+    image_url?: string;
     images?: string[];
     [key: string]: any;
   };
-  created_at: string;
-  updated_at: string;
 };
 
-// ─── Failure Prediction (from AssetFailurePredictionOut) ───────────────────────
-export type FailurePrediction = {
+/** Overall result for an asset. `conflict` means the models disagreed. */
+export type PredictionTier = "urgent" | "watch" | "healthy" | "conflict";
+
+/** How sure the due date is, which decides how the UI words it. */
+export type PredictionDisplayMode = "date" | "soft_estimate" | "horizon";
+
+/**
+ * An asset's current PdM state, from `GET /batch-predictions/{asset_id}`.
+ *
+ * Holds the classifier, regressor, health score and cost estimate, plus the
+ * decision layer that combines them into one {@link PredictionTier}. The daily
+ * job and the "Refresh now" button both write this same row, so it is the only
+ * place the UI reads predictions from.
+ */
+export type BatchPrediction = {
   id: string;
-  run_id: string;
   asset_id: string;
-  health_score: number | null;
   failure_probability: number | null;
-  confidence: number | null;
+  maintenance_required: boolean | null;
   risk_level: string | null;
+  predicted_days_until_maintenance: number | null;
   predicted_maintenance_date: string | null;
-  days_until_maintenance: number | null;
-  top_explanations: Record<string, unknown> | null;
+  health_score: number | null;
+  health_status: string | null;
+  contributing_factors: { feature: string; impact: number }[];
+  estimated_cost_lkr: number | null;
+  min_cost_lkr: number | null;
+  max_cost_lkr: number | null;
+  top_explanations: { feature: string; impact: number }[];
+  predicted_at: string | null;
+  run_duration_ms: number | null;
+  status: string;
+  error_message: string | null;
+
+  // Decision layer: combines the model outputs into one recommendation.
+  model_version: string | null;
+  tier: PredictionTier | null;
+  agreement: boolean | null;
+  display_mode: PredictionDisplayMode | null;
+  horizon_text: string | null;
+  recommended_action: string | null;
+  horizon_saturated: boolean | null;
 };
 
-// ─── Cost Prediction (from AssetCostPredictionOut) ─────────────────────────────
-export type CostPrediction = {
-  id: string;
-  run_id: string;
-  asset_id: string;
-  estimated_cost: number | null;
-  min_cost: number | null;
-  max_cost: number | null;
-  currency: string | null;
-  confidence_score: number | null;
-};
-
-// ─── Maintenance Event (from MaintenanceEventOut) ──────────────────────────────
+/** One completed or scheduled service against an asset. */
 export type MaintenanceEvent = {
   id: string;
   asset_id: string;
@@ -82,7 +162,7 @@ export type MaintenanceEvent = {
   notes: string | null;
 };
 
-// ─── Ticket (from models.py Ticket) ───────────────────────────────────────────
+/** A maintenance ticket, optionally linked to an asset. */
 export type Ticket = {
   id: string;
   ticket_number: string;
@@ -103,7 +183,7 @@ export type Ticket = {
   resolved_at: string | null;
 };
 
-// ─── Asset Assignment (from AssetAssignmentOut) ────────────────────────────────
+/** A record of an asset being assigned to a user. Inactive once unassigned. */
 export type AssetAssignment = {
   id: string;
   asset_id: string;
@@ -113,47 +193,43 @@ export type AssetAssignment = {
   unassigned_at: string | null;
   is_active: boolean;
   notes: string | null;
+  /** Resolved by the API. Null when the referenced profile no longer exists. */
+  user_name: string | null;
+  user_email: string | null;
+  assigned_by_name: string | null;
 };
 
-// ─── Vehicle Prediction (full stored result) ───────────────────────────────────
-export type VehiclePredictionResult = {
-  run_id: string;
-  asset_id: string;
-  predicted_class: number;
-  predicted_label: string;
-  failure_probability: number;
-  confidence: number;
-  predicted_days_until_maintenance: number;
-  predicted_maintenance_date: string;
-  health_score: number;
-  health_band: string;
-  risk_level: string;
-  estimated_cost_lkr: number;
-  min_cost_lkr: number;
-  max_cost_lkr: number;
-  features_used: Record<string, unknown>;
-};
-
-// ─── Survival Prediction (FRSO) ────────────────────────────────────────────────
+/** One point on a component's survival curve: probability it lasts to `day`. */
 export type SurvivalCurvePoint = {
   day: number;
   survival_prob: number;
 };
 
+/** Remaining-life forecast for one component, from the Weibull AFT model. */
 export type ComponentSurvivalResponse = {
   asset_id: string;
   component: "brake" | "tire" | "battery" | "oil" | "hydraulic";
+  health_pct: number | null;
   median_days: number;
   p10_days: number;
   p90_days: number;
+  fail_prob_7d: number;
+  fail_prob_30d: number;
+  /**
+   * True when the day counts hit the limit of what the model was trained on.
+   * Read them as "further out than this", not as an exact number of days.
+   */
+  horizon_capped: boolean;
   curve: SurvivalCurvePoint[];
 };
 
+/** Sent instead of a forecast when one component could not be scored. */
 export type ComponentSurvivalError = {
   component: "brake" | "tire" | "battery" | "oil" | "hydraulic";
   error: string;
 };
 
+/** Per-component remaining life for one asset, plus whichever fails soonest. */
 export type AssetSurvivalResponse = {
   asset_id: string;
   horizon_days: number;
@@ -163,21 +239,61 @@ export type AssetSurvivalResponse = {
   components: (ComponentSurvivalResponse | ComponentSurvivalError)[];
 };
 
-// ─── Combined asset detail view (assembled in the service layer) ───────────────
+/**
+ * One month of recorded operation. Any measure may be null when that month's
+ * reading did not carry it, so a chart must skip a null rather than plot zero.
+ */
+export type UsagePoint = {
+  period: string;
+  operating_hours: number | null;
+  idle_hours: number | null;
+  distance_km: number | null;
+  days_since_last_service: number | null;
+  downtime_hours_90d: number | null;
+};
+
+/** Recorded operating history for one asset, oldest point first. */
+export type AssetUsageHistory = {
+  asset_id: string;
+  months: number;
+  points: UsagePoint[];
+};
+
+/**
+ * Everything the asset detail panel shows. The service layer fetches it from
+ * several endpoints so the component only makes one call.
+ */
 export type AssetDetail = {
   asset: Asset;
-  prediction: FailurePrediction | null;
-  costPrediction: CostPrediction | null;
-  survivalPrediction: AssetSurvivalResponse | null;
+  prediction: BatchPrediction | null;
+  componentRul: AssetSurvivalResponse | null;
+  usageHistory: AssetUsageHistory | null;
   maintenanceEvents: MaintenanceEvent[];
   tickets: Ticket[];
   assignments: AssetAssignment[];
 };
 
-// ─── Filter state used by the toolbar ─────────────────────────────────────────
+/** Columns the list can be sorted by. Must match the keys the backend accepts. */
+export type AssetSortBy =
+  | "created_at"
+  | "updated_at"
+  | "asset_name"
+  | "asset_code"
+  | "status"
+  | "vehicle_type"
+  | "make"
+  | "model"
+  | "manufacture_year"
+  | "current_mileage"
+  | "criticality_score"
+  | "payload_capacity_kg";
+
+/** Current toolbar filter and sort state, sent as query params to `GET /assets/`. */
 export type AssetFilters = {
   query: string;
   status: string;        // "all" | actual status values
   health_band: string;   // "all" | "excellent" | "good" | "moderate" | "poor" | "critical"
   warehouse_id: string;  // "all" | warehouse UUID
+  sort_by: AssetSortBy;
+  sort_order: "asc" | "desc";
 };

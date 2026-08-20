@@ -12,6 +12,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Copy, Check } from "lucide-react";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -25,9 +33,63 @@ import {
   login,
   selectWarehouse,
   storeAuthSession,
+  warmupInferenceSpace,
   type LoginResponse,
   type WarehouseOption,
 } from "@/lib/authService";
+import { supabase } from "@/lib/supabaseBrowserClient";
+
+// ─── Shared Components ────────────────────────────────────────────────────────
+
+/** Support address shown on the login screen. Single source of truth, the
+    displayed text and the clipboard copy previously hardcoded it separately,
+    so editing one would have silently left the other stale. */
+const SUPPORT_EMAIL = "neuromindspredictix@gmail.com";
+
+function AdminContactDialog() {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(SUPPORT_EMAIL);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button type="button" className="text-center text-xs text-slate-500 hover:text-slate-800 dark:text-muted-foreground dark:hover:text-foreground transition-colors">
+          contact admin
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Contact Administrator</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <p className="text-sm text-slate-500 dark:text-muted-foreground mb-4">
+            If you're having trouble logging in or need to reset your password, please contact our support team at the email below.
+          </p>
+          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-border dark:bg-muted">
+            <a
+              href={`mailto:${SUPPORT_EMAIL}`}
+              className="text-sm font-medium text-slate-900 underline-offset-2 select-all hover:underline dark:text-foreground"
+            >
+              {SUPPORT_EMAIL}
+            </a>
+            <Button variant="ghost" size="icon" onClick={handleCopy} className="h-8 w-8 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+              {copied ? (
+                <Check className="h-4 w-4 text-green-500 transition-all scale-110" />
+              ) : (
+                <Copy className="h-4 w-4 text-slate-500 transition-all hover:scale-110" />
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // ─── Background decoration ────────────────────────────────────────────────────
 
@@ -47,7 +109,7 @@ function BackgroundBlobs() {
         className="absolute -bottom-56 -right-56 rounded-full bg-white/70 blur-[160px] float-slow-3 dark:hidden"
         style={{ height: 900, width: 225 }}
       />
-      {/* Dark mode blobs — subtle, matches true-black OLED theme */}
+      {/* Dark mode blobs, subtle, matches true-black OLED theme */}
       <div
         className="hidden dark:block absolute -top-56 -left-56 rounded-full bg-sky-400/5 blur-[160px] float-slow-1"
         style={{ height: 225, width: 225 }}
@@ -96,6 +158,41 @@ export default function LoginPage() {
   const [warehouseId, setWarehouseId] = React.useState("");
   const [superAdminName, setSuperAdminName] = React.useState("");
 
+  // Wake the AI inference Space as soon as the login page is visited, so it's
+  // warm by the time the user's first ticket-categorization/priority call
+  // happens post-login. Fire-and-forget, never blocks rendering or login.
+  React.useEffect(() => {
+    warmupInferenceSpace();
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      
+      const errorParam = searchParams.get("error");
+      if (errorParam) {
+        setError(decodeURIComponent(errorParam));
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      
+      if (searchParams.get("oauth_super_admin") === "true") {
+        const stored = sessionStorage.getItem("predictix.google_oauth_super_admin");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            setSelectionToken(parsed.selectionToken);
+            setSuperAdminName(parsed.superAdminName);
+            setWarehouses(parsed.warehouses || []);
+            setStep("warehouse");
+            sessionStorage.removeItem("predictix.google_oauth_super_admin");
+          } catch (e) {
+            console.error("Failed to parse stored Google OAuth super admin state:", e);
+          }
+        }
+      }
+    }
+  }, []);
+
   function redirectAfterLogin(role: string) {
     const r = role.toUpperCase();
     if (r === "ADMIN" || r === "SUPER_ADMIN") {
@@ -104,6 +201,7 @@ export default function LoginPage() {
       router.push("/user/dashboard");
     }
   }
+
 
   // ── Step 1: credential submit ──────────────────────────────────────────────
 
@@ -210,7 +308,7 @@ export default function LoginPage() {
       <div className="relative z-20 mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-4 py-12">
         <div className="grid w-full grid-cols-1 items-center gap-12 lg:grid-cols-2">
 
-          {/* Left — hero text */}
+          {/* Left, hero text */}
           <section className="hidden lg:flex flex-col justify-center">
             <PredictiXLogo size={72} />
             <h2 className="mt-10 text-4xl font-semibold leading-tight tracking-tight text-slate-900 dark:text-foreground">
@@ -223,7 +321,7 @@ export default function LoginPage() {
             </p>
           </section>
 
-          {/* Right — login card */}
+          {/* Right, login card */}
           <section className="flex items-center justify-center">
             <Card className="w-full max-w-md rounded-3xl border border-slate-200 bg-white/90 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card/80">
               <CardHeader className="space-y-3">
@@ -291,18 +389,50 @@ export default function LoginPage() {
                       {isSubmitting ? "Logging in…" : "Log in"}
                     </Button>
 
-                    {/* Dev credentials hint */}
+
+                    {/* Demo credentials hint.
+                        Every warehouse has a matching demo pair, swap "colombo"
+                        for "badulla" or "galle" in the address to sign in against
+                        that site. Staff accounts follow
+                        firstname.department@lankalogix.com (departments: log,
+                        elec, sft, mech, adm) with the password user@123, or
+                        admin@123 for warehouse administrators. */}
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-border dark:bg-muted dark:text-muted-foreground">
-                      <div className="font-medium text-slate-800 dark:text-foreground mb-1">Dev accounts</div>
-                      <div><span className="font-medium">Super Admin:</span> super.admin1@lankalogix.lk / super</div>
-                      <div><span className="font-medium">Admin:</span> anjali.warnakulasuriya.adm1@lankalogix.lk / admin</div>
-                      <div><span className="font-medium">User:</span> nuwan.gunasekara.tra1@lankalogix.lk / user</div>
-                      <div className="mt-1 text-slate-500">Other seeded accounts: <span className="font-mono">Predictix@123</span></div>
+                      <div className="font-medium text-slate-800 dark:text-foreground mb-1.5">Demo accounts</div>
+                      <div className="space-y-1.5">
+                        <div>
+                          <span className="font-medium">Super Admin</span>
+                          <div className="font-mono break-all text-slate-500 dark:text-muted-foreground/80">
+                            demosuperadmin@lankalogix.com / superadmin@123
+                          </div>
+                        </div>
+                        <div>
+                          <span className="font-medium">Admin</span>
+                          <div className="font-mono break-all text-slate-500 dark:text-muted-foreground/80">
+                            demoadmincolombo.adm@lankalogix.com / demoadmin@123
+                          </div>
+                        </div>
+                        <div>
+                          <span className="font-medium">User</span>
+                          <div className="font-mono break-all text-slate-500 dark:text-muted-foreground/80">
+                            demousercolombo.adm@lankalogix.com / demouser@123
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-slate-500 dark:text-muted-foreground/70">
+                        Badulla and Galle have the same pair — replace{" "}
+                        <span className="font-mono">colombo</span> with{" "}
+                        <span className="font-mono">badulla</span> or{" "}
+                        <span className="font-mono">galle</span>.
+                      </div>
                     </div>
 
-                    <p className="text-center text-xs text-slate-500 dark:text-muted-foreground">
-                      © {new Date().getFullYear()} PredictiX
-                    </p>
+                    <div className="flex flex-col items-center gap-1 mt-4">
+                      <AdminContactDialog />
+                      <p className="text-center text-xs text-slate-500 dark:text-muted-foreground">
+                        © {new Date().getFullYear()} PredictiX
+                      </p>
+                    </div>
                   </form>
                 )}
 
@@ -352,9 +482,12 @@ export default function LoginPage() {
                       ← Back
                     </button>
 
-                    <p className="text-center text-xs text-slate-500 dark:text-muted-foreground">
-                      © {new Date().getFullYear()} PredictiX
-                    </p>
+                    <div className="flex flex-col items-center gap-1 mt-4">
+                      <AdminContactDialog />
+                      <p className="text-center text-xs text-slate-500 dark:text-muted-foreground">
+                        © {new Date().getFullYear()} PredictiX
+                      </p>
+                    </div>
                   </form>
                 )}
 

@@ -16,12 +16,11 @@ import {
 import {
   TicketPriorityBreakdownCard,
   TicketsByCategoryCard,
-  MonthlyTicketVolumeCard,
 } from "@/components/admin/warehouse/WarehouseTicketInsights";
 
 import { getWarehouseSummary, WarehouseSummaryData } from "@/lib/warehouseService";
 
-export default function WarehouseInsightsSection({ data: initialData }: { data?: WarehouseSummaryData }) {
+export default function WarehouseInsightsSection({ data: initialData }: { data?: any }) {
   const [data, setData] = useState<WarehouseSummaryData | null>(initialData || null);
   const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
@@ -84,10 +83,6 @@ export default function WarehouseInsightsSection({ data: initialData }: { data?:
 
         <TicketsByCategoryCard data={data?.ticketsByCategory} />
         <AssetsByTypeCard data={data?.assetsByType} />
-
-        <div className="lg:col-span-2">
-          <MonthlyTicketVolumeCard data={data?.monthlyTicketVolume} />
-        </div>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, CheckCircle, Clock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { apiGet } from "@/lib/apiClient";
 
 interface MaintenanceItem {
   asset: string;
@@ -20,18 +21,11 @@ export default function MaintenanceScheduleTable() {
     setLoading(true);
     setError(null);
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-      const response = await fetch(`${apiBaseUrl}/warehouse-dashboard/maintenance-schedule`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch: ${response.status}`);
-      }
-
-      const result = await response.json();
+      // Uses the shared API client: resolves NEXT_PUBLIC_API_URL (local / EC2)
+      // and attaches the auth token, instead of a hardcoded localhost URL.
+      const result = await apiGet<MaintenanceItem[]>(
+        "/warehouse-dashboard/maintenance-schedule"
+      );
       setData(Array.isArray(result) ? result : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");

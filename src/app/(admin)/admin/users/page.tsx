@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,19 +29,20 @@ import AddUserDialog from "@/components/admin/users/AddUserDialog";
 import type { NewUser } from "@/components/admin/users/AddUserDialog";
 import ViewUserDetailsDialog from "@/components/admin/users/ViewUserDetailsDialog";
 import ViewAssignedAssetsDialog from "@/components/admin/users/ViewAssignedAssetsDialog";
+import AssignAssetToUserDialog from "@/components/admin/users/AssignAssetToUserDialog";
 import EditUserDialog from "@/components/admin/users/EditUserDialog";
-import type { AssetItem } from "@/components/admin/users/ViewAssignedAssetsDialog";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   listUsers,
   createUser,
   updateUser,
   getUserAssets,
-  deleteUser,
   type UserItem,
   type UserRole,
   type UserStatus,
+  type CreateUserPayload,
 } from "@/lib/userService";
 
 import {
@@ -51,13 +53,26 @@ import {
   UserPlus,
   Search,
   Building2,
-  Trash2,
 } from "lucide-react";
 
-/**
- * Admin Users Management Page (PredictiX)
- * Fetches real users from the backend /users API.
- */
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type AssignedAsset = {
+  id: string;
+  asset_id?: string;
+  name: string;
+  category: string;
+  location: string;
+  healthPercent: number | null;
+};
+
+type ChartEntry = {
+  label: string;
+  value: number;
+  color: string;
+};
 
 // ---------------------------------------------------------------------------
 // KPI helpers
@@ -68,7 +83,6 @@ function computeKpis(users: UserItem[]) {
   const active = users.filter((u) => u.status === "active").length;
   const admins = users.filter((u) => u.role === "admin").length;
   const regular = users.filter((u) => u.role === "user").length;
-
   return [
     { label: "Total Users", value: total, icon: Users },
     { label: "Active", value: active, icon: UserCheck },
@@ -78,7 +92,7 @@ function computeKpis(users: UserItem[]) {
 }
 
 // ---------------------------------------------------------------------------
-// Sub-components: Badges (solid fills matching Figma)
+// Badges
 // ---------------------------------------------------------------------------
 
 function RoleBadge({ role }: { role: UserRole }) {
@@ -104,23 +118,22 @@ function StatusBadge({ status }: { status: UserStatus }) {
       </Badge>
     );
   }
-  return (
-    <Badge variant="secondary">inactive</Badge>
-  );
+  return <Badge variant="secondary">inactive</Badge>;
 }
 
 // ---------------------------------------------------------------------------
-// Sub-component: User avatar
+// Avatar
 // ---------------------------------------------------------------------------
 
 function UserAvatar({ name }: { name: string }) {
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
+  const initials =
+    (name || "?")
+      .split(" ")
+      .filter((n) => n.length > 0)
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "?";
   return (
     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
       {initials}
@@ -129,43 +142,135 @@ function UserAvatar({ name }: { name: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Donut Chart
+// ---------------------------------------------------------------------------
+
+function DonutChart({
+  data,
+  title,
+}: {
+  data: ChartEntry[];
+  title: string;
+}) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex items-center gap-6">
+        <div className="h-[120px] w-[120px] shrink-0">
+          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data.map((d) => ({ name: d.label, value: d.value }))}
+                cx="50%"
+                cy="50%"
+                innerRadius={38}
+                outerRadius={58}
+                dataKey="value"
+                strokeWidth={0}
+              >
+                {data.map((entry, index) => (
+                  <Cell key={index} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0];
+                  const pct =
+                    total > 0
+                      ? Math.round((Number(d.value) / total) * 100)
+                      : 0;
+                  return (
+                    <div className="rounded-xl border border-border bg-popover px-3 py-2 shadow-md text-xs">
+                      <p className="font-semibold text-foreground mb-0.5">
+                        {d.name}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {d.value} users&nbsp;·&nbsp;{pct}%
+                      </p>
+                    </div>
+                  );
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+          {data.map((d) => (
+            <div key={d.label} className="flex items-center gap-2 text-xs">
+              <span
+                className="h-2.5 w-2.5 rounded-sm shrink-0"
+                style={{ background: d.color }}
+              />
+              <span className="truncate text-muted-foreground">{d.label}</span>
+              <span className="ml-auto font-medium tabular-nums whitespace-nowrap">
+                {d.value}
+                <span className="text-muted-foreground font-normal ml-1">
+                  ({total > 0 ? Math.round((d.value / total) * 100) : 0}%)
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
 export default function AdminUsersPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = React.useState(true);
   const [users, setUsers] = React.useState<UserItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
-  const [departmentFilter, setDepartmentFilter] = React.useState<string>("all");
+  const [departmentFilter, setDepartmentFilter] =
+    React.useState<string>("all");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [detailsUser, setDetailsUser] = React.useState<UserItem | null>(null);
   const [editUser, setEditUser] = React.useState<UserItem | null>(null);
   const [assetsUser, setAssetsUser] = React.useState<UserItem | null>(null);
-  const [assignedAssets, setAssignedAssets] = React.useState<AssetItem[]>([]);
+  const [assignedAssets, setAssignedAssets] = React.useState<AssignedAsset[]>(
+    []
+  );
   const [assetsLoading, setAssetsLoading] = React.useState(false);
 
   function generateUserId(role: UserRole, department: string): string {
     const roleLetter = role === "admin" ? "A" : "U";
     const deptLetter = department.charAt(0).toUpperCase() || "X";
-
     const relevantUsers = users.filter((u) => u.id.startsWith(roleLetter));
     let maxNumber = 0;
-
     for (const u of relevantUsers) {
       const match = u.id.match(/^[AU](\d{4})[A-Z]?$/);
       if (match) {
         const num = parseInt(match[1], 10);
-        if (!Number.isNaN(num) && num > maxNumber) {
-          maxNumber = num;
-        }
+        if (!Number.isNaN(num) && num > maxNumber) maxNumber = num;
       }
     }
-
     const next = String(maxNumber + 1).padStart(4, "0");
     return `${roleLetter}${next}${deptLetter}`;
   }
+
+  // Deep link support
+  const deepLinkUserId = searchParams.get("user_id");
+  React.useEffect(() => {
+    if (deepLinkUserId && users.length > 0) {
+      const u = users.find((x) => x.id === deepLinkUserId);
+      if (u) setDetailsUser(u);
+    }
+  }, [deepLinkUserId, users]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -190,25 +295,62 @@ export default function AdminUsersPage() {
     };
   }, []);
 
+  // Dynamic department list from real data
+  const departments = React.useMemo(() => {
+    const set = new Set(users.map((u) => u.department).filter(Boolean));
+    return Array.from(set).sort();
+  }, [users]);
+
+  // Department chart data
+  const deptChartData = React.useMemo((): ChartEntry[] => {
+    const COLORS = [
+      "#2a78d6",
+      "#1baf7a",
+      "#eda100",
+      "#4a3aa7",
+      "#e34948",
+      "#e87ba4",
+      "#eb6834",
+      "#888780",
+    ];
+    const map: Record<string, number> = {};
+    users.forEach((u) => {
+      if (u.department) map[u.department] = (map[u.department] || 0) + 1;
+    });
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value], i) => ({
+        label,
+        value,
+        color: COLORS[i % COLORS.length],
+      }));
+  }, [users]);
+
+  // Role chart data
+  const roleChartData = React.useMemo((): ChartEntry[] => {
+    const adminCount = users.filter((u) => u.role === "admin").length;
+    const userCount = users.filter((u) => u.role === "user").length;
+    return [
+      { label: "Regular users", value: userCount, color: "#2a78d6" },
+      { label: "Admins", value: adminCount, color: "#1baf7a" },
+    ].filter((d) => d.value > 0);
+  }, [users]);
+
+  // Filtered users for table
   const filteredUsers = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-
     return users.filter((user) => {
       const matchesSearch =
         query === "" ||
         user.name.toLowerCase().includes(query) ||
         user.email.toLowerCase().includes(query) ||
         user.id.toLowerCase().includes(query);
-
       const matchesRole = roleFilter === "all" || user.role === roleFilter;
       const matchesDepartment =
         departmentFilter === "all" || user.department === departmentFilter;
       const matchesStatus =
         statusFilter === "all" || user.status === statusFilter;
-
-      return (
-        matchesSearch && matchesRole && matchesDepartment && matchesStatus
-      );
+      return matchesSearch && matchesRole && matchesDepartment && matchesStatus;
     });
   }, [users, searchQuery, roleFilter, departmentFilter, statusFilter]);
 
@@ -230,7 +372,9 @@ export default function AdminUsersPage() {
         status: newUser.status,
       });
       setUsers((prev) => [created, ...prev]);
-      toast.success("User created", { description: `${created.name} added.` });
+      toast.success("User created", {
+        description: `${created.name} added.`,
+      });
     } catch (err) {
       toast.error("Failed to create user", {
         description: err instanceof Error ? err.message : undefined,
@@ -238,26 +382,23 @@ export default function AdminUsersPage() {
     }
   }
 
-  function handleViewDetails(user: UserItem) {
-    setDetailsUser(user);
-  }
-
-  async function handleUserUpdated(userId: string, updatedFields: Partial<UserItem>) {
-    const updatedUser = await updateUser(userId, updatedFields);
-    setUsers((prev) => prev.map((u) => (u.id === userId ? updatedUser : u)));
-    toast.success("User updated", { description: `${updatedUser.name} has been updated.` });
-  }
-
-  async function handleDeleteUser(user: UserItem) {
-    if (!confirm(`Delete ${user.name}? This removes their login and profile. This cannot be undone.`)) return;
+  async function handleUserUpdated(
+    userId: string,
+    updatedFields: Partial<CreateUserPayload>
+  ) {
     try {
-      await deleteUser(user.id);
-      setUsers((prev) => prev.filter((u) => u.id !== user.id));
-      toast.success("User deleted", { description: user.name });
+      const updatedUser = await updateUser(userId, updatedFields);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? updatedUser : u))
+      );
+      toast.success("User updated", {
+        description: `${updatedUser.name} has been updated.`,
+      });
     } catch (err) {
-      toast.error("Failed to delete user", {
+      toast.error("Failed to update user", {
         description: err instanceof Error ? err.message : undefined,
       });
+      throw err;
     }
   }
 
@@ -270,10 +411,14 @@ export default function AdminUsersPage() {
       setAssignedAssets(
         rows.map((a) => ({
           id: a.asset_id,
+          asset_id: a.asset_id,
           name: a.name,
           category: a.category ?? a.asset_type ?? "General",
           location: a.location,
-          healthPercent: Math.round(a.healthPercent),
+          // Null means the asset has no completed prediction. Math.round(null)
+          // is 0, which would render as "0% health", a worse lie than the
+          // missing value it stands in for.
+          healthPercent: a.healthPercent != null ? Math.round(a.healthPercent) : null,
         }))
       );
     } catch (err) {
@@ -284,6 +429,47 @@ export default function AdminUsersPage() {
     } finally {
       setAssetsLoading(false);
     }
+  }
+
+  function handleNavigateToAsset(assetId: string) {
+    setAssetsUser(null);
+    router.push(`/admin/assets?assetId=${assetId}`);
+  }
+
+  /**
+   * Keep the table's per-user assignment count in step after an unassign.
+   * The dialog owns the asset list it renders; this only corrects the count
+   * shown in the row behind it, which would otherwise stay stale until reload.
+   */
+  function handleAssetUnassigned(assetId: string) {
+    setAssignedAssets((prev) => prev.filter((a) => (a.asset_id ?? a.id) !== assetId));
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === assetsUser?.id
+          ? { ...u, assignedAssets: Math.max(0, (u.assignedAssets ?? 0) - 1) }
+          : u
+      )
+    );
+  }
+
+  // Assign dialog for the user currently shown in the assets dialog.
+  const [assigningFor, setAssigningFor] = React.useState<UserItem | null>(null);
+
+  /**
+   * Reload the person's assets after an assignment and correct the row count.
+   * Refetching rather than appending keeps health and location consistent with
+   * what the server actually holds.
+   */
+  async function handleAssetAssigned() {
+    const user = assigningFor;
+    setAssigningFor(null);
+    if (!user) return;
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === user.id ? { ...u, assignedAssets: (u.assignedAssets ?? 0) + 1 } : u
+      )
+    );
+    if (assetsUser?.id === user.id) await handleViewAssets(user);
   }
 
   if (isLoading) {
@@ -319,6 +505,14 @@ export default function AdminUsersPage() {
         ))}
       </div>
 
+      {/* Department & Role distribution charts */}
+      {users.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DonutChart data={deptChartData} title="Department distribution" />
+          <DonutChart data={roleChartData} title="Role distribution" />
+        </div>
+      )}
+
       {/* Search + filter bar */}
       <Card className="rounded-2xl">
         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -334,7 +528,7 @@ export default function AdminUsersPage() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-35">
+              <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="All Roles" />
               </SelectTrigger>
               <SelectContent>
@@ -348,21 +542,21 @@ export default function AdminUsersPage() {
               value={departmentFilter}
               onValueChange={setDepartmentFilter}
             >
-              <SelectTrigger className="w-45">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All Departments" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                <SelectItem value="Administrative">Administrative</SelectItem>
-                <SelectItem value="Mechanical">Mechanical</SelectItem>
-                <SelectItem value="Electrical">Electrical</SelectItem>
-                <SelectItem value="IT">IT</SelectItem>
-                <SelectItem value="Maintenance">Maintenance</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-35">
+              <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
@@ -372,7 +566,10 @@ export default function AdminUsersPage() {
               </SelectContent>
             </Select>
 
-            <Button onClick={() => setIsAddDialogOpen(true)} className="ml-auto">
+            <Button
+              onClick={() => setIsAddDialogOpen(true)}
+              className="ml-auto"
+            >
               <UserPlus className="mr-2 h-4 w-4" />
               Add User
             </Button>
@@ -380,7 +577,7 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      {/* Users table */}
+      {/* Users table, click any row to open View Details */}
       <Card className="rounded-2xl">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -388,11 +585,10 @@ export default function AdminUsersPage() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="min-w-60 pl-6">User</TableHead>
-                  <TableHead className="w-25">Role</TableHead>
+                  <TableHead className="w-24">Role</TableHead>
                   <TableHead className="w-40">Department</TableHead>
-                  <TableHead className="w-25">Status</TableHead>
-                  <TableHead className="w-35">Assigned Assets</TableHead>
-                  <TableHead className="w-45">Actions</TableHead>
+                  <TableHead className="w-24">Status</TableHead>
+                  <TableHead className="w-32 text-center">Assets</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -400,7 +596,7 @@ export default function AdminUsersPage() {
                 {filteredUsers.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={5}
                       className="h-24 text-center text-muted-foreground"
                     >
                       No users found.
@@ -408,7 +604,11 @@ export default function AdminUsersPage() {
                   </TableRow>
                 ) : (
                   filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow
+                      key={user.id}
+                      className="cursor-pointer"
+                      onClick={() => setDetailsUser(user)}
+                    >
                       <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
                           <UserAvatar name={user.name} />
@@ -428,9 +628,9 @@ export default function AdminUsersPage() {
                       </TableCell>
 
                       <TableCell>
-                        <div className="flex items-center gap-2 text-base">
-                          <Building2 className="h-4 w-4 text-muted-foreground" />
-                          {user.department}
+                        <div className="flex items-center gap-2 text-sm">
+                          <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="truncate">{user.department}</span>
                         </div>
                       </TableCell>
 
@@ -438,41 +638,16 @@ export default function AdminUsersPage() {
                         <StatusBadge status={user.status} />
                       </TableCell>
 
-                      <TableCell className="text-center text-base">
-                        {user.assignedAssets}
-                      </TableCell>
-
-                      <TableCell className="pr-6">
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => handleViewDetails(user)}
-                            className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
-                          >
-                            View Details
-                          </button>
-                          <button
-                            onClick={() => setEditUser(user)}
-                            className="rounded-full bg-blue-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-500"
-                          >
-                            Edit
-                          </button>
-                          {user.assignedAssets > 0 && (
-                            <button
-                              onClick={() => handleViewAssets(user)}
-                              className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-500"
-                            >
-                              View Assets
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteUser(user)}
-                            title="Delete user"
-                            className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-500"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Delete
-                          </button>
-                        </div>
+                      <TableCell className="text-center">
+                        {user.assignedAssets > 0 ? (
+                          <span className="text-base font-medium">
+                            {user.assignedAssets}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            No assets
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -498,12 +673,29 @@ export default function AdminUsersPage() {
         onOpenChange={(open) => {
           if (!open) setDetailsUser(null);
         }}
+        onEditUser={(user) => {
+          setDetailsUser(null);
+          setEditUser(user as UserItem);
+        }}
         onViewAssets={(user) => {
           setDetailsUser(null);
-          handleViewAssets(user);
+          handleViewAssets(user as UserItem);
+        }}
+        onUserUpdated={(updatedUser) => {
+          setUsers((prev) =>
+            prev.map((u) =>
+              u.id === updatedUser.id ? { ...u, ...updatedUser } : u
+            )
+          );
+          setDetailsUser(null);
+        }}
+        onUserDeleted={(userId) => {
+          setUsers((prev) => prev.filter((u) => u.id !== userId));
+          setDetailsUser(null);
         }}
       />
 
+      {/* Edit User Dialog */}
       <EditUserDialog
         user={editUser}
         open={editUser !== null}
@@ -512,6 +704,20 @@ export default function AdminUsersPage() {
         }}
         onUserUpdated={handleUserUpdated}
       />
+
+      {/* Assign an asset to the person whose assets are open */}
+      {assigningFor && (
+        <AssignAssetToUserDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setAssigningFor(null);
+          }}
+          userId={assigningFor.id}
+          userName={assigningFor.name}
+          alreadyAssignedIds={assignedAssets.map((a) => a.asset_id ?? a.id)}
+          onAssigned={handleAssetAssigned}
+        />
+      )}
 
       {/* View Assigned Assets Dialog */}
       <ViewAssignedAssetsDialog
@@ -522,6 +728,9 @@ export default function AdminUsersPage() {
         onOpenChange={(open) => {
           if (!open) setAssetsUser(null);
         }}
+        onNavigateToAsset={handleNavigateToAsset}
+        onUnassigned={handleAssetUnassigned}
+        onAssignAnother={assetsUser ? () => setAssigningFor(assetsUser) : undefined}
         onBackToDetails={
           assetsUser
             ? () => {

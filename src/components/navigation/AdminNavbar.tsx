@@ -32,6 +32,18 @@ import NotificationBell from "@/components/navigation/NotificationBell";
 import { useUser } from "@/hooks/useAuth";
 import { fetchMyProfile } from "@/lib/api/userProfileApi";
 
+// Stored and API role values are lowercase ("admin" | "super_admin" |
+// "user"); ProfileDropdownUser expects the uppercase display variants.
+// The mapping is explicit rather than a cast: a cast to "ADMIN" | "USER"
+// admits no SUPER_ADMIN, so that role would type-check while falling through
+// to "User" everywhere ProfileDropdown reads it.
+function normalizeRole(raw: string | undefined | null): "ADMIN" | "SUPER_ADMIN" | "USER" {
+  const upper = (raw || "").toUpperCase();
+  if (upper === "SUPER_ADMIN") return "SUPER_ADMIN";
+  if (upper === "ADMIN") return "ADMIN";
+  return "USER";
+}
+
 const NAV = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/tickets", label: "Tickets", icon: Ticket },
@@ -75,7 +87,7 @@ export default function AdminNavbar() {
         ...prev,
         name: storedUser.full_name || "Admin",
         email: storedUser.email || "",
-        role: (storedUser.role?.toUpperCase() as "ADMIN" | "USER") || "ADMIN",
+        role: normalizeRole(storedUser.role),
       }));
     }
   }, [storedUser]);
@@ -88,7 +100,7 @@ export default function AdminNavbar() {
         setProfileUser({
           name: data.name || storedUser?.full_name || "Admin",
           email: data.email || storedUser?.email || "",
-          role: (data.role?.toUpperCase() as "ADMIN" | "USER") || "ADMIN",
+          role: normalizeRole(data.role),
           department: data.department ?? null,
           warehouse: data.warehouse ?? null,
           avatar_url: data.avatar_url ?? storedAvatarUrl ?? null,

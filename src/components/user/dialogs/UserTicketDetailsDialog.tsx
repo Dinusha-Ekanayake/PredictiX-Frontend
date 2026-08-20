@@ -5,7 +5,7 @@
  *
  * Loads the full ticket from GET /user/tickets/{id}, lets the owner edit
  * title / description / priority (PUT /user/tickets/{id}), and lists +
- * posts comments. No delete button, no status transition controls — those
+ * posts comments. No delete button, no status transition controls, those
  * are admin-only.
  */
 
@@ -22,7 +22,7 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,8 @@ import {
 import {
   addMyTicketComment,
   getMyTicket,
+  regenerateMyTicketSummary,
+  regenerateMyAssetSummary,
   updateMyTicket,
   type UserTicketDetail,
 } from "@/lib/api/userTickets";
@@ -56,6 +58,9 @@ type Props = {
   ticketId: string | null;
   currentUserId: string | null;
   onUpdated?: (ticket: UserTicketDetail) => void;
+  /** Pass the parent page's already-loaded user list to skip this dialog's
+   * own GET /users/ fetch (used only to resolve id -> name). */
+  users?: UserItem[];
 };
 
 function StatusIcon({ status }: { status: string }) {
@@ -88,6 +93,7 @@ export default function UserTicketDetailsDialog({
   ticketId,
   currentUserId,
   onUpdated,
+  users: usersProp,
 }: Props) {
   const [ticket, setTicket] = React.useState<UserTicketDetail | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -95,12 +101,50 @@ export default function UserTicketDetailsDialog({
   const [savingEdit, setSavingEdit] = React.useState(false);
   const [commentText, setCommentText] = React.useState("");
   const [postingComment, setPostingComment] = React.useState(false);
-  const [users, setUsers] = React.useState<UserItem[]>([]);
+  const [fetchedUsers, setFetchedUsers] = React.useState<UserItem[]>([]);
+  // Prefer the parent's already-loaded list; fall back to this dialog's own fetch.
+  const users = usersProp ?? fetchedUsers;
 
-  // Edit form state — local until saved.
+  // Edit form state, local until saved.
   const [editTitle, setEditTitle] = React.useState("");
   const [editDescription, setEditDescription] = React.useState("");
   const [editPriority, setEditPriority] = React.useState<string>("");
+
+  const [fullSizeImage, setFullSizeImage] = React.useState<string | null>(null);
+  const [regenSummary, setRegenSummary] = React.useState(false);
+  const [regenAsset, setRegenAsset] = React.useState(false);
+
+  async function handleRegenerateSummary() {
+    if (!ticket) return;
+    setRegenSummary(true);
+    try {
+      const res = await regenerateMyTicketSummary(ticket.id);
+      setTicket({ ...ticket, ticket_summary: res.summary });
+      toast.success("AI summary generated");
+    } catch (e) {
+      toast.error("Failed to generate summary", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setRegenSummary(false);
+    }
+  }
+
+  async function handleRegenerateAssetSummary() {
+    if (!ticket?.asset_id) return;
+    setRegenAsset(true);
+    try {
+      const res = await regenerateMyAssetSummary(ticket.asset_id);
+      setTicket({ ...ticket, asset_summary: res.summary });
+      toast.success("Asset summary generated");
+    } catch (e) {
+      toast.error("Failed to generate asset summary", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setRegenAsset(false);
+    }
+  }
 
   React.useEffect(() => {
     if (!open || !ticketId) return;
@@ -126,16 +170,18 @@ export default function UserTicketDetailsDialog({
         if (!cancelled) setLoading(false);
       });
 
-    listUsers()
-      .then((data) => {
-        if (!cancelled) setUsers(data ?? []);
-      })
-      .catch((err) => console.error("Failed to load users:", err));
+    if (!usersProp) {
+      listUsers()
+        .then((data) => {
+          if (!cancelled) setFetchedUsers(data ?? []);
+        })
+        .catch((err) => console.error("Failed to load users:", err));
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [open, ticketId, onOpenChange]);
+  }, [open, ticketId, onOpenChange, usersProp]);
 
   const userMap = React.useMemo(() => {
     const map = new Map<string, string>();
@@ -194,7 +240,30 @@ export default function UserTicketDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[760px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        {/* Full size image overlay */}
+        {fullSizeImage && (
+          <div 
+            className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
+            onClick={() => setFullSizeImage(null)}
+          >
+            <img 
+              src={fullSizeImage} 
+              alt="Full size" 
+              className="max-w-full max-h-full object-contain cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <Button 
+              variant="secondary" 
+              size="icon" 
+              className="absolute top-4 right-4 rounded-full"
+              onClick={() => setFullSizeImage(null)}
+            >
+              <XCircle className="h-5 w-5" />
+            </Button>
+          </div>
+        )}
+
         {loading || !ticket ? (
           <>
             {/* Radix requires a DialogTitle for screen readers. The loading
@@ -271,28 +340,10 @@ export default function UserTicketDetailsDialog({
                       value={editDescription}
                       onChange={(e) => setEditDescription(e.target.value)}
                       disabled={savingEdit}
-                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[110px] resize-vertical"
+                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-27.5 resize-vertical"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Priority</p>
-                      <Select
-                        value={editPriority}
-                        onValueChange={(v) => setEditPriority(v)}
-                        disabled={savingEdit}
-                      >
-                        <SelectTrigger className="w-full bg-background">
-                          <SelectValue placeholder="Unset" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+
                   <div className="flex justify-end gap-2">
                     <Button
                       variant="ghost"
@@ -329,7 +380,7 @@ export default function UserTicketDetailsDialog({
                       <h4 className="text-sm font-medium text-muted-foreground">Category</h4>
                       <div className="mt-2">
                         <Badge className="bg-sky-100 text-sky-800">
-                          {ticket.final_category || ticket.predicted_category || "General"}
+                          {ticket.final_category || ticket.predicted_category || "Mechanical"}
                         </Badge>
                       </div>
                     </div>
@@ -351,18 +402,75 @@ export default function UserTicketDetailsDialog({
               )}
 
               {/* AI fields */}
-              {(ticket.ticket_summary ||
-                ticket.predicted_priority ||
-                ticket.predicted_category) && (
+              {ticket && (
                 <div className="rounded-md border p-3 bg-violet-50/40 dark:bg-violet-950/20">
                   <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-violet-500" />
                     AI insights
                   </h4>
-                  <div className="mt-2 space-y-2 text-sm">
-                    {ticket.ticket_summary && (
-                      <p className="text-sm">{ticket.ticket_summary}</p>
+                  <div className="mt-2 space-y-3 text-sm">
+                    {/* Ticket summary */}
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">Ticket summary</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={handleRegenerateSummary}
+                          disabled={regenSummary}
+                        >
+                          {regenSummary ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          )}
+                          <span className="ml-1">
+                            {ticket.ticket_summary ? "Regenerate" : "Generate"}
+                          </span>
+                        </Button>
+                      </div>
+                      <p className="mt-1 text-sm">
+                        {ticket.ticket_summary || (
+                          <span className="italic text-muted-foreground">
+                            No ticket summary yet — click Generate.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Asset summary */}
+                    {ticket.asset_id && (
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">Asset summary</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={handleRegenerateAssetSummary}
+                            disabled={regenAsset}
+                          >
+                            {regenAsset ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            )}
+                            <span className="ml-1">
+                              {ticket.asset_summary ? "Regenerate" : "Generate"}
+                            </span>
+                          </Button>
+                        </div>
+                        <p className="mt-1 text-sm">
+                          {ticket.asset_summary || (
+                            <span className="italic text-muted-foreground">
+                              No asset summary yet — click Generate.
+                            </span>
+                          )}
+                        </p>
+                      </div>
                     )}
+
                     <div className="flex flex-wrap gap-2">
                       {ticket.predicted_category && (
                         <Badge className="bg-sky-100 text-sky-800">
@@ -375,6 +483,30 @@ export default function UserTicketDetailsDialog({
                         </Badge>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Attachments */}
+              {ticket.attachments && ticket.attachments.length > 0 && (
+                <div className="rounded-md border p-3 bg-muted/30">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-3">
+                    Attachments
+                  </h4>
+                  <div className="flex flex-wrap gap-3">
+                    {ticket.attachments.map((a) => (
+                      <div 
+                        key={a.id} 
+                        className="relative group cursor-zoom-in rounded-md border bg-background overflow-hidden w-24 h-24 flex items-center justify-center"
+                        onClick={() => setFullSizeImage(a.file_path)}
+                      >
+                        <img 
+                          src={a.file_path} 
+                          alt={a.original_filename || "Attachment"} 
+                          className="object-cover w-full h-full"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

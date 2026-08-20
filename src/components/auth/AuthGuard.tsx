@@ -3,7 +3,7 @@
 /**
  * Client-side route guard.
  * Since the JWT lives in localStorage (not cookies), Next.js middleware can't
- * see it — so protection is enforced here. Wrap protected layouts with this.
+ * see it, so protection is enforced here. Wrap protected layouts with this.
  *
  * - Not authenticated  → redirect to /login
  * - Wrong role         → redirect to the user's own home area
@@ -20,11 +20,16 @@ type Props = {
   requiredRole?: "ADMIN" | "USER" | "SUPER_ADMIN";
 };
 
+const AUTH_GUARD_STAGES = ["Verifying session…", "Checking permissions…"];
+
 export default function AuthGuard({ children, requiredRole }: Props) {
   const router = useRouter();
   const [authorized, setAuthorized] = React.useState(false);
+  const [checkProgress, setCheckProgress] = React.useState(0);
 
   React.useEffect(() => {
+    setCheckProgress(50);
+
     if (!isAuthenticated()) {
       router.replace("/login");
       return;
@@ -41,13 +46,14 @@ export default function AuthGuard({ children, requiredRole }: Props) {
       }
     }
 
+    setCheckProgress(100);
     setAuthorized(true);
   }, [router, requiredRole]);
 
   if (!authorized) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
-        <PredictiXLoader label="Checking access…" />
+        <PredictiXLoader progress={checkProgress} stages={AUTH_GUARD_STAGES} />
       </div>
     );
   }

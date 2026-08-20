@@ -8,14 +8,14 @@ import {
 import { useTheme } from "next-themes";
 import { ShieldAlert, TrendingDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Asset } from "./types";
+import type { AssetAnalytics } from "./types";
 
 const STATUS_COLOR: Record<string, string> = {
   active: "#10b981",
   critical: "#ef4444",
   under_maintenance: "#f59e0b",
   inactive: "#6b7280",
-  retired: "#94a3b8",
+  decommissioned: "#94a3b8",
 };
 
 const HEALTH_COLOR: Record<string, string> = {
@@ -65,60 +65,64 @@ function PieLegendItem({ color, label, count, pct }: {
   );
 }
 
-export default function AssetsAnalytics({ assets }: { assets: Asset[] }) {
+/** Charts summarising status, health and vehicle type across the fleet. */
+export default function AssetsAnalytics({
+  analytics,
+  loading,
+}: {
+  analytics: AssetAnalytics | null;
+  loading?: boolean;
+}) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const axisColor = isDark ? "#94a3b8" : "#64748b";
   const gridColor = isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)";
-  const total = assets.length || 1;
 
-  // ── Status distribution ──────────────────────────────────────────────
-  const statusCount = assets.reduce<Record<string, number>>((acc, a) => {
-    const key = a.status ?? "unknown";
-    acc[key] = (acc[key] ?? 0) + 1;
-    return acc;
-  }, {});
-  const statusData = Object.entries(statusCount)
-    .map(([name, value]) => ({ name, value, color: STATUS_COLOR[name] ?? "#6b7280" }))
+  if (loading && !analytics) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest">
+          Descriptive Analytics
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="h-[220px] rounded-2xl border border-border/50 bg-card animate-pulse" />
+          <div className="h-[220px] rounded-2xl border border-border/50 bg-card animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!analytics) return null;
+
+  const total =
+    analytics.statusDistribution.reduce((s, d) => s + d.value, 0) || 1;
+
+  // ── Status distribution (fleet-wide, from the backend) ────────────────
+  const statusData = analytics.statusDistribution
+    .map((d) => ({ ...d, color: STATUS_COLOR[d.name] ?? "#6b7280" }))
     .sort((a, b) => b.value - a.value);
 
-  // ── Health band distribution ─────────────────────────────────────────
-  const healthCount = assets.reduce<Record<string, number>>((acc, a) => {
-    const key = (a.health_band ?? "unknown").toLowerCase();
-    acc[key] = (acc[key] ?? 0) + 1;
-    return acc;
-  }, {});
+  // ── Health band distribution (fleet-wide, from the backend) ───────────
+  const healthByName = Object.fromEntries(analytics.healthDistribution.map((d) => [d.name, d.value]));
   const healthData = HEALTH_ORDER
-    .filter((k) => healthCount[k] !== undefined)
-    .map((k) => ({ name: k, value: healthCount[k], color: HEALTH_COLOR[k] ?? "#6b7280" }));
+    .filter((k) => healthByName[k] !== undefined)
+    .map((k) => ({ name: k, value: healthByName[k], color: HEALTH_COLOR[k] ?? "#6b7280" }));
 
-  // ── Vehicle type breakdown ────────────────────────────────────────────
-  const typeCount = assets.reduce<Record<string, number>>((acc, a) => {
-    const raw = a.vehicle_type ?? a.asset_type ?? "Other";
-    const key = raw.replace(/_/g, " ").replace(/(\d+T$)/, " $1").trim();
-    acc[key] = (acc[key] ?? 0) + 1;
-    return acc;
-  }, {});
-  const typeData = Object.entries(typeCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([name, value]) => ({ name, value }));
+  // ── Vehicle type breakdown (fleet-wide, from the backend) ──────────────
+  const typeData = analytics.vehicleTypeDistribution.map((d) => ({
+    name: d.name.replace(/_/g, " ").replace(/(\d+T$)/, " $1").trim(),
+    value: d.value,
+  }));
 
-  // ── Top at-risk assets (health_band poor/critical) ────────────────────
-  const atRisk = assets
-    .filter((a) => a.health_band === "critical" || a.health_band === "poor")
-    .sort((a, b) => {
-      const order = ["critical", "poor"];
-      return order.indexOf(a.health_band ?? "") - order.indexOf(b.health_band ?? "");
-    })
-    .slice(0, 5);
+  // ── Top at-risk assets (fleet-wide, from the backend) ──────────────────
+  const atRisk = analytics.topAtRisk;
 
   const bandBadge: Record<string, string> = {
     critical: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
     poor: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
   };
 
-  if (assets.length === 0) return null;
+  if (total === 1 && analytics.statusDistribution.length === 0) return null;
 
   return (
     <div className="space-y-4">
@@ -136,7 +140,7 @@ export default function AssetsAnalytics({ assets }: { assets: Asset[] }) {
           <CardContent>
             <div className="flex items-center gap-4">
               <div style={{ height: 140, width: 140, flexShrink: 0 }}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
                   <PieChart>
                     <Pie data={statusData} dataKey="value" innerRadius={38} outerRadius={58}
                       paddingAngle={2} startAngle={90} endAngle={-270}>
@@ -164,7 +168,7 @@ export default function AssetsAnalytics({ assets }: { assets: Asset[] }) {
           <CardContent>
             <div className="flex items-center gap-4">
               <div style={{ height: 140, width: 140, flexShrink: 0 }}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
                   <PieChart>
                     <Pie data={healthData} dataKey="value" innerRadius={38} outerRadius={58}
                       paddingAngle={2} startAngle={90} endAngle={-270}>
@@ -194,7 +198,7 @@ export default function AssetsAnalytics({ assets }: { assets: Asset[] }) {
           </CardHeader>
           <CardContent>
             <div style={{ height: 200 }}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
                 <BarChart data={typeData} margin={{ top: 4, right: 8, left: -20, bottom: 30 }}
                   barCategoryGap={12}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
@@ -220,7 +224,7 @@ export default function AssetsAnalytics({ assets }: { assets: Asset[] }) {
           <CardContent className="space-y-2">
             {atRisk.length === 0 ? (
               <div className="flex flex-col items-center py-6 gap-2">
-                <ShieldAlert className="h-7 w-7 text-emerald-400" />
+                <ShieldAlert className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
                 <p className="text-xs text-muted-foreground">No critical or poor assets</p>
               </div>
             ) : (

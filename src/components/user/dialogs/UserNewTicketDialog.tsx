@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Create-ticket dialog — User role.
+ * Create-ticket dialog. User role.
  *
  * Flow:
  *  1. User fills in title + description (and optionally selects an asset).
- *  2. After a short debounce (1.2s) the AI runs automatically — category
+ *  2. After a short debounce (1.2s) the AI runs automatically, category
  *     and priority fields populate with a spinner while it runs.
  *  3. Create Ticket is disabled until the AI has returned (or failed).
  *  4. User can change the CATEGORY but NOT the priority (it is read-only).
@@ -17,12 +17,14 @@ import {
   AlertCircle,
   Bot,
   CheckCircle2,
+  AlertTriangle,
   Loader2,
   Lock,
   Plus,
   Sparkles,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
+import { generateUUID } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,8 +49,10 @@ import {
   type TicketPreviewResponse,
   type UserTicketDetail,
 } from "@/lib/api/userTickets";
-import { listUsers, type UserItem } from "@/lib/userService";
-import { apiGet } from "@/lib/apiClient";
+
+import { apiGet, apiPost } from "@/lib/apiClient";
+import { addMyTicketAttachment } from "@/lib/api/userTickets";
+import { supabase } from "@/lib/supabaseBrowserClient";
 
 // ─── local types ──────────────────────────────────────────────────────────────
 
@@ -65,6 +69,9 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (ticket: UserTicketDetail) => void;
+  presetAssetId?: string;
+  presetAssetName?: string;
+  lockAsset?: boolean;
 };
 
 const selectCls =
@@ -84,25 +91,31 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 // ─── component ────────────────────────────────────────────────────────────────
 
-export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: Props) {
+export default function UserNewTicketDialog({
+  open, onOpenChange, onCreated, presetAssetId, presetAssetName, lockAsset,
+}: Props) {
   // form
   const [assetId, setAssetId] = React.useState("");
   const [assets, setAssets] = React.useState<Asset[]>([]);
   const [assetsLoading, setAssetsLoading] = React.useState(false);
+  const [assetsLoadFailed, setAssetsLoadFailed] = React.useState(false);
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [assignedTo, setAssignedTo] = React.useState("");
-  const [users, setUsers] = React.useState<UserItem[]>([]);
-  const [usersLoading, setUsersLoading] = React.useState(false);
+
+
+  const [file, setFile] = React.useState<File | null>(null);
 
   // asset summary
   const [assetSummary, setAssetSummary] = React.useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = React.useState(false);
+  const [ticketSummary, setTicketSummary] = React.useState<string | null>(null);
+  const [ticketSummaryLoading, setTicketSummaryLoading] = React.useState(false);
 
   // AI state
   const [ai, setAi] = React.useState<AiState>({ status: "idle" });
-  // Category the user may have overridden after AI ran
+  // Category / priority the user may have overridden after AI ran
   const [categoryOverride, setCategoryOverride] = React.useState<string>("");
+  const [priorityOverride, setPriorityOverride] = React.useState<string>("");
 
   // submission
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -123,6 +136,37 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
     return () => { cancelled = true; };
   }, [assetId]);
 
+  // ── ticket summary preview (debounced) ───────────────────────────────────────
+  React.useEffect(() => {
+    const t = title.trim(), d = description.trim();
+    // Wait until the AI has detected category AND priority so the summary
+    // includes them instead of hallucinating those slots.
+    const aiRes = ai.status === "done" ? ai.result : null;
+    const cat = categoryOverride || aiRes?.predicted_category || "";
+    const pri = priorityOverride || aiRes?.predicted_priority || "";
+    // Generate the summary only once category AND priority are confirmed (set by
+    // the AI or the user), so it reflects those values. Regenerates if changed.
+    if (!t || !d || !cat || !pri) { setTicketSummary(null); return; }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setTicketSummaryLoading(true);
+      try {
+        const res = await apiPost<AssetSummaryResponse>("/ticket-summaries/generate", {
+          title: t,
+          description: d,
+          category: cat,
+          priority: pri,
+        });
+        if (!cancelled) setTicketSummary(res?.summary ?? null);
+      } catch {
+        if (!cancelled) setTicketSummary(null);
+      } finally {
+        if (!cancelled) setTicketSummaryLoading(false);
+      }
+    }, 900);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [title, description, ai, categoryOverride, priorityOverride]);
+
   // ── debounced AI trigger ─────────────────────────────────────────────────────
   React.useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -138,13 +182,15 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
 
     setAi({ status: "running" });
     setCategoryOverride("");
+    setPriorityOverride("");
 
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await previewMyTicketAI({ title: trimTitle, description: trimDesc });
         setAi({ status: "done", result: res });
-        // Pre-fill category override with AI suggestion
+        // Pre-fill the editable category + priority with the AI suggestion
         if (res.predicted_category) setCategoryOverride(res.predicted_category);
+        if (res.predicted_priority) setPriorityOverride(res.predicted_priority);
       } catch (err) {
         setAi({ status: "error", message: err instanceof Error ? err.message : "AI failed" });
       }
@@ -156,27 +202,25 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
   // ── dialog open/close ────────────────────────────────────────────────────────
   React.useEffect(() => {
     if (open) {
-      setAssetsLoading(true);
+      if (presetAssetId) setAssetId(presetAssetId);
+      setAssetsLoading(true); setAssetsLoadFailed(false);
       apiGet<Asset[]>("/assets/dropdown")
         .then((d) => setAssets(d ?? []))
-        .catch(() => {})
+        .catch(() => {
+          setAssetsLoadFailed(true);
+          toast.error("Couldn't load assets", { description: "The asset list failed to load. You can still create the ticket without linking an asset, or try reopening this dialog." });
+        })
         .finally(() => setAssetsLoading(false));
-
-      setUsersLoading(true);
-      listUsers()
-        .then((d) => setUsers(d ?? []))
-        .catch(() => {})
-        .finally(() => setUsersLoading(false));
       return;
     }
     const t = setTimeout(() => {
-      setAssetId(""); setAssets([]); setTitle(""); setDescription("");
-      setAssignedTo(""); setUsers([]); setAssetSummary(null);
-      setAi({ status: "idle" }); setCategoryOverride("");
-      setIsSubmitting(false); setResult(null);
+      setAssetId(""); setAssets([]); setAssetsLoadFailed(false); setTitle(""); setDescription("");
+      setAssetSummary(null); setTicketSummary(null);
+      setAi({ status: "idle" }); setCategoryOverride(""); setPriorityOverride("");
+      setIsSubmitting(false); setResult(null); setFile(null);
     }, 200);
     return () => clearTimeout(t);
-  }, [open]);
+  }, [open, presetAssetId]);
 
   // ── submit ───────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
@@ -194,12 +238,39 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
         title: title.trim(),
         description: description.trim(),
         asset_id: assetId || undefined,
-        assigned_to: assignedTo || undefined,
+
         use_ai_predictions: false,
-        predicted_priority: aiResult?.predicted_priority ?? undefined,
+        predicted_priority: priorityOverride || (aiResult?.predicted_priority ?? undefined),
         predicted_category: categoryOverride || (aiResult?.predicted_category ?? undefined),
         ticket_summary: aiResult?.ticket_summary ?? undefined,
       });
+
+      if (file && supabase) {
+        const fileExt = file.name.split(".").pop();
+        const fileName = `${Date.now()}-${generateUUID()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from("ticket-attachments")
+          .upload(fileName, file);
+        
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          toast.error("Ticket created, but failed to upload image.");
+        } else {
+          const { data: publicUrlData } = supabase.storage
+            .from("ticket-attachments")
+            .getPublicUrl(fileName);
+            
+          if (publicUrlData?.publicUrl) {
+            await addMyTicketAttachment(
+              created.id,
+              publicUrlData.publicUrl,
+              file.type,
+              file.name
+            );
+          }
+        }
+      }
+
       toast.success("Ticket created", { description: `${created.ticket_number} — ${created.title}` });
       setResult(created);
       onCreated?.(created);
@@ -212,7 +283,6 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
 
   // ── derived ──────────────────────────────────────────────────────────────────
   const aiResult = ai.status === "done" ? ai.result : null;
-  const predictedPriority = aiResult?.predicted_priority ?? null;
   // Create is blocked while AI is still running (but allowed if idle=no text, or error=graceful)
   const aiBlocking = ai.status === "running";
   const canCreate = title.trim().length > 0 && description.trim().length > 0 && !aiBlocking && !isSubmitting;
@@ -221,7 +291,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[680px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-170 max-h-[90vh] overflow-y-auto">
         {result ? (
           /* ── Success panel ── */
           <>
@@ -258,8 +328,8 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
               )}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <Button variant="secondary" onClick={() => {
-                  setTitle(""); setDescription(""); setAssetId(""); setAssignedTo("");
-                  setAi({ status: "idle" }); setCategoryOverride(""); setResult(null); setAssetSummary(null);
+                  setTitle(""); setDescription(""); setAssetId(lockAsset && presetAssetId ? presetAssetId : "");
+                  setAi({ status: "idle" }); setCategoryOverride(""); setPriorityOverride(""); setResult(null); setAssetSummary(null); setTicketSummary(null); setFile(null);
                 }}>
                   Create another
                 </Button>
@@ -283,16 +353,32 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
             <form onSubmit={handleSubmit} className="grid gap-3 pt-2">
               {/* Asset */}
               <div>
-                <p className="text-sm text-muted-foreground mb-2">Asset (optional)</p>
-                {assetsLoading ? (
+                <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
+                  {lockAsset && <Lock className="h-3.5 w-3.5" />}
+                  Asset{lockAsset ? "" : " (optional)"}
+                  {lockAsset && presetAssetName ? ` · ${presetAssetName}` : ""}
+                </p>
+                {assetsLoading && !lockAsset ? (
                   <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input text-sm text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />Loading assets…
                   </div>
                 ) : (
-                  <select value={assetId} onChange={(e) => setAssetId(e.target.value)} className={selectCls} disabled={isSubmitting}>
-                    <option value="">Select an asset (optional)</option>
-                    {assets.map((a) => <option key={a.id} value={a.id}>{a.asset_name}</option>)}
+                  <select value={assetId} onChange={(e) => setAssetId(e.target.value)} className={selectCls} disabled={isSubmitting || lockAsset}>
+                    {lockAsset && presetAssetId ? (
+                      <option value={presetAssetId}>{presetAssetName ?? "Selected asset"}</option>
+                    ) : (
+                      <>
+                        <option value="">Select an asset (optional)</option>
+                        {assets.map((a) => <option key={a.id} value={a.id}>{a.asset_name}</option>)}
+                      </>
+                    )}
                   </select>
+                )}
+                {assetsLoadFailed && !lockAsset && (
+                  <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                    Failed to load the asset list — you can still submit without one.
+                  </p>
                 )}
               </div>
 
@@ -326,15 +412,50 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[110px] resize-vertical outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-27.5 resize-vertical outline-none focus:ring-2 focus:ring-ring"
                   placeholder="Describe the issue in detail — AI will analyze this to categorize and prioritize automatically"
                   disabled={isSubmitting}
                 />
               </div>
 
-              {/* AI results: category (editable) + priority (locked) */}
+              {/* AI Ticket Summary */}
+              {(ticketSummaryLoading || ticketSummary) && (
+                <div className="rounded-md border border-violet-200/60 bg-violet-50/50 dark:bg-violet-950/20 dark:border-violet-800/40 px-3 py-2.5">
+                  <p className="text-xs font-medium text-violet-600 dark:text-violet-400 flex items-center gap-1.5 mb-1">
+                    <Bot className="h-3.5 w-3.5" />AI Ticket Summary
+                  </p>
+                  {ticketSummaryLoading
+                    ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin text-violet-500" />Generating…</div>
+                    : <p className="text-sm text-foreground/90 leading-relaxed">{ticketSummary}</p>
+                  }
+                </div>
+              )}
+
+              {/* Image Upload */}
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Attach Image (optional)</p>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  disabled={isSubmitting}
+                  className="cursor-pointer file:text-foreground file:bg-transparent file:border-0 file:text-sm file:font-medium"
+                />
+                {file && (
+                  <div className="mt-3">
+                    <p className="text-xs text-muted-foreground mb-1">Preview:</p>
+                    <img 
+                      src={URL.createObjectURL(file)} 
+                      alt="Preview" 
+                      className="max-h-32 rounded-md object-contain border bg-muted/30" 
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* AI results: category + priority, both AI-suggested and editable */}
               <div className="grid grid-cols-2 gap-3">
-                {/* Category — user CAN change */}
+                {/* Category, user CAN change */}
                 <div>
                   <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-violet-500" />
@@ -355,32 +476,31 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
                       <SelectItem value="software">Software</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">AI-suggested — you can change it</p>
                 </div>
 
-                {/* Priority — locked, AI only */}
+                {/* Priority, user CAN change */}
                 <div>
                   <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
-                    <Lock className="h-3.5 w-3.5 text-muted-foreground/60" />
+                    <Sparkles className="h-3.5 w-3.5 text-violet-500" />
                     Priority
                     {ai.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-violet-400" />}
                   </p>
-                  <div className={`h-9 flex items-center px-3 rounded-md border border-input bg-muted/40 text-sm gap-2 ${!predictedPriority ? "text-muted-foreground" : ""}`}>
-                    {ai.status === "running" ? (
-                      <><Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" /><span className="text-muted-foreground">Analyzing…</span></>
-                    ) : predictedPriority ? (
-                      <>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${PRIORITY_COLORS[predictedPriority] ?? ""}`}>
-                          {predictedPriority.charAt(0).toUpperCase() + predictedPriority.slice(1)}
-                        </span>
-                        <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
-                          <Lock className="h-3 w-3" />AI set
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">{ai.status === "error" ? "Unavailable" : "Awaiting input…"}</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Set by AI — cannot be changed</p>
+                  <Select
+                    value={priorityOverride}
+                    onValueChange={setPriorityOverride}
+                    disabled={isSubmitting || ai.status === "running"}
+                  >
+                    <SelectTrigger className="w-full bg-background">
+                      <SelectValue placeholder={ai.status === "running" ? "Analyzing…" : "AI will detect"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">AI-suggested — you can change it</p>
                 </div>
               </div>
 
@@ -392,26 +512,7 @@ export default function UserNewTicketDialog({ open, onOpenChange, onCreated }: P
                 </div>
               )}
 
-              {/* Assigned User */}
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Assign to (optional)</p>
-                {usersLoading ? (
-                  <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input text-sm text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />Loading users…
-                  </div>
-                ) : (
-                  <Select value={assignedTo} onValueChange={setAssignedTo} disabled={isSubmitting}>
-                    <SelectTrigger className="w-full bg-background">
-                      <SelectValue placeholder="Select a user (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>{u.name} ({u.role})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
+
 
               {/* Actions */}
               <div className="grid grid-cols-2 gap-3 pt-1">

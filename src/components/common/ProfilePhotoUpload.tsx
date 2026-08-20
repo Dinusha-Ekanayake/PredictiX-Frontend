@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { fetchMyProfile } from "@/lib/api/userProfileApi";
+import { apiFetch } from "@/lib/apiClient";
 import { Camera, Loader2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,10 +19,9 @@ export default function ProfilePhotoUpload() {
     // Load current profile to get avatar_url and initials
     fetchMyProfile()
       .then((data) => {
-        // Prefer DB avatar, fall back to localStorage (for stub users like super_admin)
-        const storedUrl = localStorage.getItem("predictix.avatar_url");
-        const url = data.avatar_url || storedUrl || null;
-        if (url) setAvatarUrl(url);
+        if (data.avatar_url) {
+          setAvatarUrl(data.avatar_url);
+        }
         if (data.name) {
           const parts = data.name.trim().split(/\s+/).filter(Boolean);
           if (parts.length > 0) {
@@ -35,9 +34,6 @@ export default function ProfilePhotoUpload() {
         }
       })
       .catch((err) => {
-        // Even if profile fetch fails, try localStorage
-        const storedUrl = localStorage.getItem("predictix.avatar_url");
-        if (storedUrl) setAvatarUrl(storedUrl);
         console.error("Failed to load profile for avatar:", err);
       });
   }, []);
@@ -65,30 +61,24 @@ export default function ProfilePhotoUpload() {
     formData.append("file", file);
 
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("predictix.access_token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/profiles/me/avatar`, {
+      const res = await apiFetch("/profiles/me/avatar", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-        },
         body: formData,
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Upload failed");
+        throw new Error("Upload failed");
       }
 
       const data = await res.json();
-      // Persist to localStorage so stub users (super_admin) can see it after reload
-      localStorage.setItem("predictix.avatar_url", data.avatar_url);
       setAvatarUrl(data.avatar_url);
-
+      
       // Force page reload so the Navbar picks up the new avatar
+      // A more robust app might use React Context, but a reload is safe and easy here.
       window.location.reload();
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Failed to upload profile photo. Please try again.");
+      setError("Failed to upload profile photo. Please try again.");
     } finally {
       setIsUploading(false);
       // Reset input
@@ -110,7 +100,7 @@ export default function ProfilePhotoUpload() {
         onClick={() => fileInputRef.current?.click()}
       >
         {avatarUrl ? (
-          <Image src={avatarUrl} alt="Avatar" width={96} height={96} className="h-full w-full object-cover" />
+          <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
         ) : (
           initials
         )}

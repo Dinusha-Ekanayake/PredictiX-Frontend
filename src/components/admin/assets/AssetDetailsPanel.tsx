@@ -7,22 +7,25 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   MapPin, User, Building2, Calendar, CalendarClock,
-  TrendingUp, TrendingDown, Minus, Pencil, Trash2, Bot,
+  TrendingUp, TrendingDown, Minus, ArrowLeftRight, Pencil, Trash2, Bot,
   ClipboardList, Users, ShieldCheck, Zap, AlertTriangle,
   RefreshCw, Ticket, ChevronRight, Loader2,
-  Info, Gauge, Hash, Wrench,
+  Info, Gauge, Hash, Wrench, FileText, SquareParking,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
-import type { AssetDetail, ComponentSurvivalResponse } from "./types";
+import { UtilisationChart, ServiceCadenceChart, toChartRows } from "./AssetUsageCharts";
+import type { AssetDetail, PredictionTier } from "./types";
 import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
+import { bandFor, healthColor } from "@/lib/healthBands";
 import LogMaintenanceDialog from "./LogMaintenanceDialog";
-
+import SendServiceReminderButton from "./SendServiceReminderButton";
 /* ══════════════════════════════════════════════════════════════════════════════
    Helpers
    ══════════════════════════════════════════════════════════════════════════════ */
 
+/** Format an ISO date as "05 Aug 2026", or a dash when missing. */
 function fmt(d: string | null | undefined): string {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-GB", {
@@ -30,24 +33,37 @@ function fmt(d: string | null | undefined): string {
   });
 }
 
+/** Format an ISO timestamp as "05 Aug 2026, 14:32", or a dash when missing. */
+function fmtDateTime(d: string | null | undefined): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("en-GB", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+/** Format an amount with its currency, or a dash when missing. */
 function fmtCost(n: number | null | undefined, currency = "LKR"): string {
   if (n == null) return "—";
   return `${currency} ${Number(n).toLocaleString()}`;
 }
 
 /* ── Status pill ─────────────────────────────────────────────────────────────── */
+// Keys must match the asset_status values the backend sends. Anything else
+// falls through to the grey default below.
 const STATUS_BG: Record<string, string> = {
-  active:       "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
-  maintenance:  "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
-  in_maintenance:"bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
-  inactive:     "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
-  retired:      "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
+  active:            "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
+  under_maintenance: "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  critical:          "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20",
+  inactive:          "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
+  decommissioned:    "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400 dark:ring-white/10",
 };
 const STATUS_DOT: Record<string, string> = {
-  active: "bg-emerald-500", maintenance: "bg-amber-500",
-  in_maintenance: "bg-amber-500", inactive: "bg-slate-400", retired: "bg-slate-400",
+  active: "bg-emerald-500", under_maintenance: "bg-amber-500", critical: "bg-red-500",
+  inactive: "bg-slate-400", decommissioned: "bg-slate-400",
 };
 
+/** Coloured pill showing an asset's lifecycle status. */
 function StatusPill({ status }: { status: string }) {
   const key = status.toLowerCase();
   return (
@@ -62,12 +78,20 @@ function StatusPill({ status }: { status: string }) {
 }
 
 /* ── Health Ring ─────────────────────────────────────────────────────────────── */
-function HealthRing({ score }: { score: number }) {
+/**
+ * Circular health gauge. Renders an empty ring and "Not scored" when `score`
+ * is null, so an asset with no prediction is never shown a made-up number.
+ *
+ * Colour and label come from the shared band definition, so this gauge agrees
+ * with the assets list and the dashboard.
+ */
+function HealthRing({ score }: { score: number | null }) {
   const r = 38;
   const circ = 2 * Math.PI * r;
-  const filled = (score / 100) * circ;
-  const color = score >= 80 ? "#10b981" : score >= 60 ? "#84cc16" : score >= 40 ? "#f59e0b" : score >= 20 ? "#f97316" : "#ef4444";
-  const label = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Moderate" : score >= 20 ? "Poor" : "Critical";
+  const filled = score == null ? 0 : (score / 100) * circ;
+  const color = healthColor(score);
+  const band = bandFor(score);
+  const label = band ? band[0].toUpperCase() + band.slice(1) : "Not scored";
 
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -81,16 +105,25 @@ function HealthRing({ score }: { score: number }) {
             style={{ filter: `drop-shadow(0 0 6px ${color}40)` }} />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xl font-bold leading-none">{score}</span>
-          <span className="text-[10px] text-muted-foreground/60 mt-0.5">/ 100</span>
+          <span className="text-xl font-bold leading-none">{score ?? "—"}</span>
+          {score != null && (
+            <span className="text-[10px] text-muted-foreground/60 mt-0.5">/ 100</span>
+          )}
         </div>
       </div>
       <span className="text-[11px] font-semibold" style={{ color }}>{label}</span>
+      <span
+        className="text-[9px] text-muted-foreground/50 cursor-help underline decoration-dotted underline-offset-2"
+        title="A weighted summary of component health, not a model prediction. The failure risk and maintenance date come from the trained model."
+      >
+        Composite indicator
+      </span>
     </div>
   );
 }
 
 /* ── Risk gauge ──────────────────────────────────────────────────────────────── */
+/** Horizontal bar showing failure probability as a percentage. */
 function RiskGauge({ probability }: { probability: number }) {
   const pct = Math.round(probability * 100);
   const color = pct >= 70 ? "bg-red-500" : pct >= 40 ? "bg-amber-500" : "bg-emerald-500";
@@ -109,23 +142,26 @@ function RiskGauge({ probability }: { probability: number }) {
 }
 
 /* ── Info field ──────────────────────────────────────────────────────────────── */
-function InfoField({ icon, label, value, mono, valueClass }: {
-  icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string;
+/** Labelled read-only field used across the detail tabs. */
+function InfoField({ icon, label, value, mono, valueClass, action }: {
+  icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string; action?: React.ReactNode;
 }) {
   return (
     <div className="h-full rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
       {icon && <div className="mt-0.5 text-muted-foreground/60 shrink-0">{icon}</div>}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="text-[11px] text-muted-foreground/80 font-medium">{label}</div>
         <div className={cn("text-sm font-medium mt-0.5 leading-snug break-words", mono && "font-mono text-xs", valueClass)}>
           {value}
         </div>
       </div>
+      {action && <div className="ml-auto -mr-1 -mt-1 shrink-0">{action}</div>}
     </div>
   );
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────────────── */
+/** Placeholder shown when a tab has no rows to display. */
 function EmptyState({ message, icon: Icon = Info }: { message: string, icon?: React.ElementType }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 dark:border-white/8 bg-slate-50/30 dark:bg-white/2 p-8 text-center">
@@ -154,6 +190,42 @@ function PriorityPill({ priority }: { priority: string | null }) {
       PRIORITY_META[key] ?? "bg-muted text-muted-foreground ring-border",
     )}>
       {priority}
+    </span>
+  );
+}
+
+/* ── Prediction tier badge ───────────────────────────────────────────────────────
+   Surfaces the decision layer's reconciled recommendation (classifier +
+   regressor + health score) instead of showing a raw date regardless of
+   whether the classifier thinks action is actually needed. */
+const TIER_META: Record<PredictionTier, { label: string; className: string }> = {
+  urgent: {
+    label: "Urgent",
+    className: "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20",
+  },
+  watch: {
+    label: "Watch",
+    className: "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  },
+  healthy: {
+    label: "Healthy",
+    className: "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
+  },
+  conflict: {
+    label: "Needs Review",
+    className: "bg-violet-50 text-violet-700 ring-violet-200/60 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20",
+  },
+};
+
+function TierBadge({ tier }: { tier: PredictionTier | null | undefined }) {
+  if (!tier || !TIER_META[tier]) return null;
+  const meta = TIER_META[tier];
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset",
+      meta.className,
+    )}>
+      {meta.label}
     </span>
   );
 }
@@ -219,18 +291,50 @@ type Props = {
   onRefresh: () => void;
   onDelete?: (id: string) => void;
   onEdit?: (asset: AssetDetail["asset"]) => void;
+  /** Opens the shared report modal, which the page owns. */
+  onReport?: () => void;
+  /** Opens the assign dialog, which the page owns. Admin-only screens pass it. */
+  onAssign?: (asset: AssetDetail["asset"]) => void;
+  /** Display name of the current assignee, when the page has resolved it. */
+  assigneeName?: string | null;
   readOnly?: boolean;
+  /**
+   * Warehouse names, reused from the toolbar filter so the panel can show a
+   * name instead of a UUID without fetching again. Falls back to the UUID when
+   * the parent does not pass it.
+   */
+  warehouseOptions?: { value: string; label: string }[];
 };
 
-export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, readOnly = false }: Props) {
-  const { asset, prediction, costPrediction, survivalPrediction, maintenanceEvents, tickets, assignments } = detail;
+export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, onReport, onAssign, assigneeName, readOnly = false, warehouseOptions }: Props) {
+  const { asset, prediction, componentRul, usageHistory, maintenanceEvents, tickets, assignments } = detail;
+
+  // Reshaped once per load: both charts read the same rows.
+  const usageRows = React.useMemo(
+    () => toChartRows(usageHistory?.points ?? []),
+    [usageHistory],
+  );
+  const warehouseName = warehouseOptions?.find((w) => w.value === asset.warehouse_id)?.label ?? asset.warehouse_id;
   const router = useNavRouter();
 
   const [runningPrediction, setRunningPrediction] = React.useState(false);
   const [showLogMaintenance, setShowLogMaintenance] = React.useState(false);
 
-  const healthScore = deriveHealthScore(asset, prediction);
+  // The active assignment already carries the assignee's name, so the header
+  // can show it without the page loading the whole user roster. Falls back to
+  // the prop, then to a neutral label.
+  const activeAssignment = assignments.find((a) => a.is_active);
+  const currentAssignee =
+    assigneeName ??
+    activeAssignment?.user_name ??
+    (asset.assigned_to ? "Assigned" : null);
+
+  const healthScore = deriveHealthScore(prediction);
   const failureProb = deriveFailureProbability(prediction);
+
+  // Only show an exact service date when the decision layer is confident
+  // enough to give one. Otherwise the UI shows a rough horizon instead.
+  const showHardDate = prediction?.display_mode === "date";
 
   const daysUntilMaint = asset.next_service_date
     ? Math.ceil((new Date(asset.next_service_date).getTime() - Date.now()) / 86_400_000)
@@ -248,16 +352,20 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
         )
       : null;
 
-  const costVariance =
-    costPrediction?.estimated_cost && costPrediction?.min_cost
-      ? (Number(costPrediction.estimated_cost) - Number(costPrediction.min_cost)) /
-        (Number(costPrediction.min_cost) || 1)
-      : 0;
+  // Width of the cost model's 80% interval relative to the estimate. This is
+  // a measure of confidence, not a trend: a tight range means a more precise
+  // estimate, a wide one means more uncertainty.
+  const costSpreadPct =
+    prediction?.estimated_cost_lkr && prediction?.min_cost_lkr != null && prediction?.max_cost_lkr != null
+      ? (Number(prediction.max_cost_lkr) - Number(prediction.min_cost_lkr)) /
+        (Number(prediction.estimated_cost_lkr) || 1)
+      : null;
 
-  const CostDeltaIcon =
-    costVariance > 0.05 ? TrendingUp : costVariance < -0.05 ? TrendingDown : Minus;
+  const CostDeltaIcon = costSpreadPct == null ? Minus : costSpreadPct > 0.5 ? ArrowLeftRight : Minus;
   const costDeltaColor =
-    costVariance > 0.05 ? "text-red-500" : costVariance < -0.05 ? "text-emerald-500" : "text-muted-foreground";
+    costSpreadPct == null ? "text-muted-foreground"
+      : costSpreadPct > 0.5 ? "text-amber-500"
+      : "text-emerald-500";
 
   async function handleRunPrediction() {
     setRunningPrediction(true);
@@ -266,25 +374,31 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
       toast.success("Prediction generated successfully!");
       onRefresh();
     } catch (e: any) {
-      console.error("Prediction failed:", e);
-      toast.error(e.message || "Failed to generate prediction");
+      console.warn("Prediction failed:", e);
+      const msg = e.message || "Failed to generate prediction";
+      const isNoSensor = msg.toLowerCase().includes("no sensor reading");
+      toast.error(isNoSensor ? "No sensor data available for this asset. Please ensure sensor readings are recorded before running a prediction." : msg);
     } finally {
       setRunningPrediction(false);
     }
   }
 
-  // Navigate to tickets page with the ticket pre-opened
   function goToTicket(ticketId: string) {
     router.push(`/admin/tickets?ticket_id=${ticketId}`);
   }
 
   return (
     <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden transition-all">
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/40 dark:bg-white/2">
+      {/* ── Header ──
+           Stacked (title row, then actions) instead of side-by-side, this
+           panel is often narrow (docked next to a list), and cramming a full
+           name + status + code + badges on the same row as 5 action buttons
+           left almost no room for the name itself, truncating it to a few
+           characters. */}
+      <div className="flex flex-col gap-3 px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/40 dark:bg-white/2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-bold truncate">{asset.asset_name}</h2>
+            <h2 className="text-base font-bold break-words">{asset.asset_name}</h2>
             <StatusPill status={asset.status} />
             <span className="text-[11px] font-mono text-muted-foreground/70 bg-slate-100 dark:bg-white/6 px-2 py-0.5 rounded-full">
               {asset.asset_code}
@@ -301,9 +415,20 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
           {!readOnly && (
             <>
+              {onAssign && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-xl gap-1.5 text-xs border-violet-200 dark:border-violet-900 bg-violet-50/50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/40"
+                  onClick={() => onAssign(asset)}
+                >
+                  <Users className="h-3 w-3" />
+                  {asset.assigned_to ? "Reassign" : "Assign"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -324,6 +449,16 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   ? <Loader2 className="h-3 w-3 animate-spin" />
                   : <RefreshCw className="h-3 w-3" />}
                 {runningPrediction ? "Running…" : "Run AI"}
+              </Button>
+              {/* Opens the shared report modal owned by page.tsx. */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-xl gap-1.5 text-xs border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                onClick={onReport}
+              >
+                <FileText className="h-3 w-3" />
+                Report
               </Button>
               {onEdit && (
                 <Button
@@ -359,19 +494,17 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             <HealthRing score={healthScore} />
             <div className="hidden sm:block h-24 w-px bg-slate-200/80 dark:bg-white/6" />
             <div className="flex-1 space-y-3.5 w-full">
-              <RiskGauge probability={failureProb} />
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Bot className="h-3.5 w-3.5" />
-                  Model confidence
-                </span>
-                <span className="font-bold tabular-nums">
-                  {prediction.confidence != null
-                    ? `${Math.round(Number(prediction.confidence) * 100)}%`
-                    : "—"}
-                </span>
+              <div className="flex items-center gap-2">
+                <TierBadge tier={prediction.tier} />
+                {prediction.agreement === false && (
+                  <span className="text-[11px] text-muted-foreground/70 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Signals disagree
+                  </span>
+                )}
               </div>
-              {predDiff !== null && (
+              <RiskGauge probability={failureProb} />
+              {predDiff !== null && showHardDate && (
                 <div className={cn(
                   "flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-medium",
                   predDiff < 0
@@ -413,9 +546,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
         if (legacy && !allImages.includes(legacy)) {
           allImages.unshift(legacy);
         }
-        
         if (allImages.length === 0) return null;
-        
         return (
           <div className="px-5 py-4 border-b border-slate-200/80 dark:border-white/6 bg-slate-50/20 dark:bg-slate-900/10">
             <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Asset Images</h3>
@@ -435,9 +566,9 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           <InfoField
             icon={<Building2 className="h-3.5 w-3.5" />}
-            label="Warehouse ID"
-            value={asset.warehouse_id}
-            mono
+            label="Warehouse"
+            value={warehouseName}
+            mono={warehouseName === asset.warehouse_id}
           />
           <InfoField
             icon={<MapPin className="h-3.5 w-3.5" />}
@@ -447,8 +578,20 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
           <InfoField
             icon={<User className="h-3.5 w-3.5" />}
             label="Assigned To"
-            value={asset.assigned_to ?? "Unassigned"}
-            mono={!!asset.assigned_to}
+            value={currentAssignee ?? "Unassigned"}
+            action={
+              !readOnly && onAssign ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-[11px]"
+                  onClick={() => onAssign(asset)}
+                >
+                  <ArrowLeftRight className="mr-1 h-3 w-3" />
+                  {asset.assigned_to ? "Reassign" : "Assign"}
+                </Button>
+              ) : undefined
+            }
           />
           <InfoField
             icon={<Gauge className="h-3.5 w-3.5" />}
@@ -461,6 +604,14 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             value={asset.vin ?? "—"}
             mono
           />
+          {/* Yard bay the vehicle is parked in, "<zone>-<bay>" e.g. A-012.
+              Unique per warehouse; forklifts get a bay just like road vehicles. */}
+          <InfoField
+            icon={<SquareParking className="h-3.5 w-3.5" />}
+            label="Parking Bay"
+            value={asset.parking_slot ?? "Unassigned"}
+            mono={!!asset.parking_slot}
+          />
           <InfoField
             icon={<Calendar className="h-3.5 w-3.5" />}
             label="Last Service"
@@ -470,34 +621,67 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             icon={<CalendarClock className="h-3.5 w-3.5" />}
             label="Next Scheduled Service"
             value={
-              asset.status === "maintenance"
+              asset.status === "under_maintenance"
                 ? "Currently in Maintenance"
                 : asset.next_service_date
                   ? `${fmt(asset.next_service_date)}${daysUntilMaint !== null ? ` (${daysUntilMaint > 0 ? `in ${daysUntilMaint}d` : `${Math.abs(daysUntilMaint)}d overdue`})` : ""}`
                   : "—"
             }
-            valueClass={asset.status !== "maintenance" && daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
+            valueClass={asset.status !== "under_maintenance" && daysUntilMaint !== null && daysUntilMaint < 0 ? "text-red-500 dark:text-red-400" : undefined}
+            action={
+              <SendServiceReminderButton
+                assetId={asset.id}
+                assetName={asset.asset_name}
+                hasAssignee={!!asset.assigned_to}
+                hasServiceDate={!!asset.next_service_date}
+              />
+            }
           />
           <InfoField
             icon={<Bot className="h-3.5 w-3.5" />}
             label="AI-Predicted Maintenance"
-            value={fmt(prediction?.predicted_maintenance_date)}
+            value={
+              showHardDate
+                ? fmt(prediction?.predicted_maintenance_date)
+                : prediction?.horizon_text ?? fmt(prediction?.predicted_maintenance_date)
+            }
           />
           {/* Cost prediction */}
           <div className="h-full rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/50 dark:bg-white/2 p-3 flex items-start gap-2.5">
-            <div className={cn("mt-0.5 shrink-0", costDeltaColor)}>
+            <div
+              className={cn("mt-0.5 shrink-0", costDeltaColor)}
+              title={
+                costSpreadPct == null
+                  ? "Confidence range not available"
+                  : costSpreadPct > 0.5
+                    ? "Wide confidence range — this estimate carries more uncertainty"
+                    : "Tight confidence range — this estimate is well constrained"
+              }
+            >
               <CostDeltaIcon className="h-3.5 w-3.5" />
             </div>
             <div>
               <div className="text-[11px] text-muted-foreground/80 font-medium">Est. Maintenance Cost</div>
-              <div className="text-sm font-semibold mt-0.5">
-                {fmtCost(costPrediction?.estimated_cost, costPrediction?.currency ?? "LKR")}
-              </div>
-              {costPrediction && (
-                <div className="text-[11px] text-muted-foreground/60 mt-0.5">
-                  Range: {fmtCost(costPrediction.min_cost, costPrediction.currency ?? "LKR")} –{" "}
-                  {fmtCost(costPrediction.max_cost, costPrediction.currency ?? "LKR")}
+              {/* A null cost means the cost model could not score this asset, the backend stores NULL rather than a guessed number. Say so
+                  plainly instead of rendering a dash that reads like "zero". */}
+              {prediction && prediction.estimated_cost_lkr == null ? (
+                <div
+                  className="text-sm font-medium mt-0.5 text-muted-foreground"
+                  title="The cost estimation model could not produce an estimate for this asset. No value is shown rather than an approximated one."
+                >
+                  Estimate unavailable
                 </div>
+              ) : (
+                <>
+                  <div className="text-sm font-semibold mt-0.5">
+                    {fmtCost(prediction?.estimated_cost_lkr)}
+                  </div>
+                  {prediction && (
+                    <div className="text-[11px] text-muted-foreground/60 mt-0.5">
+                      Range: {fmtCost(prediction.min_cost_lkr)} – {fmtCost(prediction.max_cost_lkr)}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -520,24 +704,14 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
           <TabsList className="rounded-xl w-full justify-start overflow-x-auto bg-slate-100/60 dark:bg-white/4">
             {[
               { value: "insights", icon: Bot, label: "Predictive Insights" },
-              {
-                value: "tickets",
-                icon: Ticket,
-                label: "Tickets",
-                count: tickets.length,
-              },
-              {
-                value: "maintenance",
-                icon: ClipboardList,
-                label: "Maintenance Logs",
-                count: maintenanceEvents.length,
-              },
-              {
-                value: "assignments",
-                icon: Users,
-                label: "Assignments",
-                count: assignments.length,
-              },
+              { value: "tickets", icon: Ticket, label: "Tickets", count: tickets.length },
+              { value: "maintenance", icon: ClipboardList, label: "Maintenance Logs", count: maintenanceEvents.length },
+              // Assignment history is an admin view. A read-only viewer would
+              // only ever see rows involving themselves (the API scopes it
+              // that way), which reads as a broken tab rather than a useful one.
+              ...(readOnly
+                ? []
+                : [{ value: "assignments", icon: Users, label: "Assignments", count: assignments.length }]),
             ].map(({ value, icon: Icon, label, count }) => (
               <TabsTrigger
                 key={value}
@@ -558,7 +732,6 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
           {/* ═══ Insights ═══ */}
           <TabsContent value="insights" className="mt-4 space-y-4">
             {!prediction ? (
-              /* ── Empty state ── */
               <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-slate-200 dark:border-white/8 bg-slate-50/30 dark:bg-white/2 p-10 text-center">
                 <div className="rounded-full bg-primary/8 dark:bg-white/6 p-4">
                   <Bot className="h-8 w-8 text-primary/50 dark:text-white/30" />
@@ -590,16 +763,16 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       <HealthRing score={healthScore} />
                       <div className="flex-1 space-y-1.5">
                         {[
-                          { label: "Brake", key: "brake_health_pct" },
-                          { label: "Tire", key: "tire_health_pct" },
-                          { label: "Battery", key: "battery_health_pct" },
-                          { label: "Oil", key: "oil_life_pct" },
-                          { label: "Hydraulic", key: "hydraulic_health_pct" },
+                          { label: "Brake", key: "brake" },
+                          { label: "Tire", key: "tire" },
+                          { label: "Battery", key: "battery" },
+                          { label: "Oil", key: "oil" },
+                          { label: "Hydraulic", key: "hydraulic" },
                         ].map(({ label, key }) => {
-                          const raw = prediction?.top_explanations as Record<string, unknown> | null;
-                          const factors = Array.isArray(raw?.top_factors) ? (raw!.top_factors as Array<{ feature: string; value?: number }>) : [];
-                          const found = factors.find((f) => f.feature === key);
-                          const pct = found?.value != null ? Math.min(100, Math.max(0, Math.round(Number(found.value)))) : null;
+                          const comp = componentRul?.components.find((c) => c.component === key);
+                          const pct = comp && !("error" in comp) && comp.health_pct != null
+                            ? Math.min(100, Math.max(0, Math.round(comp.health_pct)))
+                            : null;
                           const color = pct == null ? "bg-slate-200 dark:bg-white/10" : pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
                           return (
                             <div key={key} className="space-y-0.5">
@@ -621,7 +794,6 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                     <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Failure Risk Profile</div>
                     <div className="space-y-3">
-                      {/* Big probability number */}
                       <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${
                         failureProb >= 0.7
                           ? "bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400"
@@ -641,7 +813,6 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                           {prediction.risk_level?.toUpperCase() ?? "UNKNOWN"}
                         </div>
                       </div>
-                      {/* Risk bar */}
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] text-muted-foreground/60">
                           <span>Low risk</span><span>High risk</span>
@@ -653,52 +824,66 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                           />
                         </div>
                       </div>
-                      {/* Maintenance countdown */}
-                      {aiDaysUntilMaint != null && (
+                      {showHardDate && aiDaysUntilMaint != null ? (
                         <div className="flex items-center justify-between text-xs border-t border-slate-200/60 dark:border-white/6 pt-2">
                           <span className="text-muted-foreground">Days until maintenance</span>
                           <span className={`font-bold tabular-nums ${aiDaysUntilMaint < 0 ? "text-red-600 dark:text-red-400" : aiDaysUntilMaint <= 14 ? "text-red-500" : aiDaysUntilMaint <= 30 ? "text-amber-500" : "text-foreground"}`}>
                             {aiDaysUntilMaint < 0 ? `${Math.abs(aiDaysUntilMaint)}d overdue` : `${aiDaysUntilMaint}d`}
                           </span>
                         </div>
-                      )}
-                      {prediction.confidence != null && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground flex items-center gap-1"><Bot className="h-3 w-3" />Confidence</span>
-                          <span className="font-semibold">{Math.round(Number(prediction.confidence) * 100)}%</span>
+                      ) : prediction.horizon_text ? (
+                        <div className="text-xs text-muted-foreground border-t border-slate-200/60 dark:border-white/6 pt-2">
+                          {prediction.horizon_text}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </div>
 
-                {/* ── Row 2: SHAP Top Feature Importance ── */}
+                {/* ── Row 2: SHAP Top Feature Importance ──
+                     SHAP impact is signed in days against the regressor's
+                     predicted_days_until_maintenance: negative pulls the date
+                     closer (more urgent), positive pushes it further out
+                     (less urgent). Colored + directional so that reads at a
+                     glance instead of requiring the reader to parse a sign. */}
                 {(() => {
-                  const raw = prediction?.top_explanations as Record<string, unknown> | null;
-                  const topFactors = Array.isArray(raw?.top_factors) ? (raw!.top_factors as Array<{ feature: string; value?: number; impact?: number }>) : [];
+                  const topFactors = prediction?.top_explanations ?? [];
                   if (topFactors.length === 0) return null;
-                  const maxVal = Math.max(...topFactors.map((f) => Math.abs(Number(f.impact ?? f.value ?? 0))), 1);
+                  const maxVal = Math.max(...topFactors.map((f) => Math.abs(f.impact ?? 0)), 1);
                   return (
                     <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
-                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Top Risk Factors (SHAP)</div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Top Risk Factors (SHAP)</div>
+                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground/60">
+                          <span className="flex items-center gap-1">
+                            <TrendingDown className="h-3 w-3 text-red-500" /> Sooner
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3 text-emerald-500" /> Later
+                          </span>
+                        </div>
+                      </div>
                       <div className="space-y-2">
                         {topFactors.map((f, i) => {
-                          const impact = Math.abs(Number(f.impact ?? f.value ?? 0));
+                          const raw = f.impact ?? 0;
+                          const impact = Math.abs(raw);
                           const pct = Math.round((impact / maxVal) * 100);
                           const label = f.feature.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                          const isUrgent = raw < 0;
+                          const barColor = isUrgent ? "bg-red-500/80" : "bg-emerald-500/80";
+                          const textColor = isUrgent ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400";
+                          const DirIcon = isUrgent ? TrendingDown : TrendingUp;
                           return (
                             <div key={i} className="space-y-0.5">
-                              <div className="flex justify-between text-[11px]">
+                              <div className="flex justify-between items-center text-[11px]">
                                 <span className="text-muted-foreground font-medium truncate">{label}</span>
-                                <span className="text-xs font-mono text-muted-foreground/70 shrink-0 ml-2">
-                                  {f.value != null ? String(Number(f.value).toFixed(1)) : "—"}
+                                <span className={cn("flex items-center gap-1 text-xs font-mono shrink-0 ml-2", textColor)}>
+                                  <DirIcon className="h-3 w-3" />
+                                  {f.impact != null ? `${raw > 0 ? "+" : ""}${raw.toFixed(2)}d` : "—"}
                                 </span>
                               </div>
                               <div className="h-2 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
-                                <div
-                                  className="h-full rounded-full transition-all duration-700 bg-violet-500/80"
-                                  style={{ width: `${pct}%` }}
-                                />
+                                <div className={cn("h-full rounded-full transition-all duration-700", barColor)} style={{ width: `${pct}%` }} />
                               </div>
                             </div>
                           );
@@ -710,17 +895,22 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
 
                 {/* ── Row 3: AI Insight bullets + Cost card ── */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* AI summary bullets */}
                   <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                     <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">AI Recommendations</div>
                     <div className="space-y-2.5">
-                      {predDiff !== null && predDiff < 0 && (
+                      {prediction.tier === "conflict" && (
+                        <div className="flex items-start gap-2.5 text-sm text-violet-600 dark:text-violet-400">
+                          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>Classifier and health score disagree — <strong>flagged for manual review</strong>.</span>
+                        </div>
+                      )}
+                      {showHardDate && predDiff !== null && predDiff < 0 && (
                         <div className="flex items-start gap-2.5 text-sm text-red-600 dark:text-red-400">
                           <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                           <span>AI predicts failure <strong>{Math.abs(predDiff)} days earlier</strong> than scheduled service.</span>
                         </div>
                       )}
-                      {predDiff !== null && predDiff > 0 && (
+                      {showHardDate && predDiff !== null && predDiff > 0 && (
                         <div className="flex items-start gap-2.5 text-sm text-amber-600 dark:text-amber-400">
                           <Zap className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                           <span>Asset may last <strong>{predDiff} more days</strong> beyond scheduled service.</span>
@@ -738,10 +928,10 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                           <span>Elevated failure risk — <strong>inspect within the next 2 weeks</strong>.</span>
                         </div>
                       )}
-                      {healthScore >= 80 && (
+                      {prediction.tier === "healthy" && (
                         <div className="flex items-start gap-2.5 text-sm text-emerald-600 dark:text-emerald-400">
                           <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <span>Asset health is excellent — no immediate action required.</span>
+                          <span>Asset health is good — no immediate action required.</span>
                         </div>
                       )}
                       {asset.lifetime_breakdown_count != null && asset.lifetime_breakdown_count > 0 && (
@@ -752,35 +942,52 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       )}
                       <div className="flex items-start gap-2.5 text-sm text-muted-foreground/70">
                         <Bot className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                        <span>
-                          {aiDaysUntilMaint !== null && aiDaysUntilMaint < 0 ? "Maintenance was due on:" : "Predicted maintenance date:"} 
-                          <strong> {prediction.predicted_maintenance_date ? new Date(prediction.predicted_maintenance_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</strong>
-                        </span>
+                        {showHardDate ? (
+                          <span>
+                            {aiDaysUntilMaint !== null && aiDaysUntilMaint < 0 ? "Maintenance was due on:" : "Predicted maintenance date:"}
+                            <strong> {prediction.predicted_maintenance_date ? new Date(prediction.predicted_maintenance_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</strong>
+                          </span>
+                        ) : (
+                          <span>{prediction.horizon_text ?? prediction.recommended_action ?? "—"}</span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Cost estimate card */}
-                  {costPrediction && (
+                  {/* Rendered even when the estimate is missing. Hiding the card
+                      entirely left no trace that a cost was ever expected, so a
+                      failed cost model looked identical to a healthy asset with
+                      nothing to report. */}
+                  {prediction.estimated_cost_lkr == null ? (
+                    <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-2">
+                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Maintenance Cost Estimate</div>
+                      <div className="text-sm font-medium text-muted-foreground">Estimate unavailable</div>
+                      <div className="text-[11px] text-muted-foreground/70 leading-relaxed">
+                        The cost estimation model could not score this asset. No approximate
+                        figure is shown in its place — retry after the next prediction run, and
+                        if it persists the model may need attention.
+                      </div>
+                    </div>
+                  ) : (
                     <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                       <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Maintenance Cost Estimate</div>
                       <div className="space-y-3">
                         <div className="text-3xl font-bold tabular-nums">
-                          {fmtCost(costPrediction.estimated_cost, costPrediction.currency ?? "LKR")}
+                          {fmtCost(prediction.estimated_cost_lkr)}
                         </div>
                         <div className="space-y-2">
                           {[
-                            { label: "Minimum", value: costPrediction.min_cost, color: "bg-emerald-500" },
-                            { label: "Estimated", value: costPrediction.estimated_cost, color: "bg-violet-500" },
-                            { label: "Maximum", value: costPrediction.max_cost, color: "bg-red-500" },
+                            { label: "Minimum", value: prediction.min_cost_lkr, color: "bg-emerald-500" },
+                            { label: "Estimated", value: prediction.estimated_cost_lkr, color: "bg-violet-500" },
+                            { label: "Maximum", value: prediction.max_cost_lkr, color: "bg-red-500" },
                           ].map(({ label, value, color }) => {
-                            const max = Number(costPrediction.max_cost) || 1;
+                            const max = Number(prediction.max_cost_lkr) || 1;
                             const pct = Math.min(100, Math.round((Number(value) / max) * 100));
                             return (
                               <div key={label} className="space-y-0.5">
                                 <div className="flex justify-between text-[11px] text-muted-foreground/70">
                                   <span>{label}</span>
-                                  <span className="font-mono font-medium">{fmtCost(value, costPrediction.currency ?? "LKR")}</span>
+                                  <span className="font-mono font-medium">{fmtCost(value)}</span>
                                 </div>
                                 <div className="h-1.5 rounded-full bg-slate-200/60 dark:bg-white/8 overflow-hidden">
                                   <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
@@ -789,72 +996,18 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                             );
                           })}
                         </div>
-                        {costPrediction.confidence_score != null && (
-                          <div className="flex items-center justify-between text-xs border-t border-slate-200/60 dark:border-white/6 pt-2">
-                            <span className="text-muted-foreground">Cost model confidence</span>
-                            <span className="font-semibold">{Math.round(Number(costPrediction.confidence_score) * 100)}%</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* ── Row 4: Survival Analysis (Component RUL) ── */}
-                {survivalPrediction && (
-                  <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-4 mt-3">
-                    <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
-                      Component Remaining Useful Life (RUL)
-                    </div>
-                    {survivalPrediction.components.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No component survival data available.</div>
-                    ) : (
-                      <div className="space-y-4">
-                        {survivalPrediction.components.map((c, i) => {
-                          if ("error" in c) {
-                            return (
-                              <div key={i} className="flex justify-between items-center text-[11px] text-red-500/80">
-                                <span className="capitalize">{c.component}</span>
-                                <span>{c.error}</span>
-                              </div>
-                            );
-                          }
-                          const comp = c as ComponentSurvivalResponse;
-                          const isCritical = comp.median_days < 30;
-                          return (
-                            <div key={i} className="space-y-1.5">
-                              <div className="flex justify-between text-[11px]">
-                                <span className="capitalize font-medium text-muted-foreground">{comp.component}</span>
-                                <span className={cn("font-bold tabular-nums", isCritical ? "text-red-500" : "text-foreground")}>
-                                  {Math.round(comp.median_days)} days
-                                </span>
-                              </div>
-                              <div className="relative h-2 rounded-full bg-slate-200/60 dark:bg-white/8">
-                                {/* Error margin (P10 to P90) */}
-                                <div 
-                                  className="absolute h-full bg-primary/20 rounded-full"
-                                  style={{
-                                    left: `${Math.min(100, (comp.p10_days / 365) * 100)}%`,
-                                    width: `${Math.min(100, ((comp.p90_days - comp.p10_days) / 365) * 100)}%`
-                                  }}
-                                />
-                                {/* Median tick */}
-                                <div 
-                                  className={cn("absolute h-3 w-1 -top-0.5 rounded-full", isCritical ? "bg-red-500" : "bg-primary")}
-                                  style={{ left: `${Math.min(100, (comp.median_days / 365) * 100)}%` }}
-                                />
-                              </div>
-                              <div className="flex justify-between text-[9px] text-muted-foreground/50 font-mono">
-                                <span>0</span>
-                                <span>1 Year</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* ── Row 4: recorded operating history. Both charts plot
+                     stored sensor readings, so every point is something the
+                     asset actually did rather than a forecast. ── */}
+                <div className="space-y-3 mt-3">
+                  <UtilisationChart rows={usageRows} />
+                  <ServiceCadenceChart rows={usageRows} />
+                </div>
               </>
             )}
           </TabsContent>
@@ -864,39 +1017,46 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             {tickets.length === 0 ? (
               <EmptyState message="No tickets raised for this asset." icon={Ticket} />
             ) : (
-              tickets.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => goToTicket(t.id)}
-                  className="w-full text-left ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all hover:border-primary/30 group"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-mono text-muted-foreground/60">
-                          {t.ticket_number}
-                        </span>
-                        <TicketStatusPill status={t.status} />
-                        <PriorityPill priority={t.final_priority ?? t.predicted_priority ?? t.priority} />
-                        {t.final_category && (
-                          <span className="text-[10px] text-muted-foreground/60 bg-muted/50 px-2 py-0.5 rounded-full">
-                            {t.final_category}
-                          </span>
-                        )}
+              tickets.map((t) => {
+                const s = (t.status || "").toLowerCase();
+                const statusBorder =
+                  s === "open"
+                    ? "border-rose-500/30 dark:border-rose-500/25 hover:border-rose-500 dark:hover:border-rose-500/60"
+                    : s === "in-progress" || s === "in_progress"
+                    ? "border-amber-500/30 dark:border-amber-500/25 hover:border-amber-500 dark:hover:border-amber-500/60"
+                    : s === "resolved"
+                    ? "border-emerald-500/30 dark:border-emerald-500/25 hover:border-emerald-500 dark:hover:border-emerald-500/60"
+                    : "border-slate-500/30 dark:border-slate-500/25 hover:border-slate-500 dark:hover:border-slate-500/60";
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => goToTicket(t.id)}
+                    className={cn("w-full text-left ticket-dynamic rounded-xl border p-4 transition-all group", statusBorder)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-mono text-muted-foreground/60">{t.ticket_number}</span>
+                          <TicketStatusPill status={t.status} />
+                          <PriorityPill priority={t.final_priority ?? t.predicted_priority ?? t.priority} />
+                          {t.final_category && (
+                            <span className="text-[10px] text-muted-foreground/60 bg-muted/50 px-2 py-0.5 rounded-full">
+                              {t.final_category}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1.5 text-sm font-semibold truncate">{t.title}</div>
+                        <div className="text-[12px] text-muted-foreground/70 mt-0.5 line-clamp-1">{t.description}</div>
+                        <div className="text-[11px] text-muted-foreground/50 mt-1">
+                          Opened {fmt(t.opened_at)}
+                          {t.resolved_at && ` · Resolved ${fmt(t.resolved_at)}`}
+                        </div>
                       </div>
-                      <div className="mt-1.5 text-sm font-semibold truncate">{t.title}</div>
-                      <div className="text-[12px] text-muted-foreground/70 mt-0.5 line-clamp-1">
-                        {t.description}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground/50 mt-1">
-                        Opened {fmt(t.opened_at)}
-                        {t.resolved_at && ` · Resolved ${fmt(t.resolved_at)}`}
-                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary/60 transition-colors shrink-0 mt-1" />
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary/60 transition-colors shrink-0 mt-1" />
-                  </div>
-                </button>
-              ))
+                  </button>
+                );
+              })
             )}
           </TabsContent>
 
@@ -906,10 +1066,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
               <EmptyState message="No maintenance events recorded for this asset." icon={ClipboardList} />
             ) : (
               maintenanceEvents.map((e) => (
-                <div
-                  key={e.id}
-                  className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 space-y-2 transition-all"
-                >
+                <div key={e.id} className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 space-y-2 transition-all">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-200/60 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20">
@@ -922,14 +1079,10 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                       </div>
                     </div>
                     <div className="text-sm font-bold shrink-0 tabular-nums">
-                      {e.cost_amount != null
-                        ? fmtCost(e.cost_amount, e.currency)
-                        : "—"}
+                      {e.cost_amount != null ? fmtCost(e.cost_amount, e.currency) : "—"}
                     </div>
                   </div>
-                  {e.notes && (
-                    <p className="text-sm text-muted-foreground/80 leading-relaxed">{e.notes}</p>
-                  )}
+                  {e.notes && <p className="text-sm text-muted-foreground/80 leading-relaxed">{e.notes}</p>}
                   {e.odometer_reading != null && (
                     <div className="text-[11px] text-muted-foreground/50">
                       Odometer: {Number(e.odometer_reading).toLocaleString()} km
@@ -947,32 +1100,53 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
               <EmptyState message="No assignment history for this asset." icon={Users} />
             ) : (
               assignments.map((a) => (
-                <div
-                  key={a.id}
-                  className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className={cn(
-                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
-                        a.is_active
-                          ? "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20"
-                          : "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400",
-                      )}>
-                        {a.is_active ? "Active" : "Past"}
-                      </span>
-                      <div className="mt-1 text-xs font-mono text-muted-foreground/70">
-                        User: {a.user_id}
+                <div key={a.id} className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold">
+                      {(a.user_name ?? "?")
+                        .split(" ")
+                        .map((part) => part[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* A deleted profile leaves the id behind but no name. */}
+                        <span className="text-sm font-semibold">{a.user_name ?? "Unknown user"}</span>
+                        <span className={cn(
+                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
+                          a.is_active
+                            ? "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20"
+                            : "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400",
+                        )}>
+                          {a.is_active ? "Current" : "Past"}
+                        </span>
                       </div>
-                      <div className="text-[11px] text-muted-foreground/50 mt-0.5">
-                        Assigned {fmt(a.assigned_at)}
-                        {a.unassigned_at && ` · Removed ${fmt(a.unassigned_at)}`}
+
+                      {a.user_email && (
+                        <div className="text-[11px] text-muted-foreground/70">{a.user_email}</div>
+                      )}
+
+                      <div className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground/70">
+                        <div>
+                          <span className="text-muted-foreground/50">Assigned</span>{" "}
+                          {fmtDateTime(a.assigned_at)}
+                          {a.assigned_by_name && (
+                            <span className="text-muted-foreground/50"> by {a.assigned_by_name}</span>
+                          )}
+                        </div>
+                        {a.unassigned_at && (
+                          <div>
+                            <span className="text-muted-foreground/50">Unassigned</span>{" "}
+                            {fmtDateTime(a.unassigned_at)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
-                  {a.notes && (
-                    <p className="mt-2 text-sm text-muted-foreground/70">{a.notes}</p>
-                  )}
+                  {a.notes && <p className="mt-2 text-sm text-muted-foreground/70">{a.notes}</p>}
                 </div>
               ))
             )}

@@ -3,6 +3,8 @@
  * Handles login, token storage, and session management.
  */
 
+import { invalidateMyProfile } from "@/lib/api/userProfileApi";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -24,6 +26,7 @@ export interface LoginResponse {
   full_name?: string | null;
   warehouse_id?: string | null;
   warehouse_name?: string | null;
+  avatar_url?: string | null;
   // Super-admin step-1 fields
   requires_warehouse_selection: boolean;
   selection_token?: string | null;
@@ -42,7 +45,7 @@ export interface StoredUser {
 
 // ─── API calls ────────────────────────────────────────────────────────────────
 
-/** Step 1 — email + password only. Role is detected by the backend. */
+/** Step 1, email + password only. Role is detected by the backend. */
 export async function login(email: string, password: string): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
@@ -58,7 +61,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
   return response.json();
 }
 
-/** Step 2 (super_admin only) — exchange selection_token + warehouse_id for a full JWT. */
+/** Step 2 (super_admin only), exchange selection_token + warehouse_id for a full JWT. */
 export async function selectWarehouse(
   selectionToken: string,
   warehouseId: string,
@@ -75,6 +78,21 @@ export async function selectWarehouse(
   }
 
   return response.json();
+}
+
+/**
+ * Fire-and-forget ping to wake the PredictiX Gradio Space (ticket
+ * categorization + priority) before it's actually needed, so the first real
+ * inference call doesn't pay the ~20-60s cold-start penalty.
+ *
+ * No auth required (there's no session yet when this fires from the login
+ * page) and callers never await the result, a slow/failed ping must never
+ * block or affect the login flow.
+ */
+export function warmupInferenceSpace(): void {
+  fetch(`${API_BASE_URL}/warmup/inference-space`, { method: "POST" }).catch(() => {
+    // Intentionally silent, warmup is best-effort and must never surface an error.
+  });
 }
 
 // ─── Session helpers ──────────────────────────────────────────────────────────
@@ -110,6 +128,15 @@ export function storeAuthSession(data: LoginResponse): void {
   if (user.warehouse_name) {
     localStorage.setItem("predictix.user.warehouse_name", user.warehouse_name);
   }
+  if (data.avatar_url) {
+    localStorage.setItem("predictix.avatar_url", data.avatar_url);
+  }
+
+  // Any snapshot still on this device belongs to the previous session, a
+  // different person, or the same super admin on a different warehouse. Drop it
+  // so the chatbot cannot answer the new session from the old one's data. The
+  // pages that own these caches repopulate them on their next load.
+  clearCachedWarehouseData();
 }
 
 /** Return the stored JWT access token, or null. */
@@ -133,18 +160,52 @@ export function getUser(): StoredUser | null {
   }
 }
 
-/** Remove all auth data (logout). */
+/** Identity/session keys written at login. */
+const AUTH_STORAGE_KEYS = [
+  "predictix.access_token",
+  "token",
+  "predictix.user",
+  "predictix.user.role",
+  "predictix.user.email",
+  "predictix.user.id",
+  "predictix.user.name",
+  "predictix.user.warehouse_id",
+  "predictix.user.warehouse_name",
+  "predictix.avatar_url",
+] as const;
+
+/**
+ * Snapshots of warehouse data cached by the dashboard and assets pages.
+ *
+ * These are not decoration: FloatingChatbot reads them and sends them to the
+ * agent as `frontend_context`, so whatever is here becomes the material the
+ * assistant answers from. They must be cleared whenever the viewer or the
+ * viewed warehouse changes. Clearing only the identity keys above would leave
+ * them behind, so on a shared machine the next person to sign in would get the
+ * previous admin's figures in their chatbot context, and a super admin
+ * switching sites would keep answering from the warehouse they just left.
+ */
+export const CACHED_DATA_STORAGE_KEYS = [
+  "predictix.cached_dashboard_data",
+  "predictix.cached_asset_stats",
+  "predictix.cached_asset_analytics",
+] as const;
+
+/** Drop cached warehouse snapshots without touching the session. */
+export function clearCachedWarehouseData(): void {
+  if (typeof window === "undefined") return;
+  for (const key of CACHED_DATA_STORAGE_KEYS) localStorage.removeItem(key);
+}
+
+/** Remove all auth data and any cached warehouse snapshots (logout). */
 export function logout(): void {
-  localStorage.removeItem("predictix.access_token");
-  localStorage.removeItem("token");
-  localStorage.removeItem("predictix.user");
-  localStorage.removeItem("predictix.user.role");
-  localStorage.removeItem("predictix.user.email");
-  localStorage.removeItem("predictix.user.id");
-  localStorage.removeItem("predictix.user.name");
-  localStorage.removeItem("predictix.user.warehouse_id");
-  localStorage.removeItem("predictix.user.warehouse_name");
-  localStorage.removeItem("predictix.avatar_url");
+  if (typeof window === "undefined") return;
+  for (const key of AUTH_STORAGE_KEYS) localStorage.removeItem(key);
+  clearCachedWarehouseData();
+  // The profile cache lives in module memory, not localStorage, so clearing
+  // storage alone would leave the previous account's name and role readable by
+  // whoever signs in next.
+  invalidateMyProfile();
 }
 
 /** True if a JWT is present in localStorage. */

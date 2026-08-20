@@ -18,6 +18,9 @@ const GROUPS = [
   ["Unit: health bands", "src/lib/healthBands.test.ts"],
   ["Unit: auth session (AU-08)", "src/lib/authService.test.ts"],
   ["Unit: asset helpers", "src/components/admin/assets/assetService.test.ts"],
+  ["Unit: asset usage charts", "src/components/admin/assets/AssetUsageCharts.test.ts"],
+  ["Component: asset usage panels", "src/components/admin/assets/AssetUsageCharts.render.test.tsx"],
+  ["Theming: asset section", "src/components/admin/assets/theming.test.ts"],
   ["Component: assigned assets", "src/components/admin/users/ViewAssignedAssetsDialog.test.tsx"],
   ["Test plan: theme (NS-07)", "src/components/theme/ThemeProvider.test.tsx"],
   ["Test plan: navigation (NS-08)", "src/components/navigation/AdminNavbar.test.ts"],
@@ -65,7 +68,7 @@ function sleepSync(ms) {
  * the process ends, and on Windows the file is sometimes still absent, still
  * being written, or written but empty at that instant. Reading once made the
  * runner report "NO TESTS RAN" on a suite that had just passed 69 tests, which
- * is the worst failure mode a test runner has — it trains you to ignore it.
+ * is the worst failure mode a test runner has, it trains you to ignore it.
  */
 function readReport(attempts = 10, waitMs = 200) {
   for (let i = 0; i < attempts; i += 1) {
@@ -95,7 +98,7 @@ rmSync(jsonPath, { force: true });
 
 if (!report) {
   // Vitest's own exit code is the authority on pass/fail. A missing report
-  // means the breakdown is unavailable, not that nothing ran — say which.
+  // means the breakdown is unavailable, not that nothing ran, say which.
   if (result.status === 0) {
     console.error(
       "\nThe JSON reporter produced no usable output, so the per-group " +
@@ -155,8 +158,8 @@ for (const [label, g] of rows) {
 console.log("-".repeat(66));
 
 // The report's own totals are authoritative. The per-file breakdown above is
-// only for presentation, and has occasionally come back empty even on a run
-// that passed, which previously reported "NO TESTS RAN" for a healthy suite.
+// for presentation only and can come back empty on a run that passed, so a
+// verdict taken from it would call a healthy suite empty.
 const reported = {
   pass: report.numPassedTests ?? 0,
   fail: report.numFailedTests ?? 0,

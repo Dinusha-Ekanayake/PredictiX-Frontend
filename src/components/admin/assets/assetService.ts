@@ -1,7 +1,8 @@
 /**
- * Asset Service
- * All API calls for the admin assets section.
- * Uses apiGet / apiPost / apiPut / apiFetch (for DELETE) from apiClient so JWT is auto-attached.
+ * API calls for the admin assets section.
+ *
+ * Every request goes through apiClient, which attaches the JWT and throws
+ * {@link ApiError} on a non-2xx response.
  */
 
 import { apiGet, apiFetch, apiPost, apiPut, ApiError } from "@/lib/apiClient";
@@ -17,10 +18,10 @@ import type {
   Ticket,
   AssetAssignment,
   AssetSurvivalResponse,
+  AssetUsageHistory,
 } from "./types";
 
-// ─── Create / update payloads ────────────────────────────────────────────────
-// Mirrors the backend AssetCreate/AssetUpdate schema (editable subset).
+/** Fields accepted when creating or editing an asset. */
 export interface AssetWritePayload {
   asset_code: string;
   asset_name: string;
@@ -45,7 +46,7 @@ export interface IdNameOption {
   name: string;
 }
 
-// ─── Log Maintenance Payload ───────────────────────────────────────────────────
+/** Body for logging a completed service against an asset. */
 export interface LogMaintenancePayload {
   title: string;
   description?: string;
@@ -56,10 +57,9 @@ export interface LogMaintenancePayload {
   notes?: string;
 }
 
-// ─── List / filter assets (paginated) ──────────────────────────────────────────
-
 export const ASSETS_PAGE_SIZE = 50;
 
+/** Turn toolbar filters into query params, skipping any set to "all". */
 function buildAssetListParams(filters: AssetFilters): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.query) params.set("search", filters.query);
@@ -73,11 +73,8 @@ function buildAssetListParams(filters: AssetFilters): URLSearchParams {
   return params;
 }
 
-// ─── Short-TTL client-side cache ───────────────────────────────────────────────
-// Paging back and forth (or the filter-effect re-firing after a delete/save
-// refetch) would otherwise re-hit the network for data that's still fresh.
-// A short TTL keeps the list feeling instant for that back-and-forth while
-// staying safe against showing stale data for long.
+// Short-lived cache keyed by query string, so paging back and forth (or the
+// filter effect re-firing after a save) reuses a response instead of refetching.
 const LIST_CACHE_TTL_MS = 15_000;
 const listCache = new Map<string, { data: AssetListItem[]; expires: number }>();
 const countCache = new Map<string, { count: number; expires: number }>();
@@ -131,48 +128,36 @@ export async function getAssetAnalytics(): Promise<AssetAnalytics> {
   return apiGet<AssetAnalytics>(`/assets/analytics`);
 }
 
-// ─── Single asset ──────────────────────────────────────────────────────────────
-
+/** Fetch one asset in full. */
 export async function getAsset(assetId: string): Promise<Asset> {
   return apiGet<Asset>(`/assets/${assetId}`);
 }
 
-// ─── Maintenance events for an asset ──────────────────────────────────────────
-
+/** Fetch an asset's maintenance history. */
 export async function getMaintenanceEvents(assetId: string): Promise<MaintenanceEvent[]> {
-  // The maintenance router lists by asset_id query param
   return apiGet<MaintenanceEvent[]>(`/maintenance/?asset_id=${assetId}`);
 }
 
-// ─── Tickets for an asset ──────────────────────────────────────────────────────
-
+/** Fetch tickets raised against an asset (capped at 100). */
 export async function getAssetTickets(assetId: string): Promise<Ticket[]> {
   return apiGet<Ticket[]>(`/tickets/?asset_id=${assetId}&limit=100`);
 }
 
-// ─── Asset assignments ─────────────────────────────────────────────────────────
-
+/** Fetch the assignment history for an asset. */
 export async function getAssetAssignments(assetId: string): Promise<AssetAssignment[]> {
   return apiGet<AssetAssignment[]>(`/asset-assignments/?asset_id=${assetId}`);
 }
 
-// ─── Latest PDM batch prediction for an asset ──────────────────────────────────
-// Single source of truth for classifier + regressor + health-score + cost
-// estimate + the decision layer (tier/agreement/horizon). Populated by the
-// daily scheduler and by the manual "Refresh now" trigger — both write the
-// same row via app.ai.services.batch_prediction_service, so this always
-// reflects whichever run happened most recently, scheduled or manual.
-
+/**
+ * Fetch an asset's latest PdM prediction, or null if it has none.
+ *
+ * Returns null if it fails, so one bad fetch cannot blank the detail panel.
+ * A 404 just means the asset has not been scored yet; anything else is logged.
+ */
 export async function getBatchPrediction(assetId: string): Promise<BatchPrediction | null> {
   try {
     return await apiGet<BatchPrediction>(`/batch-predictions/${assetId}`);
   } catch (e) {
-    // 404 genuinely means no prediction yet — the normal, expected state
-    // before the first batch run. Anything else (500, network failure,
-    // auth) is a real error that was previously indistinguishable from
-    // "no data yet" both to the UI and to whoever was debugging it — still
-    // degrade to null so one failed fetch doesn't break the whole detail
-    // panel, but at least surface it in the console instead of hiding it.
     if (!(e instanceof ApiError) || e.status !== 404) {
       console.error(`Failed to load batch prediction for asset ${assetId}:`, e);
     }
@@ -180,21 +165,15 @@ export async function getBatchPrediction(assetId: string): Promise<BatchPredicti
   }
 }
 
-// ─── Component RUL for an asset (trained per-component Weibull AFT survival
-// models — same models the warehouse report uses, see survival_service.py).
-// Previously called /assets/{assetId}/component-rul, a much weaker per-asset
-// OLS trend on 1-4 sensor readings that degraded to a guessed flat decay
-// rate whenever reading history was thin (the common case). That endpoint
-// is now deprecated but still live for any external caller.
-
+/**
+ * Fetch per-component remaining-life forecasts over a 180-day horizon.
+ *
+ * Returns null on failure, same as {@link getBatchPrediction}.
+ */
 export async function getComponentRul(assetId: string): Promise<AssetSurvivalResponse | null> {
   try {
     return await apiGet<AssetSurvivalResponse>(`/survival/${assetId}?horizon_days=180&step_days=30`);
   } catch (e) {
-    // Same reasoning as getBatchPrediction above — only a 404 is the
-    // expected "no RUL data yet" case (e.g. no sensor reading at all yet);
-    // anything else gets logged so it's diagnosable instead of silently
-    // looking like an empty state.
     if (!(e instanceof ApiError) || e.status !== 404) {
       console.error(`Failed to load component survival for asset ${assetId}:`, e);
     }
@@ -202,11 +181,29 @@ export async function getComponentRul(assetId: string): Promise<AssetSurvivalRes
   }
 }
 
-// ─── Run a fresh prediction for an asset now ───────────────────────────────────
-// Triggers the same pipeline the daily scheduler runs (v7 models + decision
-// layer) for just this asset and upserts pdm_batch_predictions, so the
-// result is immediately visible via getBatchPrediction() afterward.
+/**
+ * Fetch the asset's recorded monthly operating history.
+ *
+ * Returns null on failure, same as {@link getBatchPrediction}, so a missing
+ * history hides the charts rather than failing the whole panel.
+ */
+export async function getUsageHistory(assetId: string): Promise<AssetUsageHistory | null> {
+  try {
+    return await apiGet<AssetUsageHistory>(`/assets/${assetId}/usage-history?months=24`);
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 404) {
+      console.error(`Failed to load usage history for asset ${assetId}:`, e);
+    }
+    return null;
+  }
+}
 
+/**
+ * Re-run the prediction pipeline for one asset and return the fresh result.
+ *
+ * Runs the same models as the nightly job and saves the result, so later reads
+ * see the new values.
+ */
 export async function runVehiclePrediction(assetId: string): Promise<BatchPrediction> {
   const response = await apiFetch(`/batch-predictions/run/${assetId}`, {
     method: "POST",
@@ -218,37 +215,39 @@ export async function runVehiclePrediction(assetId: string): Promise<BatchPredic
   return response.json() as Promise<BatchPrediction>;
 }
 
-// ─── Load full asset detail (asset + predictions + maintenance + tickets + assignments) ──
-
+/**
+ * Load everything the detail panel needs, in parallel.
+ *
+ * The history calls fall back to empty arrays, so a missing ticket list still
+ * lets the asset render. If the asset itself fails to load this throws, since
+ * there is nothing to show without it.
+ */
 export async function getAssetDetail(assetId: string): Promise<AssetDetail> {
-  // Run all fetches in parallel for speed
-  const [asset, prediction, componentRul, maintenanceEvents, tickets, assignments] =
+  const [asset, prediction, componentRul, usageHistory, maintenanceEvents, tickets, assignments] =
     await Promise.all([
       getAsset(assetId),
       getBatchPrediction(assetId),
       getComponentRul(assetId),
+      getUsageHistory(assetId),
       getMaintenanceEvents(assetId).catch(() => [] as MaintenanceEvent[]),
       getAssetTickets(assetId).catch(() => [] as Ticket[]),
       getAssetAssignments(assetId).catch(() => [] as AssetAssignment[]),
     ]);
 
-  return { asset, prediction, componentRul, maintenanceEvents, tickets, assignments };
+  return { asset, prediction, componentRul, usageHistory, maintenanceEvents, tickets, assignments };
 }
 
-// ─── Create asset ────────────────────────────────────────────────────────────
-
+/** Create an asset. Caller should invalidate the list cache afterwards. */
 export async function createAsset(payload: AssetWritePayload): Promise<Asset> {
   return apiPost<Asset>("/assets/", payload);
 }
 
-// ─── Log Maintenance ───────────────────────────────────────────────────────────
-
+/** Record a completed service; also advances the asset's service dates. */
 export async function logMaintenance(assetId: string, payload: LogMaintenancePayload): Promise<MaintenanceEvent> {
   return apiPost<MaintenanceEvent>(`/maintenance/log-maintenance/${assetId}`, payload);
 }
 
-// ─── Upload Asset Image ────────────────────────────────────────────────────────
-
+/** Upload a photo for an asset and return the updated asset. */
 export async function uploadAssetImage(assetId: string, file: File): Promise<Asset> {
   const formData = new FormData();
   formData.append("file", file);
@@ -256,8 +255,8 @@ export async function uploadAssetImage(assetId: string, file: File): Promise<Ass
   const response = await apiFetch(`/assets/${assetId}/image`, {
     method: "POST",
     body: formData,
-    // Note: Do NOT set Content-Type header manually for FormData, 
-    // the browser will automatically set it with the boundary.
+    // Content-Type is left unset on purpose. The browser adds it along with
+    // the multipart boundary, which we cannot write by hand.
   });
 
   if (!response.ok) {
@@ -268,8 +267,7 @@ export async function uploadAssetImage(assetId: string, file: File): Promise<Ass
   return response.json();
 }
 
-// ─── Update asset (full edit) ──────────────────────────────────────────────────
-
+/** Update an asset. Omitted fields are left unchanged. */
 export async function updateAsset(
   assetId: string,
   payload: Partial<AssetWritePayload>,
@@ -277,20 +275,19 @@ export async function updateAsset(
   return apiPut<Asset>(`/assets/${assetId}`, payload);
 }
 
-// ─── Warehouse / department options (for select dropdowns) ─────────────────────
-
+/** Warehouse options for select inputs. */
 export async function getWarehouseOptions(): Promise<IdNameOption[]> {
   const rows = await apiGet<Array<{ id: string; name: string }>>("/warehouses/");
   return rows.map((w) => ({ id: w.id, name: w.name }));
 }
 
+/** Department options for select inputs. */
 export async function getDepartmentOptions(): Promise<IdNameOption[]> {
   const rows = await apiGet<Array<{ id: string; name: string }>>("/departments/");
   return rows.map((d) => ({ id: d.id, name: d.name }));
 }
 
-// ─── Update asset status ───────────────────────────────────────────────────────
-
+/** Change an asset's status (active, under_maintenance, decommissioned, ...). */
 export async function updateAssetStatus(assetId: string, status: string): Promise<Asset> {
   const response = await apiFetch(`/assets/${assetId}/status?status=${status}`, {
     method: "PATCH",
@@ -302,14 +299,10 @@ export async function updateAssetStatus(assetId: string, status: string): Promis
   return response.json();
 }
 
-// generateAssetReport() (POST /asset-reports/{assetId}, server-rendered PDF
-// download) removed — dead since the report flow moved to the client-built
-// HTML path (src/lib/assetPdfExport.ts + POST /reports/render-pdf); nothing
-// has called this since. The backend route itself stays live (marked
-// deprecated) in case any external caller still depends on it.
+// Asset PDFs are built client-side (src/lib/assetPdfExport.ts) rather than by
+// the deprecated server-render endpoint, so there is no report call here.
 
-// ─── Delete asset ──────────────────────────────────────────────────────────────
-
+/** Delete an asset. Caller should invalidate the list cache afterwards. */
 export async function deleteAsset(assetId: string): Promise<void> {
   const response = await apiFetch(`/assets/${assetId}`, { method: "DELETE" });
   if (!response.ok) {
@@ -318,29 +311,18 @@ export async function deleteAsset(assetId: string): Promise<void> {
   }
 }
 
-// ─── Derive health score (0–100) from health_band or criticality_score ─────────
-// The real health_score comes from the prediction; fall back to band mapping.
-
-export function deriveHealthScore(asset: Asset, prediction: BatchPrediction | null): number {
-  if (prediction?.health_score != null) return Math.round(Number(prediction.health_score));
-
-  const bandMap: Record<string, number> = {
-    excellent: 90,
-    good: 72,
-    moderate: 52,
-    poor: 30,
-    critical: 12,
-  };
-  if (asset.health_band) return bandMap[asset.health_band.toLowerCase()] ?? 50;
-  if (asset.criticality_score != null) {
-    // criticality_score is 0–100, higher = worse → invert for health
-    return Math.max(0, Math.min(100, Math.round(100 - Number(asset.criticality_score))));
-  }
-  return 50;
+/**
+ * Health score (0 to 100) from an asset's prediction, or null if it has none.
+ *
+ * Null means the asset has not been scored yet. Callers should show a missing
+ * state rather than substituting a number.
+ */
+export function deriveHealthScore(prediction: BatchPrediction | null): number | null {
+  if (prediction?.health_score == null) return null;
+  return Math.round(Number(prediction.health_score));
 }
 
-// ─── Derive failure probability ────────────────────────────────────────────────
-
+/** Failure probability (0 to 1), or 0 when the asset has no prediction. */
 export function deriveFailureProbability(prediction: BatchPrediction | null): number {
   if (prediction?.failure_probability != null) return Number(prediction.failure_probability);
   return 0;

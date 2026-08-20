@@ -60,7 +60,8 @@ function AnimatedCounter({ value }: { value: number }) {
 
 export default function AdminTicketsPage() {
   const [isAdmin, setIsAdmin] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [initialLoading, setInitialLoading] = React.useState(true);
+  const [isTableLoading, setIsTableLoading] = React.useState(false);
   const [hasError, setHasError] = React.useState(false);
   const [tickets, setTickets] = React.useState<Ticket[]>([]);
   const [total, setTotal] = React.useState(0);
@@ -75,9 +76,11 @@ export default function AdminTicketsPage() {
   const [selectedTicket, setSelectedTicket] = React.useState<Ticket | null>(null);
 
   const [query, setQuery] = React.useState("");
-  const [debouncedQuery, setDebouncedQuery] = React.useState("");
+  const [appliedQuery, setAppliedQuery] = React.useState("");
   const [selectedStatus, setSelectedStatus] = React.useState("all");
   const [selectedPriority, setSelectedPriority] = React.useState("all");
+  const [sortBy, setSortBy] = React.useState("created_at");
+  const [sortDir, setSortDir] = React.useState("asc");
   const [users, setUsers] = React.useState<UserItem[]>([]);
 
   // ── Deep-link support: ?ticket_id=<uuid> (e.g. from the dashboard's
@@ -104,7 +107,8 @@ export default function AdminTicketsPage() {
 
   React.useEffect(() => {
     const role = window.localStorage.getItem("predictix.user.role");
-    setIsAdmin(role === "admin" || role === "ADMIN");
+    const r = (role || "").toLowerCase();
+    setIsAdmin(r === "admin" || r === "superadmin" || r === "super_admin");
     listUsers()
       .then(setUsers)
       .catch((err) => console.error("Failed to load users:", err));
@@ -134,30 +138,30 @@ export default function AdminTicketsPage() {
     refreshStatusCounts();
   }, [refreshStatusCounts]);
 
-  // Debounce search input
-  React.useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 400);
-    return () => clearTimeout(t);
-  }, [query]);
-
   // Reset and reload when filters change
   React.useEffect(() => {
     setPage(0);
-    setTickets([]);
-    loadPage(0, true);
+    loadPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery, selectedStatus, selectedPriority]);
+  }, [appliedQuery, selectedStatus, selectedPriority, sortBy, sortDir]);
 
-  async function loadPage(pageNum: number, reset: boolean) {
-    if (pageNum === 0) setIsLoading(true);
-    else setLoadingMore(true);
+  async function loadPage(pageNum: number) {
+    if (initialLoading) {
+      // First load handled by initialLoading
+    } else if (pageNum === 0) {
+      setIsTableLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
 
     try {
       const { tickets: rows, total: t } = await fetchTickets(
         pageNum,
-        debouncedQuery,
+        appliedQuery,
         selectedStatus,
-        selectedPriority
+        selectedPriority,
+        sortBy,
+        sortDir
       );
       setTotal(t);
       setTickets(rows);
@@ -169,17 +173,18 @@ export default function AdminTicketsPage() {
         description: err instanceof Error ? err.message : undefined,
       });
     } finally {
-      setIsLoading(false);
+      setInitialLoading(false);
+      setIsTableLoading(false);
       setLoadingMore(false);
     }
   }
 
   function handleNextPage() {
-    loadPage(page + 1, false);
+    loadPage(page + 1);
   }
 
   function handlePrevPage() {
-    if (page > 0) loadPage(page - 1, false);
+    if (page > 0) loadPage(page - 1);
   }
 
   function handleTicketCreated(ticket: Ticket) {
@@ -226,7 +231,7 @@ export default function AdminTicketsPage() {
   const hasMore = (page + 1) * PAGE_SIZE < total;
   const hasPrev = page > 0;
 
-  if (isLoading) {
+  if (initialLoading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
         <PredictiXLoader label="Loading tickets…" />
@@ -349,14 +354,44 @@ export default function AdminTicketsPage() {
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-card shadow-sm p-4">
         <div className="flex w-full items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-60">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <button
+              type="button"
+              onClick={() => setAppliedQuery(query)}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer z-10"
+            >
+              <Search className="h-4 w-4" />
+            </button>
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tickets by title, description…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setAppliedQuery(query);
+                }
+              }}
+              placeholder="Search tickets by title, ticket number, description…"
               className="pl-9 h-10 bg-background/60 dark:bg-slate-900/60"
             />
           </div>
+
+          <Select
+            value={`${sortBy}_${sortDir}`}
+            onValueChange={(v) => {
+              const [by, dir] = v.split("_");
+              setSortBy(by);
+              setSortDir(dir);
+            }}
+          >
+            <SelectTrigger className="w-44 h-10 bg-background/60 dark:bg-slate-900/60">
+              <SelectValue placeholder="Sort By" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_at_asc">Oldest First</SelectItem>
+              <SelectItem value="created_at_desc">Newest First</SelectItem>
+              <SelectItem value="title_asc">Name (A-Z)</SelectItem>
+              <SelectItem value="title_desc">Name (Z-A)</SelectItem>
+            </SelectContent>
+          </Select>
 
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Select value={selectedStatus} onValueChange={(v) => setSelectedStatus(v)}>
@@ -402,15 +437,18 @@ export default function AdminTicketsPage() {
               <Filter className="h-4 w-4" />
             </Button>
 
-            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "") && (
+            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "" || appliedQuery.trim() !== "" || sortBy !== "created_at" || sortDir !== "asc") && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-10 text-muted-foreground hover:text-foreground hover:bg-muted/50 px-3 flex items-center gap-1.5"
                 onClick={() => {
                   setQuery("");
+                  setAppliedQuery("");
                   setSelectedStatus("all");
                   setSelectedPriority("all");
+                  setSortBy("created_at");
+                  setSortDir("asc");
                 }}
               >
                 <XCircle className="h-4 w-4" />
@@ -427,9 +465,13 @@ export default function AdminTicketsPage() {
       </p>
 
       {/* ══ Ticket list ══════════════════════════════════════════════════════ */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5">
-        <div className="flex flex-col gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-        {tickets.length === 0 ? (
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0a0a0a] shadow-sm p-5 min-h-[260px] relative">
+        {isTableLoading ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <Loader2 className="size-6 text-violet-500 animate-spin" />
+            <p className="text-xs font-medium text-muted-foreground">Updating tickets list…</p>
+          </div>
+        ) : tickets.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card p-10 text-center">
             <div className="rounded-full bg-violet-100 dark:bg-violet-500/15 p-3">
               <TicketIcon className="size-5 text-violet-500" />
@@ -440,8 +482,9 @@ export default function AdminTicketsPage() {
             </p>
           </div>
         ) : (
-          tickets.map((t) => {
-            const priorityAccent =
+          <div className="flex flex-col gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+            {tickets.map((t) => {
+              const priorityAccent =
               t.priority === "High"
                 ? "from-rose-500 to-rose-600"
                 : t.priority === "Medium"
@@ -531,9 +574,9 @@ export default function AdminTicketsPage() {
                 </div>
               </div>
             );
-          })
+          })}
+          </div>
         )}
-        </div>
       </div>
 
       {/* Pagination */}

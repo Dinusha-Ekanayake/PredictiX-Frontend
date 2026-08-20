@@ -4,8 +4,15 @@ import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, AlertCircle, CheckCircle, Trash2, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, AlertCircle, CheckCircle, Trash2, Loader2, Sparkles, RefreshCw, XCircle } from "lucide-react";
 import { toast } from "@/lib/customToast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   updateTicketStatus, 
   updateTicketPriority, 
@@ -32,7 +39,7 @@ import { getAssetDetail } from "@/components/admin/assets/assetService";
 import type { AssetDetail } from "@/components/admin/assets/types";
 import type { UserItem } from "@/lib/userService";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn, generateUUID } from "@/lib/utils";
 
 type Props = {
   open: boolean;
@@ -138,11 +145,17 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
   }, []);
 
   const isTechnician = React.useMemo(() => {
-    if (currentUserRole.toLowerCase() === "admin") return true;
+    const r = (currentUserRole || "").toLowerCase();
+    if (r === "admin" || r === "superadmin" || r === "super_admin") return true;
     const userObj = users?.find((u) => u.id === currentUserId);
     return userObj?.department?.toLowerCase().includes("maintenance") || false;
   }, [users, currentUserId, currentUserRole]);
 
+  const hasAdminAccess = React.useMemo(() => {
+    if (isAdmin) return true;
+    const r = (currentUserRole || "").toLowerCase();
+    return r === "admin" || r === "superadmin" || r === "super_admin";
+  }, [isAdmin, currentUserRole]);
   const canDelete = React.useMemo(() => {
     const role = (currentUserRole || "").toLowerCase();
     if (role === "admin" || role === "superadmin" || role === "super_admin") {
@@ -203,8 +216,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     }
   }, [ticket, open]);
 
-  async function handleStatusChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const newStatus = e.target.value as TicketStatus;
+  async function handleStatusChange(newStatus: TicketStatus) {
     if (!ticket || newStatus === localStatus) return;
     setStatusUpdating(true);
     const prev = localStatus;
@@ -215,7 +227,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
       
       // Append a new status history log dynamically so the Audit Log updates instantly!
       const newLog = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         ticket_id: ticket.id,
         old_status: prev,
         new_status: newStatus,
@@ -303,7 +315,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     setUploadingImage(true);
     try {
       const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+      const fileName = `${Date.now()}-${generateUUID()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
         .from("ticket-attachments")
         .upload(fileName, file);
@@ -433,48 +445,61 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                 {/* Priority */}
                 <div className="flex items-center gap-1.5">
                   <PriorityIcon priority={localPriority} />
-                  {isAdmin ? (
-                    priorityUpdating ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                    ) : (
-                      <select
-                        value={localPriority}
-                        onChange={handlePriorityChange}
-                        disabled={priorityUpdating}
-                        className={selectCls + " w-[110px]"}
-                      >
-                        <option value="High">High</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Low">Low</option>
-                      </select>
-                    )
-                  ) : (
-                    <span className="text-sm font-medium">{localPriority}</span>
-                  )}
+                  <span className="text-sm font-medium">{localPriority}</span>
                 </div>
 
                 {/* Status */}
                 <div className="flex items-center gap-1.5">
-                  {isAdmin ? (
+                  {hasAdminAccess ? (
                     statusUpdating ? (
                       <span className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />Updating…
                       </span>
                     ) : (
-                      <select
+                      <Select
                         value={localStatus}
-                        onChange={handleStatusChange}
+                        onValueChange={(val) => handleStatusChange(val as TicketStatus)}
                         disabled={statusUpdating}
-                        className={selectCls + " w-[140px]"}
                       >
-                        <option value="open">Open</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="resolved">Resolved</option>
-                        <option value="closed">Closed</option>
-                      </select>
+                        <SelectTrigger className="w-[155px] h-8 text-xs font-semibold">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="open">
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="h-3.5 w-3.5 text-rose-500 animate-pulse" />
+                              <span>Open</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="in-progress">
+                            <div className="flex items-center gap-2">
+                              <RefreshCw className="h-3.5 w-3.5 text-amber-500" />
+                              <span>In Progress</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="resolved">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                              <span>Resolved</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="closed">
+                            <div className="flex items-center gap-2">
+                              <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span>Closed</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     )
                   ) : (
-                    <span className="text-sm font-medium capitalize">{localStatus.replace("-", " ")}</span>
+                    <span className="text-sm font-medium capitalize flex items-center gap-1.5">
+                      {localStatus === "open" && <AlertCircle className="h-3.5 w-3.5 text-rose-500 animate-pulse" />}
+                      {localStatus === "in-progress" && <RefreshCw className="h-3.5 w-3.5 text-amber-500" />}
+                      {localStatus === "resolved" && <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
+                      {localStatus === "closed" && <XCircle className="h-3.5 w-3.5 text-muted-foreground" />}
+                      {localStatus.replace("-", " ")}
+                    </span>
                   )}
                 </div>
               </div>
@@ -547,7 +572,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                             className="object-cover w-full h-full cursor-zoom-in"
                             onClick={() => setFullSizeImage(a.file_path)}
                           />
-                          {isAdmin && (
+                           {hasAdminAccess && (
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <Button 
                                 variant="destructive" 
@@ -566,7 +591,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                     <p className="text-sm text-muted-foreground italic">No attachments.</p>
                   )}
                   
-                  {isAdmin && (
+                  {hasAdminAccess && (
                     <div className="mt-3 flex items-end gap-2 max-w-sm">
                       <div className="flex-1">
                         <p className="text-xs text-muted-foreground mb-1">Upload New Image</p>
@@ -595,7 +620,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
             <div className="rounded-md border p-3 bg-muted/30">
               <h4 className="text-sm font-medium text-muted-foreground">Assigned To</h4>
               <div className="mt-2 text-sm">
-                {isAdmin ? (
+                {hasAdminAccess ? (
                   assigneeUpdating ? (
                     <span className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />Updating…
@@ -798,7 +823,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                           <span className="text-[10px] opacity-75">{new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                         </div>
                         <p className="leading-relaxed whitespace-pre-wrap">{c.comment}</p>
-                        {(isMe || isAdmin) && (
+                        {(isMe || hasAdminAccess) && (
                           <button onClick={() => handleDeleteComment(c.id)} className="self-end mt-1 text-[10px] opacity-60 hover:opacity-100 flex items-center gap-0.5 hover:text-red-400">
                             <Trash className="h-3 w-3" /> Delete
                           </button>
@@ -851,7 +876,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                             <span className="text-[10px] opacity-75">{new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                           </div>
                           <p className="leading-relaxed whitespace-pre-wrap">{c.comment}</p>
-                          {(isMe || isAdmin) && (
+                          {(isMe || hasAdminAccess) && (
                             <button onClick={() => handleDeleteComment(c.id)} className="self-end mt-1 text-[10px] opacity-60 hover:opacity-100 flex items-center gap-0.5 hover:text-red-500">
                               <Trash className="h-3 w-3" /> Delete
                             </button>

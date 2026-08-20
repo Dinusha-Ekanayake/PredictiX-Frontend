@@ -47,6 +47,7 @@ const SORT_OPTIONS: { value: AssetSortBy; label: string }[] = [
   { value: "payload_capacity_kg", label: "Payload Capacity" },
 ];
 
+/** Search, filter and sort controls for the assets list. */
 export default function AssetsToolbar({
   filters,
   setFilters,

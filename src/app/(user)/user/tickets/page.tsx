@@ -10,8 +10,8 @@
  *  - Search (title / description / ticket_number)
  *  - Status + priority filters
  *  - Mini-dashboard with open / in-progress / resolved / closed counts
- *  - "+ New Ticket" — opens UserNewTicketDialog (POST /user/tickets)
- *  - Click a card — opens UserTicketDetailsDialog (GET/PUT + comments)
+ *  - "+ New Ticket", opens UserNewTicketDialog (POST /user/tickets)
+ *  - Click a card, opens UserTicketDetailsDialog (GET/PUT + comments)
  */
 
 import * as React from "react";
@@ -132,15 +132,18 @@ export default function UserTicketsPage() {
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   const [query, setQuery] = React.useState("");
+  const [appliedQuery, setAppliedQuery] = React.useState("");
   const [selectedStatus, setSelectedStatus] = React.useState("all");
   const [selectedPriority, setSelectedPriority] = React.useState("all");
+  const [sortBy, setSortBy] = React.useState<"created_at" | "updated_at" | "priority" | "status" | "ticket_number" | "title" | "name">("created_at");
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
 
   const [newOpen, setNewOpen] = React.useState(false);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [activeTicketId, setActiveTicketId] = React.useState<string | null>(null);
   const [users, setUsers] = React.useState<UserItem[]>([]);
 
-  // Read the current user id once on mount — needed by the detail dialog to
+  // Read the current user id once on mount, needed by the detail dialog to
   // decide if the "Edit" button shows up.
   const currentUserId = React.useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -172,9 +175,9 @@ export default function UserTicketsPage() {
           listMyTickets({
             status: selectedStatus !== "all" ? selectedStatus : undefined,
             priority: selectedPriority !== "all" ? selectedPriority : undefined,
-            search: query.trim() || undefined,
-            sort_by: "created_at",
-            sort_dir: "desc",
+            search: appliedQuery.trim() || undefined,
+            sort_by: sortBy,
+            sort_dir: sortDir,
             page_size: 100,
           }),
           getMyTicketStats(),
@@ -190,10 +193,10 @@ export default function UserTicketsPage() {
         setRefreshing(false);
       }
     },
-    [selectedStatus, selectedPriority, query]
+    [selectedStatus, selectedPriority, appliedQuery, sortBy, sortDir]
   );
 
-  // Initial load — runs once.
+  // Initial load, runs once.
   React.useEffect(() => {
     loadTickets("initial");
     listUsers()
@@ -202,13 +205,10 @@ export default function UserTicketsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Refetch when filters change (debounced for search).
+  // Refetch when filters change
   React.useEffect(() => {
-    const t = setTimeout(() => {
-      loadTickets("refresh");
-    }, 300);
-    return () => clearTimeout(t);
-  }, [selectedStatus, selectedPriority, query, loadTickets]);
+    loadTickets("refresh");
+  }, [selectedStatus, selectedPriority, appliedQuery, sortBy, sortDir, loadTickets]);
 
   function openDetail(id: string) {
     setActiveTicketId(id);
@@ -264,15 +264,45 @@ export default function UserTicketsPage() {
       <div className="w-full">
         <div className="flex w-full items-center gap-3 rounded-2xl border border-input bg-transparent p-4">
           <div className="flex items-center gap-3 flex-1">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <div className="relative flex-1 max-w-2xl">
+              <button
+                type="button"
+                onClick={() => setAppliedQuery(query)}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer z-10"
+              >
+                <Search className="h-4 w-4" />
+              </button>
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by title, description or ticket number…"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setAppliedQuery(query);
+                  }
+                }}
+                placeholder="Search by title, description, ticket number or assignee name…"
                 className="pl-12 h-12 rounded-lg"
               />
             </div>
+
+            <Select
+              value={`${sortBy}_${sortDir}`}
+              onValueChange={(v) => {
+                const [by, dir] = v.split("_");
+                setSortBy(by as any);
+                setSortDir(dir as any);
+              }}
+            >
+              <SelectTrigger className="w-[170px] h-12 rounded-lg">
+                <SelectValue placeholder="Sort By" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_at_asc">Oldest First</SelectItem>
+                <SelectItem value="created_at_desc">Newest First</SelectItem>
+                <SelectItem value="title_asc">Name (A-Z)</SelectItem>
+                <SelectItem value="title_desc">Name (Z-A)</SelectItem>
+              </SelectContent>
+            </Select>
 
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
@@ -280,11 +310,19 @@ export default function UserTicketsPage() {
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="open">
+                    <div className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-rose-500" /><span>Open</span></div>
+                  </SelectItem>
+                  <SelectItem value="in_progress">
+                    <div className="flex items-center gap-2"><RefreshCw className="h-4 w-4 text-amber-500" /><span>In Progress</span></div>
+                  </SelectItem>
+                  <SelectItem value="resolved">
+                    <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-emerald-500" /><span>Resolved</span></div>
+                  </SelectItem>
+                  <SelectItem value="closed">
+                    <div className="flex items-center gap-2"><XCircle className="h-4 w-4 text-muted-foreground" /><span>Closed</span></div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
 
@@ -304,15 +342,18 @@ export default function UserTicketsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "") && (
+            {(selectedStatus !== "all" || selectedPriority !== "all" || query.trim() !== "" || appliedQuery.trim() !== "" || sortBy !== "created_at" || sortDir !== "asc") && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-10 text-muted-foreground hover:text-foreground hover:bg-muted/50 px-3 flex items-center gap-1.5"
                 onClick={() => {
                   setQuery("");
+                  setAppliedQuery("");
                   setSelectedStatus("all");
                   setSelectedPriority("all");
+                  setSortBy("created_at");
+                  setSortDir("asc");
                 }}
               >
                 <XCircle className="h-4 w-4" />

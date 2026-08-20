@@ -56,8 +56,45 @@ export type TeamMemberData = {
   status: string;
 };
 
+/**
+ * The caller's own profile, de-duplicated across components.
+ *
+ * The navbar and the page body both need it, so without sharing, every screen
+ * issues two identical /profiles/me requests. Against Supabase that is a real
+ * cost: the endpoint takes ~850ms, and the two run in parallel competing for
+ * the same connection pool.
+ *
+ * In-flight requests share one promise, and the resolved value is reused for a
+ * short window so a navigation does not refetch immediately. The window is
+ * deliberately small because the profile carries role and status, and a stale
+ * one must not outlive a deactivation for long.
+ */
+const PROFILE_TTL_MS = 30_000;
+let profileCache: { at: number; data: UserProfileData } | null = null;
+let profileInFlight: Promise<UserProfileData> | null = null;
+
 export async function fetchMyProfile(): Promise<UserProfileData> {
-  return apiGet<UserProfileData>("/profiles/me");
+  if (profileCache && Date.now() - profileCache.at < PROFILE_TTL_MS) {
+    return profileCache.data;
+  }
+  if (profileInFlight) return profileInFlight;
+
+  profileInFlight = apiGet<UserProfileData>("/profiles/me")
+    .then((data) => {
+      profileCache = { at: Date.now(), data };
+      return data;
+    })
+    .finally(() => {
+      profileInFlight = null;
+    });
+  return profileInFlight;
+}
+
+/** Drop the cached profile. Call after anything that changes it, and on sign-out
+ *  so the next account does not read the previous one's profile. */
+export function invalidateMyProfile(): void {
+  profileCache = null;
+  profileInFlight = null;
 }
 
 export async function updateMyProfile(data: {
@@ -72,7 +109,11 @@ export async function updateMyProfile(data: {
     compactView?: boolean;
   };
 }): Promise<UserProfileData> {
-  return apiPut<UserProfileData>("/profiles/me", data);
+  const updated = await apiPut<UserProfileData>("/profiles/me", data);
+  // Seed the cache with the server's response rather than clearing it, so the
+  // next read is both fresh and free.
+  profileCache = { at: Date.now(), data: updated };
+  return updated;
 }
 
 export async function fetchMyAssets(): Promise<UserAssetData[]> {
@@ -130,6 +171,20 @@ export async function fetchWarehouses(): Promise<string[]> {
   return rows.map((w) => (typeof w === "string" ? w : w.name ?? "")).filter(Boolean);
 }
 
+/**
+ * Warehouses as id/name pairs.
+ *
+ * fetchWarehouses throws the ids away, so it cannot turn an asset's
+ * warehouse_id into a name. Any view that renders an asset needs that mapping,
+ * otherwise the detail panel falls back to printing the raw UUID.
+ */
+export async function fetchWarehouseOptions(): Promise<{ value: string; label: string }[]> {
+  const rows = await apiGet<Array<{ id?: string; name?: string }>>("/warehouses/");
+  return rows
+    .filter((w) => w?.id && w?.name)
+    .map((w) => ({ value: String(w.id), label: String(w.name) }));
+}
+
 export async function fetchUserAssets(userId: string): Promise<UserAssetData[]> {
   return apiGet<UserAssetData[]>(`/users/${userId}/assets`);
 }
@@ -138,6 +193,15 @@ export async function updateUser(userId: string, data: Partial<UserItemOut>): Pr
   return apiPut<UserItemOut>(`/users/${userId}`, data);
 }
 
-export async function getTeamMembers(): Promise<TeamMemberData[]> {
-  return apiGet<TeamMemberData[]>("/profiles/me/colleagues");
+/**
+ * Colleagues in the current user's department.
+ *
+ * Pass `limit` when you only need a preview, the dashboard's "My Team" card
+ * shows eight, and unbounded this returns the whole department (measured at
+ * 519 people / 150 KB for one Colombo driver). Omit it for the team directory,
+ * which searches across the full list client-side.
+ */
+export async function getTeamMembers(limit?: number): Promise<TeamMemberData[]> {
+  const query = limit != null ? `?limit=${limit}` : "";
+  return apiGet<TeamMemberData[]>(`/profiles/me/colleagues${query}`);
 }

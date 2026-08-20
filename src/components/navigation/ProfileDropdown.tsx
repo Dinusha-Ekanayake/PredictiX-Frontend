@@ -120,7 +120,7 @@ export default function ProfileDropdown({ user, profileHref, settingsHref }: Pro
           open && "bg-slate-100/70 dark:bg-white/5"
         )}
       >
-        {/* Name + role text — capped width with ellipsis so long names never
+        {/* Name + role text, capped width with ellipsis so long names never
             wrap and stretch the navbar (full name is visible in the panel) */}
         <div className="text-right flex flex-col justify-center gap-0.5 min-w-0 max-w-[180px]">
           <div className="text-sm font-semibold tracking-tight leading-none truncate" title={user.name}>

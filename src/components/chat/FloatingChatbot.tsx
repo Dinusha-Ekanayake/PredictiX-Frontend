@@ -9,15 +9,13 @@ import {
   ExternalLink,
   Loader2,
   MessageCircle,
-  Mic,
-  MicOff,
   SendHorizontal,
   Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn, generateUUID } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -72,9 +70,9 @@ function CopyActionButton({ label, textToCopy }: { label: string; textToCopy: st
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/60 dark:border-violet-600/60 bg-violet-50 dark:bg-violet-900/40 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-800/60 transition-all duration-200 hover:shadow-sm"
+      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 shadow-sm"
     >
-      {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+      {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3 text-muted-foreground" />}
       {copied ? "Copied!" : label}
     </button>
   );
@@ -132,7 +130,6 @@ function RecordSummaryWidget({ payload }: { payload: any }) {
           const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
           const textValue = String(value);
           let displayValue: React.ReactNode = textValue;
-
           // Badge formatting for common statuses
           if (key === "status" || key === "priority" || key === "role") {
             const isGood = textValue === "active" || textValue === "resolved" || textValue === "admin";
@@ -196,15 +193,8 @@ export default function FloatingChatbot() {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSending, setIsSending] = React.useState(false);
   const [draft, setDraft] = React.useState("");
-  const [interimDraft, setInterimDraft] = React.useState("");
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
-
-  // Speech Recognition
-  const [isListening, setIsListening] = React.useState(false);
-  const isListeningRef = React.useRef(false);
-  const [speechSupported, setSpeechSupported] = React.useState(true);
-  const recognitionRef = React.useRef<any>(null);
 
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const messageEndRef = React.useRef<HTMLDivElement | null>(null);
@@ -262,7 +252,7 @@ export default function FloatingChatbot() {
       setMessages((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: "assistant",
           text: `🚨 **Critical Alert!**\n\n${payload.title}\n${payload.message}`,
           createdAt: Date.now(),
@@ -273,84 +263,6 @@ export default function FloatingChatbot() {
     window.addEventListener("proactive_alert", handleProactiveAlert);
     return () => window.removeEventListener("proactive_alert", handleProactiveAlert);
   }, []);
-
-  // Speech Recognition Setup
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        
-        recognition.onresult = (event: any) => {
-          let finalTranscript = "";
-          let interimTranscript = "";
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            } else {
-              interimTranscript += event.results[i][0].transcript;
-            }
-          }
-          if (finalTranscript) {
-            setDraft((prev) => (prev ? prev + " " + finalTranscript.trim() : finalTranscript.trim()));
-          }
-          setInterimDraft(interimTranscript);
-        };
-
-        recognition.onerror = (event: any) => {
-          if (event.error !== "no-speech" && event.error !== "network") {
-            console.error("Speech recognition error", event.error);
-            setIsListening(false);
-            isListeningRef.current = false;
-          } else if (event.error === "network") {
-            console.warn("Speech recognition network error, will retry...");
-          }
-        };
-
-        recognition.onend = () => {
-          if (isListeningRef.current) {
-            setTimeout(() => {
-              if (isListeningRef.current) {
-                try {
-                  recognition.start();
-                } catch (e) {
-                  console.error("Failed to restart speech recognition", e);
-                  setIsListening(false);
-                  isListeningRef.current = false;
-                }
-              }
-            }, 300);
-          } else {
-            setIsListening(false);
-            setInterimDraft("");
-          }
-        };
-
-        recognitionRef.current = recognition;
-      } else {
-        setSpeechSupported(false);
-      }
-    }
-  }, []);
-
-  const toggleListening = () => {
-    if (!recognitionRef.current) return;
-    if (isListeningRef.current) {
-      isListeningRef.current = false;
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      isListeningRef.current = true;
-      try {
-        recognitionRef.current.start();
-      } catch (e) {
-        console.warn("Already started");
-      }
-      setIsListening(true);
-    }
-  };
 
   // Auto-scroll on new messages
   React.useEffect(() => {
@@ -366,7 +278,7 @@ export default function FloatingChatbot() {
 
     setIsSending(true);
     const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       role: "user",
       text,
       createdAt: Date.now(),
@@ -430,7 +342,7 @@ export default function FloatingChatbot() {
       setMessages((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: "assistant",
           text: replyText || "I'm sorry, I couldn't generate a response.",
           createdAt: Date.now(),
@@ -460,7 +372,7 @@ export default function FloatingChatbot() {
       setMessages((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: "assistant",
           text: friendlyMessage,
           createdAt: Date.now(),
@@ -540,7 +452,7 @@ export default function FloatingChatbot() {
                           setDraft(chip);
                           setTimeout(() => inputRef.current?.focus(), 50);
                         }}
-                        className="rounded-full border border-violet-300/50 dark:border-violet-700/50 bg-violet-50/80 dark:bg-violet-900/30 px-3 py-1 text-xs text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-800/50 transition-colors"
+                        className="rounded-lg border border-border bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 hover:border-muted-foreground/30 transition-all duration-200"
                       >
                         {chip}
                       </button>
@@ -556,10 +468,10 @@ export default function FloatingChatbot() {
                     >
                       <div
                         className={cn(
-                          "max-w-[88%] rounded-2xl px-3 py-2.5 text-sm shadow-sm",
+                          "max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm",
                           message.role === "user"
-                            ? "rounded-br-md bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white"
-                            : "rounded-bl-md border border-border/70 bg-card text-foreground dark:bg-slate-800/80"
+                            ? "rounded-tr-sm bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-medium"
+                            : "rounded-tl-sm border border-border/60 bg-muted/40 dark:bg-muted/10 text-foreground"
                         )}
                       >
                         {/* Message body */}
@@ -618,7 +530,7 @@ export default function FloatingChatbot() {
                           <RecordSummaryWidget payload={message.widgetData} />
                         )}
 
-                        {/* Action Buttons — rendered as clickable nav buttons */}
+                        {/* Action Buttons, rendered as clickable nav buttons */}
                         {message.role === "assistant" &&
                           message.actionButtons &&
                           message.actionButtons.length > 0 && (
@@ -634,9 +546,9 @@ export default function FloatingChatbot() {
                                     onClick={() => {
                                       router.push(btn.path);
                                     }}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300/60 dark:border-violet-600/60 bg-violet-50 dark:bg-violet-900/40 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-800/60 transition-all duration-200 hover:shadow-sm"
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 shadow-sm"
                                   >
-                                    <ArrowRight className="size-3" />
+                                    <ArrowRight className="size-3 text-muted-foreground" />
                                     {btn.label}
                                   </button>
                                 );
@@ -674,46 +586,14 @@ export default function FloatingChatbot() {
               <div className="flex items-center gap-2">
                 <Input
                   ref={inputRef}
-                  value={draft + (draft && interimDraft ? " " : "") + interimDraft}
-                  onChange={(e) => {
-                    setDraft(e.target.value);
-                    setInterimDraft("");
-                  }}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
                   placeholder="Ask a question..."
                   aria-label="Chatbot message input"
                   className="h-10 text-sm"
                   disabled={isSending}
                   maxLength={500}
                 />
-                
-                {speechSupported && (
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="outline"
-                    aria-label="Toggle voice input"
-                    onClick={toggleListening}
-                    disabled={isSending}
-                    className={cn(
-                      "shrink-0 transition-all duration-300 relative h-10 w-10",
-                      isListening ? "border-violet-500 bg-violet-50 text-violet-600 w-[72px] hover:bg-violet-100 dark:bg-violet-900/30 dark:text-violet-400" : ""
-                    )}
-                  >
-                    {isListening ? (
-                      <div className="flex items-center gap-1.5 w-full justify-center">
-                        <Mic className="size-5" />
-                        <div className="flex items-center gap-0.5 h-4">
-                          <span className="w-0.5 h-full bg-current animate-[pulse_0.75s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '0ms' }} />
-                          <span className="w-0.5 h-2/3 bg-current animate-[pulse_0.6s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '150ms' }} />
-                          <span className="w-0.5 h-full bg-current animate-[pulse_0.9s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '300ms' }} />
-                          <span className="w-0.5 h-1/2 bg-current animate-[pulse_0.5s_ease-in-out_infinite_alternate] rounded-full" style={{ animationDelay: '450ms' }} />
-                        </div>
-                      </div>
-                    ) : (
-                      <MicOff className="size-5 text-muted-foreground" />
-                    )}
-                  </Button>
-                )}
 
                 <Button
                   type="submit"
@@ -741,17 +621,16 @@ export default function FloatingChatbot() {
       <button
         type="button"
         className={cn(
-          "pointer-events-auto group absolute bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full border border-white/20 text-white",
-          "bg-gradient-to-br from-violet-500 via-fuchsia-500 to-sky-500",
-          "shadow-[0_10px_30px_-10px_rgba(124,58,237,0.6)]",
-          "cursor-pointer hover:scale-105 transition-all duration-300 ease-out"
+          "pointer-events-auto group absolute bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full border border-border bg-gradient-to-br from-indigo-600 to-violet-600 text-white",
+          "shadow-[0_8px_30px_rgb(79,70,229,0.3)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.5)]",
+          "cursor-pointer hover:scale-105 hover:shadow-[0_12px_30px_rgb(79,70,229,0.4)] transition-all duration-300 ease-out"
         )}
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label={isOpen ? "Close chatbot" : "Open chatbot"}
       >
         <span className="sr-only">Sidekick</span>
         <span className="pointer-events-none absolute inset-0 rounded-full bg-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-violet-400/40 to-sky-400/40 blur-md opacity-60" />
+        <span className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-br from-indigo-400/20 to-violet-400/20 blur-md opacity-60" />
         {isOpen ? (
           <X className="relative size-6 drop-shadow-sm" />
         ) : (

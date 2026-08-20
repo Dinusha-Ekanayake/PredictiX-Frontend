@@ -5,7 +5,7 @@
  *
  * Loads the full ticket from GET /user/tickets/{id}, lets the owner edit
  * title / description / priority (PUT /user/tickets/{id}), and lists +
- * posts comments. No delete button, no status transition controls — those
+ * posts comments. No delete button, no status transition controls, those
  * are admin-only.
  */
 
@@ -105,7 +105,7 @@ export default function UserTicketDetailsDialog({
   // Prefer the parent's already-loaded list; fall back to this dialog's own fetch.
   const users = usersProp ?? fetchedUsers;
 
-  // Edit form state — local until saved.
+  // Edit form state, local until saved.
   const [editTitle, setEditTitle] = React.useState("");
   const [editDescription, setEditDescription] = React.useState("");
   const [editPriority, setEditPriority] = React.useState<string>("");
@@ -343,25 +343,7 @@ export default function UserTicketDetailsDialog({
                       className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-27.5 resize-vertical"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Priority</p>
-                      <Select
-                        value={editPriority}
-                        onValueChange={(v) => setEditPriority(v)}
-                        disabled={savingEdit}
-                      >
-                        <SelectTrigger className="w-full bg-background">
-                          <SelectValue placeholder="Unset" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+
                   <div className="flex justify-end gap-2">
                     <Button
                       variant="ghost"

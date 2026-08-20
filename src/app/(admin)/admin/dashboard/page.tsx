@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import PredictiXLoader from "@/components/loading/PredictiXLoader";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
+import { healthColor, healthTextClass } from "@/lib/healthBands";
 import {
   getAdminDashboard,
   type AdminDashboardData,
@@ -44,8 +45,7 @@ const STA: Record<TicketStatus, string> = {
 };
 
 // 5 health bands (Excellent..Critical) + a neutral gray for the "No Data"
-// band (assets with no completed prediction yet) appended by the backend —
-// keep it visually distinct from every real band, not a wrapped-around reuse.
+// band (assets with no completed prediction yet) appended by the backend, // keep it visually distinct from every real band, not a wrapped-around reuse.
 const DIST_COLORS = ["#10b981", "#6366f1", "#f59e0b", "#f97316", "#ef4444", "#94a3b8"];
 
 const INSIGHT_STYLE: Record<InsightTone, { icon: React.ElementType; color: string; bg: string }> = {
@@ -89,16 +89,10 @@ function CTip({ active, payload, label, fmt }: { active?: boolean; payload?: Arr
   );
 }
 
-// Health-band cut-offs, mirroring app/services/health_bands.py — the backend is
-// the source of truth. Previously this bar used its own 40/70 split, a third
-// health scale alongside the dashboard's bands and assets.health_band, so a
-// score could read amber here while the chart called it Poor.
-const HEALTH_POOR = 38;   // below this: poor or critical
-const HEALTH_GOOD = 50;   // at or above this: good or excellent
-
+// Cut-offs come from @/lib/healthBands so every screen bands a score alike.
 function ScoreBar({ score }: { score: number }) {
-  const c = score < HEALTH_POOR ? "#ef4444" : score < HEALTH_GOOD ? "#f59e0b" : "#10b981";
-  const tc = score < HEALTH_POOR ? "text-rose-600 dark:text-rose-400" : score < HEALTH_GOOD ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
+  const c = healthColor(score);
+  const tc = healthTextClass(score);
   return (
     <div className="flex items-center gap-2 shrink-0">
       <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
@@ -120,6 +114,44 @@ function SectionSub({ children }: { children: React.ReactNode }) {
 }
 function EmptyRow({ children }: { children: React.ReactNode }) {
   return <div className="px-5 py-8 text-center text-[12px] text-muted-foreground">{children}</div>;
+}
+
+/**
+ * How much of a trend series can actually be plotted.
+ *
+ * The API returns one entry per month and leaves months with no recorded data
+ * as null rather than inventing a number. A series can therefore be non-empty
+ * and still have nothing to draw, so counting entries is not enough.
+ *
+ *   "empty"   no month carries a value
+ *   "single"  exactly one month does. A line needs two points, so a chart
+ *             drawn from this renders as a lone dot.
+ *   "ok"      two or more months, enough for a trend
+ */
+type SeriesState = "empty" | "single" | "ok";
+
+function seriesState<T>(rows: T[] | undefined, keys: (keyof T)[]): SeriesState {
+  if (!rows?.length) return "empty";
+  const withValue = rows.filter((r) =>
+    keys.some((k) => {
+      const v = r[k] as unknown;
+      return typeof v === "number" && Number.isFinite(v);
+    }),
+  ).length;
+  if (withValue === 0) return "empty";
+  return withValue === 1 ? "single" : "ok";
+}
+
+/** Shown when a series holds one reading. States the value and why no line is
+ *  drawn, instead of rendering a chart with a single unexplained point. */
+function SingleReading({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-1.5 px-6 text-center">
+      <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="text-3xl font-bold tabular-nums text-foreground">{value}</span>
+      <p className="max-w-[42ch] text-[12px] leading-relaxed text-muted-foreground">{note}</p>
+    </div>
+  );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -152,10 +184,9 @@ export default function AdminDashboardPage() {
 
   React.useEffect(() => { load(); }, [load]);
 
-  // The header clock/date next to the "Live" badge is a real clock, not a
-  // "data last fetched" timestamp — it previously only updated inside load()'s
-  // finally block, so it froze at whatever moment the page last loaded or was
-  // manually refreshed instead of ticking forward on its own. Tick it
+  // The header clock next to the "Live" badge is a wall clock, not a
+  // "data last fetched" timestamp, so it ticks on its own interval rather than
+  // updating only when the page loads. Tick it
   // independently of data fetching so it always reflects the current time.
   React.useEffect(() => {
     setNow(new Date());
@@ -175,45 +206,69 @@ export default function AdminDashboardPage() {
   const date = now ? now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) : "";
 
   const k = data?.kpis;
-  // "Fleet Health"/"Predicted Failures" show a distinct empty state instead
-  // of a false "0%"/"0" when no PdM predictions have run yet (brand-new
-  // warehouse) — previously indistinguishable from a genuine alarming 0%.
+  // Fleet Health and Predicted Failures render an empty state when no PdM
+  // predictions exist yet. Showing "0%" there would be indistinguishable from
+  // a genuine reading of zero, which is an alarming number to display falsely.
   const hasPredictions = k?.hasPredictionData ?? false;
+
+  // Cost coverage. A missing count means an older backend, so treat it as
+  // fully covered rather than warning about data the user cannot act on.
+  const costedAssets = k?.estMaintenanceCostAssetCount ?? (k?.totalAssets ?? 0);
+  const costIsPartial = !!k && costedAssets < k.totalAssets;
+  const costSubLabel = !k
+    ? "LKR · current estimate"
+    : costedAssets === 0
+      ? "No assets could be costed"
+      : costIsPartial
+        ? `LKR · ${costedAssets} of ${k.totalAssets} assets costed`
+        : "LKR · current estimate";
+
   const kpiCards = [
     { label: "Total Assets", value: k ? String(k.totalAssets) : "—", sub: "Fleet-wide", icon: Package, iconBg: "bg-violet-100 dark:bg-violet-500/15", iconColor: "text-violet-600 dark:text-violet-400", accent: "text-violet-600 dark:text-violet-400" },
     { label: "Critical Alerts", value: k ? String(k.criticalAlerts) : "—", sub: "Require action now", icon: Flame, iconBg: "bg-rose-100 dark:bg-rose-500/15", iconColor: "text-rose-600 dark:text-rose-400", accent: "text-rose-600 dark:text-rose-400" },
     { label: "Open Tickets", value: k ? String(k.openTickets) : "—", sub: k ? `${k.highPriorityTickets} high priority` : "", icon: Ticket, iconBg: "bg-amber-100 dark:bg-amber-500/15", iconColor: "text-amber-600 dark:text-amber-400", accent: "text-amber-600 dark:text-amber-400" },
     { label: "Fleet Health", value: k ? (hasPredictions ? `${Math.round(k.fleetHealth)}%` : "—") : "—", sub: hasPredictions ? "Fleet-wide average" : "No predictions yet", icon: Activity, iconBg: "bg-emerald-100 dark:bg-emerald-500/15", iconColor: "text-emerald-600 dark:text-emerald-400", accent: "text-emerald-600 dark:text-emerald-400" },
-    // "Predicted Failures" counts every asset with failure_probability >=
-    // 50% currently on record — not filtered to any specific time horizon,
-    // so the sub-label no longer claims an "8 weeks" window the query
-    // doesn't actually enforce.
+    // Counts every asset currently on record with failure_probability >= 50%.
+    // No time horizon is applied, so the sub-label states the threshold rather
+    // than a window.
     { label: "Predicted Failures", value: k ? (hasPredictions ? String(k.predictedFailures) : "—") : "—", sub: hasPredictions ? "≥ 50% failure probability" : "No predictions yet", icon: Brain, iconBg: "bg-sky-100 dark:bg-sky-500/15", iconColor: "text-sky-600 dark:text-sky-400", accent: "text-sky-600 dark:text-sky-400" },
-    // Sum of the current per-asset cost estimate across the fleet — not a
+    // Sum of the current per-asset cost estimate across the fleet, not a
     // rolling 30-day figure (pdm_batch_predictions holds one current
     // estimate per asset, not a time-bounded window), so the label no
     // longer claims "30 days".
-    { label: "Est. Maint. Cost", value: k ? fmtCompact(k.estMaintenanceCost) : "—", sub: "LKR · current estimate", icon: Wrench, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", accent: "text-slate-600 dark:text-slate-400" },
+    // Unscored assets contribute nothing to the sum, so it can cover fewer
+    // assets than the fleet. The sub-label says so when it does.
+    { label: "Est. Maint. Cost", value: k ? (costedAssets > 0 ? fmtCompact(k.estMaintenanceCost) : "—") : "—", sub: costSubLabel, icon: Wrench, iconBg: "bg-slate-100 dark:bg-slate-500/15", iconColor: "text-slate-500 dark:text-slate-400", accent: "text-slate-600 dark:text-slate-400" },
   ];
 
   const healthTrend = data?.healthTrend ?? [];
   const ticketTrend = data?.ticketTrend ?? [];
+
+  // A month with no recorded predictions comes back as null rather than an
+  // invented number, so a six-entry array can still hold a single plottable
+  // point. Length alone cannot tell those apart.
+  const healthState = seriesState(healthTrend, ["avgHealth"]);
+  const onlyHealthPoint = healthTrend.find(
+    (p) => typeof p.avgHealth === "number" && Number.isFinite(p.avgHealth),
+  );
   const dist = data?.healthDistribution ?? [];
   // The backend always returns the 5 fixed bands (Excellent..Critical) even
-  // with zero predictions, each at count: 0 — so dist.length is never 0 for
+  // with zero predictions, each at count: 0, so dist.length is never 0 for
   // a brand-new warehouse. distTotalRaw (before the `|| 1` div-by-zero
   // guard) is what actually distinguishes "no data" from "data, all zero".
   const distTotalRaw = dist.reduce((s, d) => s + d.count, 0);
   const distTotal = distTotalRaw || 1;
   const costTrend = data?.costTrend ?? [];
+  const ticketState = seriesState(ticketTrend, ["opened", "inProgress", "resolved"]);
+  const costState = seriesState(costTrend, ["planned", "unplanned"]);
   const downtime = data?.downtimeByWarehouse ?? [];
   const downtimeByMonth = data?.downtimeScope === "month";
   const risks = data?.topRiskAssets ?? [];
   const alerts = data?.recentAlerts ?? [];
   const tickets = data?.latestTickets ?? [];
-  // Drop any malformed entries (null/non-object) before rendering — insights.map
-  // previously read ins.tone unconditionally, so a single bad item crashed the
-  // whole dashboard (unhandled TypeError) instead of just skipping that card.
+  // Drop malformed entries before rendering. Reading .tone off a null would
+  // throw during render and take down the whole dashboard, so one bad item is
+  // skipped rather than allowed to fail the page.
   const insights = (data?.aiInsights ?? []).filter(
     (ins): ins is DashboardInsight => !!ins && typeof ins === "object"
   );
@@ -360,7 +415,15 @@ export default function AdminDashboardPage() {
             <div className="px-5 pt-4 pb-2 flex-1 min-h-0">
               {tab === "health" && (
                 <div style={{ height: "100%", minHeight: 210 }}>
-                  {healthTrend.length === 0 ? <EmptyRow>No health-trend data.</EmptyRow> : (
+                  {healthState === "empty" ? (
+                    <EmptyRow>No health-trend data yet.</EmptyRow>
+                  ) : healthState === "single" ? (
+                    <SingleReading
+                      label={`${onlyHealthPoint?.month ?? ""} average health`}
+                      value={`${Math.round(onlyHealthPoint?.avgHealth ?? 0)}%`}
+                      note="Only one month of prediction history has been recorded so far. A trend line appears once a second month of nightly predictions is stored."
+                    />
+                  ) : (
                     <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <AreaChart data={healthTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
                         <defs>
@@ -369,12 +432,16 @@ export default function AdminDashboardPage() {
                             <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="4 4" stroke="hsl(var(--border))" opacity={0.5} />
-                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                        <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" opacity={0.5} />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                         <Tooltip content={<CTip fmt={(v) => `${v}%`} />} />
                         <Area type="monotone" dataKey="avgHealth" name="Health score" stroke="#6366f1" strokeWidth={2} fill="url(#hG)"
-                          dot={{ fill: "#6366f1", r: 3, strokeWidth: 0 }} activeDot={{ r: 5, fill: "#6366f1", strokeWidth: 2, stroke: "#fff" }} />
+                          dot={{ fill: "#6366f1", r: 3, strokeWidth: 0 }}
+                          /* The ring separates the active dot from the surface behind it, so
+                             it has to follow the theme: a fixed white ring vanishes on a
+                             white card. var(--card) is that surface. */
+                          activeDot={{ r: 5, fill: "#6366f1", strokeWidth: 2, stroke: "var(--card)" }} />
                       </AreaChart>
                     </ResponsiveContainer>
                   )}
@@ -382,12 +449,22 @@ export default function AdminDashboardPage() {
               )}
               {tab === "tickets" && (
                 <div style={{ height: "100%", minHeight: 210 }}>
-                  {ticketTrend.length === 0 ? <EmptyRow>No ticket-trend data.</EmptyRow> : (
+                  {ticketState === "empty" ? (
+                    <EmptyRow>No ticket-trend data yet.</EmptyRow>
+                  ) : ticketState === "single" ? (
+                    <SingleReading
+                      label="Tickets recorded"
+                      value={String(
+                        ticketTrend.reduce((s, p) => s + (p.opened ?? 0) + (p.inProgress ?? 0) + (p.resolved ?? 0), 0),
+                      )}
+                      note="Only one month has ticket activity so far. A trend appears once a second month has tickets."
+                    />
+                  ) : (
                     <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <BarChart data={ticketTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barGap={3}>
-                        <CartesianGrid strokeDasharray="4 4" stroke="hsl(var(--border))" opacity={0.5} />
-                        <XAxis dataKey="period" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                        <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" opacity={0.5} />
+                        <XAxis dataKey="period" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                         <Tooltip content={<CTip />} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                         <Bar dataKey="opened" name="Opened" fill="#f59e0b" radius={[3, 3, 0, 0]} />
@@ -400,12 +477,22 @@ export default function AdminDashboardPage() {
               )}
               {tab === "cost" && (
                 <div style={{ height: "100%", minHeight: 210 }}>
-                  {costTrend.length === 0 ? <EmptyRow>No cost-trend data.</EmptyRow> : (
+                  {costState === "empty" ? (
+                    <EmptyRow>No cost-trend data yet.</EmptyRow>
+                  ) : costState === "single" ? (
+                    <SingleReading
+                      label="Maintenance cost recorded"
+                      value={`LKR ${fmtCompact(
+                        costTrend.reduce((s, p) => s + (p.planned ?? 0) + (p.unplanned ?? 0), 0),
+                      )}`}
+                      note="Only one month has recorded maintenance cost so far. A trend appears once a second month has spend."
+                    />
+                  ) : (
                     <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <BarChart data={costTrend} margin={{ top: 4, right: 4, left: -10, bottom: 0 }} barGap={4}>
-                        <CartesianGrid strokeDasharray="4 4" stroke="hsl(var(--border))" opacity={0.5} />
-                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => fmtCompact(v)} />
+                        <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" opacity={0.5} />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(v) => fmtCompact(v)} />
                         <Tooltip content={<CTip fmt={(v) => `LKR ${fmtCompact(v)}`} />} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                         {/* Planned vs unplanned spend, same classification as
@@ -469,11 +556,11 @@ export default function AdminDashboardPage() {
 
             <Card className="p-4">
               <SectionTitle>{downtimeByMonth ? "Downtime Trend" : "Downtime by Warehouse"}</SectionTitle>
-              {/* The warehouse-grouped branch applies no date filter at all, so
-                  it is an all-time total — it previously claimed "this month". */}
+              {/* The warehouse-grouped branch applies no date filter, so that
+                  variant is an all-time total. The label reflects which is shown. */}
               <SectionSub>{downtimeByMonth ? "Planned vs unplanned hours — last 6 months" : "Planned vs unplanned hours — all time"}</SectionSub>
               {/* Height sized for 6 categories at ~35px/row so every YAxis tick has
-                  room to render — Recharts silently drops category labels that
+                  room to render. Recharts silently drops category labels that
                   don't fit rather than shrinking them, which was dropping every
                   other month at the previous, tighter height. */}
               <div className="mt-3" style={{ height: 230, minHeight: 230 }}>
@@ -485,16 +572,16 @@ export default function AdminDashboardPage() {
                         non-zero bar to a visible pixel size, and the value
                         labels make the exact hours readable regardless of how
                         short the bar itself is. (The old note here claimed
-                        planned always dwarfs unplanned — that was an artefact
+                        planned always dwarfs unplanned, that was an artefact
                         of planned being computed as a constant 0.) */}
                     <BarChart data={downtime} layout="vertical" margin={{ top: 0, right: 28, left: 36, bottom: 0 }} barGap={3}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                      <YAxis type="category" dataKey="warehouse" interval={0} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={34} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="warehouse" interval={0} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={34} />
                       <Tooltip content={<CTip />} />
                       <Legend wrapperStyle={{ fontSize: 10 }} />
                       <Bar dataKey="planned" name="Planned" fill="#6366f1" radius={[0, 3, 3, 0]} minPointSize={2}>
-                        <LabelList dataKey="planned" position="right" style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                        <LabelList dataKey="planned" position="right" style={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
                       </Bar>
                       <Bar dataKey="unplanned" name="Unplanned" fill="#ef4444" radius={[0, 3, 3, 0]} minPointSize={2}>
                         <LabelList dataKey="unplanned" position="right" style={{ fontSize: 10, fill: "#ef4444", fontWeight: 600 }} />
@@ -620,12 +707,12 @@ export default function AdminDashboardPage() {
         </Card>
 
         {/* ══ Operational summary banner ════════════════════════════════════ */}
-        {/* Deliberately not called "AI ..." — the backend deterministically
+        {/* Deliberately not called "AI ...", the backend deterministically
             builds this from real KPI data (see admin_dashboard.py), it never
             calls an LLM for it. aiSummaryIsGenerated is kept in the API
             contract as a forward-compat hook (a cheap daily-batch real-AI
             upgrade is a known possible follow-up), but it's permanently
-            false today, so there's nothing to branch on here — showing a
+            false today, so there's nothing to branch on here, showing a
             single honest badge instead of dead either/or UI. */}
         {data?.aiSummary && (
           <div className="rounded-xl border border-violet-200 dark:border-violet-500/20 bg-linear-to-br from-violet-50 to-indigo-50/60 dark:from-violet-500/10 dark:to-transparent dark:bg-white/2 p-5">

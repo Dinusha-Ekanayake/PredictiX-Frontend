@@ -4,7 +4,7 @@ import * as React from "react";
 import {
   X, Download, FileText, Loader2,
   Activity, AlertTriangle, Wrench, Bot, Shield,
-  DollarSign, Ticket, BarChart3,
+  DollarSign, Ticket, BarChart3, TrendingDown, TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/customToast";
@@ -22,17 +22,32 @@ type Props = {
   assetName?: string;
 };
 
+/** Icon colour that goes with each KPI accent tint.
+ *
+ * The tints are translucent, so they read as a pale wash on a light surface.
+ * A white icon on top of that is invisible, which is why each accent names its
+ * own icon colour with a light and a dark value instead. */
+const KPI_ICON_FOR_ACCENT: Record<string, string> = {
+  "bg-red-500/15":    "text-red-600 dark:text-red-400",
+  "bg-orange-500/15": "text-orange-600 dark:text-orange-400",
+  "bg-violet-500/15": "text-violet-600 dark:text-violet-400",
+  "bg-amber-500/15":  "text-amber-600 dark:text-amber-400",
+  "bg-teal-500/15":   "text-teal-600 dark:text-teal-400",
+};
+
+const TEAL_ICON = "text-teal-600 dark:text-teal-400";
+
 function KpiCard({ icon: Icon, label, value, accent }: {
   icon: React.ElementType; label: string; value: string; accent?: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/8 bg-white/4 px-4 py-3 flex items-center gap-3">
+    <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 flex items-center gap-3">
       <div className={cn("rounded-lg p-2", accent ?? "bg-teal-500/15")}>
-        <Icon className={cn("h-4 w-4", accent ? "text-white/70" : "text-teal-400")} />
+        <Icon className={cn("h-4 w-4", accent ? (KPI_ICON_FOR_ACCENT[accent] ?? TEAL_ICON) : TEAL_ICON)} />
       </div>
       <div>
-        <div className="text-[10px] text-white/50 font-medium uppercase tracking-wider">{label}</div>
-        <div className="text-base font-bold leading-tight">{value}</div>
+        <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{label}</div>
+        <div className="text-base font-bold leading-tight text-foreground">{value}</div>
       </div>
     </div>
   );
@@ -40,9 +55,9 @@ function KpiCard({ icon: Icon, label, value, accent }: {
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between py-2 border-b border-white/6 last:border-0">
-      <span className="text-[12px] text-white/50">{label}</span>
-      <span className="text-[12px] font-medium text-white/90 text-right max-w-[55%]">{value}</span>
+    <div className="flex items-start justify-between py-2 border-b border-border/70 last:border-0">
+      <span className="text-[12px] text-muted-foreground">{label}</span>
+      <span className="text-[12px] font-medium text-foreground text-right max-w-[55%]">{value}</span>
     </div>
   );
 }
@@ -52,14 +67,14 @@ function Section({ title, icon: Icon, children }: {
 }) {
   const [open, setOpen] = React.useState(true);
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/3 overflow-hidden">
+    <div className="rounded-2xl border border-border bg-muted/25 overflow-hidden">
       <button onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/4 transition-colors">
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/60 transition-colors">
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-teal-500/15 p-2"><Icon className="h-4 w-4 text-teal-400" /></div>
-          <span className="text-sm font-semibold">{title}</span>
+          <div className="rounded-lg bg-teal-500/15 p-2"><Icon className={cn("h-4 w-4", TEAL_ICON)} /></div>
+          <span className="text-sm font-semibold text-foreground">{title}</span>
         </div>
-        <span className={cn("text-white/30 transition-transform duration-200", !open && "rotate-180")}>▲</span>
+        <span className={cn("text-muted-foreground transition-transform duration-200", !open && "rotate-180")}>▲</span>
       </button>
       {open && <div className="px-5 pb-5 pt-1">{children}</div>}
     </div>
@@ -72,10 +87,12 @@ async function safeJson(res: Response | null): Promise<any> {
   try { return await res.json(); } catch { return null; }
 }
 
-/** Like safeJson, but also returns *why* it failed (status + response body)
- *  instead of silently discarding that information — used for the cost
- *  endpoint specifically, since its failures have been repeatedly invisible
- *  without manually checking the Network tab or backend logs. */
+/**
+ * Like {@link safeJson}, but also reports why the request failed.
+ *
+ * Used for the cost endpoint, whose failures are otherwise invisible without
+ * opening the Network tab.
+ */
 async function safeJsonWithError(res: Response | null): Promise<{ data: any; error?: string }> {
   if (!res) return { data: null, error: "Request failed to reach the server (network error)." };
   if (!res.ok) {
@@ -95,6 +112,7 @@ async function safeJsonWithError(res: Response | null): Promise<{ data: any; err
   }
 }
 
+/** Modal that gathers an asset's data and downloads it as a PDF report. */
 export default function AssetReportModal({ isOpen, onClose, assetId, assetName }: Props) {
   const [loading, setLoading]       = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
@@ -118,28 +136,22 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const asset = await assetRes.json();
         const fleet = await safeJson(fleetRes) ?? {};
 
-        // ── Step 2: all asset-level data in parallel ───────────
-        // Prediction data comes solely from /batch-predictions/{id} — the
-        // single source of truth populated by the daily scheduler and the
-        // "Run AI" trigger (app.ai.services.batch_prediction_service). The
-        // old on-demand /predictions/failure|cost endpoints are no longer
-        // the asset detail page's data source and are not queried here.
+        // Step 2: fetch all asset-level data at once. Predictions come only
+        // from /batch-predictions/{id}, which the nightly job and the "Run AI"
+        // button both write.
         const [
           batchPredRes, costPredRes,
           maintRes, ticketRes, sensorRes,
-          warehouseRes, deptRes,
+          warehouseRes, deptRes, survivalRes,
         ] = await Promise.all([
           apiFetch(`/batch-predictions/${assetId}`).catch(() => null),
-          // breakdown-cost-v4.0 — separate endpoint, flat response shape
-          // (top_drivers with relative_impact/direction — see Step 7b below)
+          // Cost model has its own endpoint and a flat response shape.
+          // See step 7b below for how its drivers are read.
           apiFetch(`/predictions/cost/${assetId}`).catch(() => null),
           apiFetch(`/maintenance?asset_id=${assetId}&limit=50`).catch(() => null),
           apiFetch(`/tickets?asset_id=${assetId}&limit=20`).catch(() => null),
-          // The real route is path-based, not query-param based — this
-          // previously hit /sensor-readings?asset_id=… which doesn't
-          // exist (405), so the report's Sensor Snapshot section was
-          // always empty. The endpoint has no limit param of its own
-          // (always returns up to 50, newest first); sensorList[0]
+          // Path-based route, not a query param. It takes no limit and
+          // always returns up to 50 readings, newest first, so sensorList[0]
           // below already takes just the latest reading from that.
           apiFetch(`/sensor-readings/asset/${assetId}`).catch(() => null),
           asset.warehouse_id
@@ -148,6 +160,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
           asset.department_id
             ? apiFetch(`/departments/${asset.department_id}`).catch(() => null)
             : Promise.resolve(null),
+          apiFetch(`/survival/${assetId}`).catch(() => null),
         ]);
 
         // ── Step 3: parse all responses ────────────────────────
@@ -158,6 +171,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const sensorList  = await safeJson(sensorRes) ?? [];
         const warehouse   = await safeJson(warehouseRes);
         const dept        = await safeJson(deptRes);
+        const survival    = await safeJson(survivalRes);
 
         // ── Step 4: resolve prediction ──────────────────────────
         const latestPred = (Array.isArray(batchPred) ? batchPred[0] : batchPred) ?? null;
@@ -180,13 +194,9 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         const risk_level       = latestPred?.risk_level       ?? undefined;
         const days_until_maint = latestPred?.predicted_days_until_maintenance ?? null;
         const pred_maint_date  = latestPred?.predicted_maintenance_date ?? null;
-        // top_explanations comes from reg_model.shap_top_factors() in
-        // batch_prediction_service.py. That function's exact return shape
-        // wasn't available to confirm, so this normalizes defensively:
-        // it may arrive as a flat {feature: value} map (old assumption) or —
-        // more likely, matching the list-of-dicts pattern used elsewhere in
-        // that file (e.g. contributing_factors: [{feature, impact}]) — as an
-        // array of objects. Common magnitude key names are all checked.
+        // top_explanations can arrive either as a flat {feature: value} map
+        // or as an array of objects, so normalise both into a map. The
+        // magnitude key varies by source, hence the list of names checked.
         const rawTopExpl = latestPred?.top_explanations;
         let top_explanations: Record<string, number> | undefined;
         if (Array.isArray(rawTopExpl)) {
@@ -202,19 +212,14 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         }
 
         const est_cost = latestPred?.estimated_cost_lkr ?? undefined;
-        // /batch-predictions/{id} already carries these — unused until now,
-        // used as the fallback for cost_lower/cost_upper below.
+        // Fallbacks for cost_lower / cost_upper when the cost endpoint fails.
         const batch_min_cost = latestPred?.min_cost_lkr != null ? Number(latestPred.min_cost_lkr) : undefined;
         const batch_max_cost = latestPred?.max_cost_lkr != null ? Number(latestPred.max_cost_lkr) : undefined;
 
-        // ── Step 7b: breakdown-cost-v4.0 — GET /predictions/cost/{asset_id} ──
-        // Response shape is FLAT — matches predict_breakdown_cost()'s actual
-        // return dict (app/ai/models/cost_estimation_model/breakdown_cost_model.py)
-        // exactly. There is NO extra_data wrapper and NO confidence_lower/upper —
-        // those only existed in the v4 docs' aspirational sample response, not
-        // in the real code. top_drivers carries relative_impact (0-100%, share
-        // of total |SHAP|) + direction — never a raw LKR shap value, and sv_log
-        // is log1p-space and intentionally not returned for display.
+        // Step 7b: cost model output, falling back to the values already on
+        // the batch prediction. The response is flat, with no wrapper object.
+        // top_drivers gives relative_impact as a percentage share and a
+        // direction, not a rupee amount.
         const cost_estimate      = costPred?.predicted_cost_lkr != null ? Number(costPred.predicted_cost_lkr) : est_cost;
         const cost_lower         = costPred?.pi_80_lower_lkr    != null ? Number(costPred.pi_80_lower_lkr)    : batch_min_cost;
         const cost_upper         = costPred?.pi_80_upper_lkr    != null ? Number(costPred.pi_80_upper_lkr)    : batch_max_cost;
@@ -229,8 +234,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
               direction: d.direction === "increases" ? "increases" as const : "decreases" as const,
             }))
           : [];
-        // Bundle-level accuracy stats — real numbers for whichever model
-        // version is actually loaded, never a hardcoded guess.
+        // Accuracy stats for the model version actually loaded on the server.
         const cost_test_r2      = costPred?.test_r2       != null ? Number(costPred.test_r2)       : undefined;
         const cost_test_mae     = costPred?.test_mae_lkr  != null ? Number(costPred.test_mae_lkr)  : undefined;
         const cost_test_medae   = costPred?.test_medae_lkr!= null ? Number(costPred.test_medae_lkr): undefined;
@@ -298,6 +302,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
           currency: "LKR",
           top_explanations,
           sensor: sensor ?? undefined,
+          survival: survival,
           maintenance: mArr,
           maintenanceMetrics: {
             total_events:        mArr.length,
@@ -321,11 +326,8 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
             predicted_failures:   kpis.predictedFailures  ?? 0,
             est_maintenance_cost: kpis.estMaintenanceCost ?? 0,
             health_distribution:  healthDist,
-            // status/vehicle distribution previously required fetching all
-            // ~1500 assets on every modal open just to compute counts that
-            // no report section or PDF page ever reads (assetPdfExport.ts
-            // declares the fields but never renders them) — left empty
-            // rather than paying that cost for dead output.
+            // Left empty on purpose. The PDF declares these fields but never
+            // renders them, and filling them meant loading every asset.
             status_distribution:  [],
             vehicle_distribution: [],
             top_risk_assets:      topRisk.map((r: any) => ({
@@ -360,10 +362,8 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
     const filename = `Asset_Report_${reportData.assetCode}.pdf`;
 
     const attemptServerRender = async (): Promise<void> => {
-      // Re-read the token fresh at call time rather than relying on a value
-      // captured earlier — if it was stale/expired when the modal opened,
-      // a fresh read (or a refreshed token if the auth layer rotates it in
-      // the background) may succeed without the person doing anything.
+      // Read the token at call time, not when the modal opened. If it has
+      // since been refreshed, this picks up the new one automatically.
       const token = getAccessToken();
       await downloadAssetPDFServer(
         reportData,
@@ -381,11 +381,8 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
       const isAuthFailure = msg.includes("401") || msg.includes("403");
 
       if (isAuthFailure) {
-        // Don't silently degrade to the print fallback here — that produces
-        // a worse PDF (browser header/footer, no pagination) AND masks the
-        // real problem (an expired/missing session), which is exactly what
-        // made this failure mode hard to diagnose. Tell the person plainly
-        // what's wrong and what to do instead.
+        // Don't fall back to the print dialog on an auth failure. It makes a
+        // worse PDF and hides the real cause, which is an expired session.
         toast.error("Your session has expired", {
           description: "Please refresh the page and sign in again, then retry Download PDF.",
         });
@@ -393,10 +390,8 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
         return;
       }
 
-      // Non-auth failure (e.g. playwright not installed on the server yet,
-      // network error, server 500) — the print-dialog fallback still makes
-      // sense here since it's unrelated to auth and can still produce a
-      // usable (if less polished) PDF.
+      // Any other failure (server error, network) can still fall back to the
+      // print dialog, which produces a usable if less polished PDF.
       try {
         downloadAssetPDF(reportData, filename);
         toast.success("Report opened — choose 'Save as PDF', and turn off 'Headers and footers' in More settings for a clean export");
@@ -417,40 +412,40 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-sm p-4 pt-8">
-      <div className="relative w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0d1117] shadow-2xl shadow-black/60 mb-8">
+      <div className="relative w-full max-w-4xl rounded-2xl border border-border bg-card text-card-foreground shadow-2xl shadow-black/30 dark:shadow-black/60 mb-8">
 
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 rounded-t-2xl border-b border-white/8 bg-[#0d1117]/95 backdrop-blur-sm px-6 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 rounded-t-2xl border-b border-border bg-card/95 backdrop-blur-sm px-6 py-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="rounded-xl bg-teal-500/15 p-2.5 shrink-0">
-              <FileText className="h-5 w-5 text-teal-400" />
+              <FileText className={cn("h-5 w-5", TEAL_ICON)} />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base font-bold truncate">
-                  {reportData?.assetName ?? "Asset Performance Report"}
+                <h2 className="text-base font-bold truncate text-foreground">
+                  {reportData?.assetName ?? assetName ?? "Asset Performance Report"}
                 </h2>
                 {reportData?.assetCode && reportData.assetCode !== "—" && (
-                  <span className="text-[11px] font-mono text-white/40 bg-white/6 px-2 py-0.5 rounded-full shrink-0">
+                  <span className="text-[11px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0">
                     {reportData.assetCode}
                   </span>
                 )}
               </div>
-              <p className="text-[12px] text-white/40 mt-0.5">
+              <p className="text-[12px] text-muted-foreground mt-0.5">
                 {new Date().toLocaleDateString("en-GB", { day:"2-digit", month:"long", year:"numeric" })}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button variant="outline" size="sm"
-              className="h-9 rounded-xl gap-1.5 text-xs border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20"
+              className="h-9 rounded-xl gap-1.5 text-xs border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300 hover:bg-teal-500/20"
               onClick={handleDownloadPDF} disabled={generating || loading || !reportData}>
               {generating
                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Generating…</>
                 : <><Download className="h-3.5 w-3.5" />PDF</>}
             </Button>
             <Button variant="ghost" size="sm"
-              className="h-9 w-9 rounded-xl p-0 text-white/40 hover:text-white hover:bg-white/8"
+              className="h-9 w-9 rounded-xl p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
               onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -462,16 +457,16 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
 
           {loading && (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-teal-400" />
-              <p className="text-sm text-white/50">Loading asset data from database…</p>
+              <Loader2 className={cn("h-8 w-8 animate-spin", TEAL_ICON)} />
+              <p className="text-sm text-muted-foreground">Loading asset data from database…</p>
             </div>
           )}
 
           {error && !loading && (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-              <AlertTriangle className="h-8 w-8 text-red-400" />
-              <p className="text-sm font-medium text-red-400">Failed to load asset data</p>
-              <p className="text-xs text-white/40">{error}</p>
+              <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">Failed to load asset data</p>
+              <p className="text-xs text-muted-foreground">{error}</p>
             </div>
           )}
 
@@ -527,9 +522,9 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
                     ["Total Cost",    `LKR ${reportData.maintenanceMetrics.total_cost.toLocaleString()}`],
                     ["Downtime",      `${reportData.maintenanceMetrics.total_downtime_hours}h`],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-xl border border-white/8 bg-white/4 p-3">
-                      <div className="text-[10px] text-white/40 uppercase tracking-wider">{label}</div>
-                      <div className="text-sm font-bold mt-1">{value}</div>
+                    <div key={label} className="rounded-xl border border-border bg-muted/40 p-3">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</div>
+                      <div className="text-sm font-bold mt-1 text-foreground">{value}</div>
                     </div>
                   ))}
                 </div>
@@ -540,27 +535,147 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     ["Total",         String(reportData.ticketMetrics.total_tickets),          ""],
-                    ["Open",          String(reportData.ticketMetrics.open_tickets),           "text-amber-400"],
-                    ["High Priority", String(reportData.ticketMetrics.high_priority_tickets),  "text-red-400"],
-                    ["Closed",        String(reportData.ticketMetrics.closed_tickets),         "text-emerald-400"],
+                    ["Open",          String(reportData.ticketMetrics.open_tickets),           "text-amber-600 dark:text-amber-400"],
+                    ["High Priority", String(reportData.ticketMetrics.high_priority_tickets),  "text-red-600 dark:text-red-400"],
+                    ["Closed",        String(reportData.ticketMetrics.closed_tickets),         "text-emerald-600 dark:text-emerald-400"],
                   ].map(([label, value, color]) => (
-                    <div key={label} className="rounded-xl border border-white/8 bg-white/4 p-3 text-center">
-                      <div className="text-[10px] text-white/40 uppercase tracking-wider">{label}</div>
-                      <div className={cn("text-2xl font-bold mt-1", color || "text-white")}>{value}</div>
+                    <div key={label} className="rounded-xl border border-border bg-muted/40 p-3 text-center">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</div>
+                      <div className={cn("text-2xl font-bold mt-1", color || "text-foreground")}>{value}</div>
                     </div>
                   ))}
                 </div>
               </Section>
 
+              {/* Top Risk Factors */}
+              {reportData.top_explanations && Object.keys(reportData.top_explanations).length > 0 && (
+                <Section title="4. Top Risk Factors" icon={AlertTriangle}>
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Top Risk Factors (SHAP)</div>
+                      <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <TrendingDown className="h-3 w-3 text-red-600 dark:text-red-400" /> Sooner
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <TrendingUp className="h-3 w-3 text-emerald-600 dark:text-emerald-400" /> Later
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {(() => {
+                        const entries = Object.entries(reportData.top_explanations!);
+                        const maxVal = Math.max(...entries.map(([_, val]) => Math.abs(val)), 1);
+                        return entries.map(([feature, raw], i) => {
+                          const impact = Math.abs(raw);
+                          const pct = Math.round((impact / maxVal) * 100);
+                          const label = feature.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                          const isUrgent = raw < 0;
+                          const barColor = isUrgent ? "bg-red-500/80" : "bg-emerald-500/80";
+                          const textColor = isUrgent ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400";
+                          const DirIcon = isUrgent ? TrendingDown : TrendingUp;
+                          return (
+                            <div key={i} className="space-y-0.5">
+                              <div className="flex justify-between items-center text-[11px]">
+                                <span className="text-foreground font-medium truncate">{label}</span>
+                                <span className={cn("flex items-center gap-1 text-xs font-mono shrink-0 ml-2", textColor)}>
+                                  <DirIcon className="h-3 w-3" />
+                                  {raw > 0 ? "+" : ""}{raw.toFixed(2)}d
+                                </span>
+                              </div>
+                              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                                <div className={cn("h-full rounded-full transition-all duration-700", barColor)} style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+                </Section>
+              )}
+
+              {/* Survival Analysis */}
+              {reportData.survival && (
+                <Section title="5. Component Survival Analysis" icon={Activity}>
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+                      <p className="text-sm font-medium text-red-600 dark:text-red-400">Critical Risk: {reportData.survival.soonest_component.charAt(0).toUpperCase() + reportData.survival.soonest_component.slice(1)}</p>
+                      <p className="text-[12px] text-muted-foreground mt-1">Predicted median RUL: {reportData.survival.soonest_median_days} days.</p>
+                    </div>
+                    <div className="space-y-4">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">7-Day & 30-Day Failure Risk</p>
+                      {reportData.survival.components.sort((a,b) => (b.fail_prob_30d||0)-(a.fail_prob_30d||0)).map(c => (
+                        <div key={c.component} className="space-y-2">
+                          <div className="flex justify-between text-xs text-foreground">
+                            <span className="capitalize">{c.component}</span>
+                            <span>{c.fail_prob_30d != null ? Math.round(c.fail_prob_30d * 100) : 0}% (30d)</span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-muted overflow-hidden relative">
+                            <div className="absolute top-0 left-0 h-full bg-teal-500/30" style={{ width: `${c.fail_prob_30d != null ? c.fail_prob_30d * 100 : 0}%` }} />
+                            <div className="absolute top-0 left-0 h-full bg-teal-500" style={{ width: `${c.fail_prob_7d != null ? c.fail_prob_7d * 100 : 0}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Section>
+              )}
+
+              {/* Cost Estimate */}
+              <Section title="6. Maintenance Cost Estimate" icon={DollarSign}>
+                {reportData.estimated_cost == null ? (
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-2">
+                    <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Maintenance Cost Estimate</div>
+                    <div className="text-sm font-medium text-foreground">Estimate unavailable</div>
+                    <div className="text-[11px] text-muted-foreground leading-relaxed">
+                      The cost estimation model could not score this asset. No approximate
+                      figure is shown in its place — retry after the next prediction run.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-3">
+                    <div className="space-y-3">
+                      <div className="text-3xl font-bold tabular-nums">
+                        LKR {reportData.estimated_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div className="space-y-2">
+                        {[
+                          { label: "Minimum", value: reportData.cost_lower, color: "bg-emerald-500" },
+                          { label: "Estimated", value: reportData.estimated_cost, color: "bg-violet-500" },
+                          { label: "Maximum", value: reportData.cost_upper, color: "bg-red-500" },
+                        ].map(({ label, value, color }) => {
+                          const max = Number(reportData.cost_upper) || 1;
+                          const pct = Math.min(100, Math.round((Number(value) / max) * 100));
+                          return (
+                            <div key={label} className="space-y-0.5">
+                              <div className="flex justify-between text-[11px] text-foreground">
+                                <span>{label}</span>
+                                <span className="font-mono font-medium">
+                                  LKR {value != null ? Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}
+                                </span>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </Section>
+
               {/* AI Insights */}
-              <Section title="4. AI Insights" icon={Bot}>
+              <Section title="7. AI Insights" icon={Bot}>
                 <div className="flex items-start gap-3 rounded-xl border border-teal-500/20 bg-teal-500/5 p-4">
-                  <Bot className="h-5 w-5 text-teal-400 shrink-0 mt-0.5" />
+                  <Bot className={cn("h-5 w-5 shrink-0 mt-0.5", TEAL_ICON)} />
                   <div className="space-y-1">
-                    <p className="text-sm font-medium text-teal-300">
+                    <p className="text-sm font-medium text-teal-700 dark:text-teal-300">
                       {reportData.health_score != null ? "AI Analysis Available" : "No Prediction Data Yet"}
                     </p>
-                    <p className="text-[12px] text-white/50 leading-relaxed">
+                    <p className="text-[12px] text-muted-foreground leading-relaxed">
                       {reportData.insights.executive_summary}
                     </p>
                   </div>
@@ -570,9 +685,9 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
               {/* Download CTA */}
               <div className="flex items-center justify-between rounded-2xl border border-teal-500/20 bg-teal-500/5 px-6 py-4">
                 <div>
-                  <p className="text-sm font-semibold text-teal-300">Ready to export full report</p>
-                  <p className="text-[12px] text-white/40 mt-0.5">
-                    Includes fleet overview, charts, sensor data, maintenance logs & AI insights
+                  <p className="text-sm font-semibold text-teal-700 dark:text-teal-300">Ready to export full report</p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
+                    Includes fleet overview, charts, sensor data, maintenance logs &amp; AI insights
                   </p>
                 </div>
                 <Button className="h-10 rounded-xl px-5 gap-2 bg-teal-600 hover:bg-teal-500 text-white font-semibold shrink-0"

@@ -59,22 +59,31 @@ export default function TicketDetailsCharts({
   const [assetTickets, setAssetTickets] = useState<any[]>([]);
   const [loadingAsset, setLoadingAsset] = useState(false);
 
-  // Load other tickets for the same asset
+  // Load other tickets for the same asset.
+  //
+  // State is set inside the async body rather than synchronously in the effect,
+  // which would trigger a cascading render. The cancelled flag stops a slow
+  // response from an earlier asset overwriting a newer one.
   useEffect(() => {
     if (!assetId) return;
-    setLoadingAsset(true);
-    apiGet<any[]>(`/tickets/?asset_id=${assetId}`)
-      .then((data) => {
-        setAssetTickets(data || []);
-      })
-      .catch((err) => {
-        console.error("Failed to load asset tickets:", err);
-      })
-      .finally(() => {
-        setLoadingAsset(false);
-      });
-  }, [assetId, ticketId]);
+    let cancelled = false;
 
+    (async () => {
+      setLoadingAsset(true);
+      try {
+        const data = await apiGet<any[]>(`/tickets/?asset_id=${assetId}`);
+        if (!cancelled) setAssetTickets(data || []);
+      } catch (err) {
+        if (!cancelled) console.error("Failed to load asset tickets:", err);
+      } finally {
+        if (!cancelled) setLoadingAsset(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assetId, ticketId]);
   // 1. Process State Durations
   const durationData = React.useMemo(() => {
     const states = {
@@ -137,10 +146,10 @@ export default function TicketDetailsCharts({
     return assetTickets
       .map((t: any) => {
         const createdTime = new Date(t.created_at).getTime();
-        const endTime = t.resolved_at || t.closed_at 
+        const endTime = t.resolved_at || t.closed_at
           ? new Date(t.resolved_at || t.closed_at).getTime()
           : new Date().getTime();
-        
+
         const resolutionDays = Math.max(0, parseFloat(((endTime - createdTime) / (1000 * 60 * 60 * 24)).toFixed(1)));
         const prio = (t.priority || "medium").toLowerCase();
 
@@ -161,8 +170,8 @@ export default function TicketDetailsCharts({
   const CustomTimelineTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="text-xs font-semibold text-slate-400 mb-1.5">State Durations:</p>
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
+          <p className="text-xs font-semibold text-muted-foreground mb-1.5">State Durations:</p>
           {payload.map((p: any, idx: number) => {
             if (p.value === 0) return null;
             return (
@@ -184,14 +193,14 @@ export default function TicketDetailsCharts({
       const dateStr = new Date(item.createdDate).toLocaleDateString();
       const isCurrent = item.id === ticketId;
       return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 shadow-xl backdrop-blur-md max-w-xs">
-          <p className="text-sm font-bold text-slate-200 truncate flex items-center gap-1.5">
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md max-w-xs">
+          <p className="text-sm font-bold text-foreground truncate flex items-center gap-1.5">
             {isCurrent && <span className="h-2 w-2 rounded-full bg-violet-500 animate-pulse" />}
             {item.title}
           </p>
-          <p className="text-xs text-slate-400 mt-1">Date Created: <span className="text-white">{dateStr}</span></p>
-          <p className="text-xs text-slate-400">Priority: <span className="font-semibold" style={{ color: item.fill }}>{item.priority}</span></p>
-          <p className="text-xs text-slate-400">Resolution Time: <span className="font-semibold text-white">{item.resolutionTime} days</span></p>
+          <p className="text-xs text-muted-foreground mt-1">Date Created: <span className="text-foreground">{dateStr}</span></p>
+          <p className="text-xs text-muted-foreground">Priority: <span className="font-semibold" style={{ color: item.fill }}>{item.priority}</span></p>
+          <p className="text-xs text-muted-foreground">Resolution Time: <span className="font-semibold text-foreground">{item.resolutionTime} days</span></p>
           {isCurrent && <p className="text-[10px] text-violet-400 font-semibold mt-1">★ Current Ticket</p>}
         </div>
       );
@@ -223,23 +232,23 @@ export default function TicketDetailsCharts({
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 15, right: 15, bottom: 5, left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                <XAxis 
-                  type="number" 
-                  dataKey="createdDate" 
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis
+                  type="number"
+                  dataKey="createdDate"
                   name="Date"
                   domain={["auto", "auto"]}
                   tickFormatter={(t) => new Date(t).toLocaleDateString()}
-                  stroke="#737373" 
+                  stroke="#737373"
                   fontSize={10}
                   tickLine={false}
                 />
-                <YAxis 
-                  type="number" 
-                  dataKey="resolutionTime" 
-                  name="Resolution Days" 
+                <YAxis
+                  type="number"
+                  dataKey="resolutionTime"
+                  name="Resolution Days"
                   unit="d"
-                  stroke="#737373" 
+                  stroke="#737373"
                   fontSize={11}
                   tickLine={false}
                 />
@@ -247,8 +256,8 @@ export default function TicketDetailsCharts({
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomScatterTooltip />} />
                 <Scatter name="Asset Tickets" data={scatterData}>
                   {scatterData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
+                    <Cell
+                      key={`cell-${index}`}
                       fill={entry.fill}
                       stroke={entry.id === ticketId ? "#8b5cf6" : "none"} // Highlight current ticket border
                       strokeWidth={entry.id === ticketId ? 2 : 0}

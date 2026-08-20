@@ -90,6 +90,7 @@ function fromAsset(a: Asset): FormState {
   };
 }
 
+/** Dialog for creating an asset or editing an existing one, including its photos. */
 export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: Props) {
   const isEdit = !!asset;
   const [form, setForm] = React.useState<FormState>(EMPTY);
@@ -101,11 +102,9 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
   const [imagePreviews, setImagePreviews] = React.useState<string[]>([]);
   const [existingImages, setExistingImages] = React.useState<string[]>([]);
 
-  // Object URLs (URL.createObjectURL) are only released by an explicit
-  // revokeObjectURL call — the browser never garbage-collects them on its
-  // own. This ref always mirrors the latest imagePreviews so every place
-  // that clears/replaces the array can revoke exactly the URLs it's
-  // discarding, without a stale closure over an old state value.
+  // Object URLs are only freed by an explicit revokeObjectURL call. This ref
+  // mirrors the latest previews so any code clearing the array can revoke the
+  // exact URLs it is discarding, without closing over stale state.
   const imagePreviewsRef = React.useRef<string[]>([]);
   React.useEffect(() => {
     imagePreviewsRef.current = imagePreviews;
@@ -133,9 +132,8 @@ export default function AssetFormDialog({ open, onOpenChange, asset, onSaved }: 
     }
 
     setExistingImages(allExisting);
-    // Release any local-preview blob URLs from the previous session before
-    // starting a new one — previously just discarded, leaking one blob URL
-    // per image added/removed/reopened for the lifetime of the page.
+    // Free the previous session's preview URLs before starting a new one,
+    // otherwise each image added or removed leaks one for the page's lifetime.
     imagePreviewsRef.current.forEach((url) => URL.revokeObjectURL(url));
     setImagePreviews([]);
     setImageFiles([]);

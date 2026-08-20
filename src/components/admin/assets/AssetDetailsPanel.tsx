@@ -15,15 +15,17 @@ import {
 import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
+import { UtilisationChart, ServiceCadenceChart, toChartRows } from "./AssetUsageCharts";
 import type { AssetDetail, PredictionTier } from "./types";
-// CHANGE 1: removed generateAssetReport from import — report now handled by parent via onReport prop
 import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
+import { bandFor, healthColor } from "@/lib/healthBands";
 import LogMaintenanceDialog from "./LogMaintenanceDialog";
 import SendServiceReminderButton from "./SendServiceReminderButton";
 /* ══════════════════════════════════════════════════════════════════════════════
    Helpers
    ══════════════════════════════════════════════════════════════════════════════ */
 
+/** Format an ISO date as "05 Aug 2026", or a dash when missing. */
 function fmt(d: string | null | undefined): string {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-GB", {
@@ -31,16 +33,24 @@ function fmt(d: string | null | undefined): string {
   });
 }
 
+/** Format an ISO timestamp as "05 Aug 2026, 14:32", or a dash when missing. */
+function fmtDateTime(d: string | null | undefined): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("en-GB", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+/** Format an amount with its currency, or a dash when missing. */
 function fmtCost(n: number | null | undefined, currency = "LKR"): string {
   if (n == null) return "—";
   return `${currency} ${Number(n).toLocaleString()}`;
 }
 
 /* ── Status pill ─────────────────────────────────────────────────────────────── */
-// Real asset_status enum: active | inactive | under_maintenance | critical |
-// decommissioned. "maintenance"/"in_maintenance"/"retired" are not real
-// values — those keys never matched, so under_maintenance/critical/
-// decommissioned assets fell through to the generic gray fallback.
+// Keys must match the asset_status values the backend sends. Anything else
+// falls through to the grey default below.
 const STATUS_BG: Record<string, string> = {
   active:            "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20",
   under_maintenance: "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
@@ -53,6 +63,7 @@ const STATUS_DOT: Record<string, string> = {
   inactive: "bg-slate-400", decommissioned: "bg-slate-400",
 };
 
+/** Coloured pill showing an asset's lifecycle status. */
 function StatusPill({ status }: { status: string }) {
   const key = status.toLowerCase();
   return (
@@ -67,21 +78,20 @@ function StatusPill({ status }: { status: string }) {
 }
 
 /* ── Health Ring ─────────────────────────────────────────────────────────────── */
-// Unlike the failure-probability/days-until-maintenance numbers on this
-// page — outputs of the trained, cross-validated v7 classifier/regressor —
-// the health score is a hand-weighted composite of the 5 component
-// readings plus a penalty term. It has not been validated against real
-// outcomes (no historical maintenance_events ground truth currently exists
-// to check it against — see PdmPredictionHistory, which now logs
-// predictions going forward so this can be checked later). Labelled here
-// so it doesn't read with the same evidentiary weight as the model outputs
-// beside it.
-function HealthRing({ score }: { score: number }) {
+/**
+ * Circular health gauge. Renders an empty ring and "Not scored" when `score`
+ * is null, so an asset with no prediction is never shown a made-up number.
+ *
+ * Colour and label come from the shared band definition, so this gauge agrees
+ * with the assets list and the dashboard.
+ */
+function HealthRing({ score }: { score: number | null }) {
   const r = 38;
   const circ = 2 * Math.PI * r;
-  const filled = (score / 100) * circ;
-  const color = score >= 80 ? "#10b981" : score >= 60 ? "#84cc16" : score >= 40 ? "#f59e0b" : score >= 20 ? "#f97316" : "#ef4444";
-  const label = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Moderate" : score >= 20 ? "Poor" : "Critical";
+  const filled = score == null ? 0 : (score / 100) * circ;
+  const color = healthColor(score);
+  const band = bandFor(score);
+  const label = band ? band[0].toUpperCase() + band.slice(1) : "Not scored";
 
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -95,14 +105,16 @@ function HealthRing({ score }: { score: number }) {
             style={{ filter: `drop-shadow(0 0 6px ${color}40)` }} />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xl font-bold leading-none">{score}</span>
-          <span className="text-[10px] text-muted-foreground/60 mt-0.5">/ 100</span>
+          <span className="text-xl font-bold leading-none">{score ?? "—"}</span>
+          {score != null && (
+            <span className="text-[10px] text-muted-foreground/60 mt-0.5">/ 100</span>
+          )}
         </div>
       </div>
       <span className="text-[11px] font-semibold" style={{ color }}>{label}</span>
       <span
         className="text-[9px] text-muted-foreground/50 cursor-help underline decoration-dotted underline-offset-2"
-        title="Composite indicator (weighted formula), not a validated prediction — unlike the failure risk and maintenance date, which come from the trained AI model."
+        title="A weighted summary of component health, not a model prediction. The failure risk and maintenance date come from the trained model."
       >
         Composite indicator
       </span>
@@ -111,6 +123,7 @@ function HealthRing({ score }: { score: number }) {
 }
 
 /* ── Risk gauge ──────────────────────────────────────────────────────────────── */
+/** Horizontal bar showing failure probability as a percentage. */
 function RiskGauge({ probability }: { probability: number }) {
   const pct = Math.round(probability * 100);
   const color = pct >= 70 ? "bg-red-500" : pct >= 40 ? "bg-amber-500" : "bg-emerald-500";
@@ -129,6 +142,7 @@ function RiskGauge({ probability }: { probability: number }) {
 }
 
 /* ── Info field ──────────────────────────────────────────────────────────────── */
+/** Labelled read-only field used across the detail tabs. */
 function InfoField({ icon, label, value, mono, valueClass, action }: {
   icon?: React.ReactNode; label: string; value: string; mono?: boolean; valueClass?: string; action?: React.ReactNode;
 }) {
@@ -147,6 +161,7 @@ function InfoField({ icon, label, value, mono, valueClass, action }: {
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────────────── */
+/** Placeholder shown when a tab has no rows to display. */
 function EmptyState({ message, icon: Icon = Info }: { message: string, icon?: React.ElementType }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 dark:border-white/8 bg-slate-50/30 dark:bg-white/2 p-8 text-center">
@@ -276,32 +291,49 @@ type Props = {
   onRefresh: () => void;
   onDelete?: (id: string) => void;
   onEdit?: (asset: AssetDetail["asset"]) => void;
-  onReport?: () => void; // CHANGE 2: added onReport prop — opens shared AssetReportModal in page.tsx
+  /** Opens the shared report modal, which the page owns. */
+  onReport?: () => void;
+  /** Opens the assign dialog, which the page owns. Admin-only screens pass it. */
+  onAssign?: (asset: AssetDetail["asset"]) => void;
+  /** Display name of the current assignee, when the page has resolved it. */
+  assigneeName?: string | null;
   readOnly?: boolean;
-  // Same {value, label} list the toolbar's warehouse filter already fetches
-  // (page.tsx's warehouseOptions) — passed through so this panel can show
-  // "LankaLogix - Colombo" instead of the raw warehouse_id UUID without a
-  // second fetch. Optional/falls back to the UUID so this component still
-  // works wherever it's used without the parent wiring it up.
+  /**
+   * Warehouse names, reused from the toolbar filter so the panel can show a
+   * name instead of a UUID without fetching again. Falls back to the UUID when
+   * the parent does not pass it.
+   */
   warehouseOptions?: { value: string; label: string }[];
 };
 
-export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, onReport, readOnly = false, warehouseOptions }: Props) {
-  const { asset, prediction, componentRul, maintenanceEvents, tickets, assignments } = detail;
+export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, onReport, onAssign, assigneeName, readOnly = false, warehouseOptions }: Props) {
+  const { asset, prediction, componentRul, usageHistory, maintenanceEvents, tickets, assignments } = detail;
+
+  // Reshaped once per load: both charts read the same rows.
+  const usageRows = React.useMemo(
+    () => toChartRows(usageHistory?.points ?? []),
+    [usageHistory],
+  );
   const warehouseName = warehouseOptions?.find((w) => w.value === asset.warehouse_id)?.label ?? asset.warehouse_id;
   const router = useNavRouter();
 
   const [runningPrediction, setRunningPrediction] = React.useState(false);
   const [showLogMaintenance, setShowLogMaintenance] = React.useState(false);
-  // CHANGE 3: removed generatingReport state — no longer needed
 
-  const healthScore = deriveHealthScore(asset, prediction);
+  // The active assignment already carries the assignee's name, so the header
+  // can show it without the page loading the whole user roster. Falls back to
+  // the prop, then to a neutral label.
+  const activeAssignment = assignments.find((a) => a.is_active);
+  const currentAssignee =
+    assigneeName ??
+    activeAssignment?.user_name ??
+    (asset.assigned_to ? "Assigned" : null);
+
+  const healthScore = deriveHealthScore(prediction);
   const failureProb = deriveFailureProbability(prediction);
 
-  // Hard dates are only actionable when the decision layer's tier agrees
-  // action is near-term (urgent/watch/conflict); "healthy" demotes the
-  // regressor's date to a soft horizon instead of showing a specific date
-  // for an asset the classifier says doesn't need service.
+  // Only show an exact service date when the decision layer is confident
+  // enough to give one. Otherwise the UI shows a rough horizon instead.
   const showHardDate = prediction?.display_mode === "date";
 
   const daysUntilMaint = asset.next_service_date
@@ -320,15 +352,9 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
         )
       : null;
 
-  // How wide the cost model's 80% confidence interval is, relative to the
-  // point estimate — NOT a trend (there's no earlier estimate to compare
-  // against here). The previous version divided (estimate - min) by min,
-  // which can only ever be >= 0 since min is the lower bound of the SAME
-  // estimate — the "down"/green branch was dead code, and the icon's
-  // up/down framing implied a comparison that was never actually being
-  // made. This uses the full [min, max] range to show estimate confidence
-  // instead: a tight range means a more precise estimate, a wide one means
-  // more uncertainty.
+  // Width of the cost model's 80% interval relative to the estimate. This is
+  // a measure of confidence, not a trend: a tight range means a more precise
+  // estimate, a wide one means more uncertainty.
   const costSpreadPct =
     prediction?.estimated_cost_lkr && prediction?.min_cost_lkr != null && prediction?.max_cost_lkr != null
       ? (Number(prediction.max_cost_lkr) - Number(prediction.min_cost_lkr)) /
@@ -357,8 +383,6 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
     }
   }
 
-  // CHANGE 4: removed handleGenerateReport — Report button now calls onReport() directly
-
   function goToTicket(ticketId: string) {
     router.push(`/admin/tickets?ticket_id=${ticketId}`);
   }
@@ -366,7 +390,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
   return (
     <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden transition-all">
       {/* ── Header ──
-           Stacked (title row, then actions) instead of side-by-side — this
+           Stacked (title row, then actions) instead of side-by-side, this
            panel is often narrow (docked next to a list), and cramming a full
            name + status + code + badges on the same row as 5 action buttons
            left almost no room for the name itself, truncating it to a few
@@ -394,6 +418,17 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
         <div className="flex flex-wrap items-center gap-2">
           {!readOnly && (
             <>
+              {onAssign && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-xl gap-1.5 text-xs border-violet-200 dark:border-violet-900 bg-violet-50/50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/40"
+                  onClick={() => onAssign(asset)}
+                >
+                  <Users className="h-3 w-3" />
+                  {asset.assigned_to ? "Reassign" : "Assign"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -415,7 +450,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   : <RefreshCw className="h-3 w-3" />}
                 {runningPrediction ? "Running…" : "Run AI"}
               </Button>
-              {/* CHANGE 5: Report button now calls onReport() — opens shared modal in page.tsx */}
+              {/* Opens the shared report modal owned by page.tsx. */}
               <Button
                 variant="outline"
                 size="sm"
@@ -543,8 +578,20 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
           <InfoField
             icon={<User className="h-3.5 w-3.5" />}
             label="Assigned To"
-            value={asset.assigned_to ?? "Unassigned"}
-            mono={!!asset.assigned_to}
+            value={currentAssignee ?? "Unassigned"}
+            action={
+              !readOnly && onAssign ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-[11px]"
+                  onClick={() => onAssign(asset)}
+                >
+                  <ArrowLeftRight className="mr-1 h-3 w-3" />
+                  {asset.assigned_to ? "Reassign" : "Assign"}
+                </Button>
+              ) : undefined
+            }
           />
           <InfoField
             icon={<Gauge className="h-3.5 w-3.5" />}
@@ -615,13 +662,26 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             </div>
             <div>
               <div className="text-[11px] text-muted-foreground/80 font-medium">Est. Maintenance Cost</div>
-              <div className="text-sm font-semibold mt-0.5">
-                {fmtCost(prediction?.estimated_cost_lkr)}
-              </div>
-              {prediction && (
-                <div className="text-[11px] text-muted-foreground/60 mt-0.5">
-                  Range: {fmtCost(prediction.min_cost_lkr)} – {fmtCost(prediction.max_cost_lkr)}
+              {/* A null cost means the cost model could not score this asset, the backend stores NULL rather than a guessed number. Say so
+                  plainly instead of rendering a dash that reads like "zero". */}
+              {prediction && prediction.estimated_cost_lkr == null ? (
+                <div
+                  className="text-sm font-medium mt-0.5 text-muted-foreground"
+                  title="The cost estimation model could not produce an estimate for this asset. No value is shown rather than an approximated one."
+                >
+                  Estimate unavailable
                 </div>
+              ) : (
+                <>
+                  <div className="text-sm font-semibold mt-0.5">
+                    {fmtCost(prediction?.estimated_cost_lkr)}
+                  </div>
+                  {prediction && (
+                    <div className="text-[11px] text-muted-foreground/60 mt-0.5">
+                      Range: {fmtCost(prediction.min_cost_lkr)} – {fmtCost(prediction.max_cost_lkr)}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -646,7 +706,12 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
               { value: "insights", icon: Bot, label: "Predictive Insights" },
               { value: "tickets", icon: Ticket, label: "Tickets", count: tickets.length },
               { value: "maintenance", icon: ClipboardList, label: "Maintenance Logs", count: maintenanceEvents.length },
-              { value: "assignments", icon: Users, label: "Assignments", count: assignments.length },
+              // Assignment history is an admin view. A read-only viewer would
+              // only ever see rows involving themselves (the API scopes it
+              // that way), which reads as a broken tab rather than a useful one.
+              ...(readOnly
+                ? []
+                : [{ value: "assignments", icon: Users, label: "Assignments", count: assignments.length }]),
             ].map(({ value, icon: Icon, label, count }) => (
               <TabsTrigger
                 key={value}
@@ -889,7 +954,21 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                     </div>
                   </div>
 
-                  {(prediction.estimated_cost_lkr != null) && (
+                  {/* Rendered even when the estimate is missing. Hiding the card
+                      entirely left no trace that a cost was ever expected, so a
+                      failed cost model looked identical to a healthy asset with
+                      nothing to report. */}
+                  {prediction.estimated_cost_lkr == null ? (
+                    <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-2">
+                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Maintenance Cost Estimate</div>
+                      <div className="text-sm font-medium text-muted-foreground">Estimate unavailable</div>
+                      <div className="text-[11px] text-muted-foreground/70 leading-relaxed">
+                        The cost estimation model could not score this asset. No approximate
+                        figure is shown in its place — retry after the next prediction run, and
+                        if it persists the model may need attention.
+                      </div>
+                    </div>
+                  ) : (
                     <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-3">
                       <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">Maintenance Cost Estimate</div>
                       <div className="space-y-3">
@@ -922,126 +1001,13 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   )}
                 </div>
 
-                {/* ── Row 4: Component RUL — trained per-component Weibull AFT
-                     survival models (survival_service.py), the same models
-                     the warehouse report uses. Needs only the asset's latest
-                     snapshot, not a reading history. ── */}
-                {componentRul && (
-                  <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-4 mt-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
-                        Component Remaining Useful Life (RUL)
-                      </div>
-                      <span
-                        className="text-[10px] text-muted-foreground/50 cursor-help"
-                        title="From a trained survival model (Weibull AFT) per component, fitted on the fleet's real service history — not just this asset's own readings. Median is the 50% failure point; the range is the model's own 10%-90% band."
-                      >
-                        What is this?
-                      </span>
-                    </div>
-                    {componentRul.components.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No component health data available.</div>
-                    ) : (
-                      <div className="space-y-4">
-                        {[...componentRul.components]
-                          // Soonest-to-fail first — the row that actually needs
-                          // attention should never be buried under 4 "fine" ones.
-                          // Errored components (model unavailable for this one
-                          // component) sort to the bottom.
-                          .sort((a, b) => {
-                            const rank = (c: typeof a) => ("error" in c ? Infinity : c.median_days);
-                            return rank(a) - rank(b);
-                          })
-                          .map((comp, i) => {
-                          if ("error" in comp) {
-                            return (
-                              <div key={i} className="flex justify-between items-center text-[11px] text-muted-foreground/60">
-                                <span className="capitalize">{comp.component}</span>
-                                <span>No prediction available</span>
-                              </div>
-                            );
-                          }
-
-                          // Three-tier urgency from the model's own 30-day
-                          // failure probability — same bands the warehouse
-                          // survival report uses (fleet_survival_summary).
-                          const urgency: "critical" | "watch" | "safe" =
-                            comp.fail_prob_30d >= 0.5 ? "critical" : comp.fail_prob_30d >= 0.2 ? "watch" : "safe";
-                          const barColor =
-                            urgency === "critical" ? "bg-red-500"
-                            : urgency === "watch" ? "bg-amber-500"
-                            : "bg-primary";
-                          const textColor =
-                            urgency === "critical" ? "text-red-500"
-                            : urgency === "watch" ? "text-amber-600 dark:text-amber-400"
-                            : "text-foreground";
-                          const healthPct = comp.health_pct != null ? Math.max(0, Math.min(100, comp.health_pct)) : null;
-                          // The backend clamps median/p10/p90 to the survival
-                          // model's trained horizon (currently 180d) when the
-                          // raw prediction extrapolated beyond it — a value
-                          // sitting exactly at that ceiling isn't a precise
-                          // day count, so it's marked "+" and de-emphasized
-                          // rather than shown with the same confidence as an
-                          // in-range prediction (same convention the old
-                          // OLS-based card used for its own horizon cap).
-                          const CAPPED_HORIZON_DAYS = 180;
-                          const fmtDays = (d: number) => {
-                            const base = d >= 365 ? `${(d / 365).toFixed(1)}y` : `${Math.round(d)}d`;
-                            return comp.horizon_capped && d >= CAPPED_HORIZON_DAYS ? `${base}+` : base;
-                          };
-                          const medianCapped = comp.horizon_capped && comp.median_days >= CAPPED_HORIZON_DAYS;
-
-                          return (
-                            <div key={i} className="space-y-1.5">
-                              <div className="flex justify-between items-start text-[11px] gap-2">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="capitalize font-medium text-muted-foreground">{comp.component}</span>
-                                  {urgency !== "safe" && (
-                                    <span
-                                      className={cn(
-                                        "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ring-1 ring-inset",
-                                        urgency === "critical"
-                                          ? "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20"
-                                          : "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
-                                      )}
-                                      title={`${Math.round(comp.fail_prob_30d * 100)}% chance this component needs service within 30 days`}
-                                    >
-                                      <AlertTriangle className="h-2.5 w-2.5" />
-                                      {urgency === "critical" ? "High risk" : "Elevated risk"}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <span
-                                    className={cn("font-bold tabular-nums block", medianCapped ? "text-muted-foreground/60" : textColor)}
-                                    title={medianCapped ? "Beyond the model's reliable prediction range — not a precise estimate" : undefined}
-                                  >
-                                    ~{fmtDays(comp.median_days)} left
-                                  </span>
-                                  <span className="text-[9px] text-muted-foreground/50 font-mono">
-                                    range {fmtDays(comp.p10_days)}–{fmtDays(comp.p90_days)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="relative h-2 rounded-full bg-slate-200/60 dark:bg-white/8">
-                                <div
-                                  className={cn("absolute h-full rounded-full", barColor)}
-                                  style={{ width: `${healthPct ?? 0}%` }}
-                                />
-                              </div>
-                              <div className="flex justify-between text-[9px] text-muted-foreground/50 font-mono">
-                                <span>{healthPct != null ? `${healthPct.toFixed(0)}% health` : "No reading"}</span>
-                                <span title="Model-predicted chance of needing service within 7 / 30 days">
-                                  {Math.round(comp.fail_prob_7d * 100)}% in 7d · {Math.round(comp.fail_prob_30d * 100)}% in 30d
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* ── Row 4: recorded operating history. Both charts plot
+                     stored sensor readings, so every point is something the
+                     asset actually did rather than a forecast. ── */}
+                <div className="space-y-3 mt-3">
+                  <UtilisationChart rows={usageRows} />
+                  <ServiceCadenceChart rows={usageRows} />
+                </div>
               </>
             )}
           </TabsContent>
@@ -1135,20 +1101,48 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             ) : (
               assignments.map((a) => (
                 <div key={a.id} className="ticket-dynamic rounded-xl border border-slate-200/80 dark:border-white/6 p-4 transition-all">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className={cn(
-                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
-                        a.is_active
-                          ? "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20"
-                          : "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400",
-                      )}>
-                        {a.is_active ? "Active" : "Past"}
-                      </span>
-                      <div className="mt-1 text-xs font-mono text-muted-foreground/70">User: {a.user_id}</div>
-                      <div className="text-[11px] text-muted-foreground/50 mt-0.5">
-                        Assigned {fmt(a.assigned_at)}
-                        {a.unassigned_at && ` · Removed ${fmt(a.unassigned_at)}`}
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold">
+                      {(a.user_name ?? "?")
+                        .split(" ")
+                        .map((part) => part[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* A deleted profile leaves the id behind but no name. */}
+                        <span className="text-sm font-semibold">{a.user_name ?? "Unknown user"}</span>
+                        <span className={cn(
+                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset",
+                          a.is_active
+                            ? "bg-emerald-50 text-emerald-700 ring-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20"
+                            : "bg-slate-100 text-slate-500 ring-slate-200/60 dark:bg-white/6 dark:text-slate-400",
+                        )}>
+                          {a.is_active ? "Current" : "Past"}
+                        </span>
+                      </div>
+
+                      {a.user_email && (
+                        <div className="text-[11px] text-muted-foreground/70">{a.user_email}</div>
+                      )}
+
+                      <div className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground/70">
+                        <div>
+                          <span className="text-muted-foreground/50">Assigned</span>{" "}
+                          {fmtDateTime(a.assigned_at)}
+                          {a.assigned_by_name && (
+                            <span className="text-muted-foreground/50"> by {a.assigned_by_name}</span>
+                          )}
+                        </div>
+                        {a.unassigned_at && (
+                          <div>
+                            <span className="text-muted-foreground/50">Unassigned</span>{" "}
+                            {fmtDateTime(a.unassigned_at)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

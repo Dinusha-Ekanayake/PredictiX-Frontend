@@ -65,7 +65,7 @@ export default function NotificationBell() {
   const { user } = useUser();
   const userId = user?.id;
 
-    // WebSocket Connection — reconnects with backoff on a transient drop
+    // WebSocket Connection, reconnects with backoff on a transient drop
     // (network blip, backend restart/redeploy), and treats an auth
     // rejection (WS_1008_POLICY_VIOLATION, the only close code
     // websockets.py's _verify_ws_token ever sends) exactly like a REST 401
@@ -82,11 +82,10 @@ export default function NotificationBell() {
       const MAX_RECONNECT_DELAY_MS = 30_000;
 
       function connect() {
-        // Re-read the token on every (re)connect attempt, not just once —
-        // a long-lived tab may reconnect hours after mount, by which point
+        // Re-read the token on every (re)connect attempt, not just once,         // a long-lived tab may reconnect hours after mount, by which point
         // the original token could be stale.
         const token = getAccessToken();
-        if (!token) return; // logged out elsewhere — nothing to reconnect to
+        if (!token) return; // logged out elsewhere, nothing to reconnect to
 
         const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
         ws = new WebSocket(

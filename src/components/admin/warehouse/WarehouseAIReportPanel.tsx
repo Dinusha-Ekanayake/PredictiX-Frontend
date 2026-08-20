@@ -63,6 +63,8 @@ interface AISections {
   maintenance_intelligence?: string;
   pattern_and_trend?: string;
   conclusion?: string;
+  critical_assets_summary?: string;
+  asset_summaries?: Record<string, string>;
 }
 
 interface CriticalAsset {
@@ -129,9 +131,9 @@ interface Props {
 const SECTION_STYLE = "rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden";
 
 function SectionHeader({
-  icon: Icon, title, subtitle, accent, collapsed, onToggle,
+  icon: Icon, title, subtitle = "", accent, collapsed, onToggle,
 }: {
-  icon: React.ElementType; title: string; subtitle: string;
+  icon: React.ElementType; title: string; subtitle?: string;
   accent: string; collapsed: boolean; onToggle: () => void;
 }) {
   return (
@@ -229,7 +231,7 @@ export default function WarehouseAIReportPanel({
   const assetTypeData    = toChartData(ctx.asset_type_breakdown);
   const assetStatusData  = toChartData(ctx.asset_status_breakdown);
   const ticketPriData    = toChartData(ctx.ticket_priority_breakdown);
-  const ticketCatData    = toChartData(ctx.ticket_category_breakdown).slice(0, 6);
+  const ticketCatData    = toChartData(ctx.ticket_category_breakdown).filter(d => d.name !== 'Uncategorized').slice(0, 6);
   const maintenTypeData  = toChartData(ctx.maintenance_type_breakdown);
   const ticketTrend      = ctx.ticket_trend_last_3m ?? [];
   const maintenTrend     = ctx.monthly_maintenance_trend ?? [];
@@ -813,13 +815,13 @@ export default function WarehouseAIReportPanel({
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b border-slate-100 dark:border-slate-800">
-                            {["Asset", "Component", "Median RUL (days)", "Risk"].map((h) => (
+                            {["Asset", "Component", "Next Maintenance Day", "Risk"].map((h) => (
                               <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {ctx.survival_summary!.watchlist!.map((w) => (
+                          {ctx.survival_summary!.watchlist!.map((w: any) => (
                             <React.Fragment key={w.asset}>
                               <tr className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
                                 <td className="py-2 pr-3 font-mono font-bold text-rose-600">{w.asset}</td>

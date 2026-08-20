@@ -12,6 +12,8 @@
  *   §7 Conclusion (final KPI summary + executive closing)
  */
 
+import { HEALTH_GOOD } from "@/lib/healthBands";
+
 // ══════════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
 // ══════════════════════════════════════════════════════════════════
@@ -466,7 +468,7 @@ function sectionHeader(num: string | number, title: string, sub?: string): strin
 }
 
 function subHeader(text: string, color = C.navy): string {
-  return `<h2 style="font-size:12.5px;font-weight:700;color:${color};margin:20px 0 8px;display:flex;align-items:center;gap:6px;">${text}</h2>`;
+  return `<h2 style="font-size:12.5px;font-weight:700;color:${color};margin:12px 0 8px;display:flex;align-items:center;gap:6px;">${text}</h2>`;
 }
 
 function kpiCard(label: string, value: string | number, sub?: string, color = C.teal, bgColor = C.offWhite): string {
@@ -478,7 +480,7 @@ function kpiCard(label: string, value: string | number, sub?: string, color = C.
 }
 
 function kpiGrid4(...cards: string[]): string {
-  return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0;">${cards.join('')}</div>`;
+  return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 16px 0;">${cards.join('')}</div>`;
 }
 
 
@@ -487,22 +489,22 @@ function twoCol(left: string, right: string, split = '1fr 1fr'): string {
 }
 
 function narrativePara(text: string): string {
-  return `<div style="border-left:3px solid ${C.teal};background:${C.tealBg};padding:12px 18px;margin:16px 0;border-radius:0 6px 6px 0;">
+  return `<div style="border-left:3px solid ${C.teal};background:${C.tealBg};padding:12px 18px;margin:0 0 20px 0;border-radius:0 6px 6px 0;">
     <p style="font-size:10.5px;line-height:1.85;color:${C.text};margin:0;">${text}</p>
   </div>`;
 }
 
 function alertBox(text: string, type: 'benchmark' | 'alert' | 'advisory' | 'info' = 'benchmark'): string {
   const styles: Record<string, { bg: string; border: string; color: string; label: string }> = {
-    benchmark: { bg: C.tealBg,    border: C.teal,      color: '#065f46', label: 'Benchmark Context' },
-    alert:     { bg: C.redLight,  border: C.red,        color: C.red,     label: '■ High Alert' },
+    benchmark: { bg: C.blueLight, border: C.blue,      color: '#1e3a8a', label: 'Benchmark Context' },
+    alert:     { bg: C.red,       border: '#b91c1c',   color: '#ffffff', label: '■ CRITICAL ALERT' },
     advisory:  { bg: C.amberLight, border: C.amber,     color: C.amber,   label: 'Advisory' },
     info:      { bg: C.blueLight, border: C.blue,       color: C.blue,    label: 'Service Reference' },
   };
   const s = styles[type];
-  return `<div style="background:${s.bg};border-left:4px solid ${s.border};padding:11px 16px;margin:14px 0;border-radius:0 6px 6px 0;">
+  return `<div style="background:${s.bg};border-left:4px solid ${s.border};padding:11px 16px;margin:0 0 16px 0;border-radius:0 6px 6px 0;">
     <span style="font-size:9.5px;font-weight:700;color:${s.color};text-transform:uppercase;letter-spacing:0.04em;">${s.label}:</span>
-    <p style="font-size:10.5px;line-height:1.75;color:${s.color};margin:5px 0 0;font-style:italic;">${text}</p>
+    <div style="font-size:10.5px;line-height:1.75;color:${s.color};margin:5px 0 0;${type !== 'alert' ? 'font-style:italic;' : 'font-weight:600;'}">${text}</div>
   </div>`;
 }
 
@@ -521,7 +523,7 @@ function progressBar(label: string, count: number, max: number, color: string, p
 
 function darkTable(headers: string[], rows: string[][]): string {
   const ths = headers.map(h =>
-    `<th style="background:${C.navy};color:white;padding:9px 11px;text-align:left;font-size:9.5px;font-weight:600;border-right:1px solid ${C.navyLight};">${h}</th>`
+    `<th style="background:${C.navy};color:white;padding:7px 11px;text-align:left;font-size:9.5px;font-weight:600;border-right:1px solid ${C.navyLight};">${h}</th>`
   ).join('');
   const trs = rows.map((row, ri) => {
     const bg = ri % 2 === 0 ? C.offWhite : C.white;
@@ -531,11 +533,11 @@ function darkTable(headers: string[], rows: string[][]): string {
       const isCritCol = typeof cell === 'string' && (cell === 'Critical' || cell === 'High' || cell === 'Ground Now');
       const color = isCritCol ? C.red : C.text;
       const fw = ci === 0 ? '600' : '400';
-      return `<td style="padding:8px 11px;font-size:10px;border-bottom:1px solid ${C.border};border-right:1px solid ${C.borderLight};color:${color};font-weight:${fw};">${cell}</td>`;
+      return `<td style="padding:7px 11px;font-size:10px;border-bottom:1px solid ${C.border};border-right:1px solid ${C.borderLight};color:${color};font-weight:${fw};">${cell}</td>`;
     }).join('');
     return `<tr style="background:${bg};">${tds}</tr>`;
   }).join('');
-  return `<table style="width:100%;border-collapse:collapse;margin:10px 0;border-radius:6px;overflow:hidden;border:1px solid ${C.border};">
+  return `<table style="width:100%;border-collapse:collapse;margin:0 0 16px 0;border-radius:6px;overflow:hidden;border:1px solid ${C.border};">
     <thead><tr>${ths}</tr></thead>
     <tbody>${trs}</tbody>
   </table>`;
@@ -553,7 +555,7 @@ function lightTable(headers: string[], rows: string[][]): string {
     }).join('');
     return `<tr style="background:${bg};">${tds}</tr>`;
   }).join('');
-  return `<table style="width:100%;border-collapse:collapse;margin:10px 0;border:1px solid ${C.border};border-radius:6px;overflow:hidden;">
+  return `<table style="width:100%;border-collapse:collapse;margin:0 0 16px 0;border:1px solid ${C.border};border-radius:6px;overflow:hidden;">
     <thead style="background:${C.offWhite};"><tr>${ths}</tr></thead>
     <tbody>${trs}</tbody>
   </table>`;
@@ -582,7 +584,7 @@ function recommendBlock(urgency: 'CRITICAL' | 'HIGH' | 'MEDIUM', days: string, i
 }
 
 function chartBox(title: string, svgContent: string, caption?: string): string {
-  return `<div style="background:${C.white};border:1px solid ${C.border};border-radius:8px;padding:16px;margin:10px 0;">
+  return `<div style="background:${C.white};border:1px solid ${C.border};border-radius:8px;padding:12px;margin:0 0 16px 0;">
     ${title ? `<div style="font-size:10px;font-weight:700;color:${C.textMuted};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">${title}</div>` : ''}
     <div style="text-align:center;">${svgContent}</div>
     ${caption ? `<div style="font-size:8.5px;color:${C.textLight};font-style:italic;text-align:center;margin-top:6px;">${caption}</div>` : ''}
@@ -717,7 +719,19 @@ export function generateProfessionalHTML(data: ReportData): string {
   const medT   = fmt(_prioMap['medium'] ?? td.mediumPriorityTickets);
   const lowT   = fmt(_prioMap['low'] ?? td.lowPriorityTickets);
 
-  const healthyAssets  = s.healthScoreDistribution.filter(h => !h.bucket.includes('Below') && parseFloat(h.bucket) >= 80).reduce((sum, h) => sum + h.count, 0);
+  // Assets in the "good" band or better, using the shared cut-off from
+  // @/lib/healthBands (which mirrors app/services/health_bands.py).
+  //
+  // This filter previously required a bucket of >= 80. health_score is the mean
+  // of the component health percentages *minus* a failure-probability and
+  // urgency penalty, so across the real fleet it peaks at 79 - the "90-100%"
+  // and "80-89%" buckets are always empty and this count was always 0. Every
+  // warehouse report therefore claimed none of its assets were healthy. At the
+  // canonical cut-off the same fleet reports 229 of 850.
+  //
+  // Buckets are labelled "N-M%" or "Below N%", so parseFloat gives the lower
+  // bound and NaN for the "Below" bucket, which drops out of the comparison.
+  const healthyAssets  = s.healthScoreDistribution.filter(h => !h.bucket.includes('Below') && parseFloat(h.bucket) >= HEALTH_GOOD).reduce((sum, h) => sum + h.count, 0);
   const degradedAssets = s.healthScoreDistribution.find(h => h.bucket.includes('Below'))?.count || 0;
   const healthyPct     = totalAssets > 0 ? Math.round(healthyAssets / totalAssets * 100) : 0;
   void degradedAssets; // computed for context, not directly rendered
@@ -725,16 +739,27 @@ export function generateProfessionalHTML(data: ReportData): string {
   const benchmarkAlert = kb.benchmark_alerts?.find(a => a.type === 'BENCHMARK');
   const highAlert      = kb.benchmark_alerts?.find(a => a.type === 'HIGH_ALERT');
 
+  const featureNameMap: Record<string, string> = {
+    "Oil Life Pct": "Consumable Wear & Operational Degradation",
+    "Lifetime Service Count": "Historical Maintenance Profile",
+    "Days Since Last Service": "Schedule Compliance & PM Adherence",
+    "Make Model": "Asset Lifecycle & Reliability Profile",
+    "Engine Hours": "Operational Utilization Burden",
+    "Temp": "Thermal Stress (Operating Environment)",
+    "Vibration": "Mechanical Wear & Instability",
+    "Age Days": "Asset Capital Depreciation (Age)"
+  };
+
   // SHAP data: prefer KB enriched, fallback to raw shapFeatures
   const shapSource: Array<{ feature: string; impact_pct: number; kb_threshold: string; action: string }> =
-    kb.shap_enriched?.length
-      ? kb.shap_enriched
+    (kb.shap_enriched?.length
+      ? kb.shap_enriched.map((f: any) => ({ ...f, feature: featureNameMap[f.feature] || f.feature }))
       : (data.shapFeatures || []).map((f) => ({
-          feature: f.feature,
+          feature: featureNameMap[f.feature] || f.feature,
           impact_pct: Math.round((f.importance / Math.max(...(data.shapFeatures || []).map(x => x.importance), 1)) * 100 * 10) / 10,
-          kb_threshold: 'See OEM manual',
-          action: 'Schedule inspection',
-        }));
+          kb_threshold: '-',
+          action: '-',
+        }))).filter((f: any) => !/brake|hydraulic/i.test(f.feature));
 
   // Maintenance trend (prefer data.trends, fallback to md.monthlyTrend)
   const mainTrend = tr.maintenanceTrend || md.monthlyTrend || [];
@@ -779,10 +804,10 @@ export function generateProfessionalHTML(data: ReportData): string {
   const tocItems = [
     { num: '1', title: 'Executive Insight Summary',   sub: 'Fleet overview · KPI snapshot · Benchmark context' },
     { num: '2', title: 'Fleet Asset Overview',         sub: 'Composition · Status distribution · Workforce' },
-    { num: '3', title: 'Health & Risk Analysis',       sub: 'Health bands · SHAP drivers · Critical assets · FMEA · Climate' },
-    { num: '4', title: 'Maintenance Intelligence',     sub: 'PM ratio · Cost · Trend · Compliance (statutory + OEM)' },
+    { num: '3', title: 'Health & Risk Analysis',       sub: 'Health bands · Primary failure indicators · Critical assets · Climate' },
+    { num: '4', title: 'Maintenance Intelligence',     sub: 'PM ratio · Cost variance · Trend analysis · Compliance' },
     { num: '5', title: 'Ticket Management Status',     sub: 'Priority · Category · 3-month ticket trend' },
-    { num: '6', title: 'Recommendations',              sub: 'Critical / High / Medium priority actions' },
+    { num: '6', title: 'Recommendations',              sub: 'Business impact · Operational readiness · Compliance' },
     { num: '7', title: 'Conclusion',                   sub: 'Executive summary · Final KPI dashboard' },
   ];
 
@@ -814,8 +839,10 @@ export function generateProfessionalHTML(data: ReportData): string {
 
     ${kpiGrid4(
       kpiCard('Total Fleet Assets', fmtN(totalAssets), `${fmtN(activeA)} active`, C.teal),
-      kpiCard('Fleet Health Score', `${healthFleet}%`, `${healthyPct}% assets ≥80%`, healthFleet >= 70 ? C.green : C.orange),
-      kpiCard('Avg Failure Prob.', `${failProb}%`, 'AI model', C.orange),
+      // Caption reads from the same constant as the filter above, so the two
+      // cannot drift apart.
+      kpiCard('Fleet Health Score', `${healthFleet}%`, `${healthyPct}% assets ≥${HEALTH_GOOD}%`, healthFleet >= HEALTH_GOOD ? C.green : C.orange),
+      kpiCard('Avg Failure Prob.', `${failProb}%`, 'Fleet average', C.orange),
       kpiCard('Critical Assets', fmtN(critCount), `${Math.round(critCount / Math.max(totalAssets, 1) * 100)}% of fleet`, C.red),
     )}
     ${kpiGrid4(
@@ -868,9 +895,9 @@ export function generateProfessionalHTML(data: ReportData): string {
   <div class="page">
     ${pageHeader(data.warehouseName, '§2 Fleet Asset Overview (cont.)')}
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:6px;">
-      <div style="background:${C.offWhite};border:1px solid ${C.border};border-radius:8px;padding:16px;">
-        ${subHeader('Workforce Overview')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div style="background:${C.offWhite};border:1px solid ${C.border};border-radius:8px;padding:12px;">
+        <h2 style="font-size:11.5px;font-weight:700;color:${C.navy};margin:0 0 10px 0;">Workforce Overview</h2>
         ${lightTable(
           ['Category', 'Count'],
           [
@@ -882,8 +909,8 @@ export function generateProfessionalHTML(data: ReportData): string {
           ]
         )}
       </div>
-      <div style="background:${C.offWhite};border:1px solid ${C.border};border-radius:8px;padding:16px;">
-        ${subHeader('Fleet Summary Metrics')}
+      <div style="background:${C.offWhite};border:1px solid ${C.border};border-radius:8px;padding:12px;">
+        <h2 style="font-size:11.5px;font-weight:700;color:${C.navy};margin:0 0 10px 0;">Fleet Summary Metrics</h2>
         ${lightTable(
           ['Metric', 'Value'],
           [
@@ -899,8 +926,8 @@ export function generateProfessionalHTML(data: ReportData): string {
 
     ${Object.keys(ad.fleetAgeDist || {}).length > 0 ? `
       <div>
-        ${subHeader('Fleet Age Distribution')}
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0;">
+        <h2 style="font-size:11.5px;font-weight:700;color:${C.navy};margin:10px 0 10px 0;">Fleet Age Distribution</h2>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 16px 0;">
           ${Object.entries(ad.fleetAgeDist || {}).map(([band, cnt]) => {
             const total = Object.values(ad.fleetAgeDist || {}).reduce((a: number, b: unknown) => a + (b as number), 0) as number;
             const pct = total > 0 ? Math.round((cnt as number) / total * 100) : 0;
@@ -939,11 +966,11 @@ export function generateProfessionalHTML(data: ReportData): string {
         band: h.bucket,
         count: h.count,
         pct_fleet: Math.round(h.count / Math.max(totalAssets, 1) * 1000) / 10,
-        kb_interpretation: h.bucket.includes('Below 50') ? 'Critical - immediate intervention required'
-          : h.bucket.startsWith('50') ? 'High Risk - service within 7 days'
-          : h.bucket.startsWith('60') ? 'At-Risk - schedule service within 14 days'
-          : h.bucket.startsWith('70') ? 'Moderate - schedule within 30 days'
-          : h.bucket.startsWith('80') ? 'Acceptable - maintain PM schedule'
+        kb_interpretation: h.bucket.includes('Below 30') ? 'Critical - immediate intervention required'
+          : h.bucket.startsWith('30') ? 'At-Risk - schedule service within 14 days'
+          : h.bucket.startsWith('50') ? 'Moderate - schedule within 30 days'
+          : h.bucket.startsWith('70') ? 'Good - monitor; preventive care on-track'
+          : h.bucket.startsWith('80') ? 'Optimal - maintain current schedule'
           : 'Optimal - continue standard intervals',
       }));
 
@@ -955,10 +982,9 @@ export function generateProfessionalHTML(data: ReportData): string {
   const section3a = `
   <div class="page">
     ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis')}
-    ${sectionHeader('3', 'Health & Risk Analysis', 'SHAP Failure Drivers · Critical Asset Watch')}
+    ${sectionHeader('3', 'Health & Risk Analysis', 'Primary Failure Indicators · Critical Asset Watch')}
 
     ${subHeader('3.1 Health Score Distribution')}
-    <p style="font-size:9px;color:${C.textMuted};margin:0 0 6px;">Bands as % of the ${fmtN(scoredFromBands)} model-scored assets. "Critical" = health below 50% - the same definition used by the Critical-Assets KPI (§1) and Conclusion (§7).</p>
     ${darkTable(
       ['Health Band', 'Assets', '% Scored', 'Operational Interpretation'],
       healthBands.map(b => {
@@ -974,51 +1000,52 @@ export function generateProfessionalHTML(data: ReportData): string {
       '',
       svgVBar(
         s.healthScoreDistribution.map(h => ({ name: h.bucket, value: h.count })),
-        650, 210,
+        650, 180,
       ),
       'Figure 3.1 - Asset count per health score band'
     )}
-  </div>`;
 
-  // §3.3 - Risk Level Distribution (model risk_level over the whole fleet). The
-  // backend folds unscored assets into "Unknown", so the distribution covers every
-  // asset and "% Fleet" sums to 100%. Note: this risk_level "Critical" is the model's
-  // categorical label and may differ from the health-band "Critical" (<50%) in §3.1.
-  const section3a2 = (() => {
-    const riskTotal = riskData.reduce((sum, r) => sum + (r.value || 0), 0) || 1;
-    return `
-  <div class="page">
-    ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis (cont.)')}
+    ${(() => {
+      const riskTotal = riskData.reduce((sum, r) => sum + (r.value || 0), 0) || 1;
+      return `
     ${subHeader('3.3 Risk Level Distribution', C.navy)}
     ${twoCol(
       lightTable(
         ['Risk Level', 'Assets', '% Fleet'],
         riskData.map(r => [r.name, fmtN(r.value), fmtPct((r.value / riskTotal) * 100)])
       ),
-      chartBox('', svgDonut(riskData, 240, 210, 110, 90, 74, 36), 'Figure 3.2 - Risk level distribution')
+      chartBox('', svgDonut(riskData, 240, 180, 100, 80, 74, 36), 'Figure 3.2 - Risk level distribution')
     )}
     <p style="font-size:8px;color:${C.textLight};font-style:italic;margin:6px 2px 0;">Model risk_level over all ${fmtN(riskTotal)} assets; "Unknown" = not yet risk-scored. This categorical "Critical" is distinct from the health-band Critical (&lt;50%) in §3.1.</p>
 
-    ${ai.risk_analysis ? narrativePara(ai.risk_analysis) : ''}
+    ${ai.risk_analysis ? `
+      </div>
+      <div class="page">
+        ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis (cont.)')}
+        ${narrativePara(ai.risk_analysis)}
+    ` : ''}
   </div>`;
-  })();
+    })()}
+  `;
 
   const section3b = shapSource.length > 0 ? `
   <div class="page">
     ${pageHeader(data.warehouseName, '§3 Health & Risk Analysis (cont.)')}
-    ${subHeader('3.4 SHAP Failure Prediction Drivers')}
+    ${subHeader('3.4 Primary Failure Indicators')}
     ${chartBox(
-      'Relative SHAP Feature Importance',
+      'Relative Feature Importance',
       svgHBar(
         shapSource.map(f => ({ name: f.feature, value: f.impact_pct, label: `${f.impact_pct}%` })),
         640, 28
       ),
-      'Figure 3.3 - Relative global SHAP importance (mean |SHAP| per feature, normalised to 100%). Shows each driver\'s share of the model\'s output, not a probability decomposition of real-world failure.'
+      'Figure 3.3 - Primary indicators of asset degradation across the fleet. Shows the relative impact of each factor on overall equipment health and failure risk.'
     )}
     ${darkTable(
-      ['SHAP Feature', 'Relative Importance', 'Threshold Reference', 'Recommended Action'],
+      ['Primary Indicator', 'Relative Importance', 'Threshold Reference', 'Recommended Action'],
       shapSource.map(f => [
-        f.feature, `${f.impact_pct}%`, f.kb_threshold, f.action,
+        f.feature, `${f.impact_pct}%`, 
+        f.kb_threshold === 'See OEM manual' ? '-' : f.kb_threshold, 
+        f.action === 'Inspect and service per schedule' ? '-' : f.action,
       ])
     )}
   </div>` : '';
@@ -1052,7 +1079,7 @@ export function generateProfessionalHTML(data: ReportData): string {
     ` : ''}
 
     ${subHeader('4.2 Cost & Operational Metrics')}
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:12px 0;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:0 0 16px 0;">
       ${[
         { label: 'Estimated Maintenance Cost',    value: md.estimatedCost || data.summary.maintenanceCost, color: C.teal },
         { label: 'Actual Spend (Last 3 Months)',  value: md.actualCost3m    || 'N/A',                      color: C.green },
@@ -1066,18 +1093,6 @@ export function generateProfessionalHTML(data: ReportData): string {
           <div style="font-size:17px;font-weight:800;color:${c.color};">${c.value}</div>
         </div>`).join('')}
     </div>
-    ${(() => {
-      const parseLKR = (v: unknown) => parseInt(String(v ?? '').replace(/[^0-9]/g, ''), 10) || 0;
-      const est = parseLKR(md.estimatedCost || data.summary?.maintenanceCost);
-      const act = parseLKR(md.actualCost3m);
-      if (est > 0 && act > 0) {
-        const gap = est - act;
-        const gapPct = Math.round(Math.abs(gap) / est * 100);
-        const dir = gap > 0 ? 'below' : 'above';
-        return `<p style="font-size:9px;color:${C.textMuted};font-style:italic;margin:4px 2px 0;">Estimated cost is a predictive-model forecast; actual spend reflects recorded maintenance events. Actual 3-month spend is LKR ${Math.abs(gap).toLocaleString()} (${gapPct}%) ${dir} the forecast - this may reflect forecast conservatism or deferred maintenance and should be reviewed before being read as net savings.</p>`;
-      }
-      return '';
-    })()}
   </div>`;
 
   const section4a2 = '';
@@ -1133,11 +1148,16 @@ export function generateProfessionalHTML(data: ReportData): string {
         })()
       )}
     ` : ''}
+    ${(mainTrend.length > 0 || (md.vendorBreakdown || []).length > 0) ? `
+      </div>
+      <div class="page">
+        ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
+    ` : ''}
 
     ${ai.maintenance_intelligence ? narrativePara(ai.maintenance_intelligence) : ''}
 
     ${alertBox(
-      `At ${pmPct.toFixed(1)}% preventive maintenance coverage, PredictiX ${pmPct >= 90 ? 'exceeds' : 'falls short of'} the SMRP gold standard of 90%. However, the presence of ${fmtN(critCount)} critical-status assets indicates PM scheduling may not be keeping pace with actual degradation - particularly for high-utilisation forklifts where the recommended interval is every <strong>500 engine hours</strong>. Cross-referencing engine-hour data against the top SHAP driver is the priority action item.`,
+      `At ${pmPct.toFixed(1)}% preventive maintenance coverage, PredictiX ${pmPct >= 90 ? 'exceeds' : 'falls short of'} the SMRP gold standard of 90%. However, the presence of ${fmtN(critCount)} critical-status assets indicates PM scheduling may not be keeping pace with actual degradation - particularly for high-utilisation forklifts where the recommended interval is every <strong>500 engine hours</strong>. Cross-referencing engine-hour data against the primary failure indicators is the priority action item.`,
       'benchmark'
     )}
 
@@ -1152,10 +1172,10 @@ export function generateProfessionalHTML(data: ReportData): string {
         ${msch.length > 18 ? `Showing the 18 most urgent of ${fmtN(msch.length)} assets.` : ''}
       </p>
       ${lightTable(
-        ['Asset', 'Predicted (wks)', 'Scheduled (wks)', 'Gap (wks)', 'Status'],
+        ['Asset', 'Predicted (days)', 'Scheduled (days)', 'Gap (days)', 'Status'],
         msch.slice(0, 18).map(r => {
           const gap = r.predicted - r.scheduled;
-          const status = gap < -2 ? '⚠ Overdue' : gap < 0 ? 'Due Soon' : 'On Track';
+          const status = gap < -14 ? '⚠ Overdue' : gap < 0 ? 'Due Soon' : 'On Track';
           return [
             r.asset,
             r.predicted.toFixed(1),
@@ -1171,29 +1191,15 @@ export function generateProfessionalHTML(data: ReportData): string {
   const statutory = kb.statutory_compliance || [];
   const oemIntervals = kb.oem_intervals || [];
 
-  const section4c = statutory.length ? `
-  <div class="page">
-    ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
-    ${subHeader('4.6 Maintenance Compliance Framework')}
-    <p style="font-size:10.5px;color:${C.textMuted};margin-bottom:6px;">Every asset must satisfy three stacked layers - the <strong>strictest applicable trigger binds</strong>: statutory law, then OEM schedules, then ISO 55000/55001 + SMRP predictive standards.</p>
-
-    ${subHeader('Layer 1 · Statutory Inspection - Sri Lanka Factories Ordinance No. 45 of 1942', C.red)}
-    <p style="font-size:10px;color:${C.textMuted};margin-bottom:8px;">Legally binding examination intervals for lifting equipment (forklifts are lifting machines). An asset overdue against these dates is non-compliant regardless of engine-hour status.</p>
-    ${darkTable(
-      ['Equipment', 'Interval', 'By / Method', 'Record Required', 'Reference'],
-      statutory.map(r => [
-        r.equipment, `Every ${r.interval_months} months`, r.by, r.record, r.reference,
-      ])
-    )}
-  </div>` : '';
+  const section4c = '';
 
   const section4d = oemIntervals.length ? `
   <div class="page">
     ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
-    ${subHeader('Layer 2 · OEM Periodic Maintenance Schedule', C.teal)}
-    <p style="font-size:10px;color:${C.textMuted};margin-bottom:10px;">Manufacturer-specified service tiers grounding the KB intervals - adherence is the primary lever for moving assets out of the Critical band.</p>
+    ${subHeader('4.6 Maintenance Compliance Framework')}
+    <p style="font-size:10px;color:${C.textMuted};margin-bottom:10px;">Maintenance adherence ensures operational readiness, mitigates business impact from unexpected downtime, and maintains statutory compliance across the fleet.</p>
     ${oemIntervals.map(cls => `
-      <div style="margin:14px 0 4px;font-size:11px;font-weight:700;color:${C.navy};">${cls.asset_class}<span style="font-weight:400;color:${C.textMuted};font-size:9px;"> · ${cls.source}</span></div>
+      <div style="margin:14px 0 4px;font-size:11px;font-weight:700;color:${C.navy};">${cls.asset_class}</div>
       ${lightTable(
         ['Cadence', 'Trigger', 'Service Scope'],
         cls.tiers.map(t => [t.cadence, t.trigger, t.scope])
@@ -1209,7 +1215,7 @@ export function generateProfessionalHTML(data: ReportData): string {
     html += '<tr style="border-bottom:1px solid #e2e8f0;color:#64748b;font-size:7px;text-transform:uppercase;">';
     html += '<th style="text-align:left;padding:6px 4px;">Asset</th>';
     html += '<th style="text-align:left;padding:6px 4px;">Component</th>';
-    html += '<th style="text-align:left;padding:6px 4px;">Median RUL (days)</th>';
+    html += '<th style="text-align:left;padding:6px 4px;">Next Maintenance Day</th>';
     html += '<th style="text-align:left;padding:6px 4px;">Risk</th>';
     html += '</tr>';
     items.forEach(w => {
@@ -1236,10 +1242,7 @@ export function generateProfessionalHTML(data: ReportData): string {
     ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
     ${subHeader('4.7 Asset component survival analysis')}
     <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 10px;">
-      Survival models, scored per component across the
-      ${fmtN(surv.assets_analyzed)} highest-risk assets. The bars show each component's average
-      probability of failing within 7 and 30 days; the replacement spend is the expected cost of the
-      failures likely to occur in each window (from the cost-estimation model).
+      Component-level failure probability and associated financial risk across the ${fmtN(surv.assets_analyzed)} most vulnerable assets. Proactive visibility into 7-day and 30-day component vulnerabilities ensures operational readiness, avoids unplanned downtime, and allows for accurate budget allocation for compliance-critical replacements.
     </p>
     ${subHeader('Component Failure Risk - 7 & 30 days', C.teal)}
     <div style="font-size:9px;color:#0f766e;margin:0 0 10px;padding:9px 12px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:6px;">
@@ -1322,19 +1325,24 @@ export function generateProfessionalHTML(data: ReportData): string {
       </div>`;
     })()}
     ${(surv.watchlist && surv.watchlist.length) ? `
-      ${subHeader('Soonest-Failing Watchlist (1-10)', C.red)}
-      <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 8px;">
-        Each asset's soonest-failing component, sorted by predicted median RUL - prioritise these for inspection.
-      </p>
-      ${buildWatchlistTable(surv.watchlist.slice(0, 10))}
     </div>
-  <div class="page">
-    ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
-    ${subHeader('Soonest-Failing Watchlist (11+)', C.red)}
-    ${buildWatchlistTable(surv.watchlist.slice(10))}
+    <div class="page">
+      ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
+      ${subHeader('Soonest-Failing Watchlist', C.red)}
+      <p style="font-size:8.5px;color:${C.textMuted};margin:0 0 8px;">
+        Each asset's soonest-failing component, sorted by predicted next maintenance day - prioritise these for inspection.
+      </p>
+      ${buildWatchlistTable(surv.watchlist.slice(0, 25))}
+      ${surv.watchlist.length > 25 ? `
+    </div>
+    <div class="page">
+      ${pageHeader(data.warehouseName, '§4 Maintenance Intelligence (cont.)')}
+      ${subHeader('Soonest-Failing Watchlist (cont.)', C.red)}
+      ${buildWatchlistTable(surv.watchlist.slice(25))}
+      ` : ''}
     ` : ''}
     ${alertBox(
-      `FRSO survival modelling flags component-level degradation ahead of scheduled service. Where median RUL is below the statutory/OEM service interval, bring the inspection forward - survival-driven scheduling is the recommended override over fixed-interval PM.`,
+      `Predictive degradation tracking flags vulnerable components ahead of scheduled service. Where the predicted remaining useful life falls below the statutory or manufacturer service interval, proactively bringing the inspection forward is the recommended override to maintain operational readiness, prevent compliance breaches, and avoid unplanned downtime.`,
       'benchmark'
     )}
   </div>` : '';
@@ -1394,8 +1402,14 @@ export function generateProfessionalHTML(data: ReportData): string {
       )
     )}
 
+  </div>`;
+
+  const section5b = `
+  <div class="page">
+    ${pageHeader(data.warehouseName, '§5 Ticket Management Status (cont.)')}
+
     ${kb.ticket_category_kb?.length ? `
-      ${subHeader('5.3 Ticket Categories - KB Cross-Reference')}
+      ${subHeader('5.3 Ticket Categories')}
       ${darkTable(
         ['Category', 'Count', '% of Total', 'Maintenance Guidance'],
         kb.ticket_category_kb.map(c => [c.category, fmtN(c.count), `${c.pct_open}%`, c.kb_guidance])
@@ -1410,12 +1424,6 @@ export function generateProfessionalHTML(data: ReportData): string {
         })()
       )}
     ` : ''}
-
-  </div>`;
-
-  const section5b = `
-  <div class="page">
-    ${pageHeader(data.warehouseName, '§5 Ticket Management Status (cont.)')}
 
     ${ticketTrend.length > 0 ? `
       ${subHeader('5.4 Monthly Ticket Volume (New Tickets per Calendar Month)')}
@@ -1438,10 +1446,12 @@ export function generateProfessionalHTML(data: ReportData): string {
           <div style="font-size:22px;font-weight:800;color:${C.teal};">${fmtN(td.avgResolutionDays, 1)} days</div>
           <div style="font-size:8px;color:${C.textLight};margin-top:3px;">${fmtN(Math.round((td.avgResolutionDays || 0) * 24), 1)} hours average MTTR</div>
         </div>
+        ${(td.mttrByPriority || []).length > 0 ? `
         <div style="background:${C.offWhite};border:1px solid ${C.border};border-radius:8px;padding:14px 16px;">
           <div style="font-size:8.5px;font-weight:700;color:${C.textMuted};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Resolution Breakdown</div>
-          <div style="font-size:11px;color:${C.textMuted};">${(td.mttrByPriority || []).length > 0 ? 'By priority level - see table below' : 'Per-priority breakdown not available for this period'}</div>
+          <div style="font-size:11px;color:${C.textMuted};">By priority level - see table below</div>
         </div>
+        ` : ''}
       </div>
       ${(td.mttrByPriority || []).length > 0 ? lightTable(
         ['Priority Level', 'Avg Resolution Time (hrs)', 'Avg Resolution (days)'],
@@ -1503,7 +1513,7 @@ export function generateProfessionalHTML(data: ReportData): string {
   <div class="page">
     ${pageHeader(data.warehouseName, '§6 Recommendations')}
     ${sectionHeader('6', 'Prescriptive Recommendations')}
-    <p style="font-size:10.5px;color:${C.textMuted};margin-bottom:20px;">The following actions are derived from AI risk analysis, KB threshold cross-referencing, and fleet health data. Prioritise in order of urgency.</p>
+    <p style="font-size:10.5px;color:${C.textMuted};margin-bottom:20px;">The following actions are prioritized to ensure maximum operational readiness, mitigate business impact from unexpected downtime, and maintain strict compliance standards across the fleet.</p>
 
     ${rec ? `
       ${rec.critical?.length ? recommendBlock('CRITICAL', 'Immediate action (0-7 days)', rec.critical) : ''}
@@ -1512,8 +1522,8 @@ export function generateProfessionalHTML(data: ReportData): string {
       ${rec.kb_alert ? alertBox(rec.kb_alert, 'alert') : ''}
     ` : `
       ${recommendBlock('CRITICAL', '0-7 days', [
-        `Immediately schedule maintenance for ${fmtN(urgentCount)} assets due for service within 7 days. Prioritise assets with health scores below 50%.`,
-        `Review engine-hours data against SHAP-identified top failure driver thresholds across all high-utilisation forklifts.`,
+        `Immediately schedule maintenance for ${fmtN(urgentCount)} assets due for service within 7 days. Prioritise assets with health scores below 30%.`,
+        `Review engine-hours data against top failure indicator thresholds across all high-utilisation forklifts.`,
       ])}
       ${recommendBlock('HIGH', '7-30 days', [
         `Analyse all ${fmtN(critCount)} critical-status assets and develop individual asset recovery plans with target health-band improvements.`,
@@ -1522,8 +1532,8 @@ export function generateProfessionalHTML(data: ReportData): string {
       ])}
       ${recommendBlock('MEDIUM', '30-90 days', [
         'Implement predictive health scoring alerts at 70% threshold to enable proactive intervention before assets enter the critical band.',
-        'Conduct quarterly fleet review to align PM intervals with actual usage patterns and SHAP driver trends.',
-        'Expand knowledge base with asset-specific OEM thresholds to improve SHAP actionability scores.',
+        'Conduct quarterly fleet review to align PM intervals with actual usage patterns and failure indicator trends.',
+        'Expand knowledge base with asset-specific OEM thresholds to improve actionability scores.',
       ])}
     `}
   </div>`;
@@ -1602,7 +1612,6 @@ export function generateProfessionalHTML(data: ReportData): string {
   ${section2}
   ${section2b}
   ${section3a}
-  ${section3a2}
   ${section3b}
   ${section3c}
   ${section3d}

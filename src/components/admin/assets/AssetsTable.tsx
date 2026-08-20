@@ -8,11 +8,8 @@ import { cn } from "@/lib/utils";
 import type { AssetListItem } from "./types";
 
 // ── Status pill ────────────────────────────────────────────────────────────────
-// Real asset_status enum values: active | inactive | under_maintenance |
-// critical | decommissioned. "retired"/"maintenance"/"in_maintenance" are
-// not real values — an asset with the real "under_maintenance", "critical",
-// or "decommissioned" status previously fell through to the generic gray
-// fallback below instead of getting its intended amber/red/gray treatment.
+// Keys must match the asset_status values the backend sends. Anything else
+// falls through to the grey default.
 const STATUS_META: Record<string, { label: string; dot: string; bg: string }> = {
   active: {
     label: "Active",
@@ -61,14 +58,9 @@ function StatusPill({ status }: { status: string }) {
 }
 
 // ── Health band mini-bar ───────────────────────────────────────────────────────
-// The trimmed list-view payload (AssetListItem) only carries health_band,
-// not a real per-asset health score (that lives on pdm_batch_predictions,
-// fetched separately per-asset on the detail panel). This previously
-// rendered a fixed fake number per band (every "good" asset showed "72",
-// identical regardless of its real score) — misleading in a list an admin
-// scans expecting differentiation between rows. Shows a band-proportional
-// bar with the band label instead of a fabricated precise number; the real
-// score is available on the detail panel via deriveHealthScore().
+// The list payload carries only health_band, not a per-asset score. The bar
+// below is sized per band and labelled with the band name, so it never implies
+// a precision the list does not have. The real score is on the detail panel.
 const BAND_META: Record<string, { pct: number; color: string; label: string }> = {
   excellent: { pct: 90, color: "bg-emerald-500", label: "Excellent" },
   good:      { pct: 72, color: "bg-lime-500",    label: "Good" },
@@ -131,6 +123,7 @@ type Props = {
   loading?: boolean;
 };
 
+/** Paginated table of assets. Clicking a row selects it in the detail panel. */
 export default function AssetsTable({ assets, selectedId, onSelect, loading }: Props) {
   return (
     <div className="h-full card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden flex flex-col transition-all">

@@ -42,7 +42,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                   </span>
                 </div>
                 <span className="font-bold text-slate-900 dark:text-white font-mono">
-                  {entry.value} wks
+                  {Math.round(entry.value)} days
                 </span>
               </div>
             );
@@ -54,7 +54,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export default function WarehouseMaintenanceSchedule({ data: propsData }: { data?: any[] } = {}) {
+export default function WarehouseMaintenanceSchedule({ 
+  data: propsData,
+  isLoading: externalLoading 
+}: { 
+  data?: any[];
+  isLoading?: boolean;
+} = {}) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   
@@ -63,7 +69,7 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
 
   const [allData, setAllData] = useState<any[]>(propsData ?? []);
   const [displayData, setDisplayData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(!managedExternally);
+  const [loading, setLoading] = useState(!managedExternally || externalLoading);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("urgent");
   const [itemsToShow, setItemsToShow] = useState(15);
@@ -72,7 +78,7 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
   useEffect(() => {
     if (managedExternally) {
       setAllData(propsData!);
-      setLoading(false);
+      setLoading(externalLoading || false);
       return;
     }
 
@@ -127,7 +133,25 @@ export default function WarehouseMaintenanceSchedule({ data: propsData }: { data
 
   // Show loading state
   if (loading) {
-    return null;
+    return (
+      <Card className="rounded-2xl overflow-hidden border-teal-100/60 dark:border-teal-900/30 h-full flex flex-col p-0 gap-0">
+        <div className="bg-gradient-to-r from-teal-500/10 via-cyan-500/5 to-transparent px-6 py-4 border-b border-teal-100/50 dark:border-teal-900/30 shrink-0">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="rounded-xl bg-teal-500/15 p-2">
+                <CalendarClock className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold leading-tight">Predictive Maintenance Schedule</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+        <CardContent className="pt-6">
+          <div className="h-64 rounded-xl animate-pulse bg-muted" />
+        </CardContent>
+      </Card>
+    );
   }
 
   // Show error state

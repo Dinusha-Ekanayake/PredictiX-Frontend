@@ -23,7 +23,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Cannot read localStorage here — pass through; AuthGuard handles protection.
+  // Cannot read localStorage here, pass through; AuthGuard handles protection.
   return NextResponse.next();
 }
 

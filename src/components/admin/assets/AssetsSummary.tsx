@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { AssetStats } from "./types";
 
+/** One KPI tile: a label, a big value, and an optional caption. */
 function SummaryCard({
   label,
   value,
@@ -44,6 +45,11 @@ function SummaryCard({
   );
 }
 
+/**
+ * Row of KPI tiles above the assets list.
+ *
+ * Shows skeletons on the first load, then the counts for the current warehouse.
+ */
 export default function AssetsSummary({
   stats,
   loading,
@@ -56,8 +62,7 @@ export default function AssetsSummary({
   const maintenance = stats?.maintenance ?? 0;
   const critical = stats?.critical ?? 0;
   const offline = stats?.offline ?? 0;
-  // Genuinely null (not 0) when no asset in scope has a completed
-  // prediction yet — shown as "No data" below rather than a fabricated 0%.
+  // Null, not 0, when nothing has been scored yet. Shown as "No data" below.
   const avgHealth = stats?.avgHealth ?? null;
   const scoredCount = stats?.avgHealthScoredCount ?? 0;
 
@@ -89,14 +94,10 @@ export default function AssetsSummary({
         accentClass="bg-blue-50"
         iconClass="text-blue-600 dark:text-blue-400"
       />
-      {/* "Operational"/"Maintenance"/"Offline" below are asset STATUS
-          (active/under_maintenance/inactive+decommissioned) — a lifecycle
-          state. "Critical Band" is a separate HEALTH classification
-          (health_band == "critical"). These are two independent axes, not
-          parts of one breakdown — an asset can be "active" status AND
-          "critical" health band at the same time, so these 5 numbers were
-          never meant to sum to Total Assets. Sub-labels below make that
-          distinction explicit instead of implying one unified breakdown. */}
+      {/* Operational, Maintenance and Offline count asset status. Critical Band
+          counts health instead. An asset can be active and in the critical band
+          at once, so these tiles do not add up to Total Assets. The captions on
+          each tile say which of the two it is reading. */}
       <SummaryCard
         label="Operational"
         value={operational}

@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Create-ticket dialog — Admin / Super Admin role.
+ * Create-ticket dialog, Admin / Super Admin role.
  *
  * Flow:
  *  1. Admin fills in title + description (and optionally asset / assigned user).
- *  2. After a 1.2s debounce, AI auto-runs — category and priority fields are
+ *  2. After a 1.2s debounce, AI auto-runs, category and priority fields are
  *     populated with a spinner while the models run.
  *  3. Create Ticket is disabled while AI is running.
  *  4. Admin CAN change BOTH category and priority after AI suggests them.
@@ -15,6 +15,7 @@
 import * as React from "react";
 import { AlertCircle, Bot, Loader2, Plus, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "@/lib/customToast";
+import { generateUUID } from "@/lib/utils";
 
 import {
   Dialog,
@@ -233,7 +234,7 @@ export default function NewTicketDialog({
 
       if (file && supabase) {
         const fileExt = file.name.split(".").pop();
-        const fileName = `${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+        const fileName = `${Date.now()}-${generateUUID()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from("ticket-attachments")
           .upload(fileName, file);
@@ -381,7 +382,7 @@ export default function NewTicketDialog({
             )}
           </div>
 
-          {/* Priority + Category — both editable for admin */}
+          {/* Priority + Category, both editable for admin */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">

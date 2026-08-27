@@ -11,7 +11,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 /**
  * Extract a human-readable message from a FastAPI error response body.
  * `detail` is a plain string for most errors, but for a 422 validation
- * error it's an array of {loc, msg, type} objects — passing that straight
+ * error it's an array of {loc, msg, type} objects, passing that straight
  * into `new Error(...)` coerces it to "[object Object],[object Object]"
  * via String(), producing a garbled, unprofessional toast instead of the
  * actual validation message (e.g. a malformed date or wrong field type).
@@ -32,7 +32,7 @@ function extractErrorMessage(body: any, fallback: string): string {
 }
 
 /**
- * Core fetch wrapper — attaches JWT and handles 401.
+ * Core fetch wrapper, attaches JWT and handles 401.
  */
 export async function apiFetch(
   endpoint: string,
@@ -41,7 +41,7 @@ export async function apiFetch(
   const token = getAccessToken();
 
   // A FormData body (file uploads) needs the browser to set its own
-  // multipart/form-data boundary — forcing application/json here would
+  // multipart/form-data boundary, forcing application/json here would
   // corrupt the request.
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
 

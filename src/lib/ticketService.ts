@@ -155,7 +155,7 @@ export async function fetchTickets(
   if (sortBy) params.set("sort_by", sortBy);
   if (sortDir) params.set("sort_dir", sortDir);
 
-  // Call FastAPI — this uses the authenticated session and the backend DB connection
+  // Call FastAPI, this uses the authenticated session and the backend DB connection
   // which is resilient to Supabase sleeping. Response includes X-Total-Count header.
   const resp = await apiFetch(`/tickets/paginated?${params.toString()}`);
   if (!resp.ok) {
@@ -181,15 +181,13 @@ export async function fetchTicketStatusCounts(): Promise<Record<string, number>>
   return apiGet<Record<string, number>>("/tickets/status-counts");
 }
 
-// These four previously wrote/deleted directly via the Supabase client,
-// relying on RLS to enforce that only an admin can change/delete a ticket
-// that isn't theirs. The real tickets_update_creator_assignee_or_admin and
-// tickets_delete policies both have qual = 'true' (no actual restriction),
-// so that path let ANY authenticated user update or delete ANY ticket in
-// the system. Routed through the backend's PUT/DELETE /tickets/{id}
-// instead, which correctly enforces is_admin_role()/require_admin
-// server-side and also logs the status-transition history the direct
-// Supabase path silently skipped.
+// These four go through the backend's PUT/DELETE /tickets/{id} rather than
+// writing via the Supabase client. RLS cannot be relied on here: the
+// tickets_update_creator_assignee_or_admin and tickets_delete policies both
+// have qual = 'true', so a direct client write would let any authenticated
+// user update or delete any ticket in the system. The backend enforces
+// is_admin_role()/require_admin server-side and logs the status-transition
+// history, which a direct write does not.
 
 export async function updateTicketStatus(id: string, status: TicketStatus): Promise<void> {
   await apiPut(`/tickets/${id}`, { status: dbStatus(status) });

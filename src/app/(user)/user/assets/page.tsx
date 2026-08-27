@@ -236,7 +236,7 @@ export default function UserAssetsPage() {
 
       {/* Create ticket on a selected asset (asset locked). UserNewTicketDialog
           shows its own success toast + confirmation panel (Create another /
-          Done) — don't duplicate the toast or force-close here. */}
+          Done), don't duplicate the toast or force-close here. */}
       <UserNewTicketDialog
         open={ticketAsset !== null}
         onOpenChange={(o) => { if (!o) setTicketAsset(null); }}

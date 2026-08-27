@@ -137,7 +137,7 @@ function FaqCard({
     >
       {/* ── Header row: outer is a plain div, click zone is a div[role=button] */}
       <div className="flex items-center gap-2 pr-3">
-        {/* Clickable question area — uses div+role so buttons can sit beside it */}
+        {/* Clickable question area. Uses div+role so buttons can sit beside it */}
         <div
           role="button"
           tabIndex={0}
@@ -161,7 +161,7 @@ function FaqCard({
           </span>
         </div>
 
-        {/* Right side: admin actions + chevron — siblings of the click zone, NOT inside it */}
+        {/* Right side: admin actions + chevron, siblings of the click zone, NOT inside it */}
         <div className="flex items-center gap-1 shrink-0">
           {isAdmin && (
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -204,7 +204,7 @@ function FaqCard({
             </div>
           )}
 
-          {/* Chevron — also a plain div click so it doesn't nest inside role=button */}
+          {/* Chevron, also a plain div click so it doesn't nest inside role=button */}
           <div
             onClick={() => setOpen((v) => !v)}
             className="p-2 cursor-pointer rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
@@ -219,7 +219,7 @@ function FaqCard({
         </div>
       </div>
 
-      {/* Answer panel — CSS height transition */}
+      {/* Answer panel, CSS height transition */}
       <div
         className={cn(
           "overflow-hidden transition-all duration-300",

@@ -16,9 +16,14 @@ import { join } from "node:path";
 // Display name for each test file, in the order they should appear.
 const GROUPS = [
   ["Unit: health bands", "src/lib/healthBands.test.ts"],
-  ["Unit: auth session", "src/lib/authService.test.ts"],
+  ["Unit: auth session (AU-08)", "src/lib/authService.test.ts"],
   ["Unit: asset helpers", "src/components/admin/assets/assetService.test.ts"],
+  ["Unit: asset usage charts", "src/components/admin/assets/AssetUsageCharts.test.ts"],
+  ["Component: asset usage panels", "src/components/admin/assets/AssetUsageCharts.render.test.tsx"],
+  ["Theming: asset section", "src/components/admin/assets/theming.test.ts"],
   ["Component: assigned assets", "src/components/admin/users/ViewAssignedAssetsDialog.test.tsx"],
+  ["Test plan: theme (NS-07)", "src/components/theme/ThemeProvider.test.tsx"],
+  ["Test plan: navigation (NS-08)", "src/components/navigation/AdminNavbar.test.ts"],
 ];
 
 const args = process.argv.slice(2);
@@ -50,23 +55,59 @@ function bail(message) {
   process.exit(1);
 }
 
-if (!existsSync(jsonPath)) {
-  bail("Vitest produced no results file, so no tests were verified.");
+/** Sleep without spinning the CPU. spawnSync is synchronous, so the wait has
+ *  to be too. */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-let report;
-try {
-  report = JSON.parse(readFileSync(jsonPath, "utf8"));
-  if (process.env.RUNNER_DEBUG) {
-    console.error("[debug] jsonPath:", jsonPath);
-    console.error("[debug] vitest status:", result.status);
-    console.error("[debug] keys:", Object.keys(report).join(","));
-    console.error("[debug] testResults:", (report.testResults ?? []).length);
+/**
+ * Read the report, retrying briefly.
+ *
+ * The JSON reporter's write races vitest's exit: spawnSync returns as soon as
+ * the process ends, and on Windows the file is sometimes still absent, still
+ * being written, or written but empty at that instant. Reading once made the
+ * runner report "NO TESTS RAN" on a suite that had just passed 69 tests, which
+ * is the worst failure mode a test runner has, it trains you to ignore it.
+ */
+function readReport(attempts = 10, waitMs = 200) {
+  for (let i = 0; i < attempts; i += 1) {
+    if (existsSync(jsonPath)) {
+      try {
+        const parsed = JSON.parse(readFileSync(jsonPath, "utf8"));
+        if ((parsed.numTotalTests ?? 0) > 0) return parsed;
+      } catch {
+        // Half-written file: fall through and wait for the rest of it.
+      }
+    }
+    sleepSync(waitMs);
   }
-} catch {
-  bail("The test results file could not be parsed.");
-} finally {
-  rmSync(jsonPath, { force: true });
+  return null;
+}
+
+const report = readReport();
+
+if (process.env.RUNNER_DEBUG) {
+  console.error("[debug] jsonPath:", jsonPath);
+  console.error("[debug] vitest status:", result.status);
+  console.error("[debug] report:", report ? Object.keys(report).join(",") : "null");
+  console.error("[debug] testResults:", (report?.testResults ?? []).length);
+}
+
+rmSync(jsonPath, { force: true });
+
+if (!report) {
+  // Vitest's own exit code is the authority on pass/fail. A missing report
+  // means the breakdown is unavailable, not that nothing ran, say which.
+  if (result.status === 0) {
+    console.error(
+      "\nThe JSON reporter produced no usable output, so the per-group " +
+      "breakdown is unavailable. Vitest itself exited 0, so the suite passed. " +
+      "Re-run `npx vitest run` to see the results directly.\n",
+    );
+    process.exit(0);
+  }
+  bail(`Vitest exited ${result.status} and produced no readable results file.`);
 }
 
 /** Normalise a path so Windows separators still match the table above. */
@@ -117,8 +158,8 @@ for (const [label, g] of rows) {
 console.log("-".repeat(66));
 
 // The report's own totals are authoritative. The per-file breakdown above is
-// only for presentation, and has occasionally come back empty even on a run
-// that passed, which previously reported "NO TESTS RAN" for a healthy suite.
+// for presentation only and can come back empty on a run that passed, so a
+// verdict taken from it would call a healthy suite empty.
 const reported = {
   pass: report.numPassedTests ?? 0,
   fail: report.numFailedTests ?? 0,

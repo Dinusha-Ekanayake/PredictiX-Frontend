@@ -10,7 +10,7 @@ type Props = {
   /**
    * Real completion percentage (0-100), when the caller actually knows it.
    * If provided, the bar becomes determinate instead of the default
-   * indeterminate sweep. Purely additive — existing callers that don't pass
+   * indeterminate sweep. Purely additive, existing callers that don't pass
    * it keep the original animated-bar behaviour.
    */
   progress?: number;

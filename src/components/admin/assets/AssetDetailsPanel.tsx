@@ -15,6 +15,7 @@ import {
 import { toast } from "@/lib/customToast";
 import { cn } from "@/lib/utils";
 import { useNavRouter } from "@/components/navigation/useNavRouter";
+import { UtilisationChart, ServiceCadenceChart, toChartRows } from "./AssetUsageCharts";
 import type { AssetDetail, PredictionTier } from "./types";
 import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
 import { bandFor, healthColor } from "@/lib/healthBands";
@@ -306,7 +307,13 @@ type Props = {
 };
 
 export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit, onReport, onAssign, assigneeName, readOnly = false, warehouseOptions }: Props) {
-  const { asset, prediction, componentRul, maintenanceEvents, tickets, assignments } = detail;
+  const { asset, prediction, componentRul, usageHistory, maintenanceEvents, tickets, assignments } = detail;
+
+  // Reshaped once per load: both charts read the same rows.
+  const usageRows = React.useMemo(
+    () => toChartRows(usageHistory?.points ?? []),
+    [usageHistory],
+  );
   const warehouseName = warehouseOptions?.find((w) => w.value === asset.warehouse_id)?.label ?? asset.warehouse_id;
   const router = useNavRouter();
 
@@ -383,7 +390,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
   return (
     <div className="card-dynamic rounded-2xl border border-slate-200 dark:border-slate-700 bg-card overflow-hidden transition-all">
       {/* ── Header ──
-           Stacked (title row, then actions) instead of side-by-side — this
+           Stacked (title row, then actions) instead of side-by-side, this
            panel is often narrow (docked next to a list), and cramming a full
            name + status + code + badges on the same row as 5 action buttons
            left almost no room for the name itself, truncating it to a few
@@ -443,7 +450,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   : <RefreshCw className="h-3 w-3" />}
                 {runningPrediction ? "Running…" : "Run AI"}
               </Button>
-              {/* CHANGE 5: Report button now calls onReport() — opens shared modal in page.tsx */}
+              {/* Opens the shared report modal owned by page.tsx. */}
               <Button
                 variant="outline"
                 size="sm"
@@ -655,8 +662,7 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
             </div>
             <div>
               <div className="text-[11px] text-muted-foreground/80 font-medium">Est. Maintenance Cost</div>
-              {/* A null cost means the cost model could not score this asset —
-                  the backend stores NULL rather than a guessed number. Say so
+              {/* A null cost means the cost model could not score this asset, the backend stores NULL rather than a guessed number. Say so
                   plainly instead of rendering a dash that reads like "zero". */}
               {prediction && prediction.estimated_cost_lkr == null ? (
                 <div
@@ -995,120 +1001,13 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                   )}
                 </div>
 
-                {/* ── Row 4: Component RUL — trained per-component Weibull AFT
-                     survival models (survival_service.py), the same models
-                     the warehouse report uses. Needs only the asset's latest
-                     snapshot, not a reading history. ── */}
-                {componentRul && (
-                  <div className="rounded-xl border border-slate-200/80 dark:border-white/6 bg-slate-50/30 dark:bg-white/2 p-4 space-y-4 mt-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
-                        Component Remaining Useful Life (RUL)
-                      </div>
-                      <span
-                        className="text-[10px] text-muted-foreground/50 cursor-help"
-                        title="From a trained survival model (Weibull AFT) per component, fitted on the fleet's real service history — not just this asset's own readings. Median is the 50% failure point; the range is the model's own 10%-90% band."
-                      >
-                        What is this?
-                      </span>
-                    </div>
-                    {componentRul.components.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No component health data available.</div>
-                    ) : (
-                      <div className="space-y-4">
-                        {[...componentRul.components]
-                          // Soonest to fail first, so the row needing attention
-                          // is never buried. Components the model could not
-                          // score sort to the bottom.
-                          .sort((a, b) => {
-                            const rank = (c: typeof a) => ("error" in c ? Infinity : c.median_days);
-                            return rank(a) - rank(b);
-                          })
-                          .map((comp, i) => {
-                          if ("error" in comp) {
-                            return (
-                              <div key={i} className="flex justify-between items-center text-[11px] text-muted-foreground/60">
-                                <span className="capitalize">{comp.component}</span>
-                                <span>No prediction available</span>
-                              </div>
-                            );
-                          }
-
-                          // Urgency from the model's 30-day failure probability,
-                          // using the same bands as the warehouse report.
-                          const urgency: "critical" | "watch" | "safe" =
-                            comp.fail_prob_30d >= 0.5 ? "critical" : comp.fail_prob_30d >= 0.2 ? "watch" : "safe";
-                          const barColor =
-                            urgency === "critical" ? "bg-red-500"
-                            : urgency === "watch" ? "bg-amber-500"
-                            : "bg-primary";
-                          const textColor =
-                            urgency === "critical" ? "text-red-500"
-                            : urgency === "watch" ? "text-amber-600 dark:text-amber-400"
-                            : "text-foreground";
-                          const healthPct = comp.health_pct != null ? Math.max(0, Math.min(100, comp.health_pct)) : null;
-                          // The backend caps day counts at the model's trained
-                          // horizon. A value sitting exactly on that ceiling is
-                          // not an exact number, so it renders as "180+" and is
-                          // played down rather than shown as a firm date.
-                          const CAPPED_HORIZON_DAYS = 180;
-                          const fmtDays = (d: number) => {
-                            const base = d >= 365 ? `${(d / 365).toFixed(1)}y` : `${Math.round(d)}d`;
-                            return comp.horizon_capped && d >= CAPPED_HORIZON_DAYS ? `${base}+` : base;
-                          };
-                          const medianCapped = comp.horizon_capped && comp.median_days >= CAPPED_HORIZON_DAYS;
-
-                          return (
-                            <div key={i} className="space-y-1.5">
-                              <div className="flex justify-between items-start text-[11px] gap-2">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="capitalize font-medium text-muted-foreground">{comp.component}</span>
-                                  {urgency !== "safe" && (
-                                    <span
-                                      className={cn(
-                                        "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ring-1 ring-inset",
-                                        urgency === "critical"
-                                          ? "bg-red-50 text-red-700 ring-red-200/60 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20"
-                                          : "bg-amber-50 text-amber-700 ring-amber-200/60 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
-                                      )}
-                                      title={`${Math.round(comp.fail_prob_30d * 100)}% chance this component needs service within 30 days`}
-                                    >
-                                      <AlertTriangle className="h-2.5 w-2.5" />
-                                      {urgency === "critical" ? "High risk" : "Elevated risk"}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <span
-                                    className={cn("font-bold tabular-nums block", medianCapped ? "text-muted-foreground/60" : textColor)}
-                                    title={medianCapped ? "Beyond the model's reliable prediction range — not a precise estimate" : undefined}
-                                  >
-                                    ~{fmtDays(comp.median_days)} left
-                                  </span>
-                                  <span className="text-[9px] text-muted-foreground/50 font-mono">
-                                    range {fmtDays(comp.p10_days)}–{fmtDays(comp.p90_days)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="relative h-2 rounded-full bg-slate-200/60 dark:bg-white/8">
-                                <div
-                                  className={cn("absolute h-full rounded-full", barColor)}
-                                  style={{ width: `${healthPct ?? 0}%` }}
-                                />
-                              </div>
-                              <div className="flex justify-between text-[9px] text-muted-foreground/50 font-mono">
-                                <span>{healthPct != null ? `${healthPct.toFixed(0)}% health` : "No reading"}</span>
-                                <span title="Model-predicted chance of needing service within 7 / 30 days">
-                                  {Math.round(comp.fail_prob_7d * 100)}% in 7d · {Math.round(comp.fail_prob_30d * 100)}% in 30d
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* ── Row 4: recorded operating history. Both charts plot
+                     stored sensor readings, so every point is something the
+                     asset actually did rather than a forecast. ── */}
+                <div className="space-y-3 mt-3">
+                  <UtilisationChart rows={usageRows} />
+                  <ServiceCadenceChart rows={usageRows} />
+                </div>
               </>
             )}
           </TabsContent>

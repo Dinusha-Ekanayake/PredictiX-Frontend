@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+# Written by scripts/run-tests.mjs and normally deleted again at the end of the
+# run; an interrupted run leaves it behind.
+vitest-results.json
 
 # next.js
 /.next/

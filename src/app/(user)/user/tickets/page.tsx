@@ -10,8 +10,8 @@
  *  - Search (title / description / ticket_number)
  *  - Status + priority filters
  *  - Mini-dashboard with open / in-progress / resolved / closed counts
- *  - "+ New Ticket" — opens UserNewTicketDialog (POST /user/tickets)
- *  - Click a card — opens UserTicketDetailsDialog (GET/PUT + comments)
+ *  - "+ New Ticket", opens UserNewTicketDialog (POST /user/tickets)
+ *  - Click a card, opens UserTicketDetailsDialog (GET/PUT + comments)
  */
 
 import * as React from "react";
@@ -143,7 +143,7 @@ export default function UserTicketsPage() {
   const [activeTicketId, setActiveTicketId] = React.useState<string | null>(null);
   const [users, setUsers] = React.useState<UserItem[]>([]);
 
-  // Read the current user id once on mount — needed by the detail dialog to
+  // Read the current user id once on mount, needed by the detail dialog to
   // decide if the "Edit" button shows up.
   const currentUserId = React.useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -196,7 +196,7 @@ export default function UserTicketsPage() {
     [selectedStatus, selectedPriority, appliedQuery, sortBy, sortDir]
   );
 
-  // Initial load — runs once.
+  // Initial load, runs once.
   React.useEffect(() => {
     loadTickets("initial");
     listUsers()

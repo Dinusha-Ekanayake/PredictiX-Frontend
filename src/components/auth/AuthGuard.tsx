@@ -3,7 +3,7 @@
 /**
  * Client-side route guard.
  * Since the JWT lives in localStorage (not cookies), Next.js middleware can't
- * see it — so protection is enforced here. Wrap protected layouts with this.
+ * see it, so protection is enforced here. Wrap protected layouts with this.
  *
  * - Not authenticated  → redirect to /login
  * - Wrong role         → redirect to the user's own home area

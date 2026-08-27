@@ -304,7 +304,7 @@ export default function EditUserDialog({
             />
           </FieldCard>
 
-          {/* Password reset — optional */}
+          {/* Password reset, optional */}
           <FieldCard
             icon={KeyRound}
             label="Reset Password (optional)"

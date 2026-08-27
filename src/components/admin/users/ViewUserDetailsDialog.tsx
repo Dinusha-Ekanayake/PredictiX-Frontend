@@ -250,7 +250,7 @@ export default function ViewUserDetailsDialog({
           </Button>
         </div>
 
-        {/* Delete — full width destructive */}
+        {/* Delete, full width destructive */}
         <Button
           variant="destructive"
           onClick={handleDelete}

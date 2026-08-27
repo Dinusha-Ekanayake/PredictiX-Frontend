@@ -1,7 +1,7 @@
 import * as React from "react";
 
 /**
- * Shared page title banner — the admin dashboard's hero design, reused across
+ * Shared page title banner, the admin dashboard's hero design, reused across
  * admin + user sections. Carries both light and dark (OLED) gradient variants.
  */
 type PageHeroProps = {
@@ -18,7 +18,7 @@ type PageHeroProps = {
 export default function PageHero({ crumbs, title, subtitle, live, right }: PageHeroProps) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-white/10 dark:bg-white/2">
-      {/* Gradient wash — light (violet/sky) + dark (OLED: faint violet sheen on black) */}
+      {/* Gradient wash, light (violet/sky) + dark (OLED: faint violet sheen on black) */}
       <div className="absolute inset-0 bg-linear-to-br from-violet-50/90 via-white/70 to-sky-50/80 dark:from-violet-500/8 dark:via-white/2 dark:to-transparent pointer-events-none" />
 
       <div className="relative px-7 py-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">

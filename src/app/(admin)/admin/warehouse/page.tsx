@@ -13,6 +13,7 @@ import { MonthlyTicketVolumeCard } from "@/components/admin/warehouse/WarehouseT
 import WarehouseDepartmentsOverview, {
   type DepartmentOverviewRow,
 } from "@/components/admin/warehouse/WarehouseDepartmentsOverview";
+import type { TicketsByDepartmentRow } from "@/components/admin/warehouse/WarehouseTicketsByDepartment";
 
 import { getMaintenanceSchedule } from "@/lib/warehouseService";
 import { getAccessToken } from "@/lib/authService";

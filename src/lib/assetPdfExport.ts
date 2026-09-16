@@ -1,5 +1,5 @@
 /**
- * PredictiX — Asset Performance Report
+ * PredictiX - Asset Performance Report
  * Professional PDF with logo, 4-side margins, no browser chrome, full cost SHAP
  */
 
@@ -19,21 +19,21 @@ export interface AssetReportData {
   estimated_cost?: number; cost_lower?: number; cost_upper?: number;
   /** LKR difference between this asset's estimate and fleet mean (real currency, not log-space) */
   cost_net_shap?: number;
-  /** Fleet mean cost from the cost model's extra_data.fleet_mean_lkr — no longer hardcoded */
+  /** Fleet mean cost from the cost model's extra_data.fleet_mean_lkr - no longer hardcoded */
   fleet_avg_cost?: number;
-  /** breakdown-cost label, e.g. "CatBoost v5.0" — shown instead of a hardcoded model name */
+  /** breakdown-cost label, e.g. "CatBoost v5.0" - shown instead of a hardcoded model name */
   cost_model_version?: string;
-  /** Bundle-level accuracy stats for whichever cost model is currently loaded —
+  /** Bundle-level accuracy stats for whichever cost model is currently loaded -
    *  real numbers from the model bundle, never hardcoded, so they never go
    *  stale when the model is retrained/replaced. */
   cost_test_r2?: number; cost_test_mae?: number; cost_test_medae?: number; cost_picp_80?: number;
   /** If the cost prediction endpoint failed, the real reason (HTTP status +
-   *  backend error detail) — shown in place of a generic empty-state message
+   *  backend error detail) - shown in place of a generic empty-state message
    *  so a failure is diagnosable directly from the report, without needing
    *  the browser Network tab or backend logs. */
   cost_error?: string;
   /** Cost model returns relative_impact (0-100%) + direction, NOT a raw LKR shap value.
-   *  Per the model docs: "Never display sv_log directly — it is in log-ratio space." */
+   *  Per the model docs: "Never display sv_log directly - it is in log-ratio space." */
   cost_drivers?: Array<{feature:string;value:string;relative_impact:number;direction:"increases"|"decreases"}>;
   currency?: string; top_explanations?: Record<string,number>;
   ai_narrative?: string;
@@ -63,6 +63,15 @@ export interface AssetReportData {
     recommendations?: {critical:string[];high:string[];medium:string[]};
     conclusion?: string;
   };
+  survival?: {
+    soonest_component: string;
+    soonest_median_days: number | null;
+    components: Array<{
+      component: string;
+      fail_prob_7d: number | null;
+      fail_prob_30d: number | null;
+    }>;
+  };
 }
 
 // ── Palette ───────────────────────────────────────────────────────────────────
@@ -75,8 +84,8 @@ const C = {
 };
 
 // This report's HTML is rendered two ways: server-side via Playwright with
-// JS disabled (safe from script execution either way), and — as a fallback
-// whenever that fails for any reason — client-side in a live iframe with
+// JS disabled (safe from script execution either way), and - as a fallback
+// whenever that fails for any reason - client-side in a live iframe with
 // full JavaScript enabled (downloadAssetPDF below). Every string on this
 // page ultimately traces back to some free-text field a user can set
 // (asset name/description/make/model, a maintenance note, a ticket
@@ -92,12 +101,12 @@ function esc(v:any):string{
     .replace(/"/g,"&quot;")
     .replace(/'/g,"&#39;");
 }
-function fmt(v:any,fb="—"):string{return(v==null||v===""||v==="—")?fb:esc(v);}
+function fmt(v:any,fb="-"):string{return(v==null||v===""||v==="-")?fb:esc(v);}
 function fmtCost(v:number,cur="LKR"):string{return`${esc(cur)} ${Number(v).toLocaleString()}`;}
-function fmtDate(v:any):string{return v?esc(String(v).slice(0,10)):"—";}
+function fmtDate(v:any):string{return v?esc(String(v).slice(0,10)):"-";}
 function cap(s:string):string{return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
 
-// ── PredictiX Logo — uses actual icon from public/logo/ ─────────────────────
+// ── PredictiX Logo - uses actual icon from public/logo/ ─────────────────────
 // The icon SVG is embedded inline as fallback; the img tag loads the real file
 function buildLogo(origin: string): string {
   return `<div style="display:flex;align-items:center;gap:10px">
@@ -133,6 +142,49 @@ function svgVBar(data:Array<{name:string;count:number}>,colors:string[],w=460,h=
   return`<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">${grid}${bars}</svg>`;
 }
 
+// ── SVG Grouped Vertical Bar (Component Failure Risk) ────────────────────────
+function svgGroupedVBar(data:Array<{name:string;val1:number;val2:number}>, w=460, h=165):string{
+  if(!data.length)return"";
+  const colors:Record<string,[string,string]> = {
+    "Tire": ["#fde68a", "#f59e0b"],
+    "Battery": ["#a7f3d0", "#10b981"],
+    "Hydraulic": ["#ddd6fe", "#8b5cf6"],
+    "Oil": ["#bae6fd", "#0ea5e9"],
+    "Brake": ["#fecaca", "#ef4444"],
+  };
+  const defaultCols = ["#e2e8f0", "#94a3b8"];
+  const mx = Math.max(20, ...data.flatMap(d=>[d.val1,d.val2]));
+  const yMax = Math.ceil(mx/20)*20;
+  const ch = h - 38;
+  const grid = [0, yMax/2, yMax].map(v=>{
+    const y = ch - (v/yMax)*ch + 6;
+    return `<text x="25" y="${y+3}" text-anchor="end" font-size="8" fill="${C.textLight}">${v}%</text><line x1="30" y1="${y}" x2="${w}" y2="${y}" stroke="${C.border}" stroke-width="1" stroke-dasharray="2,2"/>`;
+  }).join("");
+  const gap = (w - 30) / Math.max(1, data.length);
+  const bw = Math.min(22, (gap * 0.4));
+  const innerGap = 2;
+  const bars = data.map((d,i)=>{
+    const col = colors[d.name] || defaultCols;
+    const xBase = 30 + i*gap + gap/2 - bw - innerGap/2;
+    const h1 = Math.max(0, (d.val1/yMax)*ch); const y1 = ch - h1 + 6;
+    const h2 = Math.max(0, (d.val2/yMax)*ch); const y2 = ch - h2 + 6;
+    return `
+      <rect x="${xBase}" y="${y1}" width="${bw}" height="${h1}" fill="${col[0]}" rx="2"/>
+      <text x="${xBase+bw/2}" y="${y1-3}" text-anchor="middle" font-size="7.5" fill="${C.textMid}" font-weight="600">${d.val1.toFixed(1)}%</text>
+      <rect x="${xBase+bw+innerGap}" y="${y2}" width="${bw}" height="${h2}" fill="${col[1]}" rx="2"/>
+      <text x="${xBase+bw+innerGap+bw/2}" y="${y2-3}" text-anchor="middle" font-size="7.5" fill="${col[1]}" font-weight="700">${d.val2.toFixed(1)}%</text>
+      <text x="${30+i*gap+gap/2}" y="${h-16}" text-anchor="middle" font-size="9" fill="${C.textDark}" font-weight="600">${d.name}</text>
+    `;
+  }).join("");
+  const legend = `
+    <rect x="${w/2 - 44}" y="${h - 6}" width="8" height="8" fill="${C.border}" rx="1"/>
+    <text x="${w/2 - 32}" y="${h - 0.5}" font-size="8" fill="${C.textMid}">30-day risk</text>
+    <rect x="${w/2 + 20}" y="${h - 6}" width="8" height="8" fill="${C.slate}" rx="1"/>
+    <text x="${w/2 + 32}" y="${h - 0.5}" font-size="8" fill="${C.textMid}">7-day risk</text>
+  `;
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">${grid}${bars}${legend}</svg>`;
+}
+
 // ── SVG Horizontal Bar (SHAP failure) ────────────────────────────────────────
 function svgHBar(data:Array<{name:string;pct:number}>,colors:string[],w=440):string{
   if(!data.length)return"";
@@ -150,7 +202,7 @@ function svgHBar(data:Array<{name:string;pct:number}>,colors:string[],w=440):str
 // ── SVG Cost Driver Bars (relative importance %, per v4 API contract) ────────
 // v4's /predictions/cost/{id} returns extra_data.top_drivers with `relative_impact`
 // (0-100, share of total SHAP impact) and `direction` ("increases"|"decreases").
-// There is no per-feature LKR amount — sv_log is log1p-space and must never be shown.
+// There is no per-feature LKR amount - sv_log is log1p-space and must never be shown.
 function svgCostBars(drivers:Array<{feature:string;value:string;relative_impact:number;direction:string}>,w=440):string{
   if(!drivers.length)return"";
   const bH=20,gap=6,lW=190,totalH=drivers.length*(bH+gap);
@@ -252,11 +304,11 @@ function subH(title:string):string{
 // ── Page wrapper: header + content + footer (no browser chrome) ───────────────
 function page(content:string,warehouse:string,section:string,origin="",footerInfo?:{pageNum:number;total:number}):string{
   // footerInfo is only passed for the browser print-dialog fallback path
-  // (downloadAssetPDF) — that path never reaches the server, so Playwright's
+  // (downloadAssetPDF) - that path never reaches the server, so Playwright's
   // repeating footer template (reports.py) never runs for it, and without
   // this the fallback PDF would have no footer at all. The primary
   // server-rendered path (downloadAssetPDFServer / generateAssetReportHtml)
-  // omits footerInfo so only Playwright's footer shows there — never both.
+  // omits footerInfo so only Playwright's footer shows there - never both.
   const footerHtml = footerInfo ? `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 16px;background:${C.tealLight};border-top:1px solid ${C.tealBorder};flex-shrink:0">
         <span style="font-size:7.5px;color:${C.textLight}">PredictiX AI Platform &nbsp;·&nbsp; Asset Performance Report &nbsp;·&nbsp; Confidential &nbsp;·&nbsp; © Predictix 2026</span>
@@ -273,7 +325,7 @@ function page(content:string,warehouse:string,section:string,origin="",footerInf
         </div>
         <span style="font-size:8.5px;color:${C.textLight}">${section}</span>
       </div>
-      <!-- page body — see footerInfo above for why the footer is conditional -->
+      <!-- page body - see footerInfo above for why the footer is conditional -->
       <div style="padding:14px 18px;flex:1">${content}</div>${footerHtml}
     </div>
   </div>`;
@@ -292,7 +344,7 @@ function sensorBars(fields:Array<{name:string;value:number;color:string}>,w=440)
   return`<svg viewBox="0 0 ${w} ${totalH}" width="100%" height="${totalH}">${bars}</svg>`;
 }
 
-// ── CSS — proper margins, no browser chrome ───────────────────────────────────
+// ── CSS - proper margins, no browser chrome ───────────────────────────────────
 const CSS=`
   @page {
     size: A4 portrait;
@@ -307,7 +359,7 @@ const CSS=`
   .page {
     page-break-after: always;
     background: white;
-    /* No fixed height/overflow here anymore — a topic's content can now
+    /* No fixed height/overflow here anymore - a topic's content can now
        naturally overflow onto additional physical pages instead of being
        silently clipped once it grows past one sheet's worth of content
        (e.g. once real cost-model data fills out Health/Risk/Cost). */
@@ -330,14 +382,14 @@ const CSS=`
 function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):string{
   const {asset,fleet,sensor,maintenance,tickets,maintenanceMetrics,ticketMetrics,insights}=data;
   const cur=data.currency||"LKR";
-  const hs=data.health_score, fp=data.failure_probability, rl=data.risk_level??"—";
+  const hs=data.health_score, fp=data.failure_probability, rl=data.risk_level??"-";
   const hCol=hs!=null?(hs>=80?C.emerald:hs>=60?C.amber:C.rose):C.slate;
   const rColors:Record<string,string>={Low:C.emerald,Medium:C.amber,High:C.rose,Critical:"#dc2626"};
   const rCol=rColors[rl]??C.slate;
   const recs=insights.recommendations||{critical:[],high:[],medium:[]};
   const wLbl=data.warehouseName.toUpperCase().replace(/[^A-Z0-9 \-]/g,"");
   // Page numbering is now handled entirely by Playwright's footer template
-  // (see reports.py) using its own live pageNumber/totalPages — no longer
+  // (see reports.py) using its own live pageNumber/totalPages - no longer
   // tracked here, since a topic can now span a variable number of physical
   // pages depending on content length.
 
@@ -371,7 +423,7 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
       </div>
       <div style="font-size:10.5px;color:${C.textLight};margin-bottom:16px">
         Asset Code: <strong style="color:${C.textDark}">${esc(data.assetCode)}</strong>
-        &nbsp;·&nbsp; Make / Model: <strong style="color:${C.textDark}">${esc([asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"—")}</strong>
+        &nbsp;·&nbsp; Make / Model: <strong style="color:${C.textDark}">${esc([asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"-")}</strong>
       </div>
       <div style="display:inline-block;border:1px solid ${C.amber};color:${C.amber};font-size:8.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;padding:3px 14px;border-radius:3px">Confidential</div>
     </div>
@@ -395,25 +447,25 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
       <div>
         <div style="font-size:8px;color:${C.textLight};text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Overall Health Score</div>
         <div style="font-size:20px;font-weight:800;color:${hCol}">${hs}%</div>
-        <div style="font-size:9.5px;color:${C.textMid};margin-top:2px">${hs>=80?"Optimal — maintain schedule":hs>=60?"Moderate — service soon":"Critical — immediate action"}</div>
+        <div style="font-size:9.5px;color:${C.textMid};margin-top:2px">${hs>=80?"Optimal - maintain schedule":hs>=60?"Moderate - service soon":"Critical - immediate action"}</div>
         ${fp!=null?`<div style="font-size:9px;color:${C.textLight};margin-top:4px">Failure Probability: <strong style="color:${C.rose}">${fp}%</strong></div>`:""}
-        ${rl!=="—"?`<div style="font-size:9px;color:${C.textLight};margin-top:2px">Risk Level: ${riskBadge(rl)}</div>`:""}
+        ${rl!=="-"?`<div style="font-size:9px;color:${C.textLight};margin-top:2px">Risk Level: ${riskBadge(rl)}</div>`:""}
       </div>
     </div>`
-    :`<p style="font-size:10px;color:${C.textLight};padding:10px 0">No prediction data — run AI prediction to generate health scores.</p>`;
+    :`<p style="font-size:10px;color:${C.textLight};padding:10px 0">No prediction data - run AI prediction to generate health scores.</p>`;
 
   const assetRows:[string,string][]=[
     ["Asset Code",          fmt(data.assetCode)],
-    ["Asset Type",         esc([asset.asset_type,asset.vehicle_type].filter(Boolean).join(" · ")||"—")],
-    ["Make / Model",       esc([asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"—")],
+    ["Asset Type",         esc([asset.asset_type,asset.vehicle_type].filter(Boolean).join(" · ")||"-")],
+    ["Make / Model",       esc([asset.make,asset.model,asset.manufacture_year].filter(Boolean).join(" ")||"-")],
     ["Status",              cap(fmt(asset.status))],
     ["Health Band",         cap(fmt(asset.health_band))],
     ["Criticality Score",   fmt(asset.criticality_score)],
     ["Fuel Type",           fmt(asset.fuel_type)],
-    ["Current Mileage",     asset.current_mileage?`${esc(asset.current_mileage)} km`:"—"],
+    ["Current Mileage",     asset.current_mileage?`${esc(asset.current_mileage)} km`:"-"],
     ["Vehicle Role",        fmt(asset.vehicle_role)],
-    ["Vehicle Age",         asset.vehicle_age_years?`${esc(asset.vehicle_age_years)} yrs`:"—"],
-    ["Payload Capacity",    asset.payload_capacity_kg?`${esc(asset.payload_capacity_kg)} kg`:"—"],
+    ["Vehicle Age",         asset.vehicle_age_years?`${esc(asset.vehicle_age_years)} yrs`:"-"],
+    ["Payload Capacity",    asset.payload_capacity_kg?`${esc(asset.payload_capacity_kg)} kg`:"-"],
     ["Purchase Date",       fmtDate(asset.purchase_date)],
     ["Warranty Expiry",     fmtDate(asset.warranty_expiry_date)],
     ["Last Service",        fmtDate(asset.last_service_date)],
@@ -433,9 +485,9 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
         <table style="width:100%;border-collapse:collapse">
           ${([
             ["Est. Cost (v5)",           data.estimated_cost?fmtCost(data.estimated_cost,cur):"Run AI prediction"],
-            ["80% Confidence Lower",     data.cost_lower?fmtCost(data.cost_lower,cur):"—"],
-            ["80% Confidence Upper",     data.cost_upper?fmtCost(data.cost_upper,cur):"—"],
-            ["Days Until Maintenance",   data.days_until_maintenance!=null?`${data.days_until_maintenance} days`:"—"],
+            ["80% Confidence Lower",     data.cost_lower?fmtCost(data.cost_lower,cur):"-"],
+            ["80% Confidence Upper",     data.cost_upper?fmtCost(data.cost_upper,cur):"-"],
+            ["Days Until Maintenance",   data.days_until_maintenance!=null?`${data.days_until_maintenance} days`:"-"],
             ["Predicted Maint. Date",    fmtDate(data.predicted_maintenance_date)],
           ] as [string,string][]).map(([l,v],i)=>`<tr style="background:${i%2===0?C.bg:"white"}">
             <td style="padding:4px 10px;font-size:9.5px;color:${C.textLight};border-bottom:1px solid ${C.border};width:48%">${l}</td>
@@ -443,22 +495,22 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
           </tr>`).join("")}
         </table>
       </div>
-    `,"Figure 1.1 — Health score and cost prediction summary")}
+    `,"Figure 1.1 - Health score and cost prediction summary")}
 
     ${subH("1.2 Asset Details")}
     ${infoTbl(assetRows)}
-  `,wLbl,"Asset Overview",origin,includeDomFooter?{pageNum:1,total:4}:undefined);
+  `,wLbl,"Asset Overview",origin,includeDomFooter?{pageNum:1,total:5}:undefined);
 
   // ── PAGE 2: HEALTH, RISK & COST ESTIMATION ───────────────────────────────────────
-  // Build SHAP data — normalise to 0-100% regardless of input format
+  // Build SHAP data - normalise to 0-100% regardless of input format
   const shapData=(()=>{
     const raw=data.top_explanations;
     if(!raw||typeof raw!=="object") return [];
     const entries=Object.entries(raw);
     if(!entries.length) return [];
-    // Check if keys are numeric indices (bad format) — skip if so
+    // Check if keys are numeric indices (bad format) - skip if so
     const allNumeric=entries.every(([k])=>!isNaN(Number(k)));
-    if(allNumeric) return []; // no named features — show "no data"
+    if(allNumeric) return []; // no named features - show "no data"
     // Values may be 0-1 or already 0-100; normalise to sum=100 so each
     // factor's pct is its share of total impact (dividing by the max
     // instead of the sum would inflate every factor toward the top one
@@ -489,11 +541,11 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
   const p4=page(`
     ${secH("2","Health, Risk Analysis & Cost Estimation",`Key factors · ${esc(data.cost_model_version||"AI Cost Model")}`)}
 
-    ${subH("2.1 Failure Prediction — Key Risk Factors")}
+    ${subH("2.1 Failure Prediction - Key Risk Factors")}
     ${shapData.length
-      ?`${chartBox("KEY FACTORS DRIVING FAILURE RISK",svgHBar(shapData,shapCols,430),"Figure 2.1 — Relative importance of each factor, normalised to 100%")}
+      ?`${chartBox("KEY FACTORS DRIVING FAILURE RISK",svgHBar(shapData,shapCols,430),"Figure 2.1 - Relative importance of each factor, normalised to 100%")}
         ${dataTbl(["Factor","Relative Importance"],shapData.map(d=>[d.name,`${d.pct}%`]),
-          "Figure 2.2 — Factors ranked by influence on failure risk")}`
+          "Figure 2.2 - Factors ranked by influence on failure risk")}`
       :hlBox("RISK FACTOR DATA NOT AVAILABLE","Run the AI prediction engine to generate risk factor scores.",C.amber)}
 
     ${subH("2.2 Explanation of Your Estimated Cost")}
@@ -512,9 +564,9 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
            Model: ${esc(data.cost_model_version||"AI Cost Model")} · Target: cost in the next 30 days given current health${statSuffix}`,
           C.amber);
       })()}
-      ${chartBox("COST DRIVERS — RELATIVE IMPORTANCE",
+      ${chartBox("COST DRIVERS - RELATIVE IMPORTANCE",
         svgCostBars(costDrivers,430),
-        `Figure 2.3 — ${esc(data.cost_model_version||"AI Cost Model")} relative importance of each cost factor · red = increases estimate · green = decreases estimate`)}
+        `Figure 2.3 - ${esc(data.cost_model_version||"AI Cost Model")} relative importance of each cost factor · red = increases estimate · green = decreases estimate`)}
       ${dataTbl(
         ["Feature","Current Value","Relative Impact","Effect"],
         costDrivers.map(d=>{
@@ -527,23 +579,23 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
             `<span style="color:${col}">${isUp?"▲ Increases cost":"▼ Decreases cost"}</span>`,
           ];
         }),
-        `Figure 2.4 — Top cost factors ranked by relative importance (${esc(data.cost_model_version||"AI Cost Model")})`
+        `Figure 2.4 - Top cost factors ranked by relative importance (${esc(data.cost_model_version||"AI Cost Model")})`
       )}
       <div class="no-break" style="border:1px solid ${C.border};border-radius:5px;overflow:hidden;margin-bottom:12px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr">
           ${[
-            ["Point Estimate",   data.estimated_cost?fmtCost(data.estimated_cost,cur):"—",  C.teal],
-            ["80% CI Lower",    data.cost_lower?fmtCost(data.cost_lower,cur):"—",          C.emerald],
-            ["80% CI Upper",    data.cost_upper?fmtCost(data.cost_upper,cur):"—",          C.rose],
+            ["Point Estimate",   data.estimated_cost?fmtCost(data.estimated_cost,cur):"-",  C.teal],
+            ["80% CI Lower",    data.cost_lower?fmtCost(data.cost_lower,cur):"-",          C.emerald],
+            ["80% CI Upper",    data.cost_upper?fmtCost(data.cost_upper,cur):"-",          C.rose],
           ].map(([l,v,c],i)=>`<div style="padding:10px 13px;${i<2?`border-right:1px solid ${C.border};`:""}background:white">
             <div style="font-size:7.5px;color:${C.textLight};text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px">${l}</div>
             <div style="font-size:15px;font-weight:800;color:${c}">${v}</div>
           </div>`).join("")}
         </div>
         <div style="padding:8px 13px;background:${C.bg};border-top:1px solid ${C.border};font-size:9px;color:${C.textLight}">
-          Fleet average cost: <strong>${data.fleet_avg_cost?fmtCost(data.fleet_avg_cost,cur):"—"}</strong> &nbsp;·&nbsp;
+          Fleet average cost: <strong>${data.fleet_avg_cost?fmtCost(data.fleet_avg_cost,cur):"-"}</strong> &nbsp;·&nbsp;
           This asset vs average: <strong style="color:${data.cost_net_shap!=null?(data.cost_net_shap>0?C.rose:C.emerald):C.slate}">
-            ${data.cost_net_shap!=null?(data.cost_net_shap>0?"+":"")+fmtCost(data.cost_net_shap,cur)+" vs fleet average":"—"}
+            ${data.cost_net_shap!=null?(data.cost_net_shap>0?"+":"")+fmtCost(data.cost_net_shap,cur)+" vs fleet average":"-"}
           </strong>
         </div>
       </div>
@@ -565,23 +617,23 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
     ${recBlock("Medium",recs.medium,C.sky)}
     ${!recs.critical.length&&!recs.high.length&&!recs.medium.length
       ?hlBox("RECOMMENDATIONS","No specific recommendations. Run AI prediction for asset-specific guidance.",C.slate):""}
-  `,wLbl,"Health, Risk & Cost Estimation",origin,includeDomFooter?{pageNum:2,total:4}:undefined);
+  `,wLbl,"Health, Risk & Cost Estimation",origin,includeDomFooter?{pageNum:2,total:5}:undefined);
 
   // ── PAGE 3: SENSOR + MAINTENANCE ──────────────────────────────────
   const sRows:[string,string][]=sensor?[
     ["Recorded At",               fmt(sensor.recorded_at)],
-    ["Tire Health",               sensor.tire_health_pct!=null?`${sensor.tire_health_pct}%`:"—"],
-    ["Brake Health",              sensor.brake_health_pct!=null?`${sensor.brake_health_pct}%`:"—"],
-    ["Battery Health",            sensor.battery_health_pct!=null?`${sensor.battery_health_pct}%`:"—"],
-    ["Oil Life",                  sensor.oil_life_pct!=null?`${sensor.oil_life_pct}%`:"—"],
-    ["Hydraulic Health",          sensor.hydraulic_health_pct!=null?`${sensor.hydraulic_health_pct}%`:"—"],
+    ["Tire Health",               sensor.tire_health_pct!=null?`${sensor.tire_health_pct}%`:"-"],
+    ["Brake Health",              sensor.brake_health_pct!=null?`${sensor.brake_health_pct}%`:"-"],
+    ["Battery Health",            sensor.battery_health_pct!=null?`${sensor.battery_health_pct}%`:"-"],
+    ["Oil Life",                  sensor.oil_life_pct!=null?`${sensor.oil_life_pct}%`:"-"],
+    ["Hydraulic Health",          sensor.hydraulic_health_pct!=null?`${sensor.hydraulic_health_pct}%`:"-"],
     ["Coolant Temp Max (°C)",     fmt(sensor.coolant_temp_max_c)],
     ["Engine Temp Avg (°C)",      fmt(sensor.engine_temp_avg_c)],
     ["Active Fault Codes",        fmt(sensor.active_fault_code_count)],
     ["Days Since Service",        fmt(sensor.days_since_last_service)],
     ["Engine Hours Since Service",fmt(sensor.engine_hours_since_last_service)],
     ["Downtime Last 90d (h)",     fmt(sensor.downtime_hours_last_90d)],
-    ["Fuel Level",                sensor.fuel_level!=null?`${sensor.fuel_level}%`:"—"],
+    ["Fuel Level",                sensor.fuel_level!=null?`${sensor.fuel_level}%`:"-"],
     ["Odometer (km)",             fmt(sensor.odometer_km)],
   ]:[];
 
@@ -595,23 +647,13 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
 
   const maintRows=maintenance.slice(0,8).map(m=>[
     fmtDate(m.performed_at),cap(fmt(m.event_type)),
-    fmt(String(m.description??"—").slice(0,50)),
-    m.cost_amount?fmtCost(m.cost_amount,cur):"—",
-    m.downtime_hours?`${m.downtime_hours}h`:"—",
+    fmt(String(m.description??"-").slice(0,50)),
+    m.cost_amount?fmtCost(m.cost_amount,cur):"-",
+    m.downtime_hours?`${m.downtime_hours}h`:"-",
   ]);
-
-  const ticketRows=tickets.slice(0,8).map(t=>{
-    const pri=(t.priority||"").toLowerCase();
-    const pc=pri==="high"?C.rose:pri==="medium"?C.amber:C.emerald;
-    return[fmt(t.ticket_number),fmt(String(t.title??"—").slice(0,55)),
-      `<span style="color:${pc};font-weight:700">${cap(fmt(t.priority))}</span>`,
-      cap(fmt(t.status)),fmtDate(t.created_at)];
-  });
 
   const maintDonut=maintenanceMetrics.total_events>0
     ?svgDonut([{name:"Preventive",count:maintenanceMetrics.preventive_count},{name:"Corrective",count:maintenanceMetrics.corrective_count}],[C.emerald,C.rose],90):"";
-  const ticketDonut=ticketMetrics.total_tickets>0
-    ?svgDonut([{name:"Open",count:ticketMetrics.open_tickets},{name:"High Pri.",count:ticketMetrics.high_priority_tickets},{name:"Closed",count:ticketMetrics.closed_tickets}],[C.rose,C.amber,C.emerald],90):"";
 
   const p5=page(`
     ${secH("3","Sensor Data & Maintenance","Latest readings and maintenance history")}
@@ -620,7 +662,7 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
     ${sRows.length?infoTbl(sRows)
       :hlBox("SENSOR STATUS","No sensor readings available. Connect asset to the PredictiX monitoring system.",C.slate)}
 
-    ${sensorHealthFields.length?`${subH("3.2 Component Health Levels")}${chartBox("COMPONENT HEALTH",sensorBars(sensorHealthFields,430),"Figure 3.1 — Component health as percentage")}` :""}
+    ${sensorHealthFields.length?`${subH("3.2 Component Health Levels")}${chartBox("COMPONENT HEALTH",sensorBars(sensorHealthFields,430),"Figure 3.1 - Component health as percentage")}` :""}
 
     ${subH("3.3 Maintenance Summary")}
     ${infoTbl([
@@ -629,16 +671,27 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
       ["Corrective Events",  String(maintenanceMetrics.corrective_count)],
       ["Total Cost",         fmtCost(maintenanceMetrics.total_cost,cur)],
       ["Total Downtime",     `${maintenanceMetrics.total_downtime_hours} hours`],
-      ["Avg Cost / Event",   maintenanceMetrics.total_events?fmtCost(Math.round(maintenanceMetrics.total_cost/maintenanceMetrics.total_events),cur):"—"],
+      ["Avg Cost / Event",   maintenanceMetrics.total_events?fmtCost(Math.round(maintenanceMetrics.total_cost/maintenanceMetrics.total_events),cur):"-"],
     ])}
-    ${maintDonut?chartBox("MAINTENANCE TYPE BREAKDOWN",maintDonut,"Figure 3.2 — Preventive vs corrective events"):""}
-    ${maintenance.length?`${subH("3.4 Recent Maintenance Events")}${dataTbl(["Date","Type","Description",`Cost (${cur})`,"Downtime"],maintRows,"Figure 3.3 — Most recent maintenance events")}`
+    ${maintDonut?chartBox("MAINTENANCE TYPE BREAKDOWN",maintDonut,"Figure 3.2 - Preventive vs corrective events"):""}
+    ${maintenance.length?`${subH("3.4 Recent Maintenance Events")}${dataTbl(["Date","Type","Description",`Cost (${cur})`,"Downtime"],maintRows,"Figure 3.3 - Most recent maintenance events")}`
       :hlBox("MAINTENANCE HISTORY","No maintenance events recorded.",C.slate)}
-  `,wLbl,"Sensor & Maintenance",origin,includeDomFooter?{pageNum:3,total:4}:undefined);
+  `,wLbl,"Sensor & Maintenance",origin,includeDomFooter?{pageNum:3,total:5}:undefined);
 
-  // ── PAGE 4: TICKETS + INSIGHTS ────────────────────────────────────────────
+  // ── PAGE 4: TICKETS ───────────────────────────────────────────────────────
+  const ticketRows=tickets.slice(0,8).map(t=>{
+    const pri=(t.priority||"").toLowerCase();
+    const pc=pri==="high"?C.rose:pri==="medium"?C.amber:C.emerald;
+    return[fmt(t.ticket_number),fmt(String(t.title??"-").slice(0,55)),
+      `<span style="color:${pc};font-weight:700">${cap(fmt(t.priority))}</span>`,
+      cap(fmt(t.status)),fmtDate(t.created_at)];
+  });
+
+  const ticketDonut=ticketMetrics.total_tickets>0
+    ?svgDonut([{name:"Open",count:ticketMetrics.open_tickets},{name:"High Pri.",count:ticketMetrics.high_priority_tickets},{name:"Closed",count:ticketMetrics.closed_tickets}],[C.rose,C.amber,C.emerald],90):"";
+
   const p6=page(`
-    ${secH("4","Ticket Management & Insights","Support tickets · Conclusion")}
+    ${secH("4","Ticket Management & Insights","Support tickets and survival analysis")}
 
     ${subH("4.1 Ticket Summary")}
     ${infoTbl([
@@ -647,22 +700,36 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
       ["High Priority",  String(ticketMetrics.high_priority_tickets)],
       ["Closed Tickets", String(ticketMetrics.closed_tickets)],
     ])}
-    ${ticketDonut?chartBox("TICKET DISTRIBUTION",ticketDonut,"Figure 4.1 — Ticket status distribution"):""}
-    ${tickets.length?`${subH("4.2 Recent Tickets")}${dataTbl(["Ticket ID","Title","Priority","Status","Created"],ticketRows,"Figure 4.2 — Most recent support tickets")}`
+    ${ticketDonut?chartBox("TICKET DISTRIBUTION",ticketDonut,"Figure 4.1 - Ticket status distribution"):""}
+    ${tickets.length?`${subH("4.2 Recent Tickets")}${dataTbl(["Ticket ID","Title","Priority","Status","Created"],ticketRows,"Figure 4.2 - Most recent support tickets")}`
       :hlBox("TICKET HISTORY","No tickets raised for this asset.",C.slate)}
 
-    ${insights.conclusion?`${subH("4.3 Conclusion")}${hlBox("EXECUTIVE CONCLUSION",esc(insights.conclusion),C.teal)}`:""}
-  `,wLbl,"Tickets & Insights",origin,includeDomFooter?{pageNum:4,total:4}:undefined);
+    ${data.survival?`${subH("4.3 FRSO Component Survival Analysis")}
+      ${hlBox("CRITICAL RISK", `The ${esc(cap(data.survival.soonest_component))} system has the lowest predicted survival (${data.survival.soonest_median_days} days median RUL).`, C.rose)}
+      ${chartBox("7-DAY & 30-DAY COMPONENT FAILURE RISK", 
+        svgGroupedVBar(data.survival.components.map(c => ({
+          name: esc(cap(c.component)),
+          val1: c.fail_prob_30d != null ? Math.round(c.fail_prob_30d * 1000) / 10 : 0,
+          val2: c.fail_prob_7d != null ? Math.round(c.fail_prob_7d * 1000) / 10 : 0
+        }))), 
+        "Figure 4.3 - Weibull AFT Component Failure Probability")}
+    `:""}
+  `,wLbl,"Tickets & Insights",origin,includeDomFooter?{pageNum:4,total:5}:undefined);
+
+  // ── PAGE 5: CONCLUSION ────────────────────────────────────────────────────
+  const p7=page(`
+    ${insights.conclusion?`${subH("4.4 Conclusion")}${hlBox("EXECUTIVE CONCLUSION",esc(insights.conclusion),C.teal)}`:""}
+  `,wLbl,"Tickets & Insights",origin,includeDomFooter?{pageNum:5,total:5}:undefined);
 
   return`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Asset Report — ${esc(data.assetName)}</title>
+  <title>Asset Report - ${esc(data.assetName)}</title>
   <style>${CSS}</style>
 </head>
-<body>${cover}${p3}${p4}${p5}${p6}</body>
+<body>${cover}${p3}${p4}${p5}${p6}${p7}</body>
 </html>`;
 }
 
@@ -677,7 +744,7 @@ export function generateAssetReportHtml(data:AssetReportData, origin=""):string{
 
 /**
  * Renders the report to a real PDF via the backend (/reports/render-pdf,
- * headless Chromium) and downloads it directly — no browser print dialog,
+ * headless Chromium) and downloads it directly - no browser print dialog,
  * so no browser-injected URL/date header or footer ever appears; only this
  * module's own "Page X of Y" footer shows.
  *
@@ -712,7 +779,7 @@ export async function downloadAssetPDFServer(
 /** Fallback path: opens the browser's native print dialog (shows the
  *  browser's own header/footer unless the person manually disables it there).
  *  Kept as a degraded-mode fallback if the server-side renderer is
- *  unavailable — see downloadAssetPDFServer for the primary path. */
+ *  unavailable - see downloadAssetPDFServer for the primary path. */
 export function downloadAssetPDF(data:AssetReportData,filename="asset-report.pdf"):void{
   try{
     const origin = typeof window !== "undefined" ? window.location.origin : "";

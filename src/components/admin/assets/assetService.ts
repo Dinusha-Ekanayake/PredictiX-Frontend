@@ -18,6 +18,7 @@ import type {
   Ticket,
   AssetAssignment,
   AssetSurvivalResponse,
+  AssetUsageHistory,
 } from "./types";
 
 /** Fields accepted when creating or editing an asset. */
@@ -181,6 +182,23 @@ export async function getComponentRul(assetId: string): Promise<AssetSurvivalRes
 }
 
 /**
+ * Fetch the asset's recorded monthly operating history.
+ *
+ * Returns null on failure, same as {@link getBatchPrediction}, so a missing
+ * history hides the charts rather than failing the whole panel.
+ */
+export async function getUsageHistory(assetId: string): Promise<AssetUsageHistory | null> {
+  try {
+    return await apiGet<AssetUsageHistory>(`/assets/${assetId}/usage-history?months=24`);
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 404) {
+      console.error(`Failed to load usage history for asset ${assetId}:`, e);
+    }
+    return null;
+  }
+}
+
+/**
  * Re-run the prediction pipeline for one asset and return the fresh result.
  *
  * Runs the same models as the nightly job and saves the result, so later reads
@@ -205,17 +223,18 @@ export async function runVehiclePrediction(assetId: string): Promise<BatchPredic
  * there is nothing to show without it.
  */
 export async function getAssetDetail(assetId: string): Promise<AssetDetail> {
-  const [asset, prediction, componentRul, maintenanceEvents, tickets, assignments] =
+  const [asset, prediction, componentRul, usageHistory, maintenanceEvents, tickets, assignments] =
     await Promise.all([
       getAsset(assetId),
       getBatchPrediction(assetId),
       getComponentRul(assetId),
+      getUsageHistory(assetId),
       getMaintenanceEvents(assetId).catch(() => [] as MaintenanceEvent[]),
       getAssetTickets(assetId).catch(() => [] as Ticket[]),
       getAssetAssignments(assetId).catch(() => [] as AssetAssignment[]),
     ]);
 
-  return { asset, prediction, componentRul, maintenanceEvents, tickets, assignments };
+  return { asset, prediction, componentRul, usageHistory, maintenanceEvents, tickets, assignments };
 }
 
 /** Create an asset. Caller should invalidate the list cache afterwards. */

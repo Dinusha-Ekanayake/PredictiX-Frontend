@@ -28,7 +28,7 @@ import {
  *
  * The bell list clamps both title and message to two lines, so anything longer
  * was unreadable without this. Here the message is rendered whole, wrapped, and
- * with its original line breaks preserved — only the message body scrolls, so
+ * with its original line breaks preserved, only the message body scrolls, so
  * the header and actions stay put however long the text is.
  */
 export default function NotificationDetailDialog({

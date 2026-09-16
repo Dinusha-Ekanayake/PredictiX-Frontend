@@ -231,7 +231,7 @@ export default function WarehouseAIReportPanel({
   const assetTypeData    = toChartData(ctx.asset_type_breakdown);
   const assetStatusData  = toChartData(ctx.asset_status_breakdown);
   const ticketPriData    = toChartData(ctx.ticket_priority_breakdown);
-  const ticketCatData    = toChartData(ctx.ticket_category_breakdown).slice(0, 6);
+  const ticketCatData    = toChartData(ctx.ticket_category_breakdown).filter(d => d.name !== 'Uncategorized').slice(0, 6);
   const maintenTypeData  = toChartData(ctx.maintenance_type_breakdown);
   const ticketTrend      = ctx.ticket_trend_last_3m ?? [];
   const maintenTrend     = ctx.monthly_maintenance_trend ?? [];
@@ -815,7 +815,7 @@ export default function WarehouseAIReportPanel({
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b border-slate-100 dark:border-slate-800">
-                            {["Asset", "Component", "Median RUL (days)", "Risk"].map((h) => (
+                            {["Asset", "Component", "Next Maintenance Day", "Risk"].map((h) => (
                               <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">{h}</th>
                             ))}
                           </tr>

@@ -35,9 +35,9 @@ const healthDistribution = [
 ];
 
 const PIE_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--muted-foreground))",
-  "hsl(var(--destructive))",
+  "var(--primary)",
+  "var(--muted-foreground)",
+  "var(--destructive)",
 ];
 
 export default function OperationalCharts() {
@@ -69,7 +69,7 @@ export default function OperationalCharts() {
                     <Line
                       type="monotone"
                       dataKey="minutes"
-                      stroke="hsl(var(--primary))"
+                      stroke="var(--primary)"
                       strokeWidth={2}
                       dot={false}
                     />

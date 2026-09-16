@@ -59,7 +59,7 @@ export default function UserDashboardPage() {
           fetchMyStats().catch(() => ({ assignedAssets: 0, activeAssets: 0 })),
           // One more than the card renders: the extra row only decides whether
           // to show the "view all" link. Unbounded this fetched the entire
-          // department — 519 people / 150 KB to render 8 — and was the slowest
+          // department, 519 people / 150 KB to render 8, and was the slowest
           // of these four parallel calls.
           getTeamMembers(TEAM_PREVIEW_COUNT + 1).catch(() => [] as TeamMemberData[]),
         ]);
@@ -234,7 +234,7 @@ export default function UserDashboardPage() {
               ))
             )}
             {/* The extra row fetched beyond the preview is the signal that
-                more exist — it is not rendered, only counted. */}
+                more exist, it is not rendered, only counted. */}
             {team.length > TEAM_PREVIEW_COUNT && (
               <Link href="/user/users">
                 <Button variant="ghost" size="sm" className="w-full gap-1 text-xs text-muted-foreground">

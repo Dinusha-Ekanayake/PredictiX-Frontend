@@ -7,13 +7,13 @@ import { useTheme } from "next-themes";
  * Master switch for the ambient dot field.
  *
  * Turned off so the authenticated pages sit on the plain `--background`
- * surface. Nothing below has been removed — flip this back to `true` to
+ * surface. Nothing below has been removed, flip this back to `true` to
  * restore the particle field exactly as it was.
  */
 const ENABLED = false;
 
 /**
- * App-wide ambient background — two layers of tiny dots.
+ * App-wide ambient background, two layers of tiny dots.
  * The bottom layer moves slowly with the mouse direction,
  * and the upper layer moves faster, creating a parallax effect.
  */
@@ -168,7 +168,7 @@ export default function AmbientBackground() {
     };
   }, [mounted, resolvedTheme]);
 
-  // Placed after every hook so the hook order stays constant — an early return
+  // Placed after every hook so the hook order stays constant, an early return
   // above them would break the rules of hooks. With no canvas rendered, the
   // effect above bails at its `if (!canvas) return` guard before attaching any
   // listener or starting the animation frame loop, so nothing keeps running.

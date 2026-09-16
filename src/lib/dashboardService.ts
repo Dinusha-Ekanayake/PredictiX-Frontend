@@ -13,7 +13,7 @@ export interface DashboardKpis {
   criticalAlerts: number;
   openTickets: number;
   highPriorityTickets: number;
-  fleetHealth: number; // 0–100
+  fleetHealth: number; // 0-100
   predictedFailures: number;
   estMaintenanceCost: number; // raw amount (LKR)
   /**
@@ -22,7 +22,7 @@ export interface DashboardKpis {
    * older backend that omits it is treated as fully covered.
    */
   estMaintenanceCostAssetCount?: number;
-  // False for a brand-new warehouse with zero PdM predictions run yet —
+  // False for a brand-new warehouse with zero PdM predictions run yet, which
   // distinguishes "no data" from a genuine (alarming) 0% fleet health.
   hasPredictionData: boolean;
 }
@@ -30,9 +30,9 @@ export interface DashboardKpis {
 // Chart-data rows carry an index signature so recharts accepts them directly.
 export interface HealthTrendPoint {
   month: string; // e.g. "Jan"
-  // null when no predictions were recorded that month (real gap, not 0%) —
+  // null when no predictions were recorded that month (real gap, not 0%), so
   // recharts breaks the line there instead of drawing a false zero.
-  avgHealth: number | null; // 0–100
+  avgHealth: number | null; // 0-100
   [key: string]: string | number | null;
 }
 
@@ -45,7 +45,7 @@ export interface TicketTrendPoint {
 }
 
 export interface HealthDistBucket {
-  name: string; // e.g. "Excellent" | "90–100%"
+  name: string; // e.g. "Excellent" | "90-100%"
   count: number;
   [key: string]: string | number;
 }
@@ -71,12 +71,12 @@ export interface DowntimePoint {
 }
 
 export interface RiskAsset {
-  id: string; // real asset UUID — use for navigation, not display
+  id: string; // real asset UUID. Use for navigation, not display
   code: string | null; // human-readable asset code (e.g. "SLW1288")
   name: string;
   location: string;
-  healthScore: number; // 0–100
-  failureProbability: number; // 0–1
+  healthScore: number; // 0-100
+  failureProbability: number; // 0-1
   daysToMaintenance: number | null;
 }
 
@@ -96,16 +96,16 @@ export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
 
 export interface DashboardTicket {
   id: string; // human-readable ticket_number (display label, not a real id)
-  ticketId: string; // real ticket UUID — use this to navigate/fetch
+  ticketId: string; // real ticket UUID. Use this to navigate/fetch
   title: string;
   asset: string;
   priority: TicketPriority;
   status: TicketStatus;
-  assignedTo: string; // display name or "—"
+  assignedTo: string; // display name, or a dash when unassigned
 }
 
 export interface DashboardFooterStats {
-  avgHealthScore: number; // 0–100
+  avgHealthScore: number; // 0-100
   ticketsResolved: number;
   avgResolutionDays: number;
 }
@@ -132,7 +132,7 @@ export interface AdminDashboardData {
   footerStats: DashboardFooterStats;
   aiSummary: string | null;
   // False when aiSummary is the deterministic KPI-derived fallback string
-  // rather than real LLM output — lets the UI avoid claiming
+  // rather than real LLM output, which lets the UI avoid claiming
   // "AI-Generated / High confidence" for plain templated text.
   aiSummaryIsGenerated: boolean;
   aiInsights: DashboardInsight[];

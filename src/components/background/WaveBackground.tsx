@@ -3,7 +3,7 @@
 import * as React from "react";
 
 type Props = {
-  /** Lower = subtler. Recommended 0.35–0.7 */
+  /** Lower = subtler. Recommended 0.35, 0.7 */
   intensity?: number;
   /** Overall opacity of waves */
   opacity?: number;

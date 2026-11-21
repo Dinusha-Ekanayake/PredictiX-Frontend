@@ -44,7 +44,8 @@ yarn-error.log*
 next-env.d.ts
 
 
-/package-lock.json
-/package.json
 /node_modules/
 CLAUDE.md
+.claude/
+# Graphify knowledge graph (local, rebuilt with `graphify update .`)
+graphify-out/

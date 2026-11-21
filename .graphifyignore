@@ -1,0 +1,13 @@
+# Keep the code graph lean: dependencies, build output and generated files only add noise.
+node_modules/
+.next/
+out/
+build/
+coverage/
+public/
+graphify-out/
+package-lock.json
+*.tsbuildinfo
+vitest-results.json
+docs/qa-reports/
+.env*

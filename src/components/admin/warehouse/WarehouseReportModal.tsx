@@ -15,6 +15,7 @@ import {
   LineChart, Line, Legend,
 } from "recharts";
 import { downloadProfessionalPDF } from "@/lib/professionalPdfExport";
+import { apiFetch } from "@/lib/apiClient";
 import WarehouseSurvivalAnalysis from "./WarehouseSurvivalAnalysis";
 import type { SurvivalSummary } from "@/lib/warehouseService";
 
@@ -431,10 +432,6 @@ function ReportStep({
     const targets = criticalAssets.filter((a) => selectedCodes.has(a.code));
     if (targets.length === 0) return;
     setSummarizing(true);
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    const token = typeof window !== "undefined"
-      ? (localStorage.getItem("token") || localStorage.getItem("predictix.access_token"))
-      : null;
     const results: Record<string, string> = {};
     await Promise.allSettled(
       targets.map(async (asset) => {
@@ -451,12 +448,8 @@ function ReportStep({
               : "",
             asset.primary_driver ? `Primary driver: ${asset.primary_driver}` : "",
           ].filter(Boolean).join(" | ");
-          const res = await fetch(`${API_BASE}/asset-summaries/generate`, {
+          const res = await apiFetch("/asset-summaries/generate", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
             body: JSON.stringify({ input_text: input }),
           });
           if (res.ok) {
@@ -496,10 +489,6 @@ function ReportStep({
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const filename = `${warehouseName}-Report-${new Date().toISOString().split('T')[0]}.pdf`;
 
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    const token = typeof window !== "undefined"
-      ? (localStorage.getItem("token") || localStorage.getItem("predictix.access_token"))
-      : null;
 
     // Only the assets the user ticked (and summarised) carry a summary into the PDF.
     const summaryMap: Record<string, string> = summaries;
@@ -716,15 +705,8 @@ function ReportStep({
     setPdfLoading(false);
 
     // Trigger Server Notification
-    if (token) {
-      fetch(`${API_BASE}/warehouse-dashboard/notify-print`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }).catch(e => console.error("Failed to notify report print:", e));
-    }
+    apiFetch("/warehouse-dashboard/notify-print", { method: "POST" })
+      .catch(e => console.error("Failed to notify report print:", e));
   };
 
   return (

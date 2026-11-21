@@ -70,7 +70,7 @@ graph LR
 
     subgraph EDGE["VERCEL"]
         SSR["Server components<br/>+ static routes"]
-        MW["proxy.ts<br/>route protection"]
+        MW["proxy.ts<br/>pass-through"]
     end
 
     API["PredictiX API<br/>FastAPI on EC2"]
@@ -212,7 +212,7 @@ predictix_frontend/
     │   ├── utils.ts                      # cn() and misc utilities
     │   └── api/
     │       ├── assets.ts, userProfileApi.ts, userTickets.ts, notificationsApi.ts
-    └── (no middleware.ts — route protection is client-side only; see below)
+    └── proxy.ts                         # Next 16 "proxy" (formerly middleware): deliberate pass-through, see below
 ```
 
 ---
@@ -222,13 +222,13 @@ predictix_frontend/
 ### Asset Management
 - Server-side paginated asset list (50/page) with search, status, health-band, and warehouse filters.
 - Fleet-wide summary KPIs and descriptive analytics (status/health/vehicle-type distributions, top-at-risk assets) computed by the backend, not derived from the current page.
-- Per-asset detail panel: failure probability, cost estimate, component RUL (remaining useful life, computed per-asset from sensor history — independent of the warehouse survival-analysis models), maintenance history, tickets, assignments.
+- Per-asset detail panel: failure probability, cost estimate, component RUL (remaining useful life, from the same Weibull AFT survival models the warehouse view uses), maintenance history, tickets, assignments.
 - Create/edit asset dialog with the real backend status enum (`active`, `inactive`, `under_maintenance`, `critical`, `decommissioned`).
 
 ### Predictive Maintenance (ML)
-- Failure probability, risk level, and predicted maintenance date per asset (CatBoost classifier + regressor on the backend).
+- Failure probability, risk level, and predicted maintenance date per asset (LightGBM v7 classifier + regressor on the backend, trained on generated data).
 - Cost forecasting (LKR) with min/max range.
-- Component-level RUL estimation from linear-trend extrapolation over sensor history.
+- Component-level RUL from Weibull AFT survival models (brake, tire, battery, oil, hydraulic).
 
 ### Smart Maintenance Tickets
 - AI-powered ticket categorisation and priority suggestion (admin can adjust; user's priority is AI-locked).
@@ -249,7 +249,7 @@ predictix_frontend/
 
 ### Role-Based Access Control
 - Three roles (User / Admin / Super Admin) with distinct route groups, layouts, and navbars.
-- Route protection is enforced client-side via `AuthGuard`/`RouteGuard` + `useAuth()` — there is **no `middleware.ts`** in this app.
+- Route protection in the browser is `AuthGuard`/`RouteGuard` + `useAuth()`. `src/proxy.ts` (the Next 16 name for middleware) is an intentional pass-through, because the JWT lives in `localStorage`, which the server cannot read. Every API route enforces roles and warehouse scope itself, so the browser guards only decide what to render.
 
 ---
 
@@ -267,6 +267,7 @@ predictix_frontend/
 | `/admin/profile` / `/admin/settings` | Admin | Admin's own profile and account settings |
 | `/admin/warehouse` | Admin | Warehouse overview, maintenance schedule, AI insights |
 | `/admin/warehouse/report` | Admin | AI-generated warehouse report with PDF export |
+| `/admin/knowledge-base` | Admin | Chatbot knowledge-base articles (create, edit, enable/disable) |
 | `/user/dashboard` | User | Assigned assets, team, personal stats |
 | `/user/assets` | User | My assigned assets + read-only searchable fleet |
 | `/user/tickets` | User | Raise and track my tickets |
@@ -294,8 +295,23 @@ Every page above has a matching `loading.tsx` using the shared `PredictiXLoader`
 | `predictix.user` | Serialised user object (id, email, role, full_name, warehouse_id, warehouse_name) |
 
 ### Route Protection
-- **Client-side only** — `AuthGuard` (role-aware, shows the branded loader while checking) and `RouteGuard` wrap the admin/user layouts; `useAuth()` handles redirect logic. There is no server-side `middleware.ts`.
-- A `401` from any API call triggers logout + redirect to `/login`.
+- **In the browser**: `AuthGuard` (role-aware, shows the branded loader while checking) and `RouteGuard` wrap the admin/user layouts; `useAuth()` handles redirect logic. `src/proxy.ts` passes requests through unchanged.
+- A session ends when its token expires (8 hours by default, set on the backend). The guards read the token's expiry and send an expired session to `/login` straight away, and a `401` from any API call does the same.
+- The API is the authority: it checks the token, role and warehouse scope on every request, so the browser checks only shape what is shown.
+
+### Security headers
+
+`next.config.ts` sends `X-Content-Type-Options`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`,
+`Permissions-Policy` and HSTS on every response, and a Content Security Policy in **report-only**
+mode: the browser logs anything the policy would block without blocking it. Once the console shows
+no reports across the app, rename the header to `Content-Security-Policy` to enforce it. Remote
+images are limited to Supabase Storage and Google profile photos.
+
+### Attachments
+
+Ticket images are uploaded from the browser to the `ticket-attachments` Supabase bucket. Only JPG,
+PNG, WebP and GIF up to 10 MB are accepted (`src/lib/attachments.ts`), and the backend stores an
+attachment only when its URL points into this project's storage.
 
 ### HF Inference Space Warmup
 The login page fires a fire-and-forget `POST /warmup/inference-space` on mount, waking the backend's Gradio-hosted ticket categorisation/priority model before the user even logs in, so it's warm by the time they raise their first ticket.

@@ -205,3 +205,11 @@ export async function getTeamMembers(limit?: number): Promise<TeamMemberData[]> 
   const query = limit != null ? `?limit=${limit}` : "";
   return apiGet<TeamMemberData[]>(`/profiles/me/colleagues${query}`);
 }
+
+/** Change the signed-in user's password. Throws with the server's message on failure. */
+export async function changeMyPassword(currentPassword: string, newPassword: string): Promise<void> {
+  await apiPut<{ message: string }>("/profiles/me/password", {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+}

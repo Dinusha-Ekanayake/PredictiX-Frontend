@@ -22,6 +22,7 @@ import {
   priorityIcon,
   priorityOf,
 } from "./notificationUi";
+import { isInAppPath } from "@/lib/safePath";
 
 /**
  * Single notification, shown in full.
@@ -121,7 +122,7 @@ export default function NotificationDetailDialog({
                 Delete
               </Button>
             )}
-            {n.link_url && (
+            {isInAppPath(n.link_url) && (
               <Button
                 size="sm"
                 onClick={() => {

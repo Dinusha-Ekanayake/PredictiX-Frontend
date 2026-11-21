@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveBackendPort, clearPortCache } from "@/lib/backendScanner";
 
+// Local development helper: forwards to whichever port the dev backend is on.
+// A production build answers 404, so it can never be used as a relay into the
+// server's own network.
 async function handleRequest(req: NextRequest, props: { params: Promise<{ path: string[] }> | { path: string[] } }) {
+  if (process.env.NODE_ENV === "production") {
+    return new NextResponse(null, { status: 404 });
+  }
   const port = await getActiveBackendPort();
 
   // Next.js 15+ has `params` as a promise, earlier versions it is an object

@@ -1,5 +1,9 @@
 import * as React from "react";
 import { notFound } from "next/navigation";
+
+// Rendered per request so notFound() returns a real 404 status in production
+// rather than a prerendered not-found page served as 200.
+export const dynamic = "force-dynamic";
 import {
   Boxes, Ticket, Activity, Flame, ShieldCheck, AlertTriangle,
   CheckCircle, RefreshCw, Plus,

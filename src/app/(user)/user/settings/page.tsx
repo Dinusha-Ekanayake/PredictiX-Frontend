@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import ProfilePhotoUpload from "@/components/common/ProfilePhotoUpload";
+import ChangePasswordCard from "@/components/common/ChangePasswordCard";
 import { fetchMyProfile, updateMyProfile } from "@/lib/api/userProfileApi";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/lib/customToast";
@@ -87,6 +88,8 @@ export default function UserSettingsPage() {
             <ProfilePhotoUpload />
           </CardContent>
         </Card>
+
+        <ChangePasswordCard />
 
         <Card>
           <CardHeader>

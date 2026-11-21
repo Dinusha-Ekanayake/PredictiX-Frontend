@@ -40,6 +40,7 @@ import type { AssetDetail } from "@/components/admin/assets/types";
 import type { UserItem } from "@/lib/userService";
 import { Input } from "@/components/ui/input";
 import { cn, generateUUID } from "@/lib/utils";
+import { ATTACHMENT_ACCEPT, attachmentObjectName, attachmentProblem } from "@/lib/attachments";
 
 type Props = {
   open: boolean;
@@ -314,8 +315,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     if (!file || !ticket || !supabase) return;
     setUploadingImage(true);
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}-${generateUUID()}.${fileExt}`;
+      const fileName = attachmentObjectName(file, generateUUID());
       const { error: uploadError } = await supabase.storage
         .from("ticket-attachments")
         .upload(fileName, file);
@@ -597,8 +597,18 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                         <p className="text-xs text-muted-foreground mb-1">Upload New Image</p>
                         <Input
                           type="file"
-                          accept="image/*"
-                          onChange={(e) => setFile(e.target.files?.[0] || null)}
+                          accept={ATTACHMENT_ACCEPT}
+                          onChange={(e) => {
+                const picked = e.target.files?.[0] || null;
+                const problem = picked ? attachmentProblem(picked) : null;
+                if (problem) {
+                  toast.error(problem);
+                  e.target.value = "";
+                  setFile(null);
+                  return;
+                }
+                setFile(picked);
+              }}
                           disabled={uploadingImage}
                           className="cursor-pointer file:text-foreground file:bg-transparent file:border-0 file:text-sm file:font-medium h-9"
                         />

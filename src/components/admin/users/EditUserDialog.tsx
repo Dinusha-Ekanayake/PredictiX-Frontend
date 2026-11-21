@@ -40,7 +40,8 @@ import type {
   UserStatus,
   CreateUserPayload,
 } from "@/lib/userService";
-import { fetchDepartments, fetchWarehouses } from "@/lib/api/userProfileApi";
+import { fetchDepartments } from "@/lib/api/userProfileApi";
+import { fetchAssignableWarehouses } from "@/lib/assignableWarehouses";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -143,7 +144,7 @@ export default function EditUserDialog({
       .then(setDepartments)
       .catch(() => setListsLoadFailed(true))
       .finally(() => setDepartmentsLoading(false));
-    fetchWarehouses()
+    fetchAssignableWarehouses()
       .then(setWarehouses)
       .catch(() => setListsLoadFailed(true))
       .finally(() => setWarehousesLoading(false));

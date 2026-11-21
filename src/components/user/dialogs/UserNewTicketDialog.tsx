@@ -53,6 +53,7 @@ import {
 import { apiGet, apiPost } from "@/lib/apiClient";
 import { addMyTicketAttachment } from "@/lib/api/userTickets";
 import { supabase } from "@/lib/supabaseBrowserClient";
+import { ATTACHMENT_ACCEPT, attachmentObjectName, attachmentProblem } from "@/lib/attachments";
 
 // ─── local types ──────────────────────────────────────────────────────────────
 
@@ -246,8 +247,7 @@ export default function UserNewTicketDialog({
       });
 
       if (file && supabase) {
-        const fileExt = file.name.split(".").pop();
-        const fileName = `${Date.now()}-${generateUUID()}.${fileExt}`;
+        const fileName = attachmentObjectName(file, generateUUID());
         const { error: uploadError } = await supabase.storage
           .from("ticket-attachments")
           .upload(fileName, file);
@@ -436,8 +436,18 @@ export default function UserNewTicketDialog({
                 <p className="text-sm text-muted-foreground mb-2">Attach Image (optional)</p>
                 <Input
                   type="file"
-                  accept="image/*"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  accept={ATTACHMENT_ACCEPT}
+                  onChange={(e) => {
+                const picked = e.target.files?.[0] || null;
+                const problem = picked ? attachmentProblem(picked) : null;
+                if (problem) {
+                  toast.error(problem);
+                  e.target.value = "";
+                  setFile(null);
+                  return;
+                }
+                setFile(picked);
+              }}
                   disabled={isSubmitting}
                   className="cursor-pointer file:text-foreground file:bg-transparent file:border-0 file:text-sm file:font-medium"
                 />

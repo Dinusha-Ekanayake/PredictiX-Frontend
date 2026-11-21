@@ -16,7 +16,7 @@ import WarehouseDepartmentsOverview, {
 import type { TicketsByDepartmentRow } from "@/components/admin/warehouse/WarehouseTicketsByDepartment";
 
 import { getMaintenanceSchedule } from "@/lib/warehouseService";
-import { getAccessToken } from "@/lib/authService";
+import { apiFetch } from "@/lib/apiClient";
 
 // ── Warehouse Report (my section — warehouse components only) ──
 import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
@@ -24,8 +24,7 @@ import WarehouseSurvivalAnalysis from "@/components/admin/warehouse/WarehouseSur
 import { getSurvivalAnalysis, type SurvivalSummary } from "@/lib/warehouseService";
 
 // Use the same env-driven base URL as warehouseService rather than a hardcoded host.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const REPORT_API = `${API_BASE_URL}/warehouse-dashboard/generate-report`;
+const REPORT_PATH = "/warehouse-dashboard/generate-report";
 
 export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
@@ -42,13 +41,7 @@ export default function WarehousePage() {
   const [ticketsByDepartment, setTicketsByDepartment] = React.useState<TicketsByDepartmentRow[]>([]);
 
   function authedGet(path: string) {
-    return fetch(`${API_BASE_URL}${path}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
-      },
-    });
+    return apiFetch(path, { method: "GET" });
   }
 
   async function fetchData() {
@@ -115,19 +108,8 @@ export default function WarehousePage() {
     setReportError(null);
     setReportData(null);
     try {
-      const res = await fetch(REPORT_API, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          // The endpoint is guarded by require_user — attach the JWT like every
-          // other warehouse-dashboard call, otherwise it 401s "Not authenticated".
-          ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
-        },
-      });
-
-      if (res.status === 401) {
-        throw new Error("Your session has expired. Please log out and log back in, then try again.");
-      }
+      // apiFetch attaches the JWT and handles an expired session (401).
+      const res = await apiFetch(REPORT_PATH, { method: "GET" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
         throw new Error(err.detail || `HTTP ${res.status}`);

@@ -47,6 +47,14 @@ type ChatMessage = {
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
+/** True for an in-app path ("/x", never "//host") or a "copy:" action. */
+function isSafeActionButton(btn: unknown): btn is ActionButton {
+  if (!btn || typeof btn !== "object") return false;
+  const { label, path } = btn as { label?: unknown; path?: unknown };
+  if (typeof label !== "string" || typeof path !== "string" || !label.trim()) return false;
+  return /^\/(?!\/)[^\s\\]*$/.test(path) || /^copy:\S{1,200}$/.test(path);
+}
+
 const CHATBOT_API_BASE =
   process.env.NEXT_PUBLIC_CHATBOT_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
@@ -330,8 +338,10 @@ export default function FloatingChatbot() {
 
       const payload = await response.json();
       const replyText: string = typeof payload?.answer === "string" ? payload.answer : "";
+      // The server already filters buttons; checking again here means a bad
+      // response can never send the browser outside the app.
       const actionButtons: ActionButton[] = Array.isArray(payload?.action_buttons)
-        ? (payload.action_buttons as ActionButton[])
+        ? (payload.action_buttons as ActionButton[]).filter(isSafeActionButton)
         : [];
       const toolTrace: ToolTraceItem[] = Array.isArray(payload?.tool_trace)
         ? (payload.tool_trace as ToolTraceItem[])

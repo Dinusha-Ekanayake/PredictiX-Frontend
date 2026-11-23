@@ -480,26 +480,41 @@ All `NEXT_PUBLIC_` variables are exposed to the browser bundle. Never put secret
 
 ## Testing
 
-Vitest with Testing Library, in a jsdom environment. 69 tests across six groups.
+Two automated layers, both runnable without a backend or credentials. See [TESTING.md](TESTING.md)
+for the full strategy.
 
 ```bash
-npm test              # per-group pass/fail table
+npm test              # unit + component tests, per-group pass/fail table
 npm run test:list     # the same, listing every case
 npm run test:coverage # with a coverage report
 npm run test:watch    # watch mode
 npm run test:raw      # vitest directly, no table
+npm run test:e2e      # Playwright end-to-end smoke against a production build
 ```
+
+**Unit and component (Vitest, Testing Library, jsdom): 177 tests**
 
 | Group | Tests | Covers |
 |---|---|---|
 | Unit: health bands | 26 | banding thresholds, colours, the no-score case |
 | Unit: auth session | 14 | token storage, role reads, sign-out clearing every key |
+| Unit: security hardening | 8 | attachment type and size checks, token expiry |
+| Unit: safe links and chat buttons | 24 | in-app link check, chatbot button allowlist |
+| Unit: API client and 401 handling | 8 | Bearer header, sign-out on 401 only, error messages |
+| Unit: assignable warehouses | 4 | admins limited to their own warehouse |
+| Component: change password | 8 | client-side rules, success and refusal paths |
 | Unit: asset helpers | 8 | deriving displayed health from a prediction |
+| Unit: asset usage charts | 23 | chart data shaping |
+| Component: asset usage panels | 9 | rendered usage panels |
+| Theming: asset section | 24 | light and dark tokens in the asset pages |
 | Component: assigned assets | 14 | the assigned-assets dialog |
 | Test plan: theme | 4 | light/dark switching and persistence |
 | Test plan: navigation | 3 | every navbar link resolving to a real route |
 
-The runner treats vitest's own exit code as the authority on pass/fail and retries reading the
+**End-to-end (Playwright, Chromium): 9 tests** in [e2e/](e2e/): route guards, expired sessions,
+wrong-role redirects, the login flow, security headers and the disabled dev proxies.
+
+The unit runner treats vitest's own exit code as the authority on pass/fail and retries reading the
 JSON report, because the reporter's write races process exit on Windows. A zero-test run is
 reported as a failure, never as success.
 
@@ -514,4 +529,5 @@ reported as a failure, never as success.
 | Start | `npm start` | Start production server |
 | Lint | `npm run lint` | Run ESLint checks |
 | Test | `npm test` | Vitest suite with a per-group results table |
+| E2E | `npm run test:e2e` | Playwright smoke tests against a production build |
 | Typecheck | `npx tsc --noEmit` | Type check without emitting |

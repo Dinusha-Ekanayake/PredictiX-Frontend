@@ -16,6 +16,12 @@
 # run; an interrupted run leaves it behind.
 vitest-results.json
 
+# Playwright output
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # next.js
 /.next/
 /out/

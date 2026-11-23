@@ -6,12 +6,10 @@ import {
   ArrowRight,
   Check,
   Copy,
-  ExternalLink,
   Loader2,
   MessageCircle,
   SendHorizontal,
   Sparkles,
-  Trash2,
   X,
 } from "lucide-react";
 
@@ -20,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { isSafeActionButton } from "@/lib/safePath";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,17 +42,11 @@ type ChatMessage = {
   toolTrace?: ToolTraceItem[];
   widgetType?: string;
   widgetData?: any;
+  /** Audit trace id: quote it to an admin to see how this answer was produced. */
+  traceId?: string;
 };
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-
-/** True for an in-app path ("/x", never "//host") or a "copy:" action. */
-function isSafeActionButton(btn: unknown): btn is ActionButton {
-  if (!btn || typeof btn !== "object") return false;
-  const { label, path } = btn as { label?: unknown; path?: unknown };
-  if (typeof label !== "string" || typeof path !== "string" || !label.trim()) return false;
-  return /^\/(?!\/)[^\s\\]*$/.test(path) || /^copy:\S{1,200}$/.test(path);
-}
 
 const CHATBOT_API_BASE =
   process.env.NEXT_PUBLIC_CHATBOT_URL ||
@@ -348,6 +341,7 @@ export default function FloatingChatbot() {
         : [];
       const widgetType = payload?.widget_type;
       const widgetData = payload?.widget_data;
+      const traceId = typeof payload?.trace_id === "string" ? payload.trace_id : undefined;
 
       setMessages((prev) => [
         ...prev,
@@ -360,6 +354,7 @@ export default function FloatingChatbot() {
           toolTrace,
           widgetType,
           widgetData,
+          traceId,
         },
       ]);
     } catch (error) {
@@ -538,6 +533,18 @@ export default function FloatingChatbot() {
                         )}
                         {message.role === "assistant" && message.widgetType === "RECORD_SUMMARY" && (
                           <RecordSummaryWidget payload={message.widgetData} />
+                        )}
+
+                        {/* Reference to this answer's audit trace, copyable for support requests */}
+                        {message.role === "assistant" && message.traceId && (
+                          <button
+                            type="button"
+                            title={`Answer reference ${message.traceId}. Click to copy; an admin can use it to see how this answer was produced.`}
+                            onClick={() => void navigator.clipboard.writeText(message.traceId as string)}
+                            className="mt-1.5 block text-[10px] font-mono text-muted-foreground/70 hover:text-muted-foreground"
+                          >
+                            Ref {message.traceId.slice(0, 8)}
+                          </button>
                         )}
 
                         {/* Action Buttons, rendered as clickable nav buttons */}

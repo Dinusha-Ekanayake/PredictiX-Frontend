@@ -515,8 +515,8 @@ npm run test:e2e      # Playwright end-to-end smoke against a production build
 | Test plan: theme | 4 | light/dark switching and persistence |
 | Test plan: navigation | 3 | every navbar link resolving to a real route |
 
-**End-to-end (Playwright, Chromium): 9 tests** in [e2e/](e2e/): route guards, expired sessions,
-wrong-role redirects, the login flow, security headers and the disabled dev proxies.
+**End-to-end (Playwright, Chromium): 11 tests** in [e2e/](e2e/): route guards (including the help desk), expired sessions,
+wrong-role redirects, the login flow, security headers, and the dev proxies and dev pages returning 404 in production.
 
 The unit runner treats vitest's own exit code as the authority on pass/fail and retries reading the
 JSON report, because the reporter's write races process exit on Windows. A zero-test run is

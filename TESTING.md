@@ -31,7 +31,8 @@ of them needs a test change in the same commit.
 | Signed-out and wrong-role visitors are redirected | `e2e/auth.spec.ts` |
 | Admins can only assign users to their own warehouse | `src/lib/assignableWarehouses.test.ts` |
 | Attachments are limited by type and size | `src/lib/securityHardening.test.ts` |
-| Security headers are sent and dev proxies are off in production | `e2e/security.spec.ts` |
+| Security headers are sent; dev proxies and dev preview pages return 404 in production | `e2e/security.spec.ts` |
+| Signed-out visitors to the help desk go to login without calling the API | `e2e/auth.spec.ts` |
 
 The browser checks are for user experience. The API enforces every rule
 again, and the backend's authorization matrix tests prove that.

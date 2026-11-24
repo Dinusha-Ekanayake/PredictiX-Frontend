@@ -6,12 +6,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   Activity,
   AlertTriangle,
-  Clock,
+
   Gauge,
   HeartPulse,
-  ShieldAlert,
+
   TrendingDown,
-  Timer,
+
   Wallet,
   BarChart3,
   ChevronLeft,
@@ -32,7 +32,6 @@ import {
 } from "recharts";
 import type {
   SurvivalSummary,
-  SurvivalComponentSummary,
 } from "@/lib/warehouseService";
 
 interface Props {
@@ -121,7 +120,6 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
     expected_spend_7d,
     expected_spend_30d,
     component_summary,
-    assets = [],
   } = data;
 
   // ── Risk bar-chart data: average P(fail) per component for at-risk assets ──

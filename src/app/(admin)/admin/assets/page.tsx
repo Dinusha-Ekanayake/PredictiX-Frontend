@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { Boxes, ChevronRight, Radio, Box, AlertCircle, RefreshCw, Plus } from "lucide-react";
+import { Boxes, ChevronRight, Radio, Box, AlertCircle, RefreshCw } from "lucide-react";
 import { toast } from "@/lib/customToast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

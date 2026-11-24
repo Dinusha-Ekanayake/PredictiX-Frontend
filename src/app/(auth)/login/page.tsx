@@ -37,7 +37,6 @@ import {
   type LoginResponse,
   type WarehouseOption,
 } from "@/lib/authService";
-import { supabase } from "@/lib/supabaseBrowserClient";
 
 // ─── Shared Components ────────────────────────────────────────────────────────
 

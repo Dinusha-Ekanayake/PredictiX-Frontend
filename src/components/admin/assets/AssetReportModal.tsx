@@ -565,7 +565,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
                     <div className="space-y-2">
                       {(() => {
                         const entries = Object.entries(reportData.top_explanations!);
-                        const maxVal = Math.max(...entries.map(([_, val]) => Math.abs(val)), 1);
+                        const maxVal = Math.max(...entries.map(([, val]) => Math.abs(val)), 1);
                         return entries.map(([feature, raw], i) => {
                           const impact = Math.abs(raw);
                           const pct = Math.round((impact / maxVal) * 100);

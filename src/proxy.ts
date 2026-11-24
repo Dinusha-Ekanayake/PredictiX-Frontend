@@ -14,13 +14,16 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 
-const publicRoutes = ["/login", "/register", "/forgot-password"];
+// Visual-check pages used during development. Their own notFound() call cannot
+// set a 404 status because the root loading.tsx has already started a 200
+// stream, so production builds refuse them here instead.
+const DEV_ONLY_ROUTES = ["/test-loader", "/theme-preview"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (publicRoutes.some((route) => pathname.startsWith(route))) {
-    return NextResponse.next();
+  if (process.env.NODE_ENV === "production" && DEV_ONLY_ROUTES.some((route) => pathname.startsWith(route))) {
+    return new NextResponse(null, { status: 404 });
   }
 
   // Cannot read localStorage here, pass through; AuthGuard handles protection.
@@ -28,5 +31,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/user/:path*"],
+  matcher: ["/admin/:path*", "/user/:path*", "/test-loader", "/theme-preview"],
 };

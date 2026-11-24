@@ -11,6 +11,16 @@ test.describe("route protection", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
+  test("sends a signed-out visitor from the help desk to the login page without calling the API", async ({ api: page }) => {
+    const apiCalls: string[] = [];
+    page.on("request", (req) => {
+      if (req.url().startsWith(E2E_API_URL) && !req.url().includes("/warmup/")) apiCalls.push(req.url());
+    });
+    await page.goto("/help-desk");
+    await expect(page).toHaveURL(/\/login$/);
+    expect(apiCalls).toEqual([]);
+  });
+
   test("treats an expired token as signed out and clears it", async ({ api: page }) => {
     await signIn(page, fakeToken(Math.floor(Date.now() / 1000) - 60));
     await page.goto("/user/dashboard");

@@ -433,6 +433,10 @@ NEXT_PUBLIC_CHATBOT_URL=
 # Supabase — used for ticket attachment uploads and realtime features
 NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+
+# Show the demo account list on the login page (default true). Set false once
+# the demo phase ends, and disable or re-password those accounts in the database.
+NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=true
 ```
 
 All `NEXT_PUBLIC_` variables are exposed to the browser bundle. Never put secrets (service-role keys, etc.) behind a `NEXT_PUBLIC_` prefix.

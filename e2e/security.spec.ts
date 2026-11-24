@@ -19,4 +19,9 @@ test.describe("production hardening", () => {
     expect((await request.get("/api/proxy/assets/")).status()).toBe(404);
     expect((await request.get("/api/proxy-port")).status()).toBe(404);
   });
+
+  test("does not serve the development preview pages", async ({ request }) => {
+    expect((await request.get("/test-loader")).status()).toBe(404);
+    expect((await request.get("/theme-preview")).status()).toBe(404);
+  });
 });

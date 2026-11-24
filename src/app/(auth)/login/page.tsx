@@ -141,6 +141,10 @@ function BackgroundBlobs() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+// The demo accounts are real database accounts, so a deployment past the demo
+// phase should hide them here and disable or re-password them in the database.
+const SHOW_DEMO_ACCOUNTS = process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS !== "false";
+
 export default function LoginPage() {
   const router = useNavRouter();
   const ready = useMinDelay(2000);
@@ -390,13 +394,10 @@ export default function LoginPage() {
                     </Button>
 
 
-                    {/* Demo credentials hint.
-                        Every warehouse has a matching demo pair, swap "colombo"
-                        for "badulla" or "galle" in the address to sign in against
-                        that site. Staff accounts follow
-                        firstname.department@lankalogix.com (departments: log,
-                        elec, sft, mech, adm) with the password user@123, or
-                        admin@123 for warehouse administrators. */}
+                    {/* Demo credentials hint. Every warehouse has a matching demo
+                        pair: swap "colombo" for "badulla" or "galle" in the
+                        address. Hidden when NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=false. */}
+                    {SHOW_DEMO_ACCOUNTS && (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-border dark:bg-muted dark:text-muted-foreground">
                       <div className="font-medium text-slate-800 dark:text-foreground mb-1.5">Demo accounts</div>
                       <div className="space-y-1.5">
@@ -426,6 +427,7 @@ export default function LoginPage() {
                         <span className="font-mono">galle</span>.
                       </div>
                     </div>
+                    )}
 
                     <div className="flex flex-col items-center gap-1 mt-4">
                       <AdminContactDialog />

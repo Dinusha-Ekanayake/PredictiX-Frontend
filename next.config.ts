@@ -32,6 +32,8 @@ assertDeploymentConfig();
 const isDev = process.env.NODE_ENV !== "production";
 const apiOrigin = originOf(process.env.NEXT_PUBLIC_API_URL) ?? "http://127.0.0.1:8000";
 const wsOrigin = originOf(process.env.NEXT_PUBLIC_WS_URL);
+// Storage host, only for displaying uploaded images. The browser never calls
+// Supabase itself: all data and uploads go through the API (backend ADR-0008).
 const supabaseOrigin = originOf(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 const connectSources = [
@@ -39,8 +41,6 @@ const connectSources = [
   apiOrigin,
   apiOrigin.replace(/^http/, "ws"),
   wsOrigin,
-  supabaseOrigin,
-  supabaseOrigin?.replace(/^https/, "wss"),
 ].filter(Boolean);
 
 // Sent in report-only mode: the browser logs anything the policy would block

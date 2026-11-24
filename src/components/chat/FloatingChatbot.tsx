@@ -80,35 +80,6 @@ function CopyActionButton({ label, textToCopy }: { label: string; textToCopy: st
 
 // ─── Widgets ──────────────────────────────────────────────────────────────────
 
-function AssetHealthWidget({ data }: { data: any }) {
-  if (!data) return null;
-  const isGood = data.healthScore >= 70;
-  return (
-    <div className="mt-3 overflow-hidden rounded-xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm">
-      <div className="mb-2 flex items-center justify-between">
-        <h4 className="font-semibold text-sm text-foreground">{data.name}</h4>
-        <Badge variant={isGood ? "default" : "destructive"} className="text-[10px] uppercase">
-          {data.status}
-        </Badge>
-      </div>
-      <div className="space-y-2 text-xs">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Health Score</span>
-          <span className="font-medium text-foreground">{data.healthScore}%</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Failure Prob.</span>
-          <span className="font-medium text-foreground">{(data.failureProbability * 100).toFixed(0)}%</span>
-        </div>
-        <div className="flex justify-between border-t border-border/50 pt-2">
-          <span className="text-muted-foreground">Predicted Failure</span>
-          <span className="font-medium text-red-500">{data.predictedFailureDate}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function RecordSummaryWidget({ payload }: { payload: any }) {
   if (!payload || !payload.data) return null;
   const { type, data } = payload;
@@ -527,9 +498,6 @@ export default function FloatingChatbot() {
                         </div>
 
                         {/* Custom Widgets */}
-                        {message.role === "assistant" && message.widgetType === "ASSET_HEALTH" && (
-                          <AssetHealthWidget data={message.widgetData} />
-                        )}
                         {message.role === "assistant" && message.widgetType === "RECORD_SUMMARY" && (
                           <RecordSummaryWidget payload={message.widgetData} />
                         )}

@@ -13,6 +13,10 @@ const PORT = 3100;
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
+  // One `next start` server serves every worker. Playwright's default (half
+  // the CPU cores) overloads it on large machines and every test times out
+  // waiting for the page, so cap it; CI runners are small enough already.
+  workers: process.env.CI ? undefined : 4,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : [["list"]],
@@ -29,7 +33,6 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_API_URL: E2E_API_URL,
       NEXT_PUBLIC_SUPABASE_URL: "",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },

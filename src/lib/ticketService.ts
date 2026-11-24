@@ -1,5 +1,4 @@
-import { supabase } from "./supabaseBrowserClient";
-import { apiPost, apiGet, apiPut, apiDelete, apiFetch } from "./apiClient";
+import { apiPost, apiPostForm, apiGet, apiPut, apiDelete, apiFetch } from "./apiClient";
 
 // ─── FastAPI-backed ticket preview (calls POST /tickets/preview) ──────────────
 
@@ -205,18 +204,16 @@ export async function deleteTicket(id: string): Promise<void> {
   await apiDelete(`/tickets/mine/${id}`);
 }
 
-export async function addTicketAttachment(
-  ticketId: string,
-  filePath: string,
-  mimeType?: string | null,
-  originalFilename?: string | null
-): Promise<void> {
-  await apiPost(`/ticket-attachments/`, {
-    ticket_id: ticketId,
-    file_path: filePath,
-    mime_type: mimeType,
-    original_filename: originalFilename,
-  });
+/**
+ * Upload an image and attach it to a ticket. The API checks the caller may see
+ * the ticket, reads the file type from its bytes, caps the size and stores it;
+ * the browser never writes to storage itself.
+ */
+export async function uploadTicketAttachment(ticketId: string, file: File): Promise<void> {
+  const form = new FormData();
+  form.append("ticket_id", ticketId);
+  form.append("file", file);
+  await apiPostForm(`/ticket-attachments/upload`, form);
 }
 
 export async function fetchTicketAttachments(ticketId: string): Promise<any[]> {
@@ -252,111 +249,9 @@ export type TicketEnrichment = {
   history: TicketHistoryEntry[];
 };
 
-export async function fetchTicketEnrichment(ticket: {
-  id: string;
-  created_by: string | null;
-  assigned_to: string | null;
-  asset_id: string | null;
-}): Promise<TicketEnrichment> {
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const result: TicketEnrichment = {
-    creator_name: null,
-    creator_email: null,
-    assignee_name: null,
-    warehouse_name: null,
-    department_name: null,
-    history: [],
-  };
-
-  const profileIds = new Set<string>();
-  if (ticket.created_by) profileIds.add(ticket.created_by);
-  if (ticket.assigned_to) profileIds.add(ticket.assigned_to);
-
-  let historyRows: Array<{
-    id: string;
-    old_status: string | null;
-    new_status: string;
-    changed_by: string | null;
-    note: string | null;
-    created_at: string;
-  }> = [];
-
-  try {
-    const data = await apiGet<any[]>(`/ticket-status-history/?ticket_id=${ticket.id}`);
-    historyRows = ((data || []) as any[]).slice().reverse();
-  } catch (err) {
-    console.error("Failed to fetch status history from backend:", err);
-  }
-
-  for (const h of historyRows) {
-    if (h.changed_by) profileIds.add(h.changed_by);
-  }
-
-  let nameById = new Map<string, { name: string | null; email: string | null }>();
-  if (profileIds.size > 0) {
-    const { data: profiles, error: profilesError } = await supabase
-      .from("profiles")
-      .select("id,full_name,email")
-      .in("id", Array.from(profileIds));
-
-    if (profilesError) throw profilesError;
-
-    nameById = new Map(
-      ((profiles ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>).map(
-        (p) => [p.id, { name: p.full_name, email: p.email }],
-      ),
-    );
-
-    if (ticket.created_by) {
-      const p = nameById.get(ticket.created_by);
-      result.creator_name = p?.name ?? null;
-      result.creator_email = p?.email ?? null;
-    }
-    if (ticket.assigned_to) {
-      result.assignee_name = nameById.get(ticket.assigned_to)?.name ?? null;
-    }
-
-    result.history = historyRows.map((h) => ({
-      id: h.id,
-      old_status: h.old_status,
-      new_status: h.new_status,
-      changed_by: h.changed_by,
-      changed_by_name: h.changed_by ? nameById.get(h.changed_by)?.name ?? null : null,
-      note: h.note,
-      created_at: h.created_at,
-    }));
-  }
-
-  if (ticket.asset_id) {
-    const { data: asset, error: assetError } = await supabase
-      .from("assets")
-      .select("warehouse_id,department_id")
-      .eq("id", ticket.asset_id)
-      .maybeSingle();
-
-    if (assetError) throw assetError;
-
-    const a = asset as { warehouse_id: string | null; department_id: string | null } | null;
-    if (a?.warehouse_id) {
-      const { data: w } = await supabase
-        .from("warehouses")
-        .select("name")
-        .eq("id", a.warehouse_id)
-        .maybeSingle();
-      result.warehouse_name = (w as { name: string } | null)?.name ?? null;
-    }
-    if (a?.department_id) {
-      const { data: d } = await supabase
-        .from("departments")
-        .select("name")
-        .eq("id", a.department_id)
-        .maybeSingle();
-      result.department_name = (d as { name: string } | null)?.name ?? null;
-    }
-  }
-
-  return result;
+/** Creator, assignee, site and status history for the ticket view, from the API. */
+export async function fetchTicketEnrichment(ticket: { id: string }): Promise<TicketEnrichment> {
+  return apiGet<TicketEnrichment>(`/tickets/${ticket.id}/details`);
 }
 
 export async function fetchTicketComments(ticketId: string): Promise<any[]> {

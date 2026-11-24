@@ -25,7 +25,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "@/lib/customToast";
-import { generateUUID } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,9 +51,8 @@ import {
 } from "@/lib/api/userTickets";
 
 import { apiGet, apiPost } from "@/lib/apiClient";
-import { addMyTicketAttachment } from "@/lib/api/userTickets";
-import { supabase } from "@/lib/supabaseBrowserClient";
-import { ATTACHMENT_ACCEPT, attachmentObjectName, attachmentProblem } from "@/lib/attachments";
+import { uploadMyTicketAttachment } from "@/lib/api/userTickets";
+import { ATTACHMENT_ACCEPT, attachmentProblem } from "@/lib/attachments";
 
 // ─── local types ──────────────────────────────────────────────────────────────
 
@@ -248,28 +246,14 @@ export default function UserNewTicketDialog({
         ticket_summary: aiResult?.ticket_summary ?? undefined,
       });
 
-      if (file && supabase) {
-        const fileName = attachmentObjectName(file, generateUUID());
-        const { error: uploadError } = await supabase.storage
-          .from("ticket-attachments")
-          .upload(fileName, file);
-        
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          toast.error("Ticket created, but failed to upload image.");
-        } else {
-          const { data: publicUrlData } = supabase.storage
-            .from("ticket-attachments")
-            .getPublicUrl(fileName);
-            
-          if (publicUrlData?.publicUrl) {
-            await addMyTicketAttachment(
-              created.id,
-              publicUrlData.publicUrl,
-              file.type,
-              file.name
-            );
-          }
+      if (file) {
+        try {
+          await uploadMyTicketAttachment(created.id, file);
+        } catch (uploadErr: any) {
+          // The ticket exists; only the image is missing, so say exactly that.
+          toast.error("Ticket created, but the image was not attached.", {
+            description: uploadErr?.message,
+          });
         }
       }
 

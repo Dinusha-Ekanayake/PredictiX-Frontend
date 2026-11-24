@@ -36,13 +36,14 @@ Set these under **Project Settings → Environment Variables**, for both Product
 | Variable | Required | Production value |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | yes | `https://13.232.200.154.sslip.io` |
-| `NEXT_PUBLIC_SUPABASE_URL` | yes | The Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | The Supabase anon key (public by design; row-level security enforces access) |
+| `NEXT_PUBLIC_SUPABASE_URL` | yes | The Supabase project URL, used only to allow its storage host for uploaded images |
 | `NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS` | no | `true` during the demo phase, `false` afterwards |
 | `NEXT_PUBLIC_WS_URL` | no | Leave unset: it defaults to the API URL with `https` → `wss` |
 | `NEXT_PUBLIC_CHATBOT_URL` | no | Leave unset: the chatbot is served by the API |
 
 The build checks its configuration (`next.config.ts`). A Vercel build fails if `NEXT_PUBLIC_API_URL` is missing or malformed, or if it is not `https` in production. Browsers block calls from an HTTPS page to an HTTP API, so a misconfigured deployment fails loudly at build time instead of quietly breaking in users' browsers.
+
+The frontend holds no Supabase key. Every read, write and upload goes through the API (backend ADR-0008). If an older `NEXT_PUBLIC_SUPABASE_ANON_KEY` is still set in the Vercel project, delete it.
 
 Never add a service-role key or any other secret under a `NEXT_PUBLIC_` name. Those values are readable by anyone who opens the site.
 
@@ -53,7 +54,7 @@ Never add a service-role key or any other secret under a `NEXT_PUBLIC_` name. Th
 
 ## Security headers
 
-`next.config.ts` sends `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` and HSTS on every response. It also sends a Content-Security-Policy in **report-only** mode, with `connect-src` derived from the configured API and Supabase origins. Once the browser console shows no CSP reports across the app, switch the header to the enforcing `Content-Security-Policy`.
+`next.config.ts` sends `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` and HSTS on every response. It also sends a Content-Security-Policy in **report-only** mode, with `connect-src` limited to the API (HTTPS and WebSocket). Once the browser console shows no CSP reports across the app, switch the header to the enforcing `Content-Security-Policy`.
 
 ## Verify a deployment
 

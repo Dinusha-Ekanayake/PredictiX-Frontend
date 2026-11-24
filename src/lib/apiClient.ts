@@ -119,6 +119,21 @@ export async function apiPost<T>(endpoint: string, body: unknown): Promise<T> {
 }
 
 /**
+ * POST a multipart form (file uploads). apiFetch leaves the Content-Type to
+ * the browser so the multipart boundary is set correctly.
+ */
+export async function apiPostForm<T>(endpoint: string, form: FormData): Promise<T> {
+  const response = await apiFetch(endpoint, { method: "POST", body: form });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(extractErrorMessage(error, "Upload failed"));
+  }
+
+  return response.json();
+}
+
+/**
  * PUT request helper
  */
 export async function apiPut<T>(endpoint: string, body: unknown): Promise<T> {

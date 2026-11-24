@@ -3,7 +3,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import {
   ATTACHMENT_ACCEPT,
   MAX_ATTACHMENT_BYTES,
-  attachmentObjectName,
   attachmentProblem,
 } from "./attachments";
 import { getAccessToken, isAuthenticated, tokenExpiry } from "./authService";
@@ -37,11 +36,6 @@ describe("ticket attachments", () => {
 
   it("rejects files over the size limit", () => {
     expect(attachmentProblem(fileOf("image/png", MAX_ATTACHMENT_BYTES + 1))).not.toBeNull();
-  });
-
-  it("names the stored object from the file type, not the file name", () => {
-    const name = attachmentObjectName(fileOf("image/png", 10, "evil.html"), "abc");
-    expect(name).toMatch(/^\d+-abc\.png$/);
   });
 
   it("offers only the accepted types to the file picker", () => {

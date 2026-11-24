@@ -74,11 +74,9 @@ graph LR
     end
 
     API["PredictiX API<br/>FastAPI on EC2"]
-    SB["Supabase<br/>attachments · realtime"]
 
     APP --> MW --> SSR
-    APP -->|"apiClient.ts<br/>Bearer JWT"| API
-    APP -->|"attachments,<br/>notification bell"| SB
+    APP -->|"apiClient.ts<br/>Bearer JWT, uploads,<br/>notification WebSocket"| API
 
     style MW fill:#0F4C5C,color:#fff
     style API fill:#E6F1F4,stroke:#0F4C5C,stroke-width:2px
@@ -122,7 +120,7 @@ sequenceDiagram
 | Styling | Tailwind CSS v4 + Radix UI (via `radix-ui` + `@radix-ui/react-*`) |
 | Charts | Recharts |
 | Auth backend | Custom JWT (`POST /auth/login`) issued by the PredictiX FastAPI backend |
-| Realtime / Storage | Supabase (`@supabase/supabase-js`) — ticket attachments, realtime notification bell |
+| Realtime / Storage | API WebSocket for the notification bell; attachments uploaded through the API, which stores them in Supabase Storage. The browser never talks to Supabase directly |
 | Notifications (toast) | Sonner |
 | Theme | next-themes (light/dark, system-aware) |
 | PDF Export | html2pdf.js |
@@ -188,7 +186,7 @@ predictix_frontend/
     │   │   └── RoleSelectCards.tsx       # Legacy role-picker UI
     │   ├── navigation/
     │   │   ├── AdminNavbar.tsx / UserNavbar.tsx
-    │   │   ├── NotificationBell.tsx      # Realtime (Supabase/WS) notification dropdown
+    │   │   ├── NotificationBell.tsx      # Realtime (API WebSocket) notification dropdown
     │   │   └── useNavRouter.ts
     │   ├── chat/
     │   │   └── FloatingChatbot.tsx       # Draggable AI chatbot widget (all pages)
@@ -205,7 +203,6 @@ predictix_frontend/
     │   ├── authService.ts                # login/selectWarehouse, session storage, HF Space warmup ping
     │   ├── apiClient.ts                  # Authenticated fetch wrapper (apiGet/Post/Put/Delete)
     │   ├── backendScanner.ts             # Auto-detects the live backend port for the dev proxy
-    │   ├── supabaseBrowserClient.ts      # Supabase client (attachments, realtime)
     │   ├── userService.ts, ticketService.ts, warehouseService.ts, dashboardService.ts
     │   ├── assetPdfExport.ts, pdfExport.ts, professionalPdfExport.ts
     │   ├── utils.ts                      # cn() and misc utilities
@@ -235,7 +232,7 @@ predictix_frontend/
 - Admin ticket management with filters, search, and bulk visibility; user-facing raise/track flow.
 
 ### Notifications
-- Realtime notification bell (Supabase/WebSocket-backed) with unread counts and mark-as-read.
+- Realtime notification bell (API WebSocket) with unread counts and mark-as-read.
 - Per-user notification preferences.
 
 ### Warehouse Operations
@@ -308,9 +305,11 @@ Google sign-in the app used to offer).
 
 ### Attachments
 
-Ticket images are uploaded from the browser to the `ticket-attachments` Supabase bucket. Only JPG,
-PNG, WebP and GIF up to 10 MB are accepted (`src/lib/attachments.ts`), and the backend stores an
-attachment only when its URL points into this project's storage.
+Ticket images are uploaded to the API (`POST /ticket-attachments/upload`, or
+`/user/tickets/{id}/attachments/upload` for users). The API checks the caller may see the ticket,
+reads the real type from the file's bytes (JPG, PNG, WebP or GIF), caps the size at 10 MB and names
+the stored object. `src/lib/attachments.ts` makes the same checks first, only so the user gets an
+immediate answer. The browser holds no storage or database credentials.
 
 ### HF Inference Space Warmup
 The login page fires a fire-and-forget `POST /warmup/inference-space` on mount, waking the backend's Gradio-hosted ticket categorisation/priority model before the user even logs in, so it's warm by the time they raise their first ticket.
@@ -430,9 +429,9 @@ NEXT_PUBLIC_WS_URL=
 # Optional — only if a separate chatbot origin is ever used instead of /chatbot on the main API
 NEXT_PUBLIC_CHATBOT_URL=
 
-# Supabase — used for ticket attachment uploads and realtime features
+# Supabase project URL, used only to allow its storage host for displaying
+# uploaded images. No Supabase key is used by the frontend.
 NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 
 # Show the demo account list on the login page (default true). Set false once
 # the demo phase ends, and disable or re-password those accounts in the database.

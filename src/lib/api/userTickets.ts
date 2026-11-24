@@ -253,18 +253,18 @@ export async function addMyTicketComment(
   });
 }
 
-export async function addMyTicketAttachment(
+/**
+ * Upload an image and attach it to one of the user's tickets. The API checks
+ * access, validates the file from its bytes and stores it.
+ */
+export async function uploadMyTicketAttachment(
   ticketId: string,
-  filePath: string,
-  mimeType?: string | null,
-  originalFilename?: string | null
+  file: File
 ): Promise<UserTicketAttachment> {
-  return request<UserTicketAttachment>(`/user/tickets/${ticketId}/attachments`, {
+  const form = new FormData();
+  form.append("file", file);
+  return request<UserTicketAttachment>(`/user/tickets/${ticketId}/attachments/upload`, {
     method: "POST",
-    body: JSON.stringify({ 
-      file_path: filePath, 
-      mime_type: mimeType, 
-      original_filename: originalFilename 
-    }),
+    body: form,
   });
 }

@@ -168,34 +168,6 @@ export default function LoginPage() {
     warmupInferenceSpace();
   }, []);
 
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      const searchParams = new URLSearchParams(window.location.search);
-      
-      const errorParam = searchParams.get("error");
-      if (errorParam) {
-        setError(decodeURIComponent(errorParam));
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-      
-      if (searchParams.get("oauth_super_admin") === "true") {
-        const stored = sessionStorage.getItem("predictix.google_oauth_super_admin");
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            setSelectionToken(parsed.selectionToken);
-            setSuperAdminName(parsed.superAdminName);
-            setWarehouses(parsed.warehouses || []);
-            setStep("warehouse");
-            sessionStorage.removeItem("predictix.google_oauth_super_admin");
-          } catch (e) {
-            console.error("Failed to parse stored Google OAuth super admin state:", e);
-          }
-        }
-      }
-    }
-  }, []);
-
   function redirectAfterLogin(role: string) {
     const r = role.toUpperCase();
     if (r === "ADMIN" || r === "SUPER_ADMIN") {

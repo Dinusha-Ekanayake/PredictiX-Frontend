@@ -151,8 +151,7 @@ predictix_frontend/
     │   │   └── warehouse/                # Warehouse ops + AI report generation
     │   │       └── report/               # AI-generated warehouse report + PDF export
     │   ├── (auth)/login/
-    │   │   ├── page.tsx                  # Email/password login (+ 2-step super_admin warehouse pick)
-    │   │   └── callback/                 # OAuth callback handler
+    │   │   └── page.tsx                  # Email/password login (+ 2-step super_admin warehouse pick)
     │   ├── (user)/user/
     │   │   ├── layout.tsx                # User layout: navbar + AuthGuard
     │   │   ├── dashboard/                 # User dashboard (assigned assets, team, stats)
@@ -259,7 +258,6 @@ predictix_frontend/
 |---|---|---|
 | `/` | Public | Redirects to `/login` |
 | `/login` | Public | Email/password login; 2-step warehouse selection for Super Admin |
-| `/login/callback` | Public | OAuth callback handler |
 | `/admin/dashboard` | Admin | Operations dashboard: KPIs, charts, alerts, latest tickets, AI summary |
 | `/admin/assets` | Admin | Paginated asset inventory, filters, analytics, detail panel |
 | `/admin/tickets` | Admin | Ticket list, filters, create/detail dialogs |
@@ -305,7 +303,8 @@ Every page above has a matching `loading.tsx` using the shared `PredictiXLoader`
 `Permissions-Policy` and HSTS on every response, and a Content Security Policy in **report-only**
 mode: the browser logs anything the policy would block without blocking it. Once the console shows
 no reports across the app, rename the header to `Content-Security-Policy` to enforce it. Remote
-images are limited to Supabase Storage and Google profile photos.
+images are limited to Supabase Storage and Google-hosted profile photos (avatars saved by the
+Google sign-in the app used to offer).
 
 ### Attachments
 

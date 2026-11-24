@@ -50,7 +50,6 @@ Never add a service-role key or any other secret under a `NEXT_PUBLIC_` name. Th
 
 - **CORS.** The API allows the production and preview Vercel domains by default. Add any other domain, such as a custom one, to `ALLOWED_ORIGINS` in the backend `.env` and restart the service.
 - **Realtime notifications.** These use a WebSocket to `/ws/notifications/...`. The backend's nginx site (`deploy/nginx/predictix.conf`) forwards the upgrade; without it the notification bell stays empty.
-- **Google sign-in.** Google sign-in returns to `/login/callback`. The OAuth provider's allowed redirect URLs must include that path on every domain users sign in from (production, plus any preview you test on).
 
 ## Security headers
 

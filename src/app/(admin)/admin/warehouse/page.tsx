@@ -13,7 +13,6 @@ import { MonthlyTicketVolumeCard } from "@/components/admin/warehouse/WarehouseT
 import WarehouseDepartmentsOverview, {
   type DepartmentOverviewRow,
 } from "@/components/admin/warehouse/WarehouseDepartmentsOverview";
-import type { TicketsByDepartmentRow } from "@/components/admin/warehouse/WarehouseTicketsByDepartment";
 
 import { getMaintenanceSchedule } from "@/lib/warehouseService";
 import { apiFetch } from "@/lib/apiClient";
@@ -25,6 +24,10 @@ import { getSurvivalAnalysis, type SurvivalSummary } from "@/lib/warehouseServic
 
 // Use the same env-driven base URL as warehouseService rather than a hardcoded host.
 const REPORT_PATH = "/warehouse-dashboard/generate-report";
+
+function authedGet(path: string) {
+  return apiFetch(path, { method: "GET" });
+}
 
 export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
@@ -38,13 +41,9 @@ export default function WarehousePage() {
 
   // ── Departments overview + ticket load by department ──
   const [departments, setDepartments] = React.useState<DepartmentOverviewRow[]>([]);
-  const [ticketsByDepartment, setTicketsByDepartment] = React.useState<TicketsByDepartmentRow[]>([]);
+  // The departments-overview response also carries ticketsByDepartment; this page does not show it.
 
-  function authedGet(path: string) {
-    return apiFetch(path, { method: "GET" });
-  }
-
-  async function fetchData() {
+  const fetchData = React.useCallback(async () => {
     setRefreshing(true);
     try {
       // Step 1: Fast queries
@@ -65,13 +64,11 @@ export default function WarehousePage() {
       if (deptRes.status === "fulfilled" && deptRes.value.ok) {
         const deptJson = await deptRes.value.json();
         setDepartments(deptJson.departments ?? []);
-        setTicketsByDepartment(deptJson.ticketsByDepartment ?? []);
       } else {
         if (deptRes.status === "rejected") {
           console.warn("Departments overview unavailable:", deptRes.reason?.message);
         }
         setDepartments([]);
-        setTicketsByDepartment([]);
       }
       
       // Instantly unblock UI so top half loads
@@ -91,11 +88,11 @@ export default function WarehousePage() {
       setRefreshing(false);
       setInitialLoad(false);
     }
-  }
+  }, []);
 
   React.useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // ── Report modal state ──
   const [modalOpen, setModalOpen] = React.useState(false);

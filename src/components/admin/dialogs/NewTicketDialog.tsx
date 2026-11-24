@@ -13,6 +13,7 @@
  */
 
 import * as React from "react";
+import { useObjectUrl } from "@/hooks/useObjectUrl";
 import { AlertCircle, Bot, Loader2, Plus, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "@/lib/customToast";
 import { generateUUID } from "@/lib/utils";
@@ -38,8 +39,8 @@ import {
   createTicketViaApi,
   previewTicketAI,
   type Ticket,
-  type TicketPriority,
-  type TicketCategory,
+
+
   type TicketAiPreview,
   addTicketAttachment,
 } from "@/lib/ticketService";
@@ -94,6 +95,7 @@ export default function NewTicketDialog({
   const users = usersProp ?? fetchedUsers;
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [file, setFile] = React.useState<File | null>(null);
+  const previewUrl = useObjectUrl(file);
 
   // asset summary
   const [assetSummary, setAssetSummary] = React.useState<string | null>(null);
@@ -380,11 +382,12 @@ export default function NewTicketDialog({
               disabled={isSubmitting}
               className="cursor-pointer file:text-foreground file:bg-transparent file:border-0 file:text-sm file:font-medium"
             />
-            {file && (
+            {file && previewUrl && (
               <div className="mt-3">
                 <p className="text-xs text-muted-foreground mb-1">Preview:</p>
-                <img 
-                  src={URL.createObjectURL(file)} 
+                {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview, not optimisable */}
+                <img
+                  src={previewUrl} 
                   alt="Preview" 
                   className="max-h-32 rounded-md object-contain border bg-muted/30" 
                 />

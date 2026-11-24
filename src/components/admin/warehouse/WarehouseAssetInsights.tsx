@@ -89,7 +89,7 @@ export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: any
 
       <CardContent>
         <div className="h-[280px] w-full mt-2">
-          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorHealth" x1="0" y1="0" x2="0" y2="1">
@@ -161,7 +161,7 @@ export function AssetStatusDistributionCard({ data: externalData }: { data?: any
       <CardContent>
         <div className="flex items-center gap-6 mt-2 h-[260px]">
           <div style={{ height: 180, width: 180, flexShrink: 0 }}>
-            <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={statusData}
@@ -231,7 +231,7 @@ export function HealthScoreDistributionCard({ data: externalData }: { data?: any
       <CardContent>
         <div className="flex items-center gap-6 mt-2 h-[260px]">
           <div style={{ height: 180, width: 180, flexShrink: 0 }}>
-            <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
               <PieChart>
                 <Pie data={pieData} dataKey="value" innerRadius={55} outerRadius={85}
                   paddingAngle={3} startAngle={90} endAngle={-270} stroke="none">
@@ -295,7 +295,7 @@ export function AssetsByTypeCard({ data: externalData }: { data?: any[] }) {
 
       <CardContent>
         <div className="h-[300px] w-full mt-2">
-          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
             <BarChart
               data={data}
               layout="vertical"

@@ -163,7 +163,7 @@ function DonutChart({
       </CardHeader>
       <CardContent className="flex items-center gap-6">
         <div className="h-[120px] w-[120px] shrink-0">
-          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
             <PieChart>
               <Pie
                 data={data.map((d) => ({ name: d.label, value: d.value }))}

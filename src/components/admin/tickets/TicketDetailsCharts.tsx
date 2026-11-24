@@ -230,7 +230,7 @@ export default function TicketDetailsCharts({
               No asset history available.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
               <ScatterChart margin={{ top: 15, right: 15, bottom: 5, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis

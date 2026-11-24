@@ -810,7 +810,7 @@ function ReportStep({
                 <CLabel text="Asset Status Distribution" />
                 <div className="flex flex-col xl:flex-row items-center gap-4 mt-2">
                   <div className="w-full xl:w-1/2">
-                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
+                    <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={160}>
                       <PieChart>
                         <Pie data={assetStatusData} cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={3} dataKey="value">
                           {assetStatusData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -852,7 +852,7 @@ function ReportStep({
                 <CLabel text="Fleet Composition by Type" />
                 <div className="flex flex-col xl:flex-row items-center gap-4 mt-2">
                   <div className="w-full xl:w-1/2">
-                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
+                    <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={160}>
                       <BarChart data={assetTypeData} layout="vertical" margin={{ left: 70, right: 20, top: 10, bottom: 0 }}>
                         <XAxis type="number" tick={{ fontSize: 10 }} hide />
                         <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={65} axisLine={false} tickLine={false} />
@@ -958,7 +958,7 @@ function ReportStep({
             {riskData.length > 0 && (
               <div>
                 <CLabel text="Risk Levels" />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={155}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={155}>
                   <PieChart>
                     <Pie data={riskData} cx="50%" cy="50%" innerRadius={30} outerRadius={58} paddingAngle={3} dataKey="value">
                       {riskData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -972,7 +972,7 @@ function ReportStep({
             {healthDistData.length > 0 && (
               <div>
                 <CLabel text="Health Score Buckets" />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={155}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={155}>
                   <BarChart data={healthDistData} margin={{ left: -10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="name" tick={{ fontSize: 9 }} />
@@ -1021,7 +1021,7 @@ function ReportStep({
             ) : shapData.length > 0 ? (
               <div>
                 <CLabel text="Top Failure Indicators" />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={200}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={200}>
                   <BarChart data={shapData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                     <XAxis type="number" tick={{ fontSize: 10 }} />
                     <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
@@ -1060,7 +1060,7 @@ function ReportStep({
             {maintenTypeData.length > 0 && (
               <div>
                 <CLabel text="Event Types" />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={160}>
                   <PieChart>
                     <Pie data={maintenTypeData} cx="50%" cy="50%" outerRadius={57} dataKey="value">
                       {maintenTypeData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -1075,7 +1075,7 @@ function ReportStep({
           {maintenTrend.length > 0 && (
             <>
               <Divider label="Monthly Events (3 Months)" />
-              <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
+              <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={150}>
                 <LineChart data={maintenTrend} margin={{ left: -10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="month" tick={{ fontSize: 9 }} />
@@ -1180,7 +1180,7 @@ function ReportStep({
             {ticketPriData.length > 0 && (
               <div>
                 <CLabel text="Ticket Priority" />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={150}>
                   <PieChart>
                     <Pie data={ticketPriData} cx="50%" cy="50%" innerRadius={28} outerRadius={55} paddingAngle={3} dataKey="value">
                       {ticketPriData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -1198,7 +1198,7 @@ function ReportStep({
             {ticketTrend.length > 0 && (
               <div className="lg:col-span-2">
                 <CLabel text={`Monthly Ticket Volume (${ctx.ticket_trend_direction ?? "stable"})`} />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={150}>
                   <LineChart data={ticketTrend} margin={{ left: -10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 9 }} />
@@ -1214,7 +1214,7 @@ function ReportStep({
             <>
               <Divider label="Ticket Categories" />
               <div className="grid gap-4 sm:grid-cols-2">
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={200}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={200}>
                   <BarChart data={ticketCatData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                     <XAxis type="number" tick={{ fontSize: 10 }} />
                     <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />

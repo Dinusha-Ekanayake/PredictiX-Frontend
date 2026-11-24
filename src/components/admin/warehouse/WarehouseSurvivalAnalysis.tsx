@@ -213,7 +213,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
           </div>
 
           <div className="w-full mt-2 mb-6" style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height={220}>
               <BarChart data={active.data} margin={{ top: 20, right: 8, left: -12, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.15)" />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />

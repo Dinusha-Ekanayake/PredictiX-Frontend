@@ -496,7 +496,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           </p>
         </div>
         <div className="flex-1 w-full min-h-0">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
             <BarChart data={categoryChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
@@ -555,7 +555,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           </p>
         </div>
         <div className="flex-1 w-full min-h-0 flex items-center justify-center">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
             <PieChart>
               <Tooltip content={<CustomPieTooltip />} />
               <Legend
@@ -636,7 +636,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           </p>
         </div>
         <div className="flex-1 w-full min-h-0">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
             <ScatterChart margin={{ top: 20, right: 20, bottom: 5, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
 

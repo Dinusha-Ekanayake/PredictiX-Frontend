@@ -250,7 +250,7 @@ export default function WarehouseMaintenanceSchedule({
           style={{ maxHeight: "600px", minHeight: "400px" }}
         >
           <div style={{ height: Math.max(500, displayData.length * 60) }} className="w-full pt-4">
-            <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
                 <BarChart
                   data={displayData}
                   layout="vertical"

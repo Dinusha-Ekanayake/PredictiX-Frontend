@@ -424,7 +424,7 @@ export default function AdminDashboardPage() {
                       note="Only one month of prediction history has been recorded so far. A trend line appears once a second month of nightly predictions is stored."
                     />
                   ) : (
-                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
+                    <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <AreaChart data={healthTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
                         <defs>
                           <linearGradient id="hG" x1="0" y1="0" x2="0" y2="1">
@@ -460,7 +460,7 @@ export default function AdminDashboardPage() {
                       note="Only one month has ticket activity so far. A trend appears once a second month has tickets."
                     />
                   ) : (
-                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
+                    <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <BarChart data={ticketTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barGap={3}>
                         <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" opacity={0.5} />
                         <XAxis dataKey="period" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
@@ -488,7 +488,7 @@ export default function AdminDashboardPage() {
                       note="Only one month has recorded maintenance cost so far. A trend appears once a second month has spend."
                     />
                   ) : (
-                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
+                    <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <BarChart data={costTrend} margin={{ top: 4, right: 4, left: -10, bottom: 0 }} barGap={4}>
                         <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" opacity={0.5} />
                         <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
@@ -529,7 +529,7 @@ export default function AdminDashboardPage() {
               {dist.length === 0 || distTotalRaw === 0 ? <EmptyRow>No distribution data.</EmptyRow> : (
                 <div className="flex items-center gap-4 mt-3">
                   <div style={{ height: 110, minHeight: 110, width: 110, flexShrink: 0 }}>
-                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
+                    <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                       <PieChart>
                         <Pie data={dist} dataKey="count" innerRadius={34} outerRadius={52} paddingAngle={2} startAngle={90} endAngle={-270}>
                           {dist.map((_, i) => <Cell key={i} fill={DIST_COLORS[i % DIST_COLORS.length]} strokeWidth={0} />)}
@@ -565,7 +565,7 @@ export default function AdminDashboardPage() {
                   other month at the previous, tighter height. */}
               <div className="mt-3" style={{ height: 230, minHeight: 230 }}>
                 {downtime.length === 0 ? <EmptyRow>No downtime data.</EmptyRow> : (
-                  <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
+                  <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%" debounce={200}>
                     {/* The two series can differ by an order of magnitude, so on
                         a shared linear axis the smaller one rendered as an
                         invisible sliver (#98). minPointSize floors every

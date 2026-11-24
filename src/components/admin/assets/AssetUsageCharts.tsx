@@ -174,7 +174,7 @@ export function UtilisationChart({ rows }: { rows: ChartRow[] }) {
             </div>
           )}
           <div className="h-[190px] text-muted-foreground">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
               <ComposedChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.15} vertical={false} />
                 <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={18} />
@@ -227,7 +227,7 @@ export function ServiceCadenceChart({ rows }: { rows: ChartRow[] }) {
             </span>
           </div>
           <div className="h-[190px] text-muted-foreground">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
               <ComposedChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.15} vertical={false} />
                 <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={18} />

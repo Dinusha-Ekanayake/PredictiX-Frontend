@@ -140,7 +140,7 @@ export default function AssetsAnalytics({
           <CardContent>
             <div className="flex items-center gap-4">
               <div style={{ height: 140, width: 140, flexShrink: 0 }}>
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
                   <PieChart>
                     <Pie data={statusData} dataKey="value" innerRadius={38} outerRadius={58}
                       paddingAngle={2} startAngle={90} endAngle={-270}>
@@ -168,7 +168,7 @@ export default function AssetsAnalytics({
           <CardContent>
             <div className="flex items-center gap-4">
               <div style={{ height: 140, width: 140, flexShrink: 0 }}>
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
                   <PieChart>
                     <Pie data={healthData} dataKey="value" innerRadius={38} outerRadius={58}
                       paddingAngle={2} startAngle={90} endAngle={-270}>
@@ -198,7 +198,7 @@ export default function AssetsAnalytics({
           </CardHeader>
           <CardContent>
             <div style={{ height: 200 }}>
-              <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+              <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
                 <BarChart data={typeData} margin={{ top: 4, right: 8, left: -20, bottom: 30 }}
                   barCategoryGap={12}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />

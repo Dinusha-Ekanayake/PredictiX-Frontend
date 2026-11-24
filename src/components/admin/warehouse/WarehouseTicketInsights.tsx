@@ -60,7 +60,7 @@ export function TicketPriorityBreakdownCard({ data: externalData }: { data?: any
       <CardContent>
         <div className="flex items-center gap-6 mt-2 h-[260px]">
           <div style={{ height: 180, width: 180, flexShrink: 0 }}>
-            <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={priorityData}
@@ -112,7 +112,7 @@ export function TicketsByCategoryCard({ data: externalData }: { data?: any[] }) 
 
       <CardContent>
         <div className="h-[260px] w-full mt-2">
-          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
             <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} barCategoryGap={16}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
               <XAxis dataKey="category" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -147,7 +147,7 @@ export function MonthlyTicketVolumeCard({ data: externalData }: { data?: any[] }
 
       <CardContent>
         <div className="h-[280px] w-full mt-2">
-          <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
             <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
               <XAxis dataKey="month" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />

@@ -18,7 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
-  Gauge,
+
   DollarSign,
   Ticket,
   Clock,

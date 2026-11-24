@@ -6,14 +6,14 @@ import { Plus, Search, BookOpen, Edit, Trash2, Eye, EyeOff, X, Loader2, Tag, Cal
 import { cn } from "@/lib/utils";
 import PageHero from "@/components/common/PageHero";
 import { toast } from "@/lib/customToast";
-import { 
-  listKBArticles, 
-  createKBArticle, 
-  updateKBArticle, 
-  toggleKBArticle, 
-  deleteKBArticle, 
-  getKBCategories, 
-  type KBArticle 
+import {
+  listKBArticles,
+  createKBArticle,
+  updateKBArticle,
+  toggleKBArticle,
+  deleteKBArticle,
+  getKBCategories,
+  type KBArticle
 } from "@/lib/api/knowledgeBaseApi";
 
 export default function KnowledgeBasePage() {
@@ -39,11 +39,7 @@ export default function KnowledgeBasePage() {
   const [formSource, setFormSource] = React.useState("");
   const [formTags, setFormTags] = React.useState("");
 
-  React.useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = React.useCallback(async () => {
     setLoading(true);
     try {
       const [fetchedArticles, fetchedCategories] = await Promise.all([
@@ -52,15 +48,19 @@ export default function KnowledgeBasePage() {
       ]);
       setArticles(fetchedArticles);
       setCategories(fetchedCategories);
-      if (fetchedCategories.length > 0 && !formCategory) {
-        setFormCategory(fetchedCategories[0]);
+      if (fetchedCategories.length > 0) {
+        setFormCategory((current) => current || fetchedCategories[0]);
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to load knowledge base data.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleOpenCreate = () => {
     setEditingArticle(null);

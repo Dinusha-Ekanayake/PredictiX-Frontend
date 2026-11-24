@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -439,7 +440,7 @@ export default function FloatingChatbot() {
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center pb-12">
                   <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3.5">
-                    <img src="/logo/predictix-icon.svg" alt="PredictiX" className="size-8 object-contain drop-shadow-md" />
+                    <Image src="/logo/predictix-icon.svg" alt="PredictiX" width={32} height={32} className="size-8 object-contain drop-shadow-md" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">How can I help you?</p>

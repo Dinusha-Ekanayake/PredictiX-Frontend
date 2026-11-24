@@ -36,13 +36,6 @@ import {
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   addMyTicketComment,
   getMyTicket,
   regenerateMyTicketSummary,
@@ -247,6 +240,7 @@ export default function UserTicketDetailsDialog({
             className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
             onClick={() => setFullSizeImage(null)}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element -- uploaded attachment of unknown size shown full screen */}
             <img 
               src={fullSizeImage} 
               alt="Full size" 
@@ -500,6 +494,7 @@ export default function UserTicketDetailsDialog({
                         className="relative group cursor-zoom-in rounded-md border bg-background overflow-hidden w-24 h-24 flex items-center justify-center"
                         onClick={() => setFullSizeImage(a.file_path)}
                       >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- uploaded attachment of unknown size from private storage */}
                         <img 
                           src={a.file_path} 
                           alt={a.original_filename || "Attachment"} 

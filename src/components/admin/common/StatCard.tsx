@@ -1,19 +1,16 @@
 import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 
 export default function StatCard({
   label,
   value,
   hint,
   icon,
-  accentColor,
 }: {
   label: string;
   value: string;
   hint?: string;
   icon?: React.ReactNode;
-  accentColor?: string;
 }) {
   return (
     <Card className="rounded-2xl border-border/60 bg-card/90 backdrop-blur-sm">

@@ -17,7 +17,7 @@ export async function getActiveBackendPort(): Promise<number> {
         console.log(`[Proxy Scanner] Discovered backend running on port ${port}`);
         return port;
       }
-    } catch (err) {
+    } catch {
       // Port is likely closed (Connection Refused), continue scanning
     }
   }

@@ -13,6 +13,7 @@
  */
 
 import * as React from "react";
+import { useObjectUrl } from "@/hooks/useObjectUrl";
 import {
   AlertCircle,
   Bot,
@@ -105,6 +106,7 @@ export default function UserNewTicketDialog({
 
 
   const [file, setFile] = React.useState<File | null>(null);
+  const previewUrl = useObjectUrl(file);
 
   // asset summary
   const [assetSummary, setAssetSummary] = React.useState<string | null>(null);
@@ -231,7 +233,7 @@ export default function UserNewTicketDialog({
       return;
     }
 
-    const aiResult = ai.status === "done" ? ai.result : null;
+    
 
     setIsSubmitting(true);
     try {
@@ -451,11 +453,12 @@ export default function UserNewTicketDialog({
                   disabled={isSubmitting}
                   className="cursor-pointer file:text-foreground file:bg-transparent file:border-0 file:text-sm file:font-medium"
                 />
-                {file && (
+                {file && previewUrl && (
                   <div className="mt-3">
                     <p className="text-xs text-muted-foreground mb-1">Preview:</p>
-                    <img 
-                      src={URL.createObjectURL(file)} 
+                    {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview, not optimisable */}
+                    <img
+                      src={previewUrl} 
                       alt="Preview" 
                       className="max-h-32 rounded-md object-contain border bg-muted/30" 
                     />

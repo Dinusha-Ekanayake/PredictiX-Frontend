@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import {
-  Brain, AlertTriangle, Wrench, TrendingUp, Download,
-  RefreshCw, BookOpen, Users, Activity, ShieldAlert,
+  Brain, AlertTriangle, Wrench, Download,
+  RefreshCw, BookOpen, Activity, ShieldAlert,
   CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp,
   FileText, DollarSign, Clock, ClipboardList, Database, Cpu, X, HeartPulse, Info,
 } from "lucide-react";
@@ -401,7 +401,7 @@ function ReportStep({
   onClose: () => void;
   maintenanceSchedule?: MaintenanceScheduleItem[];
 }) {
-  const [sourcesOpen, setSourcesOpen] = React.useState(false);
+  const sourcesOpen = false;
   const [pdfLoading, setPdfLoading] = React.useState(false);
   const reportContentRef = React.useRef<HTMLDivElement>(null);
   const ctx = data.context;

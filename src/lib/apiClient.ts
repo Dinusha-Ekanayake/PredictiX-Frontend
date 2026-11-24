@@ -4,9 +4,8 @@
  * On 401 → logs out and redirects to /login (no refresh token in current auth scheme).
  */
 
+import { API_BASE_URL, CHATBOT_BASE_URL } from "./apiConfig";
 import { getAccessToken, logout } from "./authService";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 /**
  * Extract a human-readable message from a FastAPI error response body.
@@ -163,7 +162,7 @@ export type ChatbotAskResponse = {
 };
 
 export async function askChatbot(question: string): Promise<ChatbotAskResponse> {
-  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  const chatbotUrl = CHATBOT_BASE_URL;
 
   const response = await fetch(`${chatbotUrl}/chatbot/ask`, {
     method: "POST",

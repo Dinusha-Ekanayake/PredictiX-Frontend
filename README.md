@@ -20,9 +20,9 @@ PredictiX is a role-based Next.js web application for fleet operations and maint
 | Production | [predicti-x-frontend.vercel.app](https://predicti-x-frontend.vercel.app) |
 | Preview | [predicti-x-frontend-dinusha-ekanayakes-projects.vercel.app](https://predicti-x-frontend-dinusha-ekanayakes-projects.vercel.app) |
 
-Deployed on Vercel, connected to the repository — every push builds a preview, and `main`
+Deployed on Vercel, connected to the repository — every push builds a preview, and `master`
 promotes to production. The API host is supplied at build time as `NEXT_PUBLIC_API_URL`; it is
-never committed. The companion API lives in the [`PredictiX_Backend`](../predictix_backend) repository.
+never committed, and a Vercel build without it fails. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The companion API lives in the [`PredictiX_Backend`](../predictix_backend) repository.
 
 ---
 
@@ -418,14 +418,15 @@ npm run lint
 
 ## Environment Variables
 
-Create a `.env.local` file in the project root:
+Copy `.env.example` to `.env.local` in the project root and fill it in:
 
 ```env
 # Backend API base URL (no trailing slash). Chatbot routes live on the same origin.
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 
-# WebSocket URL for the realtime notification bell (usually the same host, ws:// scheme)
-NEXT_PUBLIC_WS_URL=ws://127.0.0.1:8000
+# Optional — WebSocket base for the notification bell. Defaults to the API URL
+# with http(s) replaced by ws(s), which is right whenever both share a host.
+NEXT_PUBLIC_WS_URL=
 
 # Optional — only if a separate chatbot origin is ever used instead of /chatbot on the main API
 NEXT_PUBLIC_CHATBOT_URL=

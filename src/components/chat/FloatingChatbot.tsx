@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { CHATBOT_BASE_URL } from "@/lib/apiConfig";
 import { isSafeActionButton } from "@/lib/safePath";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -49,10 +50,7 @@ type ChatMessage = {
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const CHATBOT_API_BASE =
-  process.env.NEXT_PUBLIC_CHATBOT_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://127.0.0.1:8000";
+const CHATBOT_API_BASE = CHATBOT_BASE_URL;
 
 const AUTH_ROUTE_PREFIXES = [
   "/login",

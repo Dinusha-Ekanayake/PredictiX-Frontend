@@ -10,6 +10,25 @@ function originOf(url: string | undefined): string | null {
   }
 }
 
+/**
+ * On Vercel, refuse to build without a usable backend URL. NEXT_PUBLIC_*
+ * values are inlined at build time, so a missing one would otherwise ship a
+ * bundle that silently calls http://127.0.0.1:8000 on every visitor's machine.
+ */
+function assertDeploymentConfig(): void {
+  if (process.env.VERCEL !== "1") return;
+  const api = process.env.NEXT_PUBLIC_API_URL;
+  const origin = originOf(api);
+  if (!origin) {
+    throw new Error("NEXT_PUBLIC_API_URL must be set to the backend URL (e.g. https://api.example.com) in the Vercel project settings.");
+  }
+  if (process.env.VERCEL_ENV === "production" && !origin.startsWith("https://")) {
+    throw new Error(`NEXT_PUBLIC_API_URL must use https in production (got ${origin}); browsers block mixed content.`);
+  }
+}
+
+assertDeploymentConfig();
+
 const isDev = process.env.NODE_ENV !== "production";
 const apiOrigin = originOf(process.env.NEXT_PUBLIC_API_URL) ?? "http://127.0.0.1:8000";
 const wsOrigin = originOf(process.env.NEXT_PUBLIC_WS_URL);

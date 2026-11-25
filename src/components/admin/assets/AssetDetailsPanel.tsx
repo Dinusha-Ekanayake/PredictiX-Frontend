@@ -18,6 +18,7 @@ import { useNavRouter } from "@/components/navigation/useNavRouter";
 import { UtilisationChart, ServiceCadenceChart, toChartRows } from "./AssetUsageCharts";
 import type { AssetDetail, PredictionTier } from "./types";
 import { deriveHealthScore, deriveFailureProbability, runVehiclePrediction } from "./assetService";
+import { serviceTiming } from "./serviceTiming";
 import { bandFor, healthColor } from "@/lib/healthBands";
 import LogMaintenanceDialog from "./LogMaintenanceDialog";
 import SendServiceReminderButton from "./SendServiceReminderButton";
@@ -344,13 +345,14 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
     ? Math.ceil((new Date(prediction.predicted_maintenance_date).getTime() - Date.now()) / 86_400_000)
     : null;
 
-  const predDiff =
-    asset.next_service_date && prediction?.predicted_maintenance_date
-      ? Math.ceil(
-          (new Date(prediction.predicted_maintenance_date).getTime() -
-            new Date(asset.next_service_date).getTime()) / 86_400_000,
-        )
-      : null;
+  // Schedule vs AI view, reconciled with the failure risk (see serviceTiming).
+  const timing = showHardDate
+    ? serviceTiming({
+        nextServiceDate: asset.next_service_date,
+        predictedDate: prediction?.predicted_maintenance_date,
+        failureProbability: failureProb,
+      })
+    : null;
 
   // Width of the cost model's 80% interval relative to the estimate. This is
   // a measure of confidence, not a trend: a tight range means a more precise
@@ -504,23 +506,19 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                 )}
               </div>
               <RiskGauge probability={failureProb} />
-              {predDiff !== null && showHardDate && (
+              {timing && (
                 <div className={cn(
                   "flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-medium",
-                  predDiff < 0
+                  timing.tone === "critical"
                     ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400"
-                    : predDiff > 0
+                    : timing.tone === "warning"
                       ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
                       : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
                 )}>
-                  {predDiff < 0
+                  {timing.tone === "critical"
                     ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                     : <Zap className="h-3.5 w-3.5 shrink-0" />}
-                  {predDiff < 0
-                    ? `AI predicts failure ${Math.abs(predDiff)} days before scheduled service`
-                    : predDiff > 0
-                      ? `Asset may last ${predDiff} days beyond scheduled service`
-                      : "AI prediction aligns with schedule"}
+                  {timing.text}
                 </div>
               )}
             </div>
@@ -904,16 +902,15 @@ export default function AssetDetailsPanel({ detail, onRefresh, onDelete, onEdit,
                           <span>Classifier and health score disagree — <strong>flagged for manual review</strong>.</span>
                         </div>
                       )}
-                      {showHardDate && predDiff !== null && predDiff < 0 && (
-                        <div className="flex items-start gap-2.5 text-sm text-red-600 dark:text-red-400">
-                          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <span>AI predicts failure <strong>{Math.abs(predDiff)} days earlier</strong> than scheduled service.</span>
-                        </div>
-                      )}
-                      {showHardDate && predDiff !== null && predDiff > 0 && (
-                        <div className="flex items-start gap-2.5 text-sm text-amber-600 dark:text-amber-400">
-                          <Zap className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                          <span>Asset may last <strong>{predDiff} more days</strong> beyond scheduled service.</span>
+                      {timing && timing.tone !== "ok" && (
+                        <div className={cn(
+                          "flex items-start gap-2.5 text-sm",
+                          timing.tone === "critical" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400",
+                        )}>
+                          {timing.tone === "critical"
+                            ? <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            : <Zap className="h-3.5 w-3.5 mt-0.5 shrink-0" />}
+                          <span>{timing.text}.</span>
                         </div>
                       )}
                       {failureProb >= 0.7 && (

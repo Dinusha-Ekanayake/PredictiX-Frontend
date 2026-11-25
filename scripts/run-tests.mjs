@@ -24,10 +24,12 @@ const GROUPS = [
   ["Unit: file preview URLs", "src/hooks/useObjectUrl.test.ts"],
   ["Component: change password", "src/components/common/ChangePasswordCard.test.tsx"],
   ["Unit: asset helpers", "src/components/admin/assets/assetService.test.ts"],
+  ["Unit: service timing advice", "src/components/admin/assets/serviceTiming.test.ts"],
   ["Unit: asset usage charts", "src/components/admin/assets/AssetUsageCharts.test.ts"],
   ["Component: asset usage panels", "src/components/admin/assets/AssetUsageCharts.render.test.tsx"],
   ["Theming: asset section", "src/components/admin/assets/theming.test.ts"],
   ["Component: assigned assets", "src/components/admin/users/ViewAssignedAssetsDialog.test.tsx"],
+  ["Component: warehouse health cards", "src/components/admin/warehouse/WarehouseAssetInsights.test.tsx"],
   ["Test plan: theme (NS-07)", "src/components/theme/ThemeProvider.test.tsx"],
   ["Test plan: navigation (NS-08)", "src/components/navigation/AdminNavbar.test.ts"],
 ];

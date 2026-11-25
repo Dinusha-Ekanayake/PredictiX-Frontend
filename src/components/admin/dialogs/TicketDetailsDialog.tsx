@@ -19,7 +19,7 @@ import {
   updateTicketAssignee,
   fetchTicketAttachments,
   deleteTicketAttachment,
-  addTicketAttachment,
+  uploadTicketAttachment,
   generateTicketSummaryById,
   generateAssetSummaryById,
   fetchTicketEnrichment,
@@ -34,13 +34,12 @@ import {
 import TicketDetailsCharts from "@/components/admin/tickets/TicketDetailsCharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Send, Trash, MessageSquare, ShieldAlert, History } from "lucide-react";
-import { supabase } from "@/lib/supabaseBrowserClient";
 import { getAssetDetail } from "@/components/admin/assets/assetService";
 import type { AssetDetail } from "@/components/admin/assets/types";
 import type { UserItem } from "@/lib/userService";
 import { Input } from "@/components/ui/input";
 import { cn, generateUUID } from "@/lib/utils";
-import { ATTACHMENT_ACCEPT, attachmentObjectName, attachmentProblem } from "@/lib/attachments";
+import { ATTACHMENT_ACCEPT, attachmentProblem } from "@/lib/attachments";
 
 type Props = {
   open: boolean;
@@ -285,32 +284,14 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
   }
 
   async function handleUploadAttachment() {
-    if (!file || !ticket || !supabase) return;
+    if (!file || !ticket) return;
     setUploadingImage(true);
     try {
-      const fileName = attachmentObjectName(file, generateUUID());
-      const { error: uploadError } = await supabase.storage
-        .from("ticket-attachments")
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: publicUrlData } = supabase.storage
-        .from("ticket-attachments")
-        .getPublicUrl(fileName);
-
-      if (publicUrlData?.publicUrl) {
-        await addTicketAttachment(
-          ticket.id,
-          publicUrlData.publicUrl,
-          file.type,
-          file.name
-        );
-        const updated = await fetchTicketAttachments(ticket.id);
-        setAttachments(updated);
-        setFile(null);
-        toast.success("Attachment uploaded");
-      }
+      await uploadTicketAttachment(ticket.id, file);
+      const updated = await fetchTicketAttachments(ticket.id);
+      setAttachments(updated);
+      setFile(null);
+      toast.success("Attachment uploaded");
     } catch (err: any) {
       toast.error("Failed to upload attachment", { description: err?.message });
     } finally {

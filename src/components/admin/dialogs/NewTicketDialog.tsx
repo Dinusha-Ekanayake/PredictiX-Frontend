@@ -16,7 +16,6 @@ import * as React from "react";
 import { useObjectUrl } from "@/hooks/useObjectUrl";
 import { AlertCircle, Bot, Loader2, Plus, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "@/lib/customToast";
-import { generateUUID } from "@/lib/utils";
 
 import {
   Dialog,
@@ -42,12 +41,11 @@ import {
 
 
   type TicketAiPreview,
-  addTicketAttachment,
+  uploadTicketAttachment,
 } from "@/lib/ticketService";
 import { listUsers, type UserItem } from "@/lib/userService";
 import { getUser } from "@/lib/authService";
-import { supabase } from "@/lib/supabaseBrowserClient";
-import { ATTACHMENT_ACCEPT, attachmentObjectName, attachmentProblem } from "@/lib/attachments";
+import { ATTACHMENT_ACCEPT, attachmentProblem } from "@/lib/attachments";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -235,28 +233,14 @@ export default function NewTicketDialog({
         created_by: currentUser.id,
       });
 
-      if (file && supabase) {
-        const fileName = attachmentObjectName(file, generateUUID());
-        const { error: uploadError } = await supabase.storage
-          .from("ticket-attachments")
-          .upload(fileName, file);
-        
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          toast.error("Ticket created, but failed to upload image.");
-        } else {
-          const { data: publicUrlData } = supabase.storage
-            .from("ticket-attachments")
-            .getPublicUrl(fileName);
-            
-          if (publicUrlData?.publicUrl) {
-            await addTicketAttachment(
-              ticket.id,
-              publicUrlData.publicUrl,
-              file.type,
-              file.name
-            );
-          }
+      if (file) {
+        try {
+          await uploadTicketAttachment(ticket.id, file);
+        } catch (uploadErr: any) {
+          // The ticket exists; only the image is missing, so say exactly that.
+          toast.error("Ticket created, but the image was not attached.", {
+            description: uploadErr?.message,
+          });
         }
       }
 

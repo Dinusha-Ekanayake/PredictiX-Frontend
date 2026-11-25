@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 import { downloadAssetPDF, downloadAssetPDFServer, type AssetReportData } from "@/lib/assetPdfExport";
 import { getAccessToken } from "@/lib/authService";
 import { apiFetch } from "@/lib/apiClient";
+import { API_BASE_URL as API_URL } from "@/lib/apiConfig";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 type Props = {
   isOpen: boolean;

@@ -4,9 +4,8 @@
  * On 401 → logs out and redirects to /login (no refresh token in current auth scheme).
  */
 
+import { API_BASE_URL, CHATBOT_BASE_URL } from "./apiConfig";
 import { getAccessToken, logout } from "./authService";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 /**
  * Extract a human-readable message from a FastAPI error response body.
@@ -120,6 +119,21 @@ export async function apiPost<T>(endpoint: string, body: unknown): Promise<T> {
 }
 
 /**
+ * POST a multipart form (file uploads). apiFetch leaves the Content-Type to
+ * the browser so the multipart boundary is set correctly.
+ */
+export async function apiPostForm<T>(endpoint: string, form: FormData): Promise<T> {
+  const response = await apiFetch(endpoint, { method: "POST", body: form });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(extractErrorMessage(error, "Upload failed"));
+  }
+
+  return response.json();
+}
+
+/**
  * PUT request helper
  */
 export async function apiPut<T>(endpoint: string, body: unknown): Promise<T> {
@@ -163,7 +177,7 @@ export type ChatbotAskResponse = {
 };
 
 export async function askChatbot(question: string): Promise<ChatbotAskResponse> {
-  const chatbotUrl = process.env.NEXT_PUBLIC_CHATBOT_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  const chatbotUrl = CHATBOT_BASE_URL;
 
   const response = await fetch(`${chatbotUrl}/chatbot/ask`, {
     method: "POST",

@@ -1,10 +1,11 @@
 /**
- * Ticket image attachments: what may be uploaded and how the stored name is built.
+ * Ticket image attachments: what the file picker offers and the quick checks
+ * made before upload, so the user gets an immediate answer.
  *
- * Files go straight from the browser to Supabase Storage, so this is the only
- * place they are checked before upload. SVG is excluded because it can carry
- * script, and the stored extension comes from the file's type rather than its
- * name, so a file called "x.html" can never be stored as HTML.
+ * These checks are for the user's convenience only. The API is the authority:
+ * it reads the real type from the file's bytes, caps the size and names the
+ * stored object (POST /ticket-attachments/upload). SVG is never offered
+ * because it can carry script.
  */
 
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -27,10 +28,4 @@ export function attachmentProblem(file: File): string | null {
     return "Images must be 10 MB or smaller.";
   }
   return null;
-}
-
-/** Storage object name for an accepted file: unique, with a type-derived extension. */
-export function attachmentObjectName(file: File, uniqueId: string): string {
-  const extension = EXTENSION_BY_TYPE[file.type] ?? "bin";
-  return `${Date.now()}-${uniqueId}.${extension}`;
 }

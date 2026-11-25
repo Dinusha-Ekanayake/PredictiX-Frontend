@@ -10,9 +10,30 @@ function originOf(url: string | undefined): string | null {
   }
 }
 
+/**
+ * On Vercel, refuse to build without a usable backend URL. NEXT_PUBLIC_*
+ * values are inlined at build time, so a missing one would otherwise ship a
+ * bundle that silently calls http://127.0.0.1:8000 on every visitor's machine.
+ */
+function assertDeploymentConfig(): void {
+  if (process.env.VERCEL !== "1") return;
+  const api = process.env.NEXT_PUBLIC_API_URL;
+  const origin = originOf(api);
+  if (!origin) {
+    throw new Error("NEXT_PUBLIC_API_URL must be set to the backend URL (e.g. https://api.example.com) in the Vercel project settings.");
+  }
+  if (process.env.VERCEL_ENV === "production" && !origin.startsWith("https://")) {
+    throw new Error(`NEXT_PUBLIC_API_URL must use https in production (got ${origin}); browsers block mixed content.`);
+  }
+}
+
+assertDeploymentConfig();
+
 const isDev = process.env.NODE_ENV !== "production";
 const apiOrigin = originOf(process.env.NEXT_PUBLIC_API_URL) ?? "http://127.0.0.1:8000";
 const wsOrigin = originOf(process.env.NEXT_PUBLIC_WS_URL);
+// Storage host, only for displaying uploaded images. The browser never calls
+// Supabase itself: all data and uploads go through the API (backend ADR-0008).
 const supabaseOrigin = originOf(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 const connectSources = [
@@ -20,8 +41,6 @@ const connectSources = [
   apiOrigin,
   apiOrigin.replace(/^http/, "ws"),
   wsOrigin,
-  supabaseOrigin,
-  supabaseOrigin?.replace(/^https/, "wss"),
 ].filter(Boolean);
 
 // Sent in report-only mode: the browser logs anything the policy would block

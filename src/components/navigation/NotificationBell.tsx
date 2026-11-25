@@ -14,6 +14,7 @@ import { toast } from "@/lib/customToast";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/hooks/useAuth";
 import { getAccessToken, logout } from "@/lib/authService";
+import { WS_BASE_URL } from "@/lib/apiConfig";
 
 import NotificationDetailDialog from "./NotificationDetailDialog";
 import NotificationHistoryDialog from "./NotificationHistoryDialog";
@@ -88,7 +89,7 @@ export default function NotificationBell() {
         const token = getAccessToken();
         if (!token) return; // logged out elsewhere, nothing to reconnect to
 
-        const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
+        const wsUrl = WS_BASE_URL;
         // The token goes in the first message rather than the URL, so it never
         // appears in server or proxy access logs.
         const socket = new WebSocket(`${wsUrl}/ws/notifications/${userId}`);

@@ -20,9 +20,9 @@ PredictiX is a role-based Next.js web application for fleet operations and maint
 | Production | [predicti-x-frontend.vercel.app](https://predicti-x-frontend.vercel.app) |
 | Preview | [predicti-x-frontend-dinusha-ekanayakes-projects.vercel.app](https://predicti-x-frontend-dinusha-ekanayakes-projects.vercel.app) |
 
-Deployed on Vercel, connected to the repository — every push builds a preview, and `main`
+Deployed on Vercel, connected to the repository — every push builds a preview, and `master`
 promotes to production. The API host is supplied at build time as `NEXT_PUBLIC_API_URL`; it is
-never committed. The companion API lives in the [`PredictiX_Backend`](../predictix_backend) repository.
+never committed, and a Vercel build without it fails. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The companion API lives in the [`PredictiX_Backend`](../predictix_backend) repository.
 
 ---
 
@@ -74,11 +74,9 @@ graph LR
     end
 
     API["PredictiX API<br/>FastAPI on EC2"]
-    SB["Supabase<br/>attachments · realtime"]
 
     APP --> MW --> SSR
-    APP -->|"apiClient.ts<br/>Bearer JWT"| API
-    APP -->|"attachments,<br/>notification bell"| SB
+    APP -->|"apiClient.ts<br/>Bearer JWT, uploads,<br/>notification WebSocket"| API
 
     style MW fill:#0F4C5C,color:#fff
     style API fill:#E6F1F4,stroke:#0F4C5C,stroke-width:2px
@@ -122,7 +120,7 @@ sequenceDiagram
 | Styling | Tailwind CSS v4 + Radix UI (via `radix-ui` + `@radix-ui/react-*`) |
 | Charts | Recharts |
 | Auth backend | Custom JWT (`POST /auth/login`) issued by the PredictiX FastAPI backend |
-| Realtime / Storage | Supabase (`@supabase/supabase-js`) — ticket attachments, realtime notification bell |
+| Realtime / Storage | API WebSocket for the notification bell; attachments uploaded through the API, which stores them in Supabase Storage. The browser never talks to Supabase directly |
 | Notifications (toast) | Sonner |
 | Theme | next-themes (light/dark, system-aware) |
 | PDF Export | html2pdf.js |
@@ -151,8 +149,7 @@ predictix_frontend/
     │   │   └── warehouse/                # Warehouse ops + AI report generation
     │   │       └── report/               # AI-generated warehouse report + PDF export
     │   ├── (auth)/login/
-    │   │   ├── page.tsx                  # Email/password login (+ 2-step super_admin warehouse pick)
-    │   │   └── callback/                 # OAuth callback handler
+    │   │   └── page.tsx                  # Email/password login (+ 2-step super_admin warehouse pick)
     │   ├── (user)/user/
     │   │   ├── layout.tsx                # User layout: navbar + AuthGuard
     │   │   ├── dashboard/                 # User dashboard (assigned assets, team, stats)
@@ -189,7 +186,7 @@ predictix_frontend/
     │   │   └── RoleSelectCards.tsx       # Legacy role-picker UI
     │   ├── navigation/
     │   │   ├── AdminNavbar.tsx / UserNavbar.tsx
-    │   │   ├── NotificationBell.tsx      # Realtime (Supabase/WS) notification dropdown
+    │   │   ├── NotificationBell.tsx      # Realtime (API WebSocket) notification dropdown
     │   │   └── useNavRouter.ts
     │   ├── chat/
     │   │   └── FloatingChatbot.tsx       # Draggable AI chatbot widget (all pages)
@@ -206,7 +203,6 @@ predictix_frontend/
     │   ├── authService.ts                # login/selectWarehouse, session storage, HF Space warmup ping
     │   ├── apiClient.ts                  # Authenticated fetch wrapper (apiGet/Post/Put/Delete)
     │   ├── backendScanner.ts             # Auto-detects the live backend port for the dev proxy
-    │   ├── supabaseBrowserClient.ts      # Supabase client (attachments, realtime)
     │   ├── userService.ts, ticketService.ts, warehouseService.ts, dashboardService.ts
     │   ├── assetPdfExport.ts, pdfExport.ts, professionalPdfExport.ts
     │   ├── utils.ts                      # cn() and misc utilities
@@ -236,7 +232,7 @@ predictix_frontend/
 - Admin ticket management with filters, search, and bulk visibility; user-facing raise/track flow.
 
 ### Notifications
-- Realtime notification bell (Supabase/WebSocket-backed) with unread counts and mark-as-read.
+- Realtime notification bell (API WebSocket) with unread counts and mark-as-read.
 - Per-user notification preferences.
 
 ### Warehouse Operations
@@ -259,7 +255,6 @@ predictix_frontend/
 |---|---|---|
 | `/` | Public | Redirects to `/login` |
 | `/login` | Public | Email/password login; 2-step warehouse selection for Super Admin |
-| `/login/callback` | Public | OAuth callback handler |
 | `/admin/dashboard` | Admin | Operations dashboard: KPIs, charts, alerts, latest tickets, AI summary |
 | `/admin/assets` | Admin | Paginated asset inventory, filters, analytics, detail panel |
 | `/admin/tickets` | Admin | Ticket list, filters, create/detail dialogs |
@@ -305,13 +300,16 @@ Every page above has a matching `loading.tsx` using the shared `PredictiXLoader`
 `Permissions-Policy` and HSTS on every response, and a Content Security Policy in **report-only**
 mode: the browser logs anything the policy would block without blocking it. Once the console shows
 no reports across the app, rename the header to `Content-Security-Policy` to enforce it. Remote
-images are limited to Supabase Storage and Google profile photos.
+images are limited to Supabase Storage and Google-hosted profile photos (avatars saved by the
+Google sign-in the app used to offer).
 
 ### Attachments
 
-Ticket images are uploaded from the browser to the `ticket-attachments` Supabase bucket. Only JPG,
-PNG, WebP and GIF up to 10 MB are accepted (`src/lib/attachments.ts`), and the backend stores an
-attachment only when its URL points into this project's storage.
+Ticket images are uploaded to the API (`POST /ticket-attachments/upload`, or
+`/user/tickets/{id}/attachments/upload` for users). The API checks the caller may see the ticket,
+reads the real type from the file's bytes (JPG, PNG, WebP or GIF), caps the size at 10 MB and names
+the stored object. `src/lib/attachments.ts` makes the same checks first, only so the user gets an
+immediate answer. The browser holds no storage or database credentials.
 
 ### HF Inference Space Warmup
 The login page fires a fire-and-forget `POST /warmup/inference-space` on mount, waking the backend's Gradio-hosted ticket categorisation/priority model before the user even logs in, so it's warm by the time they raise their first ticket.
@@ -418,21 +416,22 @@ npm run lint
 
 ## Environment Variables
 
-Create a `.env.local` file in the project root:
+Copy `.env.example` to `.env.local` in the project root and fill it in:
 
 ```env
 # Backend API base URL (no trailing slash). Chatbot routes live on the same origin.
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 
-# WebSocket URL for the realtime notification bell (usually the same host, ws:// scheme)
-NEXT_PUBLIC_WS_URL=ws://127.0.0.1:8000
+# Optional — WebSocket base for the notification bell. Defaults to the API URL
+# with http(s) replaced by ws(s), which is right whenever both share a host.
+NEXT_PUBLIC_WS_URL=
 
 # Optional — only if a separate chatbot origin is ever used instead of /chatbot on the main API
 NEXT_PUBLIC_CHATBOT_URL=
 
-# Supabase — used for ticket attachment uploads and realtime features
+# Supabase project URL, used only to allow its storage host for displaying
+# uploaded images. No Supabase key is used by the frontend.
 NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 
 # Show the demo account list on the login page (default true). Set false once
 # the demo phase ends, and disable or re-password those accounts in the database.

@@ -135,7 +135,10 @@ export function HealthMaintenanceTrendsCard({ data: externalData }: { data?: any
 
 export function AssetStatusDistributionCard({ data: externalData }: { data?: any[] }) {
   const data = externalData || [];
-  const ALL_STATUSES = ["active", "critical", "under_maintenance", "inactive", "decommissioned"];
+  // Operational statuses only. "Critical" is a health band, not a status (no
+  // asset is ever given status "critical"), so it lives in the Health Band
+  // Distribution card; listing it here only ever showed a misleading 0.
+  const ALL_STATUSES = ["active", "under_maintenance", "inactive", "decommissioned"];
   
   // Merge to ensure all categories show up, even if 0
   const mergedData = ALL_STATUSES.map(name => {
@@ -201,24 +204,18 @@ export function HealthScoreDistributionCard({ data: externalData }: { data?: any
   const data = externalData || [];
   const total = data.reduce((s, d) => s + d.count, 0) || 1;
 
+  // Buckets are the shared health band names from the backend
+  // (app/services/health_bands.py), the same bands the admin dashboard uses.
   const HEALTH_COLOR: Record<string, string> = {
-    "90–100%": "#10b981",
-    "80–89%": "#6366f1",
-    "70–79%": "#f59e0b",
-    "60–69%": "#f97316",
-    "< 60%": "#ef4444",
-  };
-
-  const BAND_LABEL: Record<string, string> = {
-    "90–100%": "Excellent",
-    "80–89%": "Good",
-    "70–79%": "Moderate",
-    "60–69%": "Poor",
-    "< 60%": "Critical",
+    Excellent: "#10b981",
+    Good: "#6366f1",
+    Moderate: "#f59e0b",
+    Poor: "#f97316",
+    Critical: "#ef4444",
   };
 
   const pieData = data.map((d) => ({
-    name: BAND_LABEL[d.bucket] || d.bucket,
+    name: d.range ? `${d.bucket} (${d.range})` : d.bucket,
     value: d.count,
     color: HEALTH_COLOR[d.bucket] ?? "#6b7280"
   }));

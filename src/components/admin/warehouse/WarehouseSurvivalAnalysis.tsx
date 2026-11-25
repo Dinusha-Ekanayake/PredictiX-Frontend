@@ -6,12 +6,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   Activity,
   AlertTriangle,
-  Clock,
+
   Gauge,
   HeartPulse,
-  ShieldAlert,
+
   TrendingDown,
-  Timer,
+
   Wallet,
   BarChart3,
   ChevronLeft,
@@ -32,7 +32,6 @@ import {
 } from "recharts";
 import type {
   SurvivalSummary,
-  SurvivalComponentSummary,
 } from "@/lib/warehouseService";
 
 interface Props {
@@ -121,7 +120,6 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
     expected_spend_7d,
     expected_spend_30d,
     component_summary,
-    assets = [],
   } = data;
 
   // ── Risk bar-chart data: average P(fail) per component for at-risk assets ──
@@ -213,7 +211,7 @@ export default function WarehouseSurvivalAnalysis({ data, isLoading }: Props) {
           </div>
 
           <div className="w-full mt-2 mb-6" style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height={220}>
               <BarChart data={active.data} margin={{ top: 20, right: 8, left: -12, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.15)" />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />

@@ -2,6 +2,7 @@ import { toast as sonnerToast } from "sonner";
 import { CheckCircle2, AlertCircle, Info, XCircle, X } from "lucide-react";
 import * as React from "react";
 import { cn } from "./utils";
+import { isInAppPath } from "@/lib/safePath";
 
 // Types
 type ToastType = "success" | "error" | "info" | "warning";
@@ -55,7 +56,7 @@ function CustomToastContent({ title, description, type, onDismiss, link_url }: T
               {description}
             </p>
           )}
-          {link_url && (
+          {isInAppPath(link_url) && (
             <a 
               href={link_url} 
               className={cn("inline-block mt-2 text-xs font-semibold underline hover:opacity-80 transition-opacity")}

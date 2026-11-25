@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/lib/customToast";
 
+import AuthGuard from "@/components/auth/AuthGuard";
 import AdminNavbar from "@/components/navigation/AdminNavbar";
 import UserNavbar from "@/components/navigation/UserNavbar";
 import AmbientBackground from "@/components/background/AmbientBackground";
@@ -240,7 +241,7 @@ function FaqCard({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function HelpDeskPage() {
+function HelpDeskContent() {
   const adminFormRef = React.useRef<HTMLDivElement | null>(null);
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -663,5 +664,15 @@ export default function HelpDeskPage() {
       
       <Footer />
     </div>
+  );
+}
+
+/** Shared by users and admins; needs a session because the navbar and FAQ
+ *  editing call authenticated endpoints. */
+export default function HelpDeskPage() {
+  return (
+    <AuthGuard>
+      <HelpDeskContent />
+    </AuthGuard>
   );
 }

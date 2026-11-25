@@ -13,9 +13,9 @@
  */
 
 import * as React from "react";
+import { useObjectUrl } from "@/hooks/useObjectUrl";
 import { AlertCircle, Bot, Loader2, Plus, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "@/lib/customToast";
-import { generateUUID } from "@/lib/utils";
 
 import {
   Dialog,
@@ -38,14 +38,14 @@ import {
   createTicketViaApi,
   previewTicketAI,
   type Ticket,
-  type TicketPriority,
-  type TicketCategory,
+
+
   type TicketAiPreview,
-  addTicketAttachment,
+  uploadTicketAttachment,
 } from "@/lib/ticketService";
 import { listUsers, type UserItem } from "@/lib/userService";
 import { getUser } from "@/lib/authService";
-import { supabase } from "@/lib/supabaseBrowserClient";
+import { ATTACHMENT_ACCEPT, attachmentProblem } from "@/lib/attachments";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -93,6 +93,7 @@ export default function NewTicketDialog({
   const users = usersProp ?? fetchedUsers;
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [file, setFile] = React.useState<File | null>(null);
+  const previewUrl = useObjectUrl(file);
 
   // asset summary
   const [assetSummary, setAssetSummary] = React.useState<string | null>(null);
@@ -232,29 +233,14 @@ export default function NewTicketDialog({
         created_by: currentUser.id,
       });
 
-      if (file && supabase) {
-        const fileExt = file.name.split(".").pop();
-        const fileName = `${Date.now()}-${generateUUID()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from("ticket-attachments")
-          .upload(fileName, file);
-        
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          toast.error("Ticket created, but failed to upload image.");
-        } else {
-          const { data: publicUrlData } = supabase.storage
-            .from("ticket-attachments")
-            .getPublicUrl(fileName);
-            
-          if (publicUrlData?.publicUrl) {
-            await addTicketAttachment(
-              ticket.id,
-              publicUrlData.publicUrl,
-              file.type,
-              file.name
-            );
-          }
+      if (file) {
+        try {
+          await uploadTicketAttachment(ticket.id, file);
+        } catch (uploadErr: any) {
+          // The ticket exists; only the image is missing, so say exactly that.
+          toast.error("Ticket created, but the image was not attached.", {
+            description: uploadErr?.message,
+          });
         }
       }
 
@@ -365,16 +351,27 @@ export default function NewTicketDialog({
             <p className="text-sm text-muted-foreground mb-2">Attach Image (optional)</p>
             <Input
               type="file"
-              accept="image/*"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              accept={ATTACHMENT_ACCEPT}
+              onChange={(e) => {
+                const picked = e.target.files?.[0] || null;
+                const problem = picked ? attachmentProblem(picked) : null;
+                if (problem) {
+                  toast.error(problem);
+                  e.target.value = "";
+                  setFile(null);
+                  return;
+                }
+                setFile(picked);
+              }}
               disabled={isSubmitting}
               className="cursor-pointer file:text-foreground file:bg-transparent file:border-0 file:text-sm file:font-medium"
             />
-            {file && (
+            {file && previewUrl && (
               <div className="mt-3">
                 <p className="text-xs text-muted-foreground mb-1">Preview:</p>
-                <img 
-                  src={URL.createObjectURL(file)} 
+                {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview, not optimisable */}
+                <img
+                  src={previewUrl} 
                   alt="Preview" 
                   className="max-h-32 rounded-md object-contain border bg-muted/30" 
                 />

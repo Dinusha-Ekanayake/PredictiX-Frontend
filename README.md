@@ -20,9 +20,9 @@ PredictiX is a role-based Next.js web application for fleet operations and maint
 | Production | [predicti-x-frontend.vercel.app](https://predicti-x-frontend.vercel.app) |
 | Preview | [predicti-x-frontend-dinusha-ekanayakes-projects.vercel.app](https://predicti-x-frontend-dinusha-ekanayakes-projects.vercel.app) |
 
-Deployed on Vercel, connected to the repository — every push builds a preview, and `main`
+Deployed on Vercel, connected to the repository — every push builds a preview, and `master`
 promotes to production. The API host is supplied at build time as `NEXT_PUBLIC_API_URL`; it is
-never committed. The companion API lives in the [`PredictiX_Backend`](../predictix_backend) repository.
+never committed, and a Vercel build without it fails. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The companion API lives in the [`PredictiX_Backend`](../predictix_backend) repository.
 
 ---
 
@@ -70,15 +70,13 @@ graph LR
 
     subgraph EDGE["VERCEL"]
         SSR["Server components<br/>+ static routes"]
-        MW["proxy.ts<br/>route protection"]
+        MW["proxy.ts<br/>pass-through"]
     end
 
     API["PredictiX API<br/>FastAPI on EC2"]
-    SB["Supabase<br/>attachments · realtime"]
 
     APP --> MW --> SSR
-    APP -->|"apiClient.ts<br/>Bearer JWT"| API
-    APP -->|"attachments,<br/>notification bell"| SB
+    APP -->|"apiClient.ts<br/>Bearer JWT, uploads,<br/>notification WebSocket"| API
 
     style MW fill:#0F4C5C,color:#fff
     style API fill:#E6F1F4,stroke:#0F4C5C,stroke-width:2px
@@ -122,7 +120,7 @@ sequenceDiagram
 | Styling | Tailwind CSS v4 + Radix UI (via `radix-ui` + `@radix-ui/react-*`) |
 | Charts | Recharts |
 | Auth backend | Custom JWT (`POST /auth/login`) issued by the PredictiX FastAPI backend |
-| Realtime / Storage | Supabase (`@supabase/supabase-js`) — ticket attachments, realtime notification bell |
+| Realtime / Storage | API WebSocket for the notification bell; attachments uploaded through the API, which stores them in Supabase Storage. The browser never talks to Supabase directly |
 | Notifications (toast) | Sonner |
 | Theme | next-themes (light/dark, system-aware) |
 | PDF Export | html2pdf.js |
@@ -151,8 +149,7 @@ predictix_frontend/
     │   │   └── warehouse/                # Warehouse ops + AI report generation
     │   │       └── report/               # AI-generated warehouse report + PDF export
     │   ├── (auth)/login/
-    │   │   ├── page.tsx                  # Email/password login (+ 2-step super_admin warehouse pick)
-    │   │   └── callback/                 # OAuth callback handler
+    │   │   └── page.tsx                  # Email/password login (+ 2-step super_admin warehouse pick)
     │   ├── (user)/user/
     │   │   ├── layout.tsx                # User layout: navbar + AuthGuard
     │   │   ├── dashboard/                 # User dashboard (assigned assets, team, stats)
@@ -189,7 +186,7 @@ predictix_frontend/
     │   │   └── RoleSelectCards.tsx       # Legacy role-picker UI
     │   ├── navigation/
     │   │   ├── AdminNavbar.tsx / UserNavbar.tsx
-    │   │   ├── NotificationBell.tsx      # Realtime (Supabase/WS) notification dropdown
+    │   │   ├── NotificationBell.tsx      # Realtime (API WebSocket) notification dropdown
     │   │   └── useNavRouter.ts
     │   ├── chat/
     │   │   └── FloatingChatbot.tsx       # Draggable AI chatbot widget (all pages)
@@ -206,13 +203,12 @@ predictix_frontend/
     │   ├── authService.ts                # login/selectWarehouse, session storage, HF Space warmup ping
     │   ├── apiClient.ts                  # Authenticated fetch wrapper (apiGet/Post/Put/Delete)
     │   ├── backendScanner.ts             # Auto-detects the live backend port for the dev proxy
-    │   ├── supabaseBrowserClient.ts      # Supabase client (attachments, realtime)
     │   ├── userService.ts, ticketService.ts, warehouseService.ts, dashboardService.ts
     │   ├── assetPdfExport.ts, pdfExport.ts, professionalPdfExport.ts
     │   ├── utils.ts                      # cn() and misc utilities
     │   └── api/
     │       ├── assets.ts, userProfileApi.ts, userTickets.ts, notificationsApi.ts
-    └── (no middleware.ts — route protection is client-side only; see below)
+    └── proxy.ts                         # Next 16 "proxy" (formerly middleware): deliberate pass-through, see below
 ```
 
 ---
@@ -222,13 +218,13 @@ predictix_frontend/
 ### Asset Management
 - Server-side paginated asset list (50/page) with search, status, health-band, and warehouse filters.
 - Fleet-wide summary KPIs and descriptive analytics (status/health/vehicle-type distributions, top-at-risk assets) computed by the backend, not derived from the current page.
-- Per-asset detail panel: failure probability, cost estimate, component RUL (remaining useful life, computed per-asset from sensor history — independent of the warehouse survival-analysis models), maintenance history, tickets, assignments.
+- Per-asset detail panel: failure probability, cost estimate, component RUL (remaining useful life, from the same Weibull AFT survival models the warehouse view uses), maintenance history, tickets, assignments.
 - Create/edit asset dialog with the real backend status enum (`active`, `inactive`, `under_maintenance`, `critical`, `decommissioned`).
 
 ### Predictive Maintenance (ML)
-- Failure probability, risk level, and predicted maintenance date per asset (CatBoost classifier + regressor on the backend).
+- Failure probability, risk level, and predicted maintenance date per asset (LightGBM v7 classifier + regressor on the backend, trained on generated data).
 - Cost forecasting (LKR) with min/max range.
-- Component-level RUL estimation from linear-trend extrapolation over sensor history.
+- Component-level RUL from Weibull AFT survival models (brake, tire, battery, oil, hydraulic).
 
 ### Smart Maintenance Tickets
 - AI-powered ticket categorisation and priority suggestion (admin can adjust; user's priority is AI-locked).
@@ -236,7 +232,7 @@ predictix_frontend/
 - Admin ticket management with filters, search, and bulk visibility; user-facing raise/track flow.
 
 ### Notifications
-- Realtime notification bell (Supabase/WebSocket-backed) with unread counts and mark-as-read.
+- Realtime notification bell (API WebSocket) with unread counts and mark-as-read.
 - Per-user notification preferences.
 
 ### Warehouse Operations
@@ -249,7 +245,7 @@ predictix_frontend/
 
 ### Role-Based Access Control
 - Three roles (User / Admin / Super Admin) with distinct route groups, layouts, and navbars.
-- Route protection is enforced client-side via `AuthGuard`/`RouteGuard` + `useAuth()` — there is **no `middleware.ts`** in this app.
+- Route protection in the browser is `AuthGuard`/`RouteGuard` + `useAuth()`. `src/proxy.ts` (the Next 16 name for middleware) is an intentional pass-through, because the JWT lives in `localStorage`, which the server cannot read. Every API route enforces roles and warehouse scope itself, so the browser guards only decide what to render.
 
 ---
 
@@ -259,7 +255,6 @@ predictix_frontend/
 |---|---|---|
 | `/` | Public | Redirects to `/login` |
 | `/login` | Public | Email/password login; 2-step warehouse selection for Super Admin |
-| `/login/callback` | Public | OAuth callback handler |
 | `/admin/dashboard` | Admin | Operations dashboard: KPIs, charts, alerts, latest tickets, AI summary |
 | `/admin/assets` | Admin | Paginated asset inventory, filters, analytics, detail panel |
 | `/admin/tickets` | Admin | Ticket list, filters, create/detail dialogs |
@@ -267,6 +262,7 @@ predictix_frontend/
 | `/admin/profile` / `/admin/settings` | Admin | Admin's own profile and account settings |
 | `/admin/warehouse` | Admin | Warehouse overview, maintenance schedule, AI insights |
 | `/admin/warehouse/report` | Admin | AI-generated warehouse report with PDF export |
+| `/admin/knowledge-base` | Admin | Chatbot knowledge-base articles (create, edit, enable/disable) |
 | `/user/dashboard` | User | Assigned assets, team, personal stats |
 | `/user/assets` | User | My assigned assets + read-only searchable fleet |
 | `/user/tickets` | User | Raise and track my tickets |
@@ -294,8 +290,26 @@ Every page above has a matching `loading.tsx` using the shared `PredictiXLoader`
 | `predictix.user` | Serialised user object (id, email, role, full_name, warehouse_id, warehouse_name) |
 
 ### Route Protection
-- **Client-side only** — `AuthGuard` (role-aware, shows the branded loader while checking) and `RouteGuard` wrap the admin/user layouts; `useAuth()` handles redirect logic. There is no server-side `middleware.ts`.
-- A `401` from any API call triggers logout + redirect to `/login`.
+- **In the browser**: `AuthGuard` (role-aware, shows the branded loader while checking) and `RouteGuard` wrap the admin/user layouts; `useAuth()` handles redirect logic. `src/proxy.ts` passes requests through unchanged.
+- A session ends when its token expires (8 hours by default, set on the backend). The guards read the token's expiry and send an expired session to `/login` straight away, and a `401` from any API call does the same.
+- The API is the authority: it checks the token, role and warehouse scope on every request, so the browser checks only shape what is shown.
+
+### Security headers
+
+`next.config.ts` sends `X-Content-Type-Options`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`,
+`Permissions-Policy` and HSTS on every response, and a Content Security Policy in **report-only**
+mode: the browser logs anything the policy would block without blocking it. Once the console shows
+no reports across the app, rename the header to `Content-Security-Policy` to enforce it. Remote
+images are limited to Supabase Storage and Google-hosted profile photos (avatars saved by the
+Google sign-in the app used to offer).
+
+### Attachments
+
+Ticket images are uploaded to the API (`POST /ticket-attachments/upload`, or
+`/user/tickets/{id}/attachments/upload` for users). The API checks the caller may see the ticket,
+reads the real type from the file's bytes (JPG, PNG, WebP or GIF), caps the size at 10 MB and names
+the stored object. `src/lib/attachments.ts` makes the same checks first, only so the user gets an
+immediate answer. The browser holds no storage or database credentials.
 
 ### HF Inference Space Warmup
 The login page fires a fire-and-forget `POST /warmup/inference-space` on mount, waking the backend's Gradio-hosted ticket categorisation/priority model before the user even logs in, so it's warm by the time they raise their first ticket.
@@ -402,21 +416,26 @@ npm run lint
 
 ## Environment Variables
 
-Create a `.env.local` file in the project root:
+Copy `.env.example` to `.env.local` in the project root and fill it in:
 
 ```env
 # Backend API base URL (no trailing slash). Chatbot routes live on the same origin.
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 
-# WebSocket URL for the realtime notification bell (usually the same host, ws:// scheme)
-NEXT_PUBLIC_WS_URL=ws://127.0.0.1:8000
+# Optional — WebSocket base for the notification bell. Defaults to the API URL
+# with http(s) replaced by ws(s), which is right whenever both share a host.
+NEXT_PUBLIC_WS_URL=
 
 # Optional — only if a separate chatbot origin is ever used instead of /chatbot on the main API
 NEXT_PUBLIC_CHATBOT_URL=
 
-# Supabase — used for ticket attachment uploads and realtime features
+# Supabase project URL, used only to allow its storage host for displaying
+# uploaded images. No Supabase key is used by the frontend.
 NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+
+# Show the demo account list on the login page (default true). Set false once
+# the demo phase ends, and disable or re-password those accounts in the database.
+NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=true
 ```
 
 All `NEXT_PUBLIC_` variables are exposed to the browser bundle. Never put secrets (service-role keys, etc.) behind a `NEXT_PUBLIC_` prefix.
@@ -464,26 +483,41 @@ All `NEXT_PUBLIC_` variables are exposed to the browser bundle. Never put secret
 
 ## Testing
 
-Vitest with Testing Library, in a jsdom environment. 69 tests across six groups.
+Two automated layers, both runnable without a backend or credentials. See [TESTING.md](TESTING.md)
+for the full strategy.
 
 ```bash
-npm test              # per-group pass/fail table
+npm test              # unit + component tests, per-group pass/fail table
 npm run test:list     # the same, listing every case
 npm run test:coverage # with a coverage report
 npm run test:watch    # watch mode
 npm run test:raw      # vitest directly, no table
+npm run test:e2e      # Playwright end-to-end smoke against a production build
 ```
+
+**Unit and component (Vitest, Testing Library, jsdom): 177 tests**
 
 | Group | Tests | Covers |
 |---|---|---|
 | Unit: health bands | 26 | banding thresholds, colours, the no-score case |
 | Unit: auth session | 14 | token storage, role reads, sign-out clearing every key |
+| Unit: security hardening | 8 | attachment type and size checks, token expiry |
+| Unit: safe links and chat buttons | 24 | in-app link check, chatbot button allowlist |
+| Unit: API client and 401 handling | 8 | Bearer header, sign-out on 401 only, error messages |
+| Unit: assignable warehouses | 4 | admins limited to their own warehouse |
+| Component: change password | 8 | client-side rules, success and refusal paths |
 | Unit: asset helpers | 8 | deriving displayed health from a prediction |
+| Unit: asset usage charts | 23 | chart data shaping |
+| Component: asset usage panels | 9 | rendered usage panels |
+| Theming: asset section | 24 | light and dark tokens in the asset pages |
 | Component: assigned assets | 14 | the assigned-assets dialog |
 | Test plan: theme | 4 | light/dark switching and persistence |
 | Test plan: navigation | 3 | every navbar link resolving to a real route |
 
-The runner treats vitest's own exit code as the authority on pass/fail and retries reading the
+**End-to-end (Playwright, Chromium): 11 tests** in [e2e/](e2e/): route guards (including the help desk), expired sessions,
+wrong-role redirects, the login flow, security headers, and the dev proxies and dev pages returning 404 in production.
+
+The unit runner treats vitest's own exit code as the authority on pass/fail and retries reading the
 JSON report, because the reporter's write races process exit on Windows. A zero-test run is
 reported as a failure, never as success.
 
@@ -498,4 +532,5 @@ reported as a failure, never as success.
 | Start | `npm start` | Start production server |
 | Lint | `npm run lint` | Run ESLint checks |
 | Test | `npm test` | Vitest suite with a per-group results table |
+| E2E | `npm run test:e2e` | Playwright smoke tests against a production build |
 | Typecheck | `npx tsc --noEmit` | Type check without emitting |

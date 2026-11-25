@@ -13,10 +13,9 @@ import { MonthlyTicketVolumeCard } from "@/components/admin/warehouse/WarehouseT
 import WarehouseDepartmentsOverview, {
   type DepartmentOverviewRow,
 } from "@/components/admin/warehouse/WarehouseDepartmentsOverview";
-import type { TicketsByDepartmentRow } from "@/components/admin/warehouse/WarehouseTicketsByDepartment";
 
 import { getMaintenanceSchedule } from "@/lib/warehouseService";
-import { getAccessToken } from "@/lib/authService";
+import { apiFetch } from "@/lib/apiClient";
 
 // ── Warehouse Report (my section — warehouse components only) ──
 import WarehouseReportModal from "@/components/admin/warehouse/WarehouseReportModal";
@@ -24,8 +23,11 @@ import WarehouseSurvivalAnalysis from "@/components/admin/warehouse/WarehouseSur
 import { getSurvivalAnalysis, type SurvivalSummary } from "@/lib/warehouseService";
 
 // Use the same env-driven base URL as warehouseService rather than a hardcoded host.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const REPORT_API = `${API_BASE_URL}/warehouse-dashboard/generate-report`;
+const REPORT_PATH = "/warehouse-dashboard/generate-report";
+
+function authedGet(path: string) {
+  return apiFetch(path, { method: "GET" });
+}
 
 export default function WarehousePage() {
   // ── Existing dashboard state (untouched) ──
@@ -39,19 +41,9 @@ export default function WarehousePage() {
 
   // ── Departments overview + ticket load by department ──
   const [departments, setDepartments] = React.useState<DepartmentOverviewRow[]>([]);
-  const [ticketsByDepartment, setTicketsByDepartment] = React.useState<TicketsByDepartmentRow[]>([]);
+  // The departments-overview response also carries ticketsByDepartment; this page does not show it.
 
-  function authedGet(path: string) {
-    return fetch(`${API_BASE_URL}${path}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
-      },
-    });
-  }
-
-  async function fetchData() {
+  const fetchData = React.useCallback(async () => {
     setRefreshing(true);
     try {
       // Step 1: Fast queries
@@ -72,13 +64,11 @@ export default function WarehousePage() {
       if (deptRes.status === "fulfilled" && deptRes.value.ok) {
         const deptJson = await deptRes.value.json();
         setDepartments(deptJson.departments ?? []);
-        setTicketsByDepartment(deptJson.ticketsByDepartment ?? []);
       } else {
         if (deptRes.status === "rejected") {
           console.warn("Departments overview unavailable:", deptRes.reason?.message);
         }
         setDepartments([]);
-        setTicketsByDepartment([]);
       }
       
       // Instantly unblock UI so top half loads
@@ -98,11 +88,11 @@ export default function WarehousePage() {
       setRefreshing(false);
       setInitialLoad(false);
     }
-  }
+  }, []);
 
   React.useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // ── Report modal state ──
   const [modalOpen, setModalOpen] = React.useState(false);
@@ -115,19 +105,8 @@ export default function WarehousePage() {
     setReportError(null);
     setReportData(null);
     try {
-      const res = await fetch(REPORT_API, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          // The endpoint is guarded by require_user — attach the JWT like every
-          // other warehouse-dashboard call, otherwise it 401s "Not authenticated".
-          ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
-        },
-      });
-
-      if (res.status === 401) {
-        throw new Error("Your session has expired. Please log out and log back in, then try again.");
-      }
+      // apiFetch attaches the JWT and handles an expired session (401).
+      const res = await apiFetch(REPORT_PATH, { method: "GET" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
         throw new Error(err.detail || `HTTP ${res.status}`);

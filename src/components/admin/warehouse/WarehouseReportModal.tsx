@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import {
-  Brain, AlertTriangle, Wrench, TrendingUp, Download,
-  RefreshCw, BookOpen, Users, Activity, ShieldAlert,
+  Brain, AlertTriangle, Wrench, Download,
+  RefreshCw, BookOpen, Activity, ShieldAlert,
   CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp,
   FileText, DollarSign, Clock, ClipboardList, Database, Cpu, X, HeartPulse, Info,
 } from "lucide-react";
@@ -15,6 +15,7 @@ import {
   LineChart, Line, Legend,
 } from "recharts";
 import { downloadProfessionalPDF } from "@/lib/professionalPdfExport";
+import { apiFetch } from "@/lib/apiClient";
 import WarehouseSurvivalAnalysis from "./WarehouseSurvivalAnalysis";
 import type { SurvivalSummary } from "@/lib/warehouseService";
 
@@ -400,7 +401,7 @@ function ReportStep({
   onClose: () => void;
   maintenanceSchedule?: MaintenanceScheduleItem[];
 }) {
-  const [sourcesOpen, setSourcesOpen] = React.useState(false);
+  const sourcesOpen = false;
   const [pdfLoading, setPdfLoading] = React.useState(false);
   const reportContentRef = React.useRef<HTMLDivElement>(null);
   const ctx = data.context;
@@ -431,10 +432,6 @@ function ReportStep({
     const targets = criticalAssets.filter((a) => selectedCodes.has(a.code));
     if (targets.length === 0) return;
     setSummarizing(true);
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    const token = typeof window !== "undefined"
-      ? (localStorage.getItem("token") || localStorage.getItem("predictix.access_token"))
-      : null;
     const results: Record<string, string> = {};
     await Promise.allSettled(
       targets.map(async (asset) => {
@@ -451,12 +448,8 @@ function ReportStep({
               : "",
             asset.primary_driver ? `Primary driver: ${asset.primary_driver}` : "",
           ].filter(Boolean).join(" | ");
-          const res = await fetch(`${API_BASE}/asset-summaries/generate`, {
+          const res = await apiFetch("/asset-summaries/generate", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
             body: JSON.stringify({ input_text: input }),
           });
           if (res.ok) {
@@ -496,10 +489,6 @@ function ReportStep({
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const filename = `${warehouseName}-Report-${new Date().toISOString().split('T')[0]}.pdf`;
 
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    const token = typeof window !== "undefined"
-      ? (localStorage.getItem("token") || localStorage.getItem("predictix.access_token"))
-      : null;
 
     // Only the assets the user ticked (and summarised) carry a summary into the PDF.
     const summaryMap: Record<string, string> = summaries;
@@ -716,15 +705,8 @@ function ReportStep({
     setPdfLoading(false);
 
     // Trigger Server Notification
-    if (token) {
-      fetch(`${API_BASE}/warehouse-dashboard/notify-print`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }).catch(e => console.error("Failed to notify report print:", e));
-    }
+    apiFetch("/warehouse-dashboard/notify-print", { method: "POST" })
+      .catch(e => console.error("Failed to notify report print:", e));
   };
 
   return (
@@ -828,7 +810,7 @@ function ReportStep({
                 <CLabel text="Asset Status Distribution" />
                 <div className="flex flex-col xl:flex-row items-center gap-4 mt-2">
                   <div className="w-full xl:w-1/2">
-                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
+                    <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={160}>
                       <PieChart>
                         <Pie data={assetStatusData} cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={3} dataKey="value">
                           {assetStatusData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -870,7 +852,7 @@ function ReportStep({
                 <CLabel text="Fleet Composition by Type" />
                 <div className="flex flex-col xl:flex-row items-center gap-4 mt-2">
                   <div className="w-full xl:w-1/2">
-                    <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
+                    <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={160}>
                       <BarChart data={assetTypeData} layout="vertical" margin={{ left: 70, right: 20, top: 10, bottom: 0 }}>
                         <XAxis type="number" tick={{ fontSize: 10 }} hide />
                         <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={65} axisLine={false} tickLine={false} />
@@ -976,7 +958,7 @@ function ReportStep({
             {riskData.length > 0 && (
               <div>
                 <CLabel text="Risk Levels" />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={155}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={155}>
                   <PieChart>
                     <Pie data={riskData} cx="50%" cy="50%" innerRadius={30} outerRadius={58} paddingAngle={3} dataKey="value">
                       {riskData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -990,7 +972,7 @@ function ReportStep({
             {healthDistData.length > 0 && (
               <div>
                 <CLabel text="Health Score Buckets" />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={155}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={155}>
                   <BarChart data={healthDistData} margin={{ left: -10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="name" tick={{ fontSize: 9 }} />
@@ -1039,7 +1021,7 @@ function ReportStep({
             ) : shapData.length > 0 ? (
               <div>
                 <CLabel text="Top Failure Indicators" />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={200}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={200}>
                   <BarChart data={shapData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                     <XAxis type="number" tick={{ fontSize: 10 }} />
                     <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
@@ -1078,7 +1060,7 @@ function ReportStep({
             {maintenTypeData.length > 0 && (
               <div>
                 <CLabel text="Event Types" />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={160}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={160}>
                   <PieChart>
                     <Pie data={maintenTypeData} cx="50%" cy="50%" outerRadius={57} dataKey="value">
                       {maintenTypeData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -1093,7 +1075,7 @@ function ReportStep({
           {maintenTrend.length > 0 && (
             <>
               <Divider label="Monthly Events (3 Months)" />
-              <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
+              <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={150}>
                 <LineChart data={maintenTrend} margin={{ left: -10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="month" tick={{ fontSize: 9 }} />
@@ -1198,7 +1180,7 @@ function ReportStep({
             {ticketPriData.length > 0 && (
               <div>
                 <CLabel text="Ticket Priority" />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={150}>
                   <PieChart>
                     <Pie data={ticketPriData} cx="50%" cy="50%" innerRadius={28} outerRadius={55} paddingAngle={3} dataKey="value">
                       {ticketPriData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -1216,7 +1198,7 @@ function ReportStep({
             {ticketTrend.length > 0 && (
               <div className="lg:col-span-2">
                 <CLabel text={`Monthly Ticket Volume (${ctx.ticket_trend_direction ?? "stable"})`} />
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={150}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={150}>
                   <LineChart data={ticketTrend} margin={{ left: -10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="month" tick={{ fontSize: 9 }} />
@@ -1232,7 +1214,7 @@ function ReportStep({
             <>
               <Divider label="Ticket Categories" />
               <div className="grid gap-4 sm:grid-cols-2">
-                <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height={200}>
+                <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height={200}>
                   <BarChart data={ticketCatData} layout="vertical" margin={{ left: 130, right: 20, top: 10, bottom: 10 }}>
                     <XAxis type="number" tick={{ fontSize: 10 }} />
                     <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />

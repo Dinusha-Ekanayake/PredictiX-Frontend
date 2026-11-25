@@ -16,16 +16,15 @@ import {
   ScatterChart,
   Scatter,
   ZAxis,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
+
+
+
+
+
   ReferenceArea,
 } from "recharts";
 import { apiGet } from "@/lib/apiClient";
-import { listUsers, type UserItem } from "@/lib/userService";
-import { BarChart3, PieChart as PieChartIcon, Users, Clock, AlertCircle } from "lucide-react";
+import { BarChart3, PieChart as PieChartIcon, Users } from "lucide-react";
 
 type TicketData = {
   id: string;
@@ -49,28 +48,17 @@ const CATEGORY_COLORS = {
   Software: "#ec1e85ff",   // Pink
 };
 
-const PRIORITY_VALS = {
-  High: 3,
-  Medium: 2,
-  Low: 1,
-};
-
 export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   const [data, setData] = useState<TicketData[]>([]);
-  const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [tickets, fetchedUsers] = await Promise.all([
-          apiGet<TicketData[]>("/tickets/?limit=500"),
-          listUsers(),
-        ]);
+        const tickets = await apiGet<TicketData[]>("/tickets/?limit=500");
         setData(tickets ?? []);
-        setUsers(fetchedUsers ?? []);
       } catch (err) {
-        console.error("Error fetching tickets or users for charts:", err);
+        console.error("Error fetching tickets for charts:", err);
       } finally {
         setLoading(false);
       }
@@ -78,14 +66,6 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
 
     fetchData();
   }, [refreshTrigger]);
-
-  const userMap = React.useMemo(() => {
-    const map = new Map<string, string>();
-    users.forEach((u) => {
-      map.set(u.id, u.name);
-    });
-    return map;
-  }, [users]);
 
   // 1. Process data for Category Bar Chart
   const categoryCounts = data.reduce((acc, ticket) => {
@@ -123,32 +103,6 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
       value,
     }))
     .sort((a, b) => b.value - a.value);
-
-  // 3. Process data for Technician Queue Depth (Active Tickets only, grouped by priority)
-  const techQueueCounts = data.reduce((acc, ticket) => {
-    // Exclude resolved and closed from queue depth
-    const status = (ticket.status || "").toLowerCase();
-    if (status === "resolved" || status === "closed") return acc;
-
-    const assigneeId = ticket.assigned_to;
-    const name = assigneeId ? (userMap.get(assigneeId) ?? "Unknown") : "Unassigned";
-
-    let prio = (ticket.priority || "Medium").toLowerCase();
-    let prioKey: "High" | "Medium" | "Low" = "Medium";
-    if (prio === "high") prioKey = "High";
-    else if (prio === "medium") prioKey = "Medium";
-    else if (prio === "low") prioKey = "Low";
-
-    if (!acc[name]) {
-      acc[name] = { name, High: 0, Medium: 0, Low: 0, total: 0 };
-    }
-    acc[name][prioKey] += 1;
-    acc[name].total += 1;
-    return acc;
-  }, {} as Record<string, { name: string; High: number; Medium: number; Low: number; total: number }>);
-
-  const techQueueData = Object.values(techQueueCounts)
-    .sort((a, b) => b.total - a.total);
 
   // 4. Process data for 4x3 Status vs Category Grid Counts
   const gridCountsData = React.useMemo(() => {
@@ -235,25 +189,6 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
               style={{ backgroundColor: payload[0].payload.fill }}
             />
             {payload[0].name}: {payload[0].value}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Custom Tooltip for Technician Queue
-  const CustomTechTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="mb-1.5 text-sm font-semibold text-foreground">{label}</p>
-          <p className="text-xs font-medium text-rose-500">High Priority: {data.High}</p>
-          <p className="text-xs font-medium text-amber-500">Medium Priority: {data.Medium}</p>
-          <p className="text-xs font-medium text-emerald-500">Low Priority: {data.Low}</p>
-          <p className="text-sm font-semibold text-violet-400 mt-1 border-t border-slate-800 pt-1">
-            Total Active Tickets: {data.total}
           </p>
         </div>
       );
@@ -422,64 +357,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
     );
   };
 
-  // Custom shape to render 3D horizontal bars (isometric horizontal cuboid)
-  const Custom3DHorizontalBar = (props: any) => {
-    const { x, y, width, height, fill } = props;
-    if (!width || !height) return null;
-
-    const depth = 8;
-
-    return (
-      <g>
-        {/* Front Face */}
-        <rect x={x} y={y} width={width} height={height} fill={fill} />
-
-        {/* Right/End Face (Shadow Overlay) */}
-        <polygon
-          points={`
-            ${x + width},${y} 
-            ${x + width + depth},${y - depth} 
-            ${x + width + depth},${y + height - depth} 
-            ${x + width},${y + height}
-          `}
-          fill={fill}
-        />
-        <polygon
-          points={`
-            ${x + width},${y} 
-            ${x + width + depth},${y - depth} 
-            ${x + width + depth},${y + height - depth} 
-            ${x + width},${y + height}
-          `}
-          fill="#000000"
-          fillOpacity={0.25}
-        />
-
-        {/* Top Face (Highlight Overlay) */}
-        <polygon
-          points={`
-            ${x},${y} 
-            ${x + depth},${y - depth} 
-            ${x + width + depth},${y - depth} 
-            ${x + width},${y}
-          `}
-          fill={fill}
-        />
-        <polygon
-          points={`
-            ${x},${y} 
-            ${x + depth},${y - depth} 
-            ${x + width + depth},${y - depth} 
-            ${x + width},${y}
-          `}
-          fill="#ffffff"
-          fillOpacity={0.2}
-        />
-      </g>
-    );
-  };
-
-  const renderLegendText = (value: string, entry: any) => {
+  const renderLegendText = (value: string) => {
     return <span className="text-sm font-medium text-slate-300 ml-1">{value}</span>;
   };
 
@@ -496,7 +374,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           </p>
         </div>
         <div className="flex-1 w-full min-h-0">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
             <BarChart data={categoryChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
@@ -555,7 +433,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           </p>
         </div>
         <div className="flex-1 w-full min-h-0 flex items-center justify-center">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
             <PieChart>
               <Tooltip content={<CustomPieTooltip />} />
               <Legend
@@ -636,7 +514,7 @@ export default function TicketDashboardCharts({ refreshTrigger = 0 }: { refreshT
           </p>
         </div>
         <div className="flex-1 w-full min-h-0">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
             <ScatterChart margin={{ top: 20, right: 20, bottom: 5, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
 

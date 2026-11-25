@@ -14,6 +14,7 @@ import { toast } from "@/lib/customToast";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/hooks/useAuth";
 import { getAccessToken, logout } from "@/lib/authService";
+import { WS_BASE_URL } from "@/lib/apiConfig";
 
 import NotificationDetailDialog from "./NotificationDetailDialog";
 import NotificationHistoryDialog from "./NotificationHistoryDialog";
@@ -82,17 +83,20 @@ export default function NotificationBell() {
       const MAX_RECONNECT_DELAY_MS = 30_000;
 
       function connect() {
-        // Re-read the token on every (re)connect attempt, not just once,         // a long-lived tab may reconnect hours after mount, by which point
-        // the original token could be stale.
+        // Re-read the token on every (re)connect attempt, not just once: a
+        // long-lived tab may reconnect hours after mount, by which point the
+        // original token could be stale.
         const token = getAccessToken();
         if (!token) return; // logged out elsewhere, nothing to reconnect to
 
-        const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
-        ws = new WebSocket(
-          `${wsUrl}/ws/notifications/${userId}?token=${encodeURIComponent(token)}`
-        );
+        const wsUrl = WS_BASE_URL;
+        // The token goes in the first message rather than the URL, so it never
+        // appears in server or proxy access logs.
+        const socket = new WebSocket(`${wsUrl}/ws/notifications/${userId}`);
+        ws = socket;
 
-        ws.onopen = () => {
+        socket.onopen = () => {
+          socket.send(JSON.stringify({ type: "auth", token }));
           reconnectAttempt = 0; // reset backoff once a connection actually succeeds
         };
 

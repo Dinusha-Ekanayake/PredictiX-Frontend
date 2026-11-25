@@ -35,7 +35,8 @@ import {
 
 import { createUser } from "@/lib/userService";
 import type { UserRole, UserStatus } from "@/lib/userService";
-import { fetchDepartments, fetchWarehouses } from "@/lib/api/userProfileApi";
+import { fetchDepartments } from "@/lib/api/userProfileApi";
+import { fetchAssignableWarehouses } from "@/lib/assignableWarehouses";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -153,7 +154,7 @@ export default function AddUserDialog({
         .then(setDepartments)
         .catch(() => setListsLoadFailed(true))
         .finally(() => setDepartmentsLoading(false));
-      fetchWarehouses()
+      fetchAssignableWarehouses()
         .then(setWarehouses)
         .catch(() => setListsLoadFailed(true))
         .finally(() => setWarehousesLoading(false));

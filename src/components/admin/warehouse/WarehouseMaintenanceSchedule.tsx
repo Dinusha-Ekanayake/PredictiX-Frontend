@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarClock, Lightbulb, Loader2, ArrowUpDown } from "lucide-react";
+import { CalendarClock, Lightbulb, ArrowUpDown } from "lucide-react";
 import { useTheme } from "next-themes";
 import { getMaintenanceSchedule } from "@/lib/warehouseService";
 import { Button } from "@/components/ui/button";
@@ -100,7 +100,7 @@ export default function WarehouseMaintenanceSchedule({
     };
 
     fetchData();
-  }, [propsData, managedExternally]);
+  }, [propsData, managedExternally, externalLoading]);
 
   // Update display data based on sort and filter
   useEffect(() => {
@@ -125,11 +125,6 @@ export default function WarehouseMaintenanceSchedule({
   const gridColor = isDark
     ? "rgba(148, 163, 184, 0.18)"
     : "rgba(148, 163, 184, 0.3)";
-  const tooltipStyle = {
-    backgroundColor: isDark ? "#0f172a" : "#ffffff",
-    border: isDark ? "1px solid #334155" : "1px solid #e2e8f0",
-    color: isDark ? "#f8fafc" : "#0f172a",
-  };
 
   // Show loading state
   if (loading) {
@@ -250,7 +245,7 @@ export default function WarehouseMaintenanceSchedule({
           style={{ maxHeight: "600px", minHeight: "400px" }}
         >
           <div style={{ height: Math.max(500, displayData.length * 60) }} className="w-full pt-4">
-            <ResponsiveContainer minWidth={0} minHeight={0} width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} minWidth={0} minHeight={0} width="100%" height="100%">
                 <BarChart
                   data={displayData}
                   layout="vertical"

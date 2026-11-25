@@ -1,17 +1,16 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowRight,
   Check,
   Copy,
-  ExternalLink,
   Loader2,
   MessageCircle,
   SendHorizontal,
   Sparkles,
-  Trash2,
   X,
 } from "lucide-react";
 
@@ -20,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { CHATBOT_BASE_URL } from "@/lib/apiConfig";
+import { isSafeActionButton } from "@/lib/safePath";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,14 +44,13 @@ type ChatMessage = {
   toolTrace?: ToolTraceItem[];
   widgetType?: string;
   widgetData?: any;
+  /** Audit trace id: quote it to an admin to see how this answer was produced. */
+  traceId?: string;
 };
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const CHATBOT_API_BASE =
-  process.env.NEXT_PUBLIC_CHATBOT_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://127.0.0.1:8000";
+const CHATBOT_API_BASE = CHATBOT_BASE_URL;
 
 const AUTH_ROUTE_PREFIXES = [
   "/login",
@@ -79,35 +79,6 @@ function CopyActionButton({ label, textToCopy }: { label: string; textToCopy: st
 }
 
 // ─── Widgets ──────────────────────────────────────────────────────────────────
-
-function AssetHealthWidget({ data }: { data: any }) {
-  if (!data) return null;
-  const isGood = data.healthScore >= 70;
-  return (
-    <div className="mt-3 overflow-hidden rounded-xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm">
-      <div className="mb-2 flex items-center justify-between">
-        <h4 className="font-semibold text-sm text-foreground">{data.name}</h4>
-        <Badge variant={isGood ? "default" : "destructive"} className="text-[10px] uppercase">
-          {data.status}
-        </Badge>
-      </div>
-      <div className="space-y-2 text-xs">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Health Score</span>
-          <span className="font-medium text-foreground">{data.healthScore}%</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Failure Prob.</span>
-          <span className="font-medium text-foreground">{(data.failureProbability * 100).toFixed(0)}%</span>
-        </div>
-        <div className="flex justify-between border-t border-border/50 pt-2">
-          <span className="text-muted-foreground">Predicted Failure</span>
-          <span className="font-medium text-red-500">{data.predictedFailureDate}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function RecordSummaryWidget({ payload }: { payload: any }) {
   if (!payload || !payload.data) return null;
@@ -330,14 +301,17 @@ export default function FloatingChatbot() {
 
       const payload = await response.json();
       const replyText: string = typeof payload?.answer === "string" ? payload.answer : "";
+      // The server already filters buttons; checking again here means a bad
+      // response can never send the browser outside the app.
       const actionButtons: ActionButton[] = Array.isArray(payload?.action_buttons)
-        ? (payload.action_buttons as ActionButton[])
+        ? (payload.action_buttons as ActionButton[]).filter(isSafeActionButton)
         : [];
       const toolTrace: ToolTraceItem[] = Array.isArray(payload?.tool_trace)
         ? (payload.tool_trace as ToolTraceItem[])
         : [];
       const widgetType = payload?.widget_type;
       const widgetData = payload?.widget_data;
+      const traceId = typeof payload?.trace_id === "string" ? payload.trace_id : undefined;
 
       setMessages((prev) => [
         ...prev,
@@ -350,6 +324,7 @@ export default function FloatingChatbot() {
           toolTrace,
           widgetType,
           widgetData,
+          traceId,
         },
       ]);
     } catch (error) {
@@ -434,7 +409,7 @@ export default function FloatingChatbot() {
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center pb-12">
                   <div className="rounded-full bg-gradient-to-br from-violet-500/15 to-sky-500/15 p-3.5">
-                    <img src="/logo/predictix-icon.svg" alt="PredictiX" className="size-8 object-contain drop-shadow-md" />
+                    <Image src="/logo/predictix-icon.svg" alt="PredictiX" width={32} height={32} className="size-8 object-contain drop-shadow-md" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">How can I help you?</p>
@@ -523,11 +498,20 @@ export default function FloatingChatbot() {
                         </div>
 
                         {/* Custom Widgets */}
-                        {message.role === "assistant" && message.widgetType === "ASSET_HEALTH" && (
-                          <AssetHealthWidget data={message.widgetData} />
-                        )}
                         {message.role === "assistant" && message.widgetType === "RECORD_SUMMARY" && (
                           <RecordSummaryWidget payload={message.widgetData} />
+                        )}
+
+                        {/* Reference to this answer's audit trace, copyable for support requests */}
+                        {message.role === "assistant" && message.traceId && (
+                          <button
+                            type="button"
+                            title={`Answer reference ${message.traceId}. Click to copy; an admin can use it to see how this answer was produced.`}
+                            onClick={() => void navigator.clipboard.writeText(message.traceId as string)}
+                            className="mt-1.5 block text-[10px] font-mono text-muted-foreground/70 hover:text-muted-foreground"
+                          >
+                            Ref {message.traceId.slice(0, 8)}
+                          </button>
                         )}
 
                         {/* Action Buttons, rendered as clickable nav buttons */}

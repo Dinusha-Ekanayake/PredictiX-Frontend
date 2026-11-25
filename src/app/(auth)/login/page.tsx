@@ -37,7 +37,6 @@ import {
   type LoginResponse,
   type WarehouseOption,
 } from "@/lib/authService";
-import { supabase } from "@/lib/supabaseBrowserClient";
 
 // ─── Shared Components ────────────────────────────────────────────────────────
 
@@ -141,6 +140,10 @@ function BackgroundBlobs() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+// The demo accounts are real database accounts, so a deployment past the demo
+// phase should hide them here and disable or re-password them in the database.
+const SHOW_DEMO_ACCOUNTS = process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS !== "false";
+
 export default function LoginPage() {
   const router = useNavRouter();
   const ready = useMinDelay(2000);
@@ -163,34 +166,6 @@ export default function LoginPage() {
   // happens post-login. Fire-and-forget, never blocks rendering or login.
   React.useEffect(() => {
     warmupInferenceSpace();
-  }, []);
-
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      const searchParams = new URLSearchParams(window.location.search);
-      
-      const errorParam = searchParams.get("error");
-      if (errorParam) {
-        setError(decodeURIComponent(errorParam));
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-      
-      if (searchParams.get("oauth_super_admin") === "true") {
-        const stored = sessionStorage.getItem("predictix.google_oauth_super_admin");
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            setSelectionToken(parsed.selectionToken);
-            setSuperAdminName(parsed.superAdminName);
-            setWarehouses(parsed.warehouses || []);
-            setStep("warehouse");
-            sessionStorage.removeItem("predictix.google_oauth_super_admin");
-          } catch (e) {
-            console.error("Failed to parse stored Google OAuth super admin state:", e);
-          }
-        }
-      }
-    }
   }, []);
 
   function redirectAfterLogin(role: string) {
@@ -390,13 +365,10 @@ export default function LoginPage() {
                     </Button>
 
 
-                    {/* Demo credentials hint.
-                        Every warehouse has a matching demo pair, swap "colombo"
-                        for "badulla" or "galle" in the address to sign in against
-                        that site. Staff accounts follow
-                        firstname.department@lankalogix.com (departments: log,
-                        elec, sft, mech, adm) with the password user@123, or
-                        admin@123 for warehouse administrators. */}
+                    {/* Demo credentials hint. Every warehouse has a matching demo
+                        pair: swap "colombo" for "badulla" or "galle" in the
+                        address. Hidden when NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=false. */}
+                    {SHOW_DEMO_ACCOUNTS && (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-border dark:bg-muted dark:text-muted-foreground">
                       <div className="font-medium text-slate-800 dark:text-foreground mb-1.5">Demo accounts</div>
                       <div className="space-y-1.5">
@@ -426,6 +398,7 @@ export default function LoginPage() {
                         <span className="font-mono">galle</span>.
                       </div>
                     </div>
+                    )}
 
                     <div className="flex flex-col items-center gap-1 mt-4">
                       <AdminContactDialog />

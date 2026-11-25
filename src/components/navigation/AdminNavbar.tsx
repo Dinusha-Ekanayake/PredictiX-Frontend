@@ -11,7 +11,6 @@ import {
   Warehouse,
   Users,
   Menu,
-  CircleHelp,
 } from "lucide-react";
 
 import PredictiXLogo from "@/components/brand/PredictiXLogo";

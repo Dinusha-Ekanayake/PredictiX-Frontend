@@ -3,20 +3,20 @@
 import React, { useEffect, useState } from "react";
 import {
   ResponsiveContainer,
-  BarChart,
-  Bar,
+
+
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
+
   Cell,
   ScatterChart,
   Scatter,
   ZAxis,
 } from "recharts";
 import { apiGet } from "@/lib/apiClient";
-import { Clock, LineChart } from "lucide-react";
+import { LineChart } from "lucide-react";
 
 type HistoryEntry = {
   created_at: string;
@@ -34,13 +34,6 @@ type TicketDetailsChartsProps = {
   assetId: string | null;
 };
 
-const STATE_COLORS = {
-  "Open": "#ef4444",        // Red
-  "In Progress": "#f59e0b", // Amber
-  "Resolved": "#10b981",    // Emerald
-  "Closed": "#64748b",      // Slate
-};
-
 const PRIORITY_COLORS = {
   high: "#f59e0b",   // Orange
   medium: "#3b82f6", // Blue
@@ -49,11 +42,6 @@ const PRIORITY_COLORS = {
 
 export default function TicketDetailsCharts({
   ticketId,
-  createdAt,
-  resolvedAt,
-  closedAt,
-  currentStatus,
-  history,
   assetId,
 }: TicketDetailsChartsProps) {
   const [assetTickets, setAssetTickets] = useState<any[]>([]);
@@ -84,62 +72,6 @@ export default function TicketDetailsCharts({
       cancelled = true;
     };
   }, [assetId, ticketId]);
-  // 1. Process State Durations
-  const durationData = React.useMemo(() => {
-    const states = {
-      "Open": 0,
-      "In Progress": 0,
-      "Resolved": 0,
-      "Closed": 0,
-    };
-
-    // Sort history by date ascending
-    const sortedHistory = [...history].sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
-
-    let currentTimestamp = new Date(createdAt).getTime();
-    let currentPhase = "Open"; // Default initial state when ticket is created
-
-    for (const h of sortedHistory) {
-      const nextTimestamp = new Date(h.created_at).getTime();
-      const diffHours = Math.max(0, (nextTimestamp - currentTimestamp) / (1000 * 60 * 60));
-
-      if (currentPhase === "open") states["Open"] += diffHours;
-      else if (currentPhase === "in-progress" || currentPhase === "in_progress") states["In Progress"] += diffHours;
-      else if (currentPhase === "resolved") states["Resolved"] += diffHours;
-      else if (currentPhase === "closed") states["Closed"] += diffHours;
-
-      currentTimestamp = nextTimestamp;
-      currentPhase = h.new_status;
-    }
-
-    // Final interval to now or resolution/close time
-    let endTimestamp = new Date().getTime();
-    const cleanStatus = currentStatus.toLowerCase();
-    if (cleanStatus === "resolved" && resolvedAt) {
-      endTimestamp = new Date(resolvedAt).getTime();
-    } else if (cleanStatus === "closed" && closedAt) {
-      endTimestamp = new Date(closedAt).getTime();
-    }
-
-    const finalDiffHours = Math.max(0, (endTimestamp - currentTimestamp) / (1000 * 60 * 60));
-    if (currentPhase === "open") states["Open"] += finalDiffHours;
-    else if (currentPhase === "in-progress" || currentPhase === "in_progress") states["In Progress"] += finalDiffHours;
-    else if (currentPhase === "resolved") states["Resolved"] += finalDiffHours;
-    else if (currentPhase === "closed") states["Closed"] += finalDiffHours;
-
-    // Convert to days or keep in hours for layout
-    return [
-      {
-        name: "Duration",
-        "Open": parseFloat(states["Open"].toFixed(1)),
-        "In Progress": parseFloat(states["In Progress"].toFixed(1)),
-        "Resolved": parseFloat(states["Resolved"].toFixed(1)),
-        "Closed": parseFloat(states["Closed"].toFixed(1)),
-      },
-    ];
-  }, [createdAt, resolvedAt, closedAt, currentStatus, history]);
 
   // 2. Process Asset Chronology Scatter Plot
   const scatterData = React.useMemo(() => {
@@ -165,26 +97,6 @@ export default function TicketDetailsCharts({
       })
       .sort((a, b) => a.createdDate - b.createdDate);
   }, [assetTickets, ticketId]);
-
-  // Custom Tooltip for Stacked Timeline
-  const CustomTimelineTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-xl backdrop-blur-md">
-          <p className="text-xs font-semibold text-muted-foreground mb-1.5">State Durations:</p>
-          {payload.map((p: any, idx: number) => {
-            if (p.value === 0) return null;
-            return (
-              <p key={idx} className="text-xs font-medium" style={{ color: p.color }}>
-                {p.name}: {p.value} hours ({(p.value / 24).toFixed(1)} days)
-              </p>
-            );
-          })}
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Custom Tooltip for Asset Chronology Scatter Plot
   const CustomScatterTooltip = ({ active, payload }: any) => {
@@ -230,7 +142,7 @@ export default function TicketDetailsCharts({
               No asset history available.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer initialDimension={{ width: 1, height: 1 }} width="100%" height="100%">
               <ScatterChart margin={{ top: 15, right: 15, bottom: 5, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis

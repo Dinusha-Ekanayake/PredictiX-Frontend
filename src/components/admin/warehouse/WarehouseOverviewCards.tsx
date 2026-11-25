@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, ShieldCheck, AlertTriangle, Ticket, Truck, AlertCircle, Zap, DollarSign } from "lucide-react";
 
 function SummaryCard({

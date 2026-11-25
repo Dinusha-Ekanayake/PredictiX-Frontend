@@ -100,6 +100,7 @@ export default function ProfilePhotoUpload() {
         onClick={() => fileInputRef.current?.click()}
       >
         {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- avatar may be a data: URL from the upload preview
           <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
         ) : (
           initials

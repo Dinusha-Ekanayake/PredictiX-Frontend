@@ -4,8 +4,8 @@
  */
 
 import { invalidateMyProfile } from "@/lib/api/userProfileApi";
+import { API_BASE_URL } from "@/lib/apiConfig";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -208,9 +208,36 @@ export function logout(): void {
   invalidateMyProfile();
 }
 
-/** True if a JWT is present in localStorage. */
+/**
+ * Seconds-since-epoch expiry read from a JWT's payload, or null when the token
+ * is not a readable JWT. The signature is not checked here; the API does that.
+ * This only lets the UI notice an expired session before making a request.
+ */
+export function tokenExpiry(token: string): number | null {
+  const payload = token.split(".")[1];
+  if (!payload) return null;
+  try {
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const exp = (JSON.parse(json) as { exp?: unknown }).exp;
+    return typeof exp === "number" ? exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True if a session token is stored and has not expired. An expired session
+ * is cleared here, so every guard sends the user to the login page at once.
+ */
 export function isAuthenticated(): boolean {
-  return !!getAccessToken();
+  const token = getAccessToken();
+  if (!token) return false;
+  const exp = tokenExpiry(token);
+  if (exp !== null && exp * 1000 <= Date.now()) {
+    logout();
+    return false;
+  }
+  return true;
 }
 
 /** Return the stored role (uppercase), or null. */

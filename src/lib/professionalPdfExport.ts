@@ -508,19 +508,6 @@ function alertBox(text: string, type: 'benchmark' | 'alert' | 'advisory' | 'info
   </div>`;
 }
 
-function progressBar(label: string, count: number, max: number, color: string, pct?: number): string {
-  const p = pct !== undefined ? pct : (max > 0 ? Math.min((count / max) * 100, 100) : 0);
-  return `<div style="margin-bottom:12px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-      <span style="font-size:10px;color:${C.text};font-weight:500;">${label}</span>
-      <span style="font-size:10px;font-weight:700;color:${color};">${count.toLocaleString()} <span style="font-weight:400;color:${C.textMuted};">(${p.toFixed(1)}%)</span></span>
-    </div>
-    <div style="background:${C.borderLight};height:9px;border-radius:5px;overflow:hidden;">
-      <div style="width:${p}%;background:${color};height:100%;border-radius:5px;"></div>
-    </div>
-  </div>`;
-}
-
 function darkTable(headers: string[], rows: string[][]): string {
   const ths = headers.map(h =>
     `<th style="background:${C.navy};color:white;padding:7px 11px;text-align:left;font-size:9.5px;font-weight:600;border-right:1px solid ${C.navyLight};">${h}</th>`
@@ -559,12 +546,6 @@ function lightTable(headers: string[], rows: string[][]): string {
     <thead style="background:${C.offWhite};"><tr>${ths}</tr></thead>
     <tbody>${trs}</tbody>
   </table>`;
-}
-
-function healthBadge(health: string): string {
-  const score = parseFloat(health);
-  const color = isNaN(score) ? C.slateMid : score < 50 ? C.red : score < 70 ? C.orange : C.green;
-  return `<span style="font-weight:700;color:${color};">${health}</span>`;
 }
 
 function recommendBlock(urgency: 'CRITICAL' | 'HIGH' | 'MEDIUM', days: string, items: string[]): string {
@@ -677,7 +658,6 @@ export function generateProfessionalHTML(data: ReportData): string {
   const md  = data.maintenanceDetail || {};
   const ud  = data.userDetail    || {};
   const ad  = data.assetDetail   || {};
-  const od  = data.operationsDetail || {};
   const tr  = data.trends        || {};
   const msch = data.maintenanceSchedule || [];
 
@@ -1053,8 +1033,6 @@ export function generateProfessionalHTML(data: ReportData): string {
   const section3c = '';
 
   // ── §3 (cont.): FMEA CRITICALITY + CLIMATE RISK ───────────────
-  const fmeaRank = kb.fmea_criticality || [];
-  const climateRisk = kb.climate_risk || [];
   const section3d = '';
 
   // ── §4: MAINTENANCE INTELLIGENCE ──────────────────────────────
@@ -1188,7 +1166,6 @@ export function generateProfessionalHTML(data: ReportData): string {
     </div>` : ''}`;
 
   // ── §4 (cont.): MAINTENANCE COMPLIANCE FRAMEWORK ──────────────
-  const statutory = kb.statutory_compliance || [];
   const oemIntervals = kb.oem_intervals || [];
 
   const section4c = '';

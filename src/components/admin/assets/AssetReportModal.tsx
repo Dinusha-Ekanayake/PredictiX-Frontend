@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 import { downloadAssetPDF, downloadAssetPDFServer, type AssetReportData } from "@/lib/assetPdfExport";
 import { getAccessToken } from "@/lib/authService";
 import { apiFetch } from "@/lib/apiClient";
+import { API_BASE_URL as API_URL } from "@/lib/apiConfig";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 type Props = {
   isOpen: boolean;
@@ -565,7 +565,7 @@ export default function AssetReportModal({ isOpen, onClose, assetId, assetName }
                     <div className="space-y-2">
                       {(() => {
                         const entries = Object.entries(reportData.top_explanations!);
-                        const maxVal = Math.max(...entries.map(([_, val]) => Math.abs(val)), 1);
+                        const maxVal = Math.max(...entries.map(([, val]) => Math.abs(val)), 1);
                         return entries.map(([feature, raw], i) => {
                           const impact = Math.abs(raw);
                           const pct = Math.round((impact / maxVal) * 100);

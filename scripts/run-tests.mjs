@@ -17,6 +17,12 @@ import { join } from "node:path";
 const GROUPS = [
   ["Unit: health bands", "src/lib/healthBands.test.ts"],
   ["Unit: auth session (AU-08)", "src/lib/authService.test.ts"],
+  ["Unit: security hardening", "src/lib/securityHardening.test.ts"],
+  ["Unit: safe links and chat buttons", "src/lib/safePath.test.ts"],
+  ["Unit: API client and 401 handling", "src/lib/apiClient.test.ts"],
+  ["Unit: assignable warehouses", "src/lib/assignableWarehouses.test.ts"],
+  ["Unit: file preview URLs", "src/hooks/useObjectUrl.test.ts"],
+  ["Component: change password", "src/components/common/ChangePasswordCard.test.tsx"],
   ["Unit: asset helpers", "src/components/admin/assets/assetService.test.ts"],
   ["Unit: asset usage charts", "src/components/admin/assets/AssetUsageCharts.test.ts"],
   ["Component: asset usage panels", "src/components/admin/assets/AssetUsageCharts.render.test.tsx"],

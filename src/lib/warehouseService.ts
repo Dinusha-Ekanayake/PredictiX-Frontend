@@ -3,20 +3,8 @@
  * Handles all API calls to backend warehouse endpoints
  */
 
-import { getAccessToken } from './authService';
+import { apiFetch } from './apiClient';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-
-/**
- * Build request headers with the auth token attached. The warehouse-dashboard
- * and survival endpoints require a valid JWT, so every call here must send it.
- */
-function authHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const token = getAccessToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-}
 
 export interface WarehouseSummaryData {
   kpiGrid?: any[];
@@ -97,10 +85,9 @@ export interface SurvivalSummary {
  */
 export async function getSurvivalAnalysis(): Promise<SurvivalSummary | null> {
   try {
-    const url = `${API_BASE_URL}/warehouse-dashboard/survival`;
-    const response = await fetch(url, {
+    const path = `/warehouse-dashboard/survival`;
+    const response = await apiFetch(path, {
       method: 'GET',
-      headers: authHeaders(),
       cache: 'no-store',
     });
 
@@ -125,11 +112,10 @@ export async function getSurvivalAnalysis(): Promise<SurvivalSummary | null> {
  */
 export async function getMaintenanceSchedule() {
   try {
-    const url = `${API_BASE_URL}/warehouse-dashboard/maintenance-schedule`;
+    const path = `/warehouse-dashboard/maintenance-schedule`;
 
-    const response = await fetch(url, {
+    const response = await apiFetch(path, {
       method: 'GET',
-      headers: authHeaders(),
       cache: 'no-store',
     });
 
@@ -152,11 +138,10 @@ export async function getMaintenanceSchedule() {
  */
 export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
   try {
-    const url = `${API_BASE_URL}/warehouse-dashboard/summary`;
+    const path = `/warehouse-dashboard/summary`;
 
-    const response = await fetch(url, {
+    const response = await apiFetch(path, {
       method: 'GET',
-      headers: authHeaders(),
       cache: 'no-store', // Disable caching for fresh data
     });
 
@@ -179,30 +164,5 @@ export async function getWarehouseSummary(): Promise<WarehouseSummaryData> {
   } catch (error) {
     console.error('[ERROR] Failed to fetch warehouse summary:', error);
     throw error;
-  }
-}
-
-/**
- * Fetch fleet-level FRSO survival summary (per-component RUL + watchlist)
- * from the backend GET /survival/warehouse/summary endpoint.
- */
-export async function getFleetSurvival(maxAssets = 12, horizonDays = 180) {
-  try {
-    const url = `${API_BASE_URL}/survival/warehouse/summary?max_assets=${maxAssets}&horizon_days=${horizonDays}`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: authHeaders(),
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      console.warn(`[warehouseService] Fleet survival error: ${response.status}`);
-      return null;
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.warn('[warehouseService] Fleet survival unavailable:', (error as Error).message);
-    return null;
   }
 }

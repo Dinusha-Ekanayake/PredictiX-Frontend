@@ -13,33 +13,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  updateTicketStatus, 
-  updateTicketPriority, 
-  updateTicketAssignee, 
+import {
+  updateTicketStatus,
+
+  updateTicketAssignee,
   fetchTicketAttachments,
   deleteTicketAttachment,
-  addTicketAttachment,
+  uploadTicketAttachment,
   generateTicketSummaryById,
   generateAssetSummaryById,
   fetchTicketEnrichment,
   fetchTicketComments,
   createTicketComment,
   deleteTicketComment,
-  askChatbotAgent,
+
   type Ticket,
-  type TicketStatus, 
-  type TicketPriority 
+  type TicketStatus,
+  type TicketPriority
 } from "@/lib/ticketService";
 import TicketDetailsCharts from "@/components/admin/tickets/TicketDetailsCharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send, User as UserIcon, Bot, Trash, MessageSquare, ShieldAlert, History } from "lucide-react";
-import { supabase } from "@/lib/supabaseBrowserClient";
+import { Send, Trash, MessageSquare, ShieldAlert, History } from "lucide-react";
 import { getAssetDetail } from "@/components/admin/assets/assetService";
 import type { AssetDetail } from "@/components/admin/assets/types";
 import type { UserItem } from "@/lib/userService";
 import { Input } from "@/components/ui/input";
 import { cn, generateUUID } from "@/lib/utils";
+import { ATTACHMENT_ACCEPT, attachmentProblem } from "@/lib/attachments";
 
 type Props = {
   open: boolean;
@@ -63,7 +63,6 @@ function PriorityIcon({ priority }: { priority: string }) {
 export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDelete, onUpdated, isAdmin = false, users }: Props) {
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [statusUpdating, setStatusUpdating] = React.useState(false);
-  const [priorityUpdating, setPriorityUpdating] = React.useState(false);
   const [localStatus, setLocalStatus] = React.useState<TicketStatus>("open");
   const [localPriority, setLocalPriority] = React.useState<TicketPriority>("Medium");
   
@@ -75,18 +74,11 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
 
   const [currentUserId, setCurrentUserId] = React.useState<string>("");
   const [currentUserRole, setCurrentUserRole] = React.useState<string>("");
-  const [currentUserName, setCurrentUserName] = React.useState<string>("");
 
   const [discussionInput, setDiscussionInput] = React.useState("");
   const [notesInput, setNotesInput] = React.useState("");
   const [postingComment, setPostingComment] = React.useState(false);
 
-  const [copilotMessages, setCopilotMessages] = React.useState<Array<{ role: string; content: string }>>([
-    { role: "assistant", content: "👋 Hi! I am your AI Diagnostics Copilot. Ask me anything about this ticket, its failure diagnostics, or repair manuals!" }
-  ]);
-  const [copilotInput, setCopilotInput] = React.useState("");
-  const [copilotLoading, setCopilotLoading] = React.useState(false);
-  
   const [assetDetail, setAssetDetail] = React.useState<AssetDetail | null>(null);
   const [assetLoading, setAssetLoading] = React.useState(false);
 
@@ -141,7 +133,6 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
   React.useEffect(() => {
     setCurrentUserId(window.localStorage.getItem("predictix.user.id") || "");
     setCurrentUserRole(window.localStorage.getItem("predictix.user.role") || "");
-    setCurrentUserName(window.localStorage.getItem("predictix.user.name") || "");
   }, []);
 
   const isTechnician = React.useMemo(() => {
@@ -246,24 +237,6 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     }
   }
 
-  async function handlePriorityChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const newPriority = e.target.value as TicketPriority;
-    if (!ticket || newPriority === localPriority) return;
-    setPriorityUpdating(true);
-    const prev = localPriority;
-    setLocalPriority(newPriority);
-    try {
-      await updateTicketPriority(ticket.id, newPriority);
-      onUpdated?.({ ...ticket, status: localStatus, priority: newPriority, assigned_to: localAssignee || null });
-      toast.success("Priority updated");
-    } catch (err: any) {
-      setLocalPriority(prev);
-      toast.error("Failed to update priority", { description: err?.message });
-    } finally {
-      setPriorityUpdating(false);
-    }
-  }
-
   async function handleAssigneeChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const newAssignee = e.target.value;
     if (!ticket || newAssignee === localAssignee) return;
@@ -311,33 +284,14 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
   }
 
   async function handleUploadAttachment() {
-    if (!file || !ticket || !supabase) return;
+    if (!file || !ticket) return;
     setUploadingImage(true);
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}-${generateUUID()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from("ticket-attachments")
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: publicUrlData } = supabase.storage
-        .from("ticket-attachments")
-        .getPublicUrl(fileName);
-
-      if (publicUrlData?.publicUrl) {
-        await addTicketAttachment(
-          ticket.id,
-          publicUrlData.publicUrl,
-          file.type,
-          file.name
-        );
-        const updated = await fetchTicketAttachments(ticket.id);
-        setAttachments(updated);
-        setFile(null);
-        toast.success("Attachment uploaded");
-      }
+      await uploadTicketAttachment(ticket.id, file);
+      const updated = await fetchTicketAttachments(ticket.id);
+      setAttachments(updated);
+      setFile(null);
+      toast.success("Attachment uploaded");
     } catch (err: any) {
       toast.error("Failed to upload attachment", { description: err?.message });
     } finally {
@@ -373,37 +327,6 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
     }
   }
 
-  async function handleSendCopilot() {
-    if (!copilotInput.trim() || copilotLoading || !ticket) return;
-    const userMsg = copilotInput.trim();
-    setCopilotInput("");
-    setCopilotMessages((prev) => [...prev, { role: "user", content: userMsg }]);
-    setCopilotLoading(true);
-
-    try {
-      const context = {
-        ticket_id: ticket.id,
-        title: ticket.title,
-        description: ticket.description,
-        status: localStatus,
-        priority: localPriority,
-        asset_name: ticket.asset_name,
-        predicted_category: ticket.predicted_category || ticket.final_category,
-      };
-      const activeHistory = copilotMessages.slice(-10);
-      const res = await askChatbotAgent(userMsg, activeHistory, context);
-      setCopilotMessages((prev) => [...prev, { role: "assistant", content: res.answer }]);
-    } catch (err: any) {
-      toast.error("AI Copilot failed", { description: err?.message });
-      setCopilotMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "⚠️ Sorry, I encountered an error while processing your request." }
-      ]);
-    } finally {
-      setCopilotLoading(false);
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto">
@@ -413,6 +336,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
             className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
             onClick={() => setFullSizeImage(null)}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element -- uploaded attachment of unknown size shown full screen */}
             <img 
               src={fullSizeImage} 
               alt="Full size" 
@@ -566,6 +490,7 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                     <div className="flex flex-wrap gap-3">
                       {attachments.map((a) => (
                         <div key={a.id} className="relative group rounded-md border bg-background overflow-hidden w-24 h-24 flex items-center justify-center">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- uploaded attachment of unknown size from private storage */}
                           <img 
                             src={a.file_path} 
                             alt={a.original_filename || "Attachment"} 
@@ -597,8 +522,18 @@ export default function TicketDetailsDialog({ open, onOpenChange, ticket, onDele
                         <p className="text-xs text-muted-foreground mb-1">Upload New Image</p>
                         <Input
                           type="file"
-                          accept="image/*"
-                          onChange={(e) => setFile(e.target.files?.[0] || null)}
+                          accept={ATTACHMENT_ACCEPT}
+                          onChange={(e) => {
+                const picked = e.target.files?.[0] || null;
+                const problem = picked ? attachmentProblem(picked) : null;
+                if (problem) {
+                  toast.error(problem);
+                  e.target.value = "";
+                  setFile(null);
+                  return;
+                }
+                setFile(picked);
+              }}
                           disabled={uploadingImage}
                           className="cursor-pointer file:text-foreground file:bg-transparent file:border-0 file:text-sm file:font-medium h-9"
                         />

@@ -51,19 +51,6 @@ import {
 } from "@/lib/api/userTickets";
 import { listUsers, type UserItem } from "@/lib/userService";
 
-// Values must match the Postgres ENUM labels (`ticket_status`,
-// `ticket_priority`). Display label is human-friendly; value is what the
-// backend stores.
-const STATUS_OPTIONS = [
-  { value: "all", label: "All Status" },
-  { value: "open", label: "Open" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "pending", label: "Pending" },
-  { value: "resolved", label: "Resolved" },
-  { value: "closed", label: "Closed" },
-  { value: "cancelled", label: "Cancelled" },
-];
-
 const PRIORITY_OPTIONS = [
   { value: "all", label: "All Priority" },
   { value: "low", label: "Low" },
@@ -101,19 +88,6 @@ function statusIcon(status: string) {
   if (status === "resolved")
     return <CheckCircle className="h-3 w-3 text-emerald-600" />;
   return <XCircle className="h-3 w-3 text-slate-600" />;
-}
-
-function categoryBadgeClass(cat?: string | null) {
-  switch ((cat || "").toLowerCase()) {
-    case "mechanical":
-      return "bg-emerald-100 text-emerald-800";
-    case "electrical":
-      return "bg-pink-100 text-pink-800";
-    case "software":
-      return "bg-sky-100 text-sky-800";
-    default:
-      return "bg-slate-100 text-slate-800";
-  }
 }
 
 function formatDate(iso: string) {

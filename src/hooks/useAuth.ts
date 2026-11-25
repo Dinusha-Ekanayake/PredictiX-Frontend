@@ -43,15 +43,14 @@ export function useAuth({
       return;
     }
 
-    // Check admin role
+    // Wrong role: send the user to their own area, as AuthGuard does.
     if (requireAdmin && !isAdmin()) {
-      router.push("/unauthorized");
+      router.push("/user/dashboard");
       return;
     }
 
-    // Check user role
     if (requireUser && !isUserRole()) {
-      router.push("/unauthorized");
+      router.push("/admin/dashboard");
       return;
     }
 

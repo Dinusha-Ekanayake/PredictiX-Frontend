@@ -16,7 +16,7 @@ export default function SectionCard({
   className?: string;
 }) {
   return (
-    <Card className="rounded-2xl border-border/60 bg-card/90 backdrop-blur-sm">
+    <Card className={cn("rounded-2xl border-border/60 bg-card/90 backdrop-blur-sm", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm font-semibold">{title}</CardTitle>
         {right}

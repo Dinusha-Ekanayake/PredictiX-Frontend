@@ -122,26 +122,6 @@ function buildLogo(origin: string): string {
   </div>`;
 }
 
-// ── SVG Vertical Bar ──────────────────────────────────────────────────────────
-function svgVBar(data:Array<{name:string;count:number}>,colors:string[],w=460,h=165):string{
-  if(!data.length)return`<p style="color:${C.textLight};font-size:10px;text-align:center;padding:12px">No data</p>`;
-  const mx=Math.max(...data.map(d=>d.count));
-  const bw=Math.min(50,Math.floor((w-48)/data.length)-6);
-  const ch=h-32;
-  const grid=[0,Math.round(mx/2),mx].map(v=>{
-    const y=ch-(mx?(v/mx)*ch:0)+2;
-    return`<text x="35" y="${y+3}" text-anchor="end" font-size="8" fill="${C.textLight}">${v}</text><line x1="38" y1="${y}" x2="${w}" y2="${y}" stroke="${C.border}" stroke-width="0.5" stroke-dasharray="3,3"/>`;
-  }).join("");
-  const bars=data.map((d,i)=>{
-    const bh=mx?Math.max(2,Math.round((d.count/mx)*ch)):2;
-    const x=42+i*(bw+6);const y=ch-bh+2;
-    return`<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="2" fill="${colors[i%colors.length]}"/>
-      <text x="${x+bw/2}" y="${y-3}" text-anchor="middle" font-size="8" fill="${C.textMid}" font-weight="600">${d.count}</text>
-      <text x="${x+bw/2}" y="${h-3}" text-anchor="middle" font-size="7.5" fill="${C.textLight}">${d.name.replace(/_/g," ").slice(0,10)}</text>`;
-  }).join("");
-  return`<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">${grid}${bars}</svg>`;
-}
-
 // ── SVG Grouped Vertical Bar (Component Failure Risk) ────────────────────────
 function svgGroupedVBar(data:Array<{name:string;val1:number;val2:number}>, w=460, h=165):string{
   if(!data.length)return"";
@@ -243,16 +223,6 @@ function svgDonut(data:Array<{name:string;count:number}>,colors:string[],size=10
   });
   const legend=data.map((d,i)=>`<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px"><div style="width:8px;height:8px;border-radius:1px;background:${colors[i%colors.length]};flex-shrink:0"></div><span style="font-size:9.5px;color:${C.textDark}">${d.name}: <b>${d.count}</b></span></div>`).join("");
   return`<div style="display:flex;align-items:center;gap:12px"><svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${paths}</svg><div>${legend}</div></div>`;
-}
-
-// ── Components ────────────────────────────────────────────────────────────────
-function kpiRow(items:Array<{label:string;value:string;color?:string}>):string{
-  return`<div class="no-break" style="display:grid;grid-template-columns:repeat(${items.length},1fr);border:1px solid ${C.border};border-radius:6px;overflow:hidden;margin-bottom:14px">
-    ${items.map((it,i)=>`<div style="padding:10px 12px;${i<items.length-1?`border-right:1px solid ${C.border};`:""} background:white">
-      <div style="font-size:7.5px;color:${C.textLight};text-transform:uppercase;letter-spacing:.7px;margin-bottom:2px">${it.label}</div>
-      <div style="font-size:17px;font-weight:800;color:${it.color||C.teal};line-height:1">${it.value}</div>
-    </div>`).join("")}
-  </div>`;
 }
 
 function infoTbl(rows:Array<[string,string]>):string{
@@ -380,12 +350,10 @@ const CSS=`
 //  MAIN GENERATOR
 // ══════════════════════════════════════════════════════════════════════════════
 function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):string{
-  const {asset,fleet,sensor,maintenance,tickets,maintenanceMetrics,ticketMetrics,insights}=data;
+  const {asset,sensor,maintenance,tickets,maintenanceMetrics,ticketMetrics,insights}=data;
   const cur=data.currency||"LKR";
   const hs=data.health_score, fp=data.failure_probability, rl=data.risk_level??"-";
   const hCol=hs!=null?(hs>=80?C.emerald:hs>=60?C.amber:C.rose):C.slate;
-  const rColors:Record<string,string>={Low:C.emerald,Medium:C.amber,High:C.rose,Critical:"#dc2626"};
-  const rCol=rColors[rl]??C.slate;
   const recs=insights.recommendations||{critical:[],high:[],medium:[]};
   const wLbl=data.warehouseName.toUpperCase().replace(/[^A-Z0-9 \-]/g,"");
   // Page numbering is now handled entirely by Playwright's footer template
@@ -518,7 +486,7 @@ function generateHTML(data:AssetReportData, origin="", includeDomFooter=false):s
     const vals=entries.map(([,v])=>Math.abs(Number(v)));
     const total=vals.reduce((a,b)=>a+b,0)||1;
     return entries
-      .map(([name,val],i)=>({
+      .map(([name],i)=>({
         name:esc(name.replace(/_/g," ").replace(/pct/g,"%").replace(/\w/g,c=>c.toUpperCase())),
         pct:Math.round((vals[i]/total)*100*10)/10,
       }))
